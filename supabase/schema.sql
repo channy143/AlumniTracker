@@ -302,3 +302,100 @@ CREATE TRIGGER update_profiles_updated_at
 CREATE TRIGGER update_employment_updated_at
   BEFORE UPDATE ON public.employment
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- EXTEND USERS TABLE
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ;
+
+-- COMPANIES TABLE
+CREATE TABLE IF NOT EXISTS public.companies (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(200) NOT NULL,
+  logo TEXT,
+  industry VARCHAR(100),
+  website VARCHAR(300),
+  description TEXT,
+  address TEXT,
+  city VARCHAR(100),
+  province VARCHAR(100),
+  country VARCHAR(100) DEFAULT 'Philippines',
+  contact_email VARCHAR(255),
+  contact_phone VARCHAR(20),
+  is_verified BOOLEAN DEFAULT FALSE,
+  verified_by UUID REFERENCES public.users(id),
+  verified_at TIMESTAMPTZ,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ANNOUNCEMENTS TABLE
+CREATE TABLE IF NOT EXISTS public.announcements (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title VARCHAR(300) NOT NULL,
+  content TEXT NOT NULL,
+  image_url TEXT,
+  document_url TEXT,
+  is_pinned BOOLEAN DEFAULT FALSE,
+  is_scheduled BOOLEAN DEFAULT FALSE,
+  scheduled_at TIMESTAMPTZ,
+  send_to_all BOOLEAN DEFAULT FALSE,
+  send_by_batch BOOLEAN DEFAULT FALSE,
+  send_by_course BOOLEAN DEFAULT FALSE,
+  target_batches INTEGER[] DEFAULT '{}',
+  target_courses VARCHAR(100)[] DEFAULT '{}',
+  status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+  published_at TIMESTAMPTZ,
+  created_by UUID REFERENCES public.users(id) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- AUDIT LOGS TABLE
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES public.users(id),
+  action VARCHAR(50) NOT NULL,
+  entity VARCHAR(50) NOT NULL,
+  entity_id UUID,
+  details JSONB DEFAULT '{}',
+  ip_address VARCHAR(45),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- INDEXES FOR NEW TABLES
+CREATE INDEX IF NOT EXISTS idx_companies_is_verified ON public.companies(is_verified);
+CREATE INDEX IF NOT EXISTS idx_companies_industry ON public.companies(industry);
+CREATE INDEX IF NOT EXISTS idx_announcements_status ON public.announcements(status);
+CREATE INDEX IF NOT EXISTS idx_announcements_created_by ON public.announcements(created_by);
+CREATE INDEX IF NOT EXISTS idx_announcements_pinned ON public.announcements(is_pinned) WHERE is_pinned = TRUE;
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON public.audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON public.audit_logs(entity);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON public.audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs(created_at);
+
+-- SYSTEM SETTINGS TABLE
+CREATE TABLE IF NOT EXISTS public.settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  key VARCHAR(100) UNIQUE NOT NULL,
+  value JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by UUID REFERENCES public.users(id)
+);
+
+-- AUDIT LOG TRIGGER FUNCTION
+CREATE OR REPLACE FUNCTION log_audit()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.audit_logs (user_id, action, entity, entity_id, details)
+  VALUES (
+    COALESCE(current_setting('app.current_user_id', TRUE)::UUID, NULL),
+    TG_ARGV[0],
+    TG_TABLE_NAME,
+    NEW.id,
+    jsonb_build_object('old', to_jsonb(OLD), 'new', to_jsonb(NEW))
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;

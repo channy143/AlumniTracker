@@ -110,10 +110,84 @@ export const surveyApi = {
     api.post<any>(`/surveys/${surveyId}/respond`, responses),
 };
 
+function toQuery(obj: Record<string, any>) {
+  return Object.entries(obj).filter(([, v]) => v !== '' && v !== undefined && v !== null)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+}
+
 export const adminApi = {
   users: () => api.get<any[]>('/admin/users'),
-  updateUser: (id: string, data: any) =>
-    api.put<any>(`/admin/users/${id}`, data),
-  exportData: (format: string) =>
-    api.get<Blob>(`/admin/export?format=${format}`),
+  updateUser: (id: string, data: any) => api.put<any>(`/admin/users/${id}`, data),
+  exportData: (format: string) => api.get<Blob>(`/admin/export?format=${format}`),
+
+  dashboardStats: () => api.get<any>('/admin/dashboard/stats'),
+  dashboardCharts: () => api.get<any>('/admin/dashboard/charts'),
+
+  alumniList: (params: Record<string, any> = {}) => api.get<any>(`/admin/alumni?${toQuery(params)}`),
+  alumniGet: (id: string) => api.get<any>(`/admin/alumni/${id}`),
+  alumniCreate: (data: any) => api.post<any>('/admin/alumni', data),
+  alumniUpdate: (id: string, data: any) => api.put<any>(`/admin/alumni/${id}`, data),
+  alumniDelete: (id: string) => api.delete(`/admin/alumni/${id}`),
+  alumniArchive: (id: string) => api.put<any>(`/admin/alumni/${id}/archive`, {}),
+  alumniRestore: (id: string) => api.put<any>(`/admin/alumni/${id}/restore`, {}),
+  alumniVerify: (id: string) => api.put<any>(`/admin/alumni/${id}/verify`, {}),
+  alumniResetPassword: (id: string, newPassword: string) => api.post<any>(`/admin/alumni/${id}/reset-password`, { newPassword }),
+  alumniEmployment: (id: string) => api.get<any[]>(`/admin/alumni/${id}/employment`),
+  alumniExport: (format = 'csv') => api.get<Blob>(`/admin/alumni/export?format=${format}`),
+
+  companyList: (params: Record<string, any> = {}) => api.get<any>(`/admin/companies?${toQuery(params)}`),
+  companyCreate: (data: any) => api.post<any>('/admin/companies', data),
+  companyUpdate: (id: string, data: any) => api.put<any>(`/admin/companies/${id}`, data),
+  companyVerify: (id: string) => api.put<any>(`/admin/companies/${id}/verify`, {}),
+  companyDelete: (id: string) => api.delete(`/admin/companies/${id}`),
+
+  jobList: (params: Record<string, any> = {}) => api.get<any>(`/admin/jobs?${toQuery(params)}`),
+  jobUpdate: (id: string, data: any) => api.put<any>(`/admin/jobs/${id}`, data),
+  jobDelete: (id: string) => api.delete(`/admin/jobs/${id}`),
+  jobClose: (id: string) => api.put<any>(`/admin/jobs/${id}/close`, {}),
+  jobApplicants: (id: string) => api.get<any[]>(`/admin/jobs/${id}/applicants`),
+
+  surveyList: () => api.get<any[]>('/admin/surveys'),
+  surveyCreate: (data: any) => api.post<any>('/admin/surveys', data),
+  surveyUpdate: (id: string, data: any) => api.put<any>(`/admin/surveys/${id}`, data),
+  surveyDelete: (id: string) => api.delete(`/admin/surveys/${id}`),
+  surveyActivate: (id: string) => api.put<any>(`/admin/surveys/${id}/activate`, {}),
+  surveyDeactivate: (id: string) => api.put<any>(`/admin/surveys/${id}/deactivate`, {}),
+  surveyResponses: (id: string, params: Record<string, any> = {}) => api.get<any>(`/admin/surveys/${id}/responses?${toQuery(params)}`),
+  surveyExportResponses: (id: string) => api.get<Blob>(`/admin/surveys/${id}/responses/export`),
+
+  announcementList: (params: Record<string, any> = {}) => api.get<any>(`/admin/announcements?${toQuery(params)}`),
+  announcementCreate: (data: any) => api.post<any>('/admin/announcements', data),
+  announcementUpdate: (id: string, data: any) => api.put<any>(`/admin/announcements/${id}`, data),
+  announcementDelete: (id: string) => api.delete(`/admin/announcements/${id}`),
+  announcementPin: (id: string, isPinned: boolean) => api.put<any>(`/admin/announcements/${id}/pin`, { is_pinned: isPinned }),
+  announcementPublish: (id: string) => api.put<any>(`/admin/announcements/${id}/publish`, {}),
+
+  reportAlumni: (format = 'json') => api.get<Blob>(`/admin/reports/alumni?format=${format}`),
+  reportEmployment: (format = 'json') => api.get<Blob>(`/admin/reports/employment?format=${format}`),
+  reportEmployer: (format = 'json') => api.get<Blob>(`/admin/reports/employer?format=${format}`),
+  reportSurvey: (id: string, format = 'json') => api.get<Blob>(`/admin/reports/survey/${id}?format=${format}`),
+  reportCareerProgress: (format = 'json') => api.get<Blob>(`/admin/reports/career-progress?format=${format}`),
+
+  employmentRate: (params: Record<string, any> = {}) => api.get<any>(`/admin/analytics/employment-rate?${toQuery(params)}`),
+  employmentByCourse: (params: Record<string, any> = {}) => api.get<any[]>(`/admin/analytics/employment-by-course?${toQuery(params)}`),
+  employmentByBatch: () => api.get<any[]>('/admin/analytics/employment-by-batch'),
+  industryDistribution: () => api.get<any[]>('/admin/analytics/industry-distribution'),
+  topEmployers: () => api.get<any[]>('/admin/analytics/top-employers'),
+  salaryDistribution: () => api.get<any[]>('/admin/analytics/salary-distribution'),
+  degreeAlignment: () => api.get<any[]>('/admin/analytics/degree-alignment'),
+  avgTimeEmployment: () => api.get<any>('/admin/analytics/avg-time-employment'),
+
+  userList: (params: Record<string, any> = {}) => api.get<any>(`/admin/users?${toQuery(params)}`),
+  userCreate: (data: any) => api.post<any>('/admin/users', data),
+  userDisable: (id: string) => api.put<any>(`/admin/users/${id}/disable`, {}),
+  userEnable: (id: string) => api.put<any>(`/admin/users/${id}/enable`, {}),
+  userSetRole: (id: string, role: string) => api.put<any>(`/admin/users/${id}/role`, { role }),
+  userResetPassword: (id: string, newPassword: string) => api.post<any>(`/admin/users/${id}/reset-password`, { newPassword }),
+  userLoginHistory: (id: string) => api.get<any[]>(`/admin/users/${id}/login-history`),
+
+  settingsGet: () => api.get<any>('/admin/settings'),
+  settingsUpdate: (data: any) => api.put<any>('/admin/settings', data),
+
+  auditLogs: (params: Record<string, any> = {}) => api.get<any>(`/admin/audit-logs?${toQuery(params)}`),
 };

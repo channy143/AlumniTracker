@@ -10,6 +10,11 @@ import {
   UsersIcon,
   NewspaperIcon,
   ShieldCheckIcon,
+  BuildingOfficeIcon,
+  ClipboardDocumentListIcon,
+  MegaphoneIcon,
+  DocumentTextIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
@@ -22,8 +27,23 @@ const navigation = [
   { name: 'Job Board', href: '/jobs', icon: NewspaperIcon },
 ];
 
+const adminNav = [
+  { name: 'Dashboard', href: '/admin', icon: ShieldCheckIcon, end: true },
+  { name: 'Profile', href: '/admin/profile', icon: UserIcon },
+  { name: 'Alumni', href: '/admin/alumni', icon: UsersIcon },
+  { name: 'Employers', href: '/admin/employers', icon: BuildingOfficeIcon },
+  { name: 'Jobs', href: '/admin/jobs', icon: ClipboardDocumentListIcon },
+  { name: 'Surveys', href: '/admin/surveys', icon: DocumentTextIcon },
+  { name: 'Announcements', href: '/admin/announcements', icon: MegaphoneIcon },
+  { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
+  { name: 'Analytics', href: '/admin/analytics', icon: ChartBarIcon },
+  { name: 'Users', href: '/admin/users', icon: UsersIcon },
+  { name: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon },
+];
+
 export default function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen: boolean; onMobileClose: () => void }) {
   const { user } = useAuthStore();
+  const isAdminPath = window.location.pathname.startsWith('/admin');
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -32,14 +52,14 @@ export default function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen: boo
         : 'text-blue-200 hover:bg-white/10 hover:text-white'
     }`;
 
+  const items = isAdminPath && user?.role === 'admin' ? adminNav : navigation;
+
   return (
     <>
-      {/* Mobile overlay backdrop */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={onMobileClose} />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`fixed top-0 left-0 h-full w-64 gradient-header z-50 transition-transform duration-300 ease-in-out ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
@@ -57,15 +77,15 @@ export default function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen: boo
           </div>
 
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {navigation.map((item) => (
-              <NavLink key={item.name} to={item.href} onClick={onMobileClose} className={linkClass}>
+            {items.map((item) => (
+              <NavLink key={item.name} to={item.href} onClick={onMobileClose} className={linkClass} end={item.end}>
                 <item.icon className="w-5 h-5" />
                 {item.name}
               </NavLink>
             ))}
           </nav>
 
-          {user?.role === 'admin' && (
+          {user?.role === 'admin' && !isAdminPath && (
             <div className="p-4 border-t border-blue-700">
               <NavLink to="/admin" onClick={onMobileClose} className={linkClass}>
                 <ShieldCheckIcon className="w-5 h-5" />
