@@ -23,6 +23,7 @@ router.get('/', async (req, res, next) => {
     query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
     const { data: companies, count, error } = await query;
+    if (error && error.code === '42P01') return res.json({ data: [], total: 0, page, limit });
     if (error) throw new AppError(error.message, 500);
 
     res.json({ data: companies || [], total: count || 0, page, limit });
@@ -40,6 +41,7 @@ router.post('/', async (req, res, next) => {
       name, industry, website, description, address, city, province, contact_email, contact_phone,
     }).select().single();
 
+    if (error && error.code === '42P01') throw new AppError('Companies table not available. Run the SQL migration first.', 400);
     if (error) throw new AppError(error.message, 500);
     res.status(201).json(data);
   } catch (err) {

@@ -2,6 +2,11 @@ import { Router } from 'express';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 
+async function safeData(query: any): Promise<any[]> {
+  try { const { data } = await query; return data || []; }
+  catch { return []; }
+}
+
 const router = Router();
 
 router.get('/employment-rate', async (req, res, next) => {

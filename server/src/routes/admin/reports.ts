@@ -65,6 +65,7 @@ router.get('/employer', async (req, res, next) => {
   try {
     const format = (req.query.format as string) || 'json';
     const { data: companies } = await supabase.from('companies').select('*').order('name');
+    if (!companies) return res.json([]);
 
     if (format === 'csv') {
       const rows = (companies || []).map((c: any) => ({

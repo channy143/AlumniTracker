@@ -17,33 +17,38 @@ router.get('/', async (req, res, next) => {
     const employmentStatus = (req.query.employment_status as string) || '';
     const archived = req.query.archived === 'true';
 
-    let query = supabase
+    const { data: allUsers, count, error } = await supabase
       .from('users')
       .select('*, profile:profiles(*)', { count: 'exact' })
       .eq('role', 'alumni')
       .eq('is_archived', archived)
       .order('created_at', { ascending: false });
 
-    if (status === 'active') query = query.eq('is_active', true);
-    else if (status === 'inactive') query = query.eq('is_active', false);
-    else if (status === 'verified') query = query.eq('is_verified', true);
-    else if (status === 'unverified') query = query.eq('is_verified', false);
-
-    if (search) {
-      query = query.or(`email.ilike.%${search}%,profile.first_name.ilike.%${search}%,profile.last_name.ilike.%${search}%,profile.id_number.ilike.%${search}%`);
-    }
-
-    const { data: users, count, error } = await query.range(offset, offset + limit - 1);
     if (error) throw new AppError(error.message, 500);
 
-    let filtered = users || [];
+    let filtered = allUsers || [];
+
+    if (status === 'active') filtered = filtered.filter((u: any) => u.is_active === true);
+    else if (status === 'inactive') filtered = filtered.filter((u: any) => u.is_active === false);
+    else if (status === 'verified') filtered = filtered.filter((u: any) => u.is_verified === true);
+    else if (status === 'unverified') filtered = filtered.filter((u: any) => u.is_verified === false);
+
+    if (search) {
+      const s = search.toLowerCase();
+      filtered = filtered.filter((u: any) =>
+        (u.email && u.email.toLowerCase().includes(s)) ||
+        (u.profile?.first_name && u.profile.first_name.toLowerCase().includes(s)) ||
+        (u.profile?.last_name && u.profile.last_name.toLowerCase().includes(s)) ||
+        (u.profile?.id_number && u.profile.id_number.toLowerCase().includes(s))
+      );
+    }
 
     if (course || year || employmentStatus) {
       const profileIds = filtered.map((u: any) => u.profile?.id).filter(Boolean);
       if (profileIds.length > 0) {
         let eduQuery = supabase.from('education').select('profile_id, program, year_graduated').in('profile_id', profileIds);
         if (course) eduQuery = eduQuery.eq('program', course);
-        if (year) eduQuery = eduQuery.eq('year_graduated', parseInt(year));
+        if (year && !isNaN(parseInt(year))) eduQuery = eduQuery.eq('year_graduated', parseInt(year));
         const { data: education } = await eduQuery;
         const validProfileIds = new Set(education?.map((e: any) => e.profile_id) || []);
 
@@ -64,7 +69,8 @@ router.get('/', async (req, res, next) => {
       }
     }
 
-    res.json({ data: filtered, total: count || 0, page, limit });
+    const paginated = filtered.slice(offset, offset + limit);
+    res.json({ data: paginated, total: filtered.length, page, limit });
   } catch (err) {
     next(err);
   }

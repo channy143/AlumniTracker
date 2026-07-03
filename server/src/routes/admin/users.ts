@@ -125,6 +125,7 @@ router.get('/:id/login-history', async (req, res, next) => {
       .order('created_at', { ascending: false })
       .limit(50);
 
+    if (error && error.code === '42P01') return res.json([]);
     if (error) throw new AppError(error.message, 500);
     res.json(logs || []);
   } catch (err) {

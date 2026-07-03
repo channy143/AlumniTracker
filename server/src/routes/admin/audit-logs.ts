@@ -28,6 +28,7 @@ router.get('/', async (req, res, next) => {
     query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
     const { data: logs, count, error } = await query;
+    if (error && error.code === '42P01') return res.json({ data: [], total: 0, page, limit });
     if (error) throw new AppError(error.message, 500);
 
     res.json({ data: logs || [], total: count || 0, page, limit });

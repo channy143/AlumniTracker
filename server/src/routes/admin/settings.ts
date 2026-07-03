@@ -25,6 +25,7 @@ router.get('/', async (_req, res, next) => {
       .eq('key', 'system_settings')
       .maybeSingle();
 
+    if (error && error.code === '42P01') return res.json(DEFAULT_SETTINGS);
     if (error) throw new AppError(error.message, 500);
     res.json(data?.value || DEFAULT_SETTINGS);
   } catch (err) {
@@ -45,11 +46,13 @@ router.put('/', async (req, res, next) => {
         .from('settings')
         .update({ value: req.body })
         .eq('id', existing.id);
+      if (error && error.code === '42P01') return res.json({ message: 'Settings table not available' });
       if (error) throw new AppError(error.message, 500);
     } else {
       const { error } = await supabase
         .from('settings')
         .insert({ key: 'system_settings', value: req.body });
+      if (error && error.code === '42P01') return res.json({ message: 'Settings table not available' });
       if (error) throw new AppError(error.message, 500);
     }
 
