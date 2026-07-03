@@ -31,6 +31,7 @@ CREATE TABLE public.profiles (
   province VARCHAR(100),
   country VARCHAR(100) DEFAULT 'Philippines',
   avatar_url TEXT,
+  id_number VARCHAR(50) UNIQUE,
   headline VARCHAR(200),
   bio TEXT,
   linkedin_url TEXT,

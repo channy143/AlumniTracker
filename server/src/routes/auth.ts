@@ -51,7 +51,7 @@ router.post('/send-otp', async (req, res, next) => {
 
 router.post('/register', async (req, res, next) => {
   try {
-    const { firstName, lastName, email, password, program, yearGraduated, otp } = req.body;
+    const { firstName, lastName, email, password, program, yearGraduated, idNumber, otp } = req.body;
 
     if (!otp) throw new AppError('OTP is required', 400);
 
@@ -92,6 +92,7 @@ router.post('/register', async (req, res, next) => {
       first_name: firstName,
       last_name: lastName,
       email,
+      id_number: idNumber || null,
     });
 
     await supabase.from('education').insert({

@@ -15,6 +15,7 @@ export default function RegisterPage() {
     confirmPassword: '',
     program: '',
     yearGraduated: '',
+    idNumber: '',
   });
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState<'form' | 'otp'>('form');
@@ -30,7 +31,7 @@ export default function RegisterPage() {
   const handleCreateAccount = useCallback(async () => {
     setError('');
 
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.program || !formData.yearGraduated || !formData.password) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.program || !formData.yearGraduated || !formData.idNumber || !formData.password) {
       setError('Please fill in all fields');
       return;
     }
@@ -117,6 +118,11 @@ export default function RegisterPage() {
               <div>
                 <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">Email Address</label>
                 <input type="email" name="email" value={formData.email} onChange={handleChange} className="input-field" placeholder="alumni@ctu.edu.ph" required />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">ID Number</label>
+                <input type="text" name="idNumber" value={formData.idNumber} onChange={handleChange} className="input-field" placeholder="e.g. CTU-2020-0001" required />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
