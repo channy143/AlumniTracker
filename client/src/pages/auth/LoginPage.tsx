@@ -23,7 +23,7 @@ export default function LoginPage() {
       const res = await authApi.login(email, password);
       setToken(res.token, rememberMe);
       setUser(res.user);
-      navigate('/dashboard');
+      navigate(res.user.role === 'admin' ? '/admin' : '/dashboard');
     } catch (err: any) {
       setError(err.message || 'Invalid email or password');
     } finally {

@@ -85,15 +85,6 @@ export default function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen: boo
             ))}
           </nav>
 
-          {user?.role === 'admin' && !isAdminPath && (
-            <div className="p-4 border-t border-blue-700">
-              <NavLink to="/admin" onClick={onMobileClose} className={linkClass}>
-                <ShieldCheckIcon className="w-5 h-5" />
-                Admin Panel
-              </NavLink>
-            </div>
-          )}
-
           <div className="p-4 border-t border-blue-700">
             <p className="text-xs text-blue-300 text-center">Bridging Education to Eternity</p>
           </div>

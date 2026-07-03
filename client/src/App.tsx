@@ -37,6 +37,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/auth/login" replace />;
+  if (user.role === 'admin') return <Navigate to="/admin" replace />;
   return <>{children}</>;
 }
 
