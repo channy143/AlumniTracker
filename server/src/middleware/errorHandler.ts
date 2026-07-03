@@ -28,7 +28,7 @@ export function errorHandler(
   console.error('Unhandled error:', err);
 
   return res.status(500).json({
-    message: 'Internal server error',
+    message: err.message || 'Internal server error',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 }
