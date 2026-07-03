@@ -53,20 +53,20 @@ export default function AdminDashboard() {
 
   const statCards = [
     { label: 'Total Alumni', value: stats?.totalAlumni?.toLocaleString() || '0', color: 'text-ctu-blue', bg: 'bg-blue-50', href: '/admin/alumni' },
-    { label: 'Employed Alumni', value: stats?.employedAlumni?.toLocaleString() || '0', color: 'text-green-600', bg: 'bg-green-50', href: '/admin/alumni' },
-    { label: 'Unemployed Alumni', value: stats?.unemployedAlumni?.toLocaleString() || '0', color: 'text-orange-600', bg: 'bg-orange-50', href: '/admin/alumni' },
-    { label: 'Partner Companies', value: stats?.partnerCompanies?.toLocaleString() || '0', color: 'text-purple-600', bg: 'bg-purple-50', href: '/admin/employers' },
-    { label: 'Active Jobs', value: stats?.activeJobs?.toLocaleString() || '0', color: 'text-teal-600', bg: 'bg-teal-50', href: '/admin/jobs' },
-    { label: 'Active Announcements', value: stats?.activeAnnouncements?.toLocaleString() || '0', color: 'text-pink-600', bg: 'bg-pink-50', href: '/admin/announcements' },
-    { label: 'Pending Verifications', value: stats?.pendingVerifications?.toLocaleString() || '0', color: 'text-yellow-600', bg: 'bg-yellow-50', href: '/admin/alumni' },
-    { label: 'Survey Response Rate', value: `${stats?.surveyResponseRate || 0}%`, color: 'text-indigo-600', bg: 'bg-indigo-50', href: '/admin/surveys' },
+    { label: 'Active Alumni', value: stats?.activeAlumni?.toLocaleString() || '0', color: 'text-green-600', bg: 'bg-green-50', href: '/admin/alumni' },
+    { label: 'Verified Alumni', value: stats?.verifiedAlumni?.toLocaleString() || '0', color: 'text-purple-600', bg: 'bg-purple-50', href: '/admin/alumni' },
+    { label: 'Companies Connected', value: stats?.companiesConnected?.toLocaleString() || '0', color: 'text-teal-600', bg: 'bg-teal-50', href: '/admin/employers' },
+    { label: 'Available for Referral', value: stats?.alumniAvailableForReferral?.toLocaleString() || '0', color: 'text-amber-600', bg: 'bg-amber-50', href: '/admin/alumni' },
+    { label: 'Pending Referrals', value: stats?.pendingReferralRequests?.toLocaleString() || '0', color: 'text-orange-600', bg: 'bg-orange-50', href: '/admin/jobs' },
+    { label: 'Active Job Listings', value: stats?.activeJobs?.toLocaleString() || '0', color: 'text-indigo-600', bg: 'bg-indigo-50', href: '/admin/jobs' },
+    { label: 'Network Connections', value: stats?.alumniNetworkConnections?.toLocaleString() || '0', color: 'text-pink-600', bg: 'bg-pink-50', href: '/admin/analytics' },
   ];
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="section-title">Admin Dashboard</h1>
-        <p className="text-gray-500 mt-1">Overview of the alumni platform</p>
+        <p className="text-gray-500 mt-1">Career Analytics & Alumni Networking Platform</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -96,6 +96,7 @@ export default function AdminDashboard() {
               </div>
               <div className="space-y-2 text-sm text-gray-600">
                 <p>Employed: {stats?.employedAlumni?.toLocaleString() || 0}</p>
+                <p>Self-employed: {charts.selfEmployedRate}%</p>
                 <p>Total: {stats?.totalAlumni?.toLocaleString() || 0}</p>
               </div>
             </div>
@@ -146,6 +147,44 @@ export default function AdminDashboard() {
                   <span className="text-xs text-gray-500 w-8 text-right">{item.count}</span>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <h2 className="text-lg font-semibold text-ctu-charcoal mb-4">Networking Growth</h2>
+            <div className="space-y-2">
+              {(charts.monthlyConnections || []).slice(-6).map((item: any, i: number) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600 w-16 truncate">{item.month?.slice(5) || item.month}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2">
+                    <div className="bg-pink-500 rounded-full h-2 transition-all"
+                      style={{ width: `${Math.min(100, (item.count / Math.max(...(charts.monthlyConnections || []).map((x: any) => x.count), 1)) * 100)}%` }} />
+                  </div>
+                  <span className="text-xs text-gray-500 w-8 text-right">{item.count}</span>
+                </div>
+              ))}
+              {(!charts.monthlyConnections || charts.monthlyConnections.length === 0) && (
+                <p className="text-sm text-gray-400 text-center py-4">No connection data yet</p>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <h2 className="text-lg font-semibold text-ctu-charcoal mb-4">Referral Activity</h2>
+            <div className="space-y-2">
+              {(charts.monthlyReferrals || []).slice(-6).map((item: any, i: number) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600 w-16 truncate">{item.month?.slice(5) || item.month}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2">
+                    <div className="bg-amber-500 rounded-full h-2 transition-all"
+                      style={{ width: `${Math.min(100, (item.count / Math.max(...(charts.monthlyReferrals || []).map((x: any) => x.count), 1)) * 100)}%` }} />
+                  </div>
+                  <span className="text-xs text-gray-500 w-8 text-right">{item.count}</span>
+                </div>
+              ))}
+              {(!charts.monthlyReferrals || charts.monthlyReferrals.length === 0) && (
+                <p className="text-sm text-gray-400 text-center py-4">No referral activity yet</p>
+              )}
             </div>
           </div>
         </div>

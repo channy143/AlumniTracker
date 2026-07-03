@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 
@@ -16,10 +16,41 @@ router.get('/', authenticate, async (_req, res, next) => {
 
     if (error) throw new AppError(error.message, 500);
 
-    res.json(jobs);
+    const result = (jobs || []).map((job: any) => ({
+      ...job,
+      application_method: job.application_url ? 'external' : 'email',
+      external_link: job.application_url || null,
+    }));
+
+    res.json(result);
   } catch (err) {
     next(err);
   }
+});
+
+router.get('/:id', authenticate, async (req, res, next) => {
+  try {
+    const { data: job, error } = await supabase
+      .from('job_postings')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+    if (error) throw new AppError(error.message, 500);
+    if (!job) throw new AppError('Job not found', 404);
+
+    const { data: company } = await supabase
+      .from('companies')
+      .select('*')
+      .ilike('name', job.company_name)
+      .maybeSingle();
+
+    res.json({
+      ...job,
+      application_method: job.application_url ? 'external' : 'email',
+      external_link: job.application_url || null,
+      company_profile: company || null,
+    });
+  } catch (err) { next(err); }
 });
 
 router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
@@ -41,25 +72,6 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
     if (error) throw new AppError(error.message, 500);
 
     res.status(201).json(job);
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/:id/apply', authenticate, async (req: AuthenticatedRequest, res, next) => {
-  try {
-    const { data: application, error } = await supabase
-      .from('job_applications')
-      .insert({
-        job_id: req.params.id,
-        user_id: req.user!.userId,
-      })
-      .select()
-      .single();
-
-    if (error) throw new AppError(error.message, 500);
-
-    res.status(201).json(application);
   } catch (err) {
     next(err);
   }

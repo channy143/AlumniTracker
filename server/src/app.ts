@@ -10,6 +10,10 @@ import communityRoutes from './routes/community';
 import jobsRoutes from './routes/jobs';
 import surveyRoutes from './routes/survey';
 import adminRoutes from './routes/admin';
+import connectionsRoutes from './routes/connections';
+import messagesRoutes from './routes/messages';
+import referralsRoutes from './routes/referrals';
+import networkingRoutes from './routes/networking';
 
 const app = express();
 
@@ -29,6 +33,10 @@ app.use('/api/community', communityRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/surveys', surveyRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/connections', connectionsRoutes);
+app.use('/api/messages', messagesRoutes);
+app.use('/api/referrals', referralsRoutes);
+app.use('/api/networking', networkingRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

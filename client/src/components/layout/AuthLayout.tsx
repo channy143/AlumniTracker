@@ -35,7 +35,7 @@ export default function AuthLayout() {
             <div className="max-w-md w-full">
               <h1 className="text-5xl md:text-6xl font-bold text-white font-display leading-[1.05] tracking-tight">
                 CTU-Naga<br />
-                <span className="text-ctu-marigold">Alumni Tracker</span>
+                <span className="text-ctu-marigold">Alumni Network</span>
               </h1>
               <div className="w-12 h-0.5 bg-ctu-marigold mt-6" />
               <p className="text-lg text-white/60 mt-6 font-light tracking-wide uppercase">

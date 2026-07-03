@@ -17,60 +17,70 @@ router.get('/', async (req, res, next) => {
     const employmentStatus = (req.query.employment_status as string) || '';
     const archived = req.query.archived === 'true';
 
-    const { data: allUsers, count, error } = await supabase
+    let query = supabase
       .from('users')
-      .select('*, profile:profiles(*)', { count: 'exact' })
-      .eq('role', 'alumni')
-      .eq('is_archived', archived)
-      .order('created_at', { ascending: false });
+      .select('*', { count: 'exact' })
+      .eq('role', 'alumni');
 
+    if (status === 'verified') query = query.eq('is_verified', true);
+    else if (status === 'unverified') query = query.eq('is_verified', false);
+
+    if (search) query = query.or(`email.ilike.%${search}%`);
+
+    query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+
+    const { data: usersList, count, error } = await query;
+    if (error && (error.code === '42P01' || error.code === '42703')) return res.json({ data: [], total: 0, page, limit });
     if (error) throw new AppError(error.message, 500);
 
-    let filtered = allUsers || [];
+    let result = usersList || [];
 
-    if (status === 'active') filtered = filtered.filter((u: any) => u.is_active === true);
-    else if (status === 'inactive') filtered = filtered.filter((u: any) => u.is_active === false);
-    else if (status === 'verified') filtered = filtered.filter((u: any) => u.is_verified === true);
-    else if (status === 'unverified') filtered = filtered.filter((u: any) => u.is_verified === false);
+    const userIds = result.map((u: any) => u.id).filter(Boolean);
+    if (userIds.length > 0) {
+      const [{ data: profiles }, { data: education }] = await Promise.all([
+        supabase.from('profiles').select('*').in('user_id', userIds),
+        supabase.from('education').select('profile_id, program, year_graduated').in('profile_id', userIds),
+      ]);
 
-    if (search) {
-      const s = search.toLowerCase();
-      filtered = filtered.filter((u: any) =>
-        (u.email && u.email.toLowerCase().includes(s)) ||
-        (u.profile?.first_name && u.profile.first_name.toLowerCase().includes(s)) ||
-        (u.profile?.last_name && u.profile.last_name.toLowerCase().includes(s)) ||
-        (u.profile?.id_number && u.profile.id_number.toLowerCase().includes(s))
-      );
-    }
+      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+      const eduSet = new Set((education || []).map((e: any) => e.profile_id));
 
-    if (course || year || employmentStatus) {
-      const profileIds = filtered.map((u: any) => u.profile?.id).filter(Boolean);
-      if (profileIds.length > 0) {
-        let eduQuery = supabase.from('education').select('profile_id, program, year_graduated').in('profile_id', profileIds);
-        if (course) eduQuery = eduQuery.eq('program', course);
-        if (year && !isNaN(parseInt(year))) eduQuery = eduQuery.eq('year_graduated', parseInt(year));
-        const { data: education } = await eduQuery;
-        const validProfileIds = new Set(education?.map((e: any) => e.profile_id) || []);
+      result = result.map((u: any) => ({ ...u, profile: profileMap.get(u.id) || null }));
+
+      if (search) {
+        const s = search.toLowerCase();
+        result = result.filter((u: any) =>
+          (u.email && u.email.toLowerCase().includes(s)) ||
+          (u.profile?.first_name && u.profile.first_name.toLowerCase().includes(s)) ||
+          (u.profile?.last_name && u.profile.last_name.toLowerCase().includes(s)) ||
+          (u.profile?.id_number && u.profile.id_number.toLowerCase().includes(s))
+        );
+      }
+
+      if (course || year || employmentStatus) {
+        if (course || year) {
+          let eduQuery = supabase.from('education').select('profile_id').in('profile_id', userIds);
+          if (course) eduQuery = eduQuery.eq('program', course);
+          if (year && !isNaN(parseInt(year))) eduQuery = eduQuery.eq('year_graduated', parseInt(year));
+          const { data: filteredEdu } = await eduQuery;
+          const validIds = new Set((filteredEdu || []).map((e: any) => e.profile_id));
+          result = result.filter((u: any) => validIds.has(u.id));
+        }
 
         if (employmentStatus) {
           const { data: empData } = await supabase
             .from('employment')
             .select('profile_id')
-            .in('profile_id', profileIds)
+            .in('profile_id', userIds)
             .eq('is_current', true)
             .eq('employment_status', employmentStatus);
-          const empProfileIds = new Set(empData?.map((e: any) => e.profile_id) || []);
-          filtered = filtered.filter((u: any) => u.profile?.id && validProfileIds.has(u.profile.id) && empProfileIds.has(u.profile.id));
-        } else {
-          filtered = filtered.filter((u: any) => u.profile?.id && validProfileIds.has(u.profile.id));
+          const empIds = new Set((empData || []).map((e: any) => e.profile_id));
+          result = result.filter((u: any) => empIds.has(u.id));
         }
-      } else {
-        filtered = [];
       }
     }
 
-    const paginated = filtered.slice(offset, offset + limit);
-    res.json({ data: paginated, total: filtered.length, page, limit });
+    res.json({ data: result, total: count || 0, page, limit });
   } catch (err) {
     next(err);
   }
@@ -79,10 +89,13 @@ router.get('/', async (req, res, next) => {
 router.get('/export', async (req, res, next) => {
   try {
     const format = (req.query.format as string) || 'json';
-    const { data: users } = await supabase
+    const { data: usersData } = await supabase
       .from('users')
-      .select('*, profile:profiles(*), education:education(*), employment:employment(*)')
+      .select('*')
       .eq('role', 'alumni');
+    const { data: profiles } = await supabase.from('profiles').select('*');
+    const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+    const users = (usersData || []).map((u: any) => ({ ...u, profile: profileMap.get(u.id) || null }));
 
     if (format === 'csv') {
       const rows = (users || []).map((u: any) => ({
@@ -113,12 +126,34 @@ router.get('/:id', async (req, res, next) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('*, profile:profiles(*), education:education(*), employment:employment(*), skills:skills(*)')
+      .select('*')
       .eq('id', req.params.id)
       .single();
 
     if (error) throw new AppError('Alumni not found', 404);
-    res.json(user);
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', req.params.id)
+      .maybeSingle();
+
+    const { data: education } = await supabase
+      .from('education')
+      .select('*')
+      .eq('profile_id', req.params.id);
+
+    const { data: employment } = await supabase
+      .from('employment')
+      .select('*')
+      .eq('profile_id', req.params.id);
+
+    const { data: skills } = await supabase
+      .from('skills')
+      .select('*')
+      .eq('profile_id', req.params.id);
+
+    res.json({ ...user, profile, education: education || [], employment: employment || [], skills: skills || [] });
   } catch (err) {
     next(err);
   }
@@ -185,6 +220,7 @@ router.put('/:id', async (req, res, next) => {
 router.put('/:id/archive', async (req, res, next) => {
   try {
     const { error } = await supabase.from('users').update({ is_archived: true, is_active: false }).eq('id', req.params.id);
+    if (error && error.code === '42703') return res.json({ message: 'Archive column not available on this database' });
     if (error) throw new AppError(error.message, 500);
     res.json({ message: 'Alumni archived' });
   } catch (err) {
@@ -195,6 +231,7 @@ router.put('/:id/archive', async (req, res, next) => {
 router.put('/:id/restore', async (req, res, next) => {
   try {
     const { error } = await supabase.from('users').update({ is_archived: false, is_active: true }).eq('id', req.params.id);
+    if (error && error.code === '42703') return res.json({ message: 'Restore column not available on this database' });
     if (error) throw new AppError(error.message, 500);
     res.json({ message: 'Alumni restored' });
   } catch (err) {

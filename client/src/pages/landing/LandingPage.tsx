@@ -526,8 +526,7 @@ export default function LandingPage() {
           <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-ctu-marigold to-transparent mx-auto mt-8 origin-center" />
 
           <p ref={heroDescRef} style={{ transition: 'opacity 0.15s ease-out' }} className="text-lg md:text-xl text-white/70 mt-8 max-w-2xl mx-auto leading-relaxed font-light">
-            CTU-Naga Alumni Tracker transforms graduates into lifelong learners,
-            mentors into changemakers, and connections into opportunities.
+            CTU-Naga Alumni Network helps graduates advance their careers, connect with fellow alumni, and discover new opportunities.
           </p>
 
           <div ref={heroButtonsRef} style={{ transition: 'opacity 0.15s ease-out' }} className="flex flex-wrap justify-center gap-4 mt-10">
@@ -872,7 +871,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid sm:grid-cols-2 lg:grid-cols-12 gap-10">
             <div className="lg:col-span-5">
-              <h3 className="text-2xl font-bold text-white font-display">CTU-Naga Alumni Tracker</h3>
+              <h3 className="text-2xl font-bold text-white font-display">CTU-Naga Alumni Network</h3>
               <p className="text-sm text-gray-500 mt-3 max-w-sm leading-relaxed font-light">
                 Bridging Education to Eternity &mdash; a lifelong learning community
                 platform for Cebu Technological University &mdash; Naga Extension Campus.
@@ -916,7 +915,7 @@ export default function LandingPage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-12 sm:mt-16 pt-8 border-t border-gray-800/50">
             <p className="text-xs text-gray-600">
-              &copy; {new Date().getFullYear()} CTU-Naga Alumni Tracker. All rights reserved.
+              &copy; {new Date().getFullYear()} CTU-Naga Alumni Network. All rights reserved.
             </p>
             <button
               onClick={scrollToTop}

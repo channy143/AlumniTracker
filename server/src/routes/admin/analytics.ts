@@ -165,7 +165,7 @@ router.get('/salary-distribution', async (_req, res, next) => {
     employment?.forEach((e: any) => {
       const nums = e.salary_range.replace(/[^0-9\-]/g, '').split('-').map(Number).filter(Boolean);
       if (nums.length > 0) {
-        const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+        const avg = nums.reduce((a: number, b: number) => a + b, 0) / nums.length;
         if (avg <= 10000) brackets['0-10000']++;
         else if (avg <= 20000) brackets['10001-20000']++;
         else if (avg <= 30000) brackets['20001-30000']++;
@@ -257,6 +257,117 @@ router.get('/avg-time-employment', async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+router.get('/career-overview', async (_req, res, next) => {
+  try {
+    const { data: employment } = await supabase.from('employment').select('employment_status, is_current, salary_range, profile_id');
+    const { data: profiles } = await supabase.from('profiles').select('id');
+    const { data: users } = await supabase.from('users').select('id').eq('role', 'alumni');
+
+    const totalAlumni = users?.length || 0;
+    const totalProfiles = profiles?.length || 0;
+    const currentEmployment = employment?.filter((e: any) => e.is_current) || [];
+    const allEmployment = employment || [];
+
+    const employed = currentEmployment.filter((e: any) => e.employment_status === 'employed').length;
+    const selfEmployed = currentEmployment.filter((e: any) => ['self-employed', 'entrepreneur'].includes(e.employment_status)).length;
+    const unemployed = currentEmployment.filter((e: any) => ['unemployed', 'seeking'].includes(e.employment_status)).length;
+    const underemployed = currentEmployment.filter((e: any) => e.employment_status === 'employed' && e.salary_range).length;
+
+    const withSalary = currentEmployment.filter((e: any) => e.salary_range);
+    const totalWithSalary = withSalary.length;
+
+    res.json({
+      totalAlumni,
+      totalProfiles,
+      employmentRate: totalAlumni > 0 ? Math.round((employed / totalAlumni) * 100) : 0,
+      unemploymentRate: totalAlumni > 0 ? Math.round((unemployed / totalAlumni) * 100) : 0,
+      selfEmployedRate: totalAlumni > 0 ? Math.round((selfEmployed / totalAlumni) * 100) : 0,
+      employed,
+      unemployed,
+      selfEmployed,
+      underemployedEstimate: totalAlumni > 0 ? Math.round((underemployed / totalAlumni) * 100) : 0,
+      localEmployed: employed,
+      overseasEmployed: 0,
+      averageSalaryAvailable: totalWithSalary > 0,
+    });
+  } catch (err) { next(err); }
+});
+
+router.get('/career-progression', async (_req, res, next) => {
+  try {
+    const employment = await safeData(
+      supabase.from('employment').select('profile_id, position, company_name, start_date, is_current, employment_status')
+        .order('start_date', { ascending: true })
+    );
+
+    const progressionMap = new Map<string, any[]>();
+    employment.forEach((e: any) => {
+      if (!progressionMap.has(e.profile_id)) progressionMap.set(e.profile_id, []);
+      progressionMap.get(e.profile_id)!.push(e);
+    });
+
+    const careerPaths: Record<string, number> = {};
+    let totalWithProgression = 0;
+
+    progressionMap.forEach((records) => {
+      if (records.length >= 2) {
+        totalWithProgression++;
+        const first = records[0];
+        const last = records[records.length - 1];
+        if (first.position !== last.position) {
+          const key = `${first.position} → ${last.position}`;
+          careerPaths[key] = (careerPaths[key] || 0) + 1;
+        }
+      }
+    });
+
+    const sorted = Object.entries(careerPaths)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 15)
+      .map(([path, count]) => ({ path, count }));
+
+    res.json({
+      totalWithProgression,
+      commonProgressions: sorted,
+      totalAlumniTracked: employment.length || 0,
+    });
+  } catch (err) { next(err); }
+});
+
+router.get('/networking-growth', async (_req, res, next) => {
+  try {
+    const connections = await safeData(
+      supabase.from('connections').select('created_at').eq('status', 'accepted').order('created_at', { ascending: true })
+    );
+    const referrals = await safeData(
+      supabase.from('referral_requests').select('created_at').order('created_at', { ascending: true })
+    );
+
+    const monthlyConnections: Record<string, number> = {};
+    const monthlyReferrals: Record<string, number> = {};
+
+    connections.forEach((c: any) => {
+      if (c.created_at) {
+        const key = new Date(c.created_at).toISOString().slice(0, 7);
+        monthlyConnections[key] = (monthlyConnections[key] || 0) + 1;
+      }
+    });
+    referrals.forEach((r: any) => {
+      if (r.created_at) {
+        const key = new Date(r.created_at).toISOString().slice(0, 7);
+        monthlyReferrals[key] = (monthlyReferrals[key] || 0) + 1;
+      }
+    });
+
+    res.json({
+      totalConnections: connections?.length || 0,
+      totalReferrals: referrals?.length || 0,
+      connectionsGrowth: Object.entries(monthlyConnections).map(([month, count]) => ({ month, count })),
+      referralsGrowth: Object.entries(monthlyReferrals).map(([month, count]) => ({ month, count })),
+    });
+  } catch (err) { next(err); }
 });
 
 export default router;

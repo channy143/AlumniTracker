@@ -21,22 +21,22 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Profile', href: '/profile', icon: UserIcon },
   { name: 'Employment', href: '/employment', icon: BriefcaseIcon },
-  { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
+  { name: 'Career Analytics', href: '/analytics', icon: ChartBarIcon },
   { name: 'Mentorship', href: '/mentorship', icon: HandRaisedIcon },
   { name: 'Community', href: '/community', icon: UsersIcon },
-  { name: 'Job Board', href: '/jobs', icon: NewspaperIcon },
+  { name: 'Career Hub', href: '/jobs', icon: NewspaperIcon },
 ];
 
 const adminNav = [
   { name: 'Dashboard', href: '/admin', icon: ShieldCheckIcon, end: true },
   { name: 'Profile', href: '/admin/profile', icon: UserIcon },
   { name: 'Alumni', href: '/admin/alumni', icon: UsersIcon },
-  { name: 'Employers', href: '/admin/employers', icon: BuildingOfficeIcon },
-  { name: 'Jobs', href: '/admin/jobs', icon: ClipboardDocumentListIcon },
+  { name: 'Companies', href: '/admin/employers', icon: BuildingOfficeIcon },
+  { name: 'Job Postings', href: '/admin/jobs', icon: ClipboardDocumentListIcon },
   { name: 'Surveys', href: '/admin/surveys', icon: DocumentTextIcon },
   { name: 'Announcements', href: '/admin/announcements', icon: MegaphoneIcon },
   { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
-  { name: 'Analytics', href: '/admin/analytics', icon: ChartBarIcon },
+  { name: 'Career Analytics', href: '/admin/analytics', icon: ChartBarIcon },
   { name: 'Users', href: '/admin/users', icon: UsersIcon },
   { name: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon },
 ];
@@ -69,7 +69,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen: boo
           <div className="p-6 border-b border-blue-700 flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-white font-display">CTU-Naga Alumni</h2>
-              <p className="text-sm text-blue-300 mt-1">Alumni Tracker</p>
+              <p className="text-sm text-blue-300 mt-1">Career & Networking</p>
             </div>
             <button onClick={onMobileClose} className="lg:hidden p-1 text-blue-200 hover:text-white">
               <XMarkIcon className="w-5 h-5" />

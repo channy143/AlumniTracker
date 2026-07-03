@@ -4,6 +4,15 @@ import { AppError } from '../../middleware/errorHandler';
 
 const router = Router();
 
+function groupBy<T extends Record<string, any>>(arr: T[], key: string): Record<string, T[]> {
+  return (arr || []).reduce((acc: Record<string, T[]>, item: T) => {
+    const k = item[key];
+    if (!acc[k]) acc[k] = [];
+    acc[k].push(item);
+    return acc;
+  }, {} as Record<string, T[]>);
+}
+
 function buildCsv(rows: Record<string, any>[]): string {
   if (rows.length === 0) return '';
   const headers = Object.keys(rows[0]);
@@ -14,13 +23,32 @@ function buildCsv(rows: Record<string, any>[]): string {
 router.get('/alumni', async (req, res, next) => {
   try {
     const format = (req.query.format as string) || 'json';
-    const { data: users } = await supabase
+    const { data: usersData } = await supabase
       .from('users')
-      .select('*, profile:profiles(*), education:education(*), employment:employment(*)')
+      .select('*')
       .eq('role', 'alumni');
 
+    let users = usersData || [];
+    const userIds = users.map((u: any) => u.id).filter(Boolean);
+    if (userIds.length > 0) {
+      const [{ data: profiles }, { data: education }, { data: employment }] = await Promise.all([
+        supabase.from('profiles').select('*').in('user_id', userIds),
+        supabase.from('education').select('*').in('profile_id', userIds),
+        supabase.from('employment').select('*').in('profile_id', userIds),
+      ]);
+      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+      const eduByProfile = groupBy(education || [], 'profile_id');
+      const empByProfile = groupBy(employment || [], 'profile_id');
+      users = users.map((u: any) => ({
+        ...u,
+        profile: profileMap.get(u.id) || null,
+        education: eduByProfile[u.id] || [],
+        employment: empByProfile[u.id] || [],
+      }));
+    }
+
     if (format === 'csv') {
-      const rows = (users || []).map((u: any) => ({
+      const rows = users.map((u: any) => ({
         email: u.email, first_name: u.profile?.first_name, last_name: u.profile?.last_name,
         id_number: u.profile?.id_number, program: u.education?.[0]?.program, year_graduated: u.education?.[0]?.year_graduated,
         company: u.employment?.[0]?.company_name, position: u.employment?.[0]?.position,
@@ -39,10 +67,26 @@ router.get('/alumni', async (req, res, next) => {
 router.get('/employment', async (req, res, next) => {
   try {
     const format = (req.query.format as string) || 'json';
-    const { data: employment } = await supabase
+    const { data: employmentData } = await supabase
       .from('employment')
-      .select('*, profile:profiles!employment_profile_id_fkey(first_name, last_name, email, id_number), education:education!profile_id(program, year_graduated)')
+      .select('*')
       .order('start_date', { ascending: false });
+
+    let employment = employmentData || [];
+    const profileIds = employment.map((e: any) => e.profile_id).filter(Boolean);
+    if (profileIds.length > 0) {
+      const [{ data: profiles }, { data: education }] = await Promise.all([
+        supabase.from('profiles').select('id, user_id, first_name, last_name, email, id_number').in('id', profileIds),
+        supabase.from('education').select('profile_id, program, year_graduated').in('profile_id', profileIds),
+      ]);
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+      const eduByProfile = groupBy(education || [], 'profile_id');
+      employment = employment.map((e: any) => ({
+        ...e,
+        profile: profileMap.get(e.profile_id) || null,
+        education: eduByProfile[e.profile_id] || [],
+      }));
+    }
 
     if (format === 'csv') {
       const rows = (employment || []).map((e: any) => ({
@@ -85,12 +129,20 @@ router.get('/employer', async (req, res, next) => {
 router.get('/survey/:id', async (req, res, next) => {
   try {
     const format = (req.query.format as string) || 'json';
-    const { data: responses } = await supabase
+    const { data: responsesData } = await supabase
       .from('survey_responses')
-      .select('*, user:users!survey_responses_user_id_fkey(email)')
+      .select('*')
       .eq('survey_id', req.params.id);
 
     const { data: survey } = await supabase.from('surveys').select('title').eq('id', req.params.id).single();
+
+    let responses = responsesData || [];
+    const userIds = responses.map((r: any) => r.user_id).filter(Boolean);
+    if (userIds.length > 0) {
+      const { data: users } = await supabase.from('users').select('id, email').in('id', userIds);
+      const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+      responses = responses.map((r: any) => ({ ...r, user: userMap.get(r.user_id) || { email: null } }));
+    }
 
     if (format === 'csv') {
       const rows = (responses || []).map((r: any, i: number) => ({
@@ -109,11 +161,19 @@ router.get('/survey/:id', async (req, res, next) => {
 router.get('/career-progress', async (req, res, next) => {
   try {
     const format = (req.query.format as string) || 'json';
-    const { data: employment } = await supabase
+    const { data: employmentData } = await supabase
       .from('employment')
-      .select('*, profile:profiles!employment_profile_id_fkey(first_name, last_name, email)')
+      .select('*')
       .order('profile_id')
       .order('start_date', { ascending: true });
+
+    let employment = employmentData || [];
+    const profileIds = employment.map((e: any) => e.profile_id).filter(Boolean);
+    if (profileIds.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, email').in('id', profileIds);
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+      employment = employment.map((e: any) => ({ ...e, profile: profileMap.get(e.profile_id) || null }));
+    }
 
     const careerPaths: Record<string, any> = {};
     (employment || []).forEach((e: any) => {

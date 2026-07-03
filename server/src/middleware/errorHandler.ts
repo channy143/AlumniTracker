@@ -25,7 +25,8 @@ export function errorHandler(
     });
   }
 
-  console.error('Unhandled error:', err);
+  console.error('Unhandled error:', err.message || err);
+  if (err.stack) console.error(err.stack);
 
   return res.status(500).json({
     message: err.message || 'Internal server error',

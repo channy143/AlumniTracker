@@ -25,7 +25,7 @@ export default function AlumniManagement() {
       const res = await adminApi.alumniList({ page, limit, search, ...filters, archived: filters.archived });
       setData(res.data);
       setTotal(res.total);
-    } catch { setError('Failed to load alumni'); }
+    } catch (err: any) { setError(err.message || 'Failed to load alumni'); }
     finally { setLoading(false); }
   }, [page, search, filters]);
 

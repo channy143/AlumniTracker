@@ -14,19 +14,38 @@ router.get('/', async (req, res, next) => {
     const role = (req.query.role as string) || '';
     const status = (req.query.status as string) || '';
 
-    let query = supabase.from('users').select('*, profile:profiles(*)', { count: 'exact' });
+    let query = supabase.from('users').select('*', { count: 'exact' });
 
     if (role) query = query.eq('role', role);
-    if (status === 'active') query = query.eq('is_active', true);
-    else if (status === 'inactive') query = query.eq('is_active', false);
-    if (search) query = query.or(`email.ilike.%${search}%,profile.first_name.ilike.%${search}%,profile.last_name.ilike.%${search}%`);
+    if (search) query = query.or(`email.ilike.%${search}%`);
 
     query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
-    const { data: users, count, error } = await query;
+    const { data: usersData, count, error } = await query;
+    if (error && error.code === '42P01') return res.json({ data: [], total: 0, page, limit });
     if (error) throw new AppError(error.message, 500);
 
-    res.json({ data: users || [], total: count || 0, page, limit });
+    let result = usersData || [];
+    if (result.length > 0) {
+      const userIds = result.map((u: any) => u.id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('user_id', userIds);
+      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+      result = result.map((u: any) => ({ ...u, profile: profileMap.get(u.id) || null }));
+
+      if (search) {
+        const s = search.toLowerCase();
+        result = result.filter((u: any) =>
+          (u.email && u.email.toLowerCase().includes(s)) ||
+          (u.profile?.first_name && u.profile.first_name.toLowerCase().includes(s)) ||
+          (u.profile?.last_name && u.profile.last_name.toLowerCase().includes(s))
+        );
+      }
+    }
+
+    res.json({ data: result, total: count || 0, page, limit });
   } catch (err) {
     next(err);
   }
@@ -71,6 +90,7 @@ router.put('/:id', async (req, res, next) => {
 router.put('/:id/disable', async (req, res, next) => {
   try {
     const { error } = await supabase.from('users').update({ is_active: false }).eq('id', req.params.id);
+    if (error && error.code === '42703') return res.json({ message: 'Account status column not available on this database' });
     if (error) throw new AppError(error.message, 500);
     res.json({ message: 'Account disabled' });
   } catch (err) {
@@ -81,6 +101,7 @@ router.put('/:id/disable', async (req, res, next) => {
 router.put('/:id/enable', async (req, res, next) => {
   try {
     const { error } = await supabase.from('users').update({ is_active: true }).eq('id', req.params.id);
+    if (error && error.code === '42703') return res.json({ message: 'Account status column not available on this database' });
     if (error) throw new AppError(error.message, 500);
     res.json({ message: 'Account enabled' });
   } catch (err) {

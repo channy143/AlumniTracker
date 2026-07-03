@@ -92,13 +92,39 @@ router.get('/:id/responses', async (req, res, next) => {
 
     const { data: responses, count, error } = await supabase
       .from('survey_responses')
-      .select('*, user:users!survey_responses_user_id_fkey(id, email, profile:profiles!user_id(first_name, last_name))', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .eq('survey_id', req.params.id)
       .order('submitted_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
+    if (error && error.code === '42P01') return res.json({ data: [], total: 0, page, limit });
     if (error) throw new AppError(error.message, 500);
-    res.json({ data: responses || [], total: count || 0, page, limit });
+
+    let result = responses || [];
+    const userIds = result.map((r: any) => r.user_id).filter(Boolean);
+    if (userIds.length > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, email')
+        .in('id', userIds);
+      const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, first_name, last_name')
+        .in('user_id', userIds);
+      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+
+      result = result.map((r: any) => ({
+        ...r,
+        user: {
+          ...(userMap.get(r.user_id) || { id: r.user_id, email: null }),
+          profile: profileMap.get(r.user_id) || null,
+        },
+      }));
+    }
+
+    res.json({ data: result, total: count || 0, page, limit });
   } catch (err) {
     next(err);
   }
@@ -108,12 +134,20 @@ router.get('/:id/responses/export', async (req, res, next) => {
   try {
     const { data: responses } = await supabase
       .from('survey_responses')
-      .select('*, user:users!survey_responses_user_id_fkey(email)')
+      .select('*')
       .eq('survey_id', req.params.id);
 
     const { data: survey } = await supabase.from('surveys').select('title, questions').eq('id', req.params.id).single();
 
-    const csvRows = (responses || []).map((r: any) => {
+    let result = responses || [];
+    const userIds = result.map((r: any) => r.user_id).filter(Boolean);
+    if (userIds.length > 0) {
+      const { data: users } = await supabase.from('users').select('id, email').in('id', userIds);
+      const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+      result = result.map((r: any) => ({ ...r, user: userMap.get(r.user_id) || { email: null } }));
+    }
+
+    const csvRows = (result || []).map((r: any) => {
       const row: Record<string, string> = { email: r.user?.email || '' };
       if (survey?.questions) {
         (survey.questions as any[]).forEach((q: any, i: number) => {

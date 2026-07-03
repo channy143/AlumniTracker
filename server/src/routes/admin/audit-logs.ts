@@ -17,13 +17,13 @@ router.get('/', async (req, res, next) => {
 
     let query = supabase
       .from('audit_logs')
-      .select('*, user:users!audit_logs_user_id_fkey(email)', { count: 'exact' });
+      .select('*', { count: 'exact' });
 
     if (action) query = query.eq('action', action);
     if (entity) query = query.eq('entity', entity);
     if (from) query = query.gte('created_at', new Date(from).toISOString());
     if (to) query = query.lte('created_at', new Date(to).toISOString());
-    if (search) query = query.or(`user.email.ilike.%${search}%,entity.ilike.%${search}%,details->>'email'.ilike.%${search}%`);
+    if (search) query = query.or(`entity.ilike.%${search}%`);
 
     query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
@@ -31,7 +31,18 @@ router.get('/', async (req, res, next) => {
     if (error && error.code === '42P01') return res.json({ data: [], total: 0, page, limit });
     if (error) throw new AppError(error.message, 500);
 
-    res.json({ data: logs || [], total: count || 0, page, limit });
+    let result = logs || [];
+    const logUserIds = result.map((l: any) => l.user_id).filter(Boolean);
+    if (logUserIds.length > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, email')
+        .in('id', logUserIds);
+      const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+      result = result.map((l: any) => ({ ...l, user: userMap.get(l.user_id) || { email: null } }));
+    }
+
+    res.json({ data: result, total: count || 0, page, limit });
   } catch (err) {
     next(err);
   }

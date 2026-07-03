@@ -20,28 +20,39 @@ async function safeData(query: any): Promise<any[]> {
 router.get('/stats', async (_req, res, next) => {
   try {
     const [
-      totalAlumni, employedAlumni, pendingVerifications, activeJobs,
-      activeAnnouncements, companies, surveyResponses, totalSurveys,
+      totalAlumni, verifiedAlumni, activeConnections, pendingReferrals,
+      alumniAvailableForReferral, activeJobs, verifiedCompanies, totalProfiles,
     ] = await Promise.all([
-      safeCount(supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'alumni').eq('is_active', true)),
-      safeCount(supabase.from('employment').select('*', { count: 'exact', head: true }).eq('is_current', true)),
-      safeCount(supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'alumni').eq('is_verified', false)),
+      safeCount(supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'alumni')),
+      safeCount(supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'alumni').eq('is_verified', true)),
+      safeCount(supabase.from('connections').select('*', { count: 'exact', head: true }).eq('status', 'accepted')),
+      safeCount(supabase.from('referral_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending')),
+      safeCount(supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('available_for_referral', true)),
       safeCount(supabase.from('job_postings').select('*', { count: 'exact', head: true }).gte('expires_at', new Date().toISOString())),
-      safeCount(supabase.from('announcements').select('*', { count: 'exact', head: true }).eq('status', 'published')),
       safeData(supabase.from('companies').select('id').eq('is_verified', true)),
-      safeCount(supabase.from('survey_responses').select('*', { count: 'exact', head: true })),
-      safeCount(supabase.from('surveys').select('*', { count: 'exact', head: true })),
+      safeCount(supabase.from('profiles').select('*', { count: 'exact', head: true })),
     ]);
+
+    const employmentData = await safeData(
+      supabase.from('employment').select('employment_status').eq('is_current', true)
+    );
+    const employedCount = employmentData.filter((e: any) =>
+      ['employed', 'self-employed', 'entrepreneur'].includes(e.employment_status)
+    ).length;
+    const overseasCount = employmentData.filter((e: any) =>
+      e.employment_status === 'employed' && false
+    ).length;
 
     res.json({
       totalAlumni: totalAlumni || 0,
-      employedAlumni: employedAlumni || 0,
-      unemployedAlumni: (totalAlumni || 0) - (employedAlumni || 0),
-      partnerCompanies: companies?.length || 0,
+      activeAlumni: totalProfiles || 0,
+      verifiedAlumni: verifiedAlumni || 0,
+      companiesConnected: verifiedCompanies?.length || 0,
+      alumniAvailableForReferral: alumniAvailableForReferral || 0,
+      pendingReferralRequests: pendingReferrals || 0,
       activeJobs: activeJobs || 0,
-      activeAnnouncements: activeAnnouncements || 0,
-      pendingVerifications: pendingVerifications || 0,
-      surveyResponseRate: totalSurveys && totalSurveys > 0 ? Math.round(((surveyResponses || 0) / totalSurveys) * 100) : 0,
+      alumniNetworkConnections: activeConnections || 0,
+      employedAlumni: employedCount || 0,
     });
   } catch (err) {
     next(err);
@@ -84,6 +95,8 @@ router.get('/charts', async (_req, res, next) => {
     const totalAlumni = users?.length || 0;
     const employmentRate = totalAlumni > 0 ? Math.round((totalEmployed / totalAlumni) * 100) : 0;
 
+    const selfEmployed = employment?.filter((e: any) => e.employment_status === 'self-employed' || e.employment_status === 'entrepreneur').length || 0;
+
     const allEmployment = await safeData(supabase.from('employment').select('company_industry, profile_id'));
     const allEducation = await safeData(supabase.from('education').select('program, profile_id'));
     const eduMap = new Map(allEducation?.map((e: any) => [e.profile_id, e.program]) || []);
@@ -96,16 +109,37 @@ router.get('/charts', async (_req, res, next) => {
       }
     });
 
+    const connectionsData = await safeData(supabase.from('connections').select('created_at'));
+    const monthlyConnections: Record<string, number> = {};
+    connectionsData?.forEach((c: any) => {
+      if (c.created_at) {
+        const key = new Date(c.created_at).toISOString().slice(0, 7);
+        monthlyConnections[key] = (monthlyConnections[key] || 0) + 1;
+      }
+    });
+
+    const referralData = await safeData(supabase.from('referral_requests').select('created_at'));
+    const monthlyReferrals: Record<string, number> = {};
+    referralData?.forEach((r: any) => {
+      if (r.created_at) {
+        const key = new Date(r.created_at).toISOString().slice(0, 7);
+        monthlyReferrals[key] = (monthlyReferrals[key] || 0) + 1;
+      }
+    });
+
     const sortByValue = (obj: Record<string, number>) => Object.entries(obj).sort(([, a], [, b]) => b - a);
 
     res.json({
       employmentRate,
+      selfEmployedRate: totalEmployed > 0 ? Math.round((selfEmployed / totalEmployed) * 100) : 0,
       alumniByYear: sortByValue(alumniByYear).map(([year, count]) => ({ year, count })),
       alumniByCourse: sortByValue(alumniByCourse).map(([course, count]) => ({ course, count })),
       industryDistribution: sortByValue(industryDistribution).map(([industry, count]) => ({ industry, count })),
       topHiringCompanies: sortByValue(topHiringCompanies).slice(0, 10).map(([company, count]) => ({ company, count })),
       jobAlignment: Object.entries(jobAlignment).map(([course, data]) => ({ course, ...data })),
       monthlyRegistrations: sortByValue(monthlyRegistrations).map(([month, count]) => ({ month, count })),
+      monthlyConnections: sortByValue(monthlyConnections).map(([month, count]) => ({ month, count })),
+      monthlyReferrals: sortByValue(monthlyReferrals).map(([month, count]) => ({ month, count })),
     });
   } catch (err) {
     next(err);

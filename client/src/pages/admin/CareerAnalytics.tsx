@@ -11,6 +11,9 @@ export default function CareerAnalytics() {
   const [salaryDist, setSalaryDist] = useState<any[]>([]);
   const [degreeAlign, setDegreeAlign] = useState<any[]>([]);
   const [avgTime, setAvgTime] = useState<any>(null);
+  const [careerOverview, setCareerOverview] = useState<any>(null);
+  const [careerProgression, setCareerProgression] = useState<any>(null);
+  const [networkingGrowth, setNetworkingGrowth] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,7 +23,7 @@ export default function CareerAnalytics() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [rate, course, batch, ind, emp, sal, align, time] = await Promise.all([
+      const [rate, course, batch, ind, emp, sal, align, time, overview, progression, networking] = await Promise.all([
         adminApi.employmentRate({ year: filters.year, course: filters.course }),
         adminApi.employmentByCourse({ year: filters.year }),
         adminApi.employmentByBatch(),
@@ -29,6 +32,9 @@ export default function CareerAnalytics() {
         adminApi.salaryDistribution(),
         adminApi.degreeAlignment(),
         adminApi.avgTimeEmployment(),
+        adminApi.careerOverview().catch(() => null),
+        adminApi.careerProgression().catch(() => null),
+        adminApi.networkingGrowth().catch(() => null),
       ]);
       setEmploymentRate(rate);
       setByCourse(course);
@@ -38,6 +44,9 @@ export default function CareerAnalytics() {
       setSalaryDist(sal);
       setDegreeAlign(align);
       setAvgTime(time);
+      setCareerOverview(overview);
+      setCareerProgression(progression);
+      setNetworkingGrowth(networking);
     } catch { /* ignore */ }
     finally { setLoading(false); }
   };
@@ -51,7 +60,7 @@ export default function CareerAnalytics() {
     <div className="space-y-6">
       <div>
         <h1 className="section-title">Career Analytics</h1>
-        <p className="text-gray-500 mt-1">Interactive analytics dashboard</p>
+        <p className="text-gray-500 mt-1">Comprehensive career and networking analytics</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -91,6 +100,32 @@ export default function CareerAnalytics() {
                   <p>Total Alumni: {employmentRate.total}</p>
                 </div>
               </div>
+            )}
+          </div>
+
+          <div className="card">
+            <h2 className="text-lg font-semibold text-ctu-charcoal mb-4">Career Overview</h2>
+            {careerOverview ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-3 bg-blue-50 rounded-lg">
+                  <p className="text-2xl font-bold text-ctu-blue">{careerOverview.employmentRate}%</p>
+                  <p className="text-xs text-gray-500 mt-1">Employment Rate</p>
+                </div>
+                <div className="text-center p-3 bg-orange-50 rounded-lg">
+                  <p className="text-2xl font-bold text-orange-600">{careerOverview.unemploymentRate}%</p>
+                  <p className="text-xs text-gray-500 mt-1">Unemployment Rate</p>
+                </div>
+                <div className="text-center p-3 bg-amber-50 rounded-lg">
+                  <p className="text-2xl font-bold text-amber-600">{careerOverview.selfEmployedRate}%</p>
+                  <p className="text-xs text-gray-500 mt-1">Self-Employed</p>
+                </div>
+                <div className="text-center p-3 bg-purple-50 rounded-lg">
+                  <p className="text-2xl font-bold text-purple-600">{careerOverview.totalAlumni}</p>
+                  <p className="text-xs text-gray-500 mt-1">Total Alumni</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-8">No career overview data</p>
             )}
           </div>
 
@@ -192,6 +227,42 @@ export default function CareerAnalytics() {
                 <p className="text-gray-500 mt-2">Months after graduation</p>
                 <p className="text-xs text-gray-400 mt-2">Based on {avgTime.sampleSize} alumni</p>
               </div>
+            )}
+          </div>
+
+          <div className="card">
+            <h2 className="text-lg font-semibold text-ctu-charcoal mb-4">Networking Growth</h2>
+            {networkingGrowth ? (
+              <div className="text-center space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-pink-50 rounded-lg">
+                    <p className="text-2xl font-bold text-pink-600">{networkingGrowth.totalConnections}</p>
+                    <p className="text-xs text-gray-500 mt-1">Total Connections</p>
+                  </div>
+                  <div className="p-3 bg-amber-50 rounded-lg">
+                    <p className="text-2xl font-bold text-amber-600">{networkingGrowth.totalReferrals}</p>
+                    <p className="text-xs text-gray-500 mt-1">Referral Requests</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-8">No networking data yet</p>
+            )}
+          </div>
+
+          <div className="card">
+            <h2 className="text-lg font-semibold text-ctu-charcoal mb-4">Career Progression</h2>
+            {careerProgression && careerProgression.commonProgressions?.length > 0 ? (
+              <div className="space-y-2">
+                {careerProgression.commonProgressions.slice(0, 6).map((item: any, i: number) => (
+                  <div key={i} className="text-sm p-2 rounded-lg bg-gray-50">
+                    <p className="text-ctu-charcoal font-medium">{item.path}</p>
+                    <p className="text-xs text-gray-400">{item.count} alumni</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-8">Progression data will appear as alumni update their careers</p>
             )}
           </div>
         </div>
