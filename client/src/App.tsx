@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import MainLayout from '@/components/layout/MainLayout';
 import AuthLayout from '@/components/layout/AuthLayout';
-import AdminLayout from '@/components/layout/AdminLayout';
+
 import LandingPage from '@/pages/landing/LandingPage';
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterPage from '@/pages/auth/RegisterPage';
@@ -90,19 +90,17 @@ export default function App() {
           </AdminRoute>
         }
       >
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="alumni" element={<AlumniManagement />} />
-          <Route path="employers" element={<EmployerManagement />} />
-          <Route path="jobs" element={<JobManagement />} />
-          <Route path="surveys" element={<SurveyManagement />} />
-          <Route path="announcements" element={<AnnouncementManagement />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="analytics" element={<CareerAnalytics />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="settings" element={<SystemSettings />} />
-          <Route path="profile" element={<AdminProfile />} />
-        </Route>
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/alumni" element={<AlumniManagement />} />
+        <Route path="/admin/employers" element={<EmployerManagement />} />
+        <Route path="/admin/jobs" element={<JobManagement />} />
+        <Route path="/admin/surveys" element={<SurveyManagement />} />
+        <Route path="/admin/announcements" element={<AnnouncementManagement />} />
+        <Route path="/admin/reports" element={<ReportsPage />} />
+        <Route path="/admin/analytics" element={<CareerAnalytics />} />
+        <Route path="/admin/users" element={<UserManagement />} />
+        <Route path="/admin/settings" element={<SystemSettings />} />
+        <Route path="/admin/profile" element={<AdminProfile />} />
       </Route>
     </Routes>
   );
