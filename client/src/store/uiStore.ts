@@ -5,7 +5,7 @@ interface UIState {
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   notifications: Notification[];
-  addNotification: (notification: Notification) => void;
+  addNotification: (messageOrNotification: string | Notification, type?: 'success' | 'error' | 'info' | 'warning') => void;
   removeNotification: (id: string) => void;
 }
 
@@ -21,10 +21,13 @@ export const useUIStore = create<UIState>((set) => ({
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   notifications: [],
-  addNotification: (notification) =>
-    set((state) => ({
-      notifications: [...state.notifications, notification],
-    })),
+  addNotification: (messageOrNotification, type) =>
+    set((state) => {
+      const notification = typeof messageOrNotification === 'string'
+        ? { id: Date.now().toString(), message: messageOrNotification, type: type || 'info' }
+        : messageOrNotification;
+      return { notifications: [...state.notifications, notification] };
+    }),
   removeNotification: (id) =>
     set((state) => ({
       notifications: state.notifications.filter((n) => n.id !== id),

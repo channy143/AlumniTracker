@@ -21,14 +21,16 @@ import {
   UserIcon,
 } from '@heroicons/react/24/outline';
 
-const mainNav = [
+type NavItem = { name: string; href: string; icon: any; end?: boolean };
+
+const mainNav: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Community', href: '/community', icon: UsersIcon },
   { name: 'Mentorship', href: '/mentorship', icon: HandRaisedIcon },
   { name: 'Career Hub', href: '/jobs', icon: NewspaperIcon },
 ];
 
-const resourcesNav = [
+const resourcesNav: NavItem[] = [
   { name: 'Useful Links', href: '#', icon: LinkIcon },
   { name: 'Events', href: '#', icon: CalendarDaysIcon },
   { name: 'Help Center', href: '#', icon: QuestionMarkCircleIcon },
@@ -36,7 +38,7 @@ const resourcesNav = [
   { name: 'Contact Alumni Office', href: '#', icon: EnvelopeIcon },
 ];
 
-const adminNav = [
+const adminNav: NavItem[] = [
   { name: 'Dashboard', href: '/admin', icon: ShieldCheckIcon, end: true },
   { name: 'Profile', href: '/admin/profile', icon: UserIcon },
   { name: 'Alumni', href: '/admin/alumni', icon: UsersIcon },
