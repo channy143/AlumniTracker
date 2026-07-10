@@ -51,10 +51,10 @@ export const authApi = {
     api.post<{ user: any; token: string }>('/auth/login', { email, password }),
   register: (data: any) =>
     api.post<{ user: any; token: string }>('/auth/register', data),
-  sendOtp: (email: string) =>
-    api.post<{ message: string }>('/auth/send-otp', { email }),
-  forgotPassword: (email: string) =>
-    api.post<{ message: string }>('/auth/forgot-password', { email }),
+  sendOtp: (email: string, turnstileToken?: string) =>
+    api.post<{ message: string }>('/auth/send-otp', { email, turnstileToken }),
+  forgotPassword: (email: string, turnstileToken?: string) =>
+    api.post<{ message: string }>('/auth/forgot-password', { email, turnstileToken }),
   resetPassword: (email: string, otp: string, password: string) =>
     api.post<{ message: string }>('/auth/reset-password', { email, otp, password }),
   me: () => api.get<{ user: any }>('/auth/me'),

@@ -26,31 +26,34 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-gray-200 px-4 h-12 flex items-center">
-      <div className="flex items-center gap-2 lg:gap-4 w-full max-w-6xl mx-auto">
-        <button onClick={onMenuClick} className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded">
-          <Bars3Icon className="w-5 h-5" />
-        </button>
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-xs font-bold">C</span>
-          </div>
-          <span className="hidden sm:block text-sm font-semibold text-gray-800">CTU-Naga</span>
-        </div>
-
-        <div className="flex-1 max-w-xl mx-auto">
-          <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search alumni, jobs, companies..."
-              className="w-full h-9 pl-9 pr-4 bg-gray-50 border border-gray-200 rounded-full text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all"
-            />
+    <header className="sticky top-0 z-50 bg-white border-b border-gray-200 h-12 flex items-center pr-4">
+      <div className="w-full grid grid-cols-3 items-center">
+        <div className="flex items-center gap-2">
+          <button onClick={onMenuClick} className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded">
+            <Bars3Icon className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-1.5">
+            <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-xs font-bold">C</span>
+            </div>
+            <span className="hidden sm:block text-sm font-semibold text-gray-800">CTU-Naga</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex justify-center">
+          <div className="w-full max-w-xl">
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search alumni, jobs, companies..."
+                className="w-full h-9 pl-9 pr-4 bg-gray-50 border border-gray-200 rounded-full text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 justify-end">
           <button className="relative p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg" title="Messages">
             <ChatBubbleLeftRightIcon className="w-5 h-5" />
           </button>

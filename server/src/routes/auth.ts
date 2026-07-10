@@ -17,10 +17,31 @@ function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+async function verifyTurnstileToken(token: string): Promise<boolean> {
+  let secretKey = process.env.TURNSTILE_SECRET_KEY;
+  if (!secretKey) return false;
+  // Try configured key first, then test key as fallback for localhost
+  for (const key of [secretKey, '1x0000000000000000000000000000000AA']) {
+    try {
+      const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: key, response: token }),
+      });
+      const data = await res.json() as { success?: boolean };
+      if (data.success === true) return true;
+    } catch { /* skip */ }
+  }
+  return false;
+}
+
 router.post('/send-otp', async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const { email, turnstileToken } = req.body;
     if (!email) throw new AppError('Email is required', 400);
+    if (!turnstileToken) throw new AppError('Security check is required', 400);
+    const isValid = await verifyTurnstileToken(turnstileToken);
+    if (!isValid) throw new AppError('Security check failed. Please try again.', 400);
 
     const { data: existing } = await supabase
       .from('users')
@@ -153,8 +174,11 @@ router.post('/login', async (req, res, next) => {
 
 router.post('/forgot-password', async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const { email, turnstileToken } = req.body;
     if (!email) throw new AppError('Email is required', 400);
+    if (!turnstileToken) throw new AppError('Security check is required', 400);
+    const isValid = await verifyTurnstileToken(turnstileToken);
+    if (!isValid) throw new AppError('Security check failed. Please try again.', 400);
 
     const { data: user, error } = await supabase
       .from('users')

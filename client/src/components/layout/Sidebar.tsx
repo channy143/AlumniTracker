@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChevronLeftIcon } from '@heroicons/react/24/outline';
 import {
   HomeIcon,
   UsersIcon,
@@ -56,10 +56,12 @@ export default function Sidebar({
   mobileOpen,
   onMobileClose,
   collapsed,
+  onToggleCollapse,
 }: {
   mobileOpen: boolean;
   onMobileClose: () => void;
   collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   const { user } = useAuthStore();
   const location = useLocation();
@@ -81,10 +83,20 @@ export default function Sidebar({
       )}
 
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-white z-50 transition-transform duration-300 ease-in-out ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
-        } ${collapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0'} lg:z-30`}
+        className={`fixed top-0 left-0 h-full bg-white z-50 transition-all duration-300 ease-in-out ${
+          collapsed ? 'lg:w-16' : 'lg:w-64'
+        } ${
+          mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full'
+        } ${collapsed ? 'lg:translate-x-0' : 'lg:translate-x-0'} lg:z-30`}
       >
+        {/* Toggle handle at center-right edge */}
+        <button
+          onClick={onToggleCollapse}
+          className="hidden lg:flex absolute top-1/2 -translate-y-1/2 -right-3 z-50 items-center justify-center w-6 h-10 rounded-r-full bg-white border border-l-0 border-gray-200 shadow-sm text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+        >
+          <ChevronLeftIcon className={`w-4 h-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+        </button>
+
         <div className="flex flex-col h-full">
           <div className="h-12 flex items-center justify-end px-3 border-b border-gray-200 shrink-0">
             <button onClick={onMobileClose} className="lg:hidden p-1 text-gray-400 hover:text-gray-600">
@@ -94,11 +106,13 @@ export default function Sidebar({
 
           <div className="flex-1 scrollbar-hover border-r border-gray-200">
             <nav className="p-2 space-y-0.5">
-              <div className="px-3 py-1.5">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                  {isAdminPath ? 'Admin' : 'Navigation'}
-                </p>
-              </div>
+              {!collapsed && (
+                <div className="px-3 py-1.5">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                    {isAdminPath ? 'Admin' : 'Navigation'}
+                  </p>
+                </div>
+              )}
               {items.map((item) => (
                 <NavLink
                   key={item.name}
@@ -106,32 +120,40 @@ export default function Sidebar({
                   onClick={onMobileClose}
                   className={isAdminPath ? linkClass : ({ isActive }) =>
                     `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      collapsed ? 'justify-center' : ''
+                    } ${
                       isActive
                         ? 'bg-gray-100 text-orange-600 font-semibold'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`
                   }
                   end={item.end}
+                  title={collapsed ? item.name : undefined}
                 >
-                  <item.icon className="w-5 h-5" />
-                  {item.name}
+                  <item.icon className="w-5 h-5 shrink-0" />
+                  {!collapsed && item.name}
                 </NavLink>
               ))}
 
               {!isAdminPath && (
                 <>
                   <div className="my-2 mx-3 border-t border-gray-200" />
-                  <div className="px-3 py-1.5">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Resources</p>
-                  </div>
+                  {!collapsed && (
+                    <div className="px-3 py-1.5">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Resources</p>
+                    </div>
+                  )}
                   {resourcesNav.map((item) => (
                     <a
                       key={item.name}
                       href={item.href}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors ${
+                        collapsed ? 'justify-center' : ''
+                      }`}
+                      title={collapsed ? item.name : undefined}
                     >
-                      <item.icon className="w-5 h-5 text-gray-400" />
-                      {item.name}
+                      <item.icon className="w-5 h-5 shrink-0 text-gray-400" />
+                      {!collapsed && item.name}
                     </a>
                   ))}
                 </>

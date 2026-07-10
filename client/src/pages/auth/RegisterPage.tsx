@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeftIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, CheckIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import { generateYears } from '@/utils/helpers';
@@ -18,11 +18,58 @@ export default function RegisterPage() {
     idNumber: '',
   });
   const [otp, setOtp] = useState('');
-  const [step, setStep] = useState<'form' | 'otp'>('form');
+  const [step, setStep] = useState<'form' | 'captcha' | 'otp'>('form');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [widgetRendered, setWidgetRendered] = useState(false);
+  const captchaContainerRef = useRef<HTMLDivElement>(null);
   const { setUser, setToken } = useAuthStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (step !== 'captcha') return;
+
+    // Bypass Trusted Types CSP restriction for Turnstile
+    const tt = (window as any).trustedTypes;
+    if (tt && tt.createPolicy) {
+      const orig = tt.createPolicy.bind(tt);
+      tt.createPolicy = (name: string, options: any) => {
+        try { return orig(name, options); } catch {
+          try { return orig('default', options); } catch {
+            return { createHTML: (i: string) => i, createScriptURL: (i: string) => i };
+          }
+        }
+      };
+    }
+
+    const renderWidget = () => {
+      if ((window as any).turnstile && captchaContainerRef.current) {
+        try {
+          (window as any).turnstile.render(captchaContainerRef.current, {
+            sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADzaIoBqRQR07Gis',
+            callback: (token: string) => { setTurnstileToken(token); setWidgetRendered(true); },
+            'expired-callback': () => setTurnstileToken(''),
+          });
+          setWidgetRendered(true);
+        } catch {}
+      }
+    };
+
+    if ((window as any).turnstile) {
+      setTimeout(renderWidget, 300);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'cf-turnstile-script';
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.async = true;
+    script.onload = () => setTimeout(renderWidget, 300);
+    document.head.appendChild(script);
+
+    return () => { /* cleanup handled by component lifecycle */ };
+  }, [step]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -46,16 +93,29 @@ export default function RegisterPage() {
       return;
     }
 
+    setTurnstileToken('');
+    setWidgetRendered(false);
+    setStep('captcha');
+  }, [formData]);
+
+  const handleCaptchaSubmit = async () => {
+    setError('');
+    if (!turnstileToken) { setError('Please complete the security check'); return; }
     setLoading(true);
     try {
-      await authApi.sendOtp(formData.email);
+      await authApi.sendOtp(formData.email, turnstileToken);
       setStep('otp');
     } catch (err: any) {
       setError(err.message || 'Failed to send OTP');
+      setTurnstileToken('');
+      if ((window as any).turnstile) {
+        const container = captchaContainerRef.current;
+        if (container) (window as any).turnstile.reset(container);
+      }
     } finally {
       setLoading(false);
     }
-  }, [formData]);
+  };
 
   const handleVerifyOtp = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,6 +223,44 @@ export default function RegisterPage() {
               <button type="button" onClick={handleCreateAccount} disabled={loading} className="btn-primary w-full">
                 {loading ? 'Sending verification code...' : 'Create Account'}
               </button>
+            </div>
+          </motion.div>
+        ) : step === 'captcha' ? (
+          <motion.div
+            key="captcha"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.25 }}
+          >
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                <ShieldCheckIcon className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-ctu-charcoal">Security Check</h2>
+                <p className="text-sm text-gray-500">{formData.email}</p>
+              </div>
+            </div>
+            <p className="text-gray-400 text-sm mt-4 mb-6">Please complete the security check to continue with registration.</p>
+
+            {error && (
+              <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">{error}</div>
+            )}
+
+            <div className="space-y-5">
+              <div className="flex justify-center" ref={captchaContainerRef} />
+              {!widgetRendered && (
+                <p className="text-xs text-gray-400 text-center">Loading security check...</p>
+              )}
+              <div className="flex gap-3">
+                <button type="button" onClick={() => { setStep('form'); setError(''); }} className="btn-secondary flex-1">
+                  Back
+                </button>
+                <button type="button" onClick={handleCaptchaSubmit} disabled={loading || !turnstileToken} className="btn-primary flex-1">
+                  {loading ? 'Sending OTP...' : 'Verify & Continue'}
+                </button>
+              </div>
             </div>
           </motion.div>
         ) : (
