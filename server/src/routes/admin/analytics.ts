@@ -336,6 +336,112 @@ router.get('/career-progression', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/career-statistics', async (_req, res, next) => {
+  try {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, employment_status, current_job_title, company_name, industry, salary_range, last_updated_at, first_name, last_name');
+    const { data: users } = await supabase.from('users').select('id').eq('role', 'alumni');
+    const { data: education } = await supabase.from('education').select('profile_id, program, year_graduated');
+
+    const totalAlumni = users?.length || 0;
+    const allProfiles = profiles || [];
+
+    const withStatus = allProfiles.filter((p: any) => p.employment_status);
+    const employed = withStatus.filter((p: any) => p.employment_status === 'Employed').length;
+    const unemployed = withStatus.filter((p: any) => p.employment_status === 'Unemployed').length;
+    const selfEmployed = withStatus.filter((p: any) => p.employment_status === 'Self-employed').length;
+    const seeking = withStatus.filter((p: any) => p.employment_status === 'Seeking Opportunities').length;
+    const students = withStatus.filter((p: any) => p.employment_status === 'Student').length;
+    const retired = withStatus.filter((p: any) => p.employment_status === 'Retired').length;
+
+    const missingInfo = allProfiles.filter((p: any) => !p.employment_status).length;
+
+    const statusDistribution = [
+      { status: 'Employed', count: employed },
+      { status: 'Unemployed', count: unemployed },
+      { status: 'Self-employed', count: selfEmployed },
+      { status: 'Seeking Opportunities', count: seeking },
+      { status: 'Student', count: students },
+      { status: 'Retired', count: retired },
+    ].filter((s) => s.count > 0);
+
+    const industryCount: Record<string, number> = {};
+    allProfiles.forEach((p: any) => {
+      if (p.industry) {
+        industryCount[p.industry] = (industryCount[p.industry] || 0) + 1;
+      }
+    });
+    const byIndustry = Object.entries(industryCount)
+      .map(([industry, count]) => ({ industry, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const salaryCount: Record<string, number> = {};
+    allProfiles.forEach((p: any) => {
+      if (p.salary_range) {
+        salaryCount[p.salary_range] = (salaryCount[p.salary_range] || 0) + 1;
+      }
+    });
+    const bySalary = Object.entries(salaryCount)
+      .map(([range, count]) => ({ range, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const companyCount: Record<string, { count: number; industry: string }> = {};
+    allProfiles.forEach((p: any) => {
+      if (p.company_name) {
+        if (!companyCount[p.company_name]) {
+          companyCount[p.company_name] = { count: 0, industry: p.industry || '' };
+        }
+        companyCount[p.company_name].count++;
+      }
+    });
+    const topCompanies = Object.entries(companyCount)
+      .map(([name, data]) => ({ company: name, count: data.count, industry: data.industry }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+
+    const recentlyUpdated = allProfiles
+      .filter((p: any) => p.last_updated_at)
+      .sort((a: any, b: any) => new Date(b.last_updated_at).getTime() - new Date(a.last_updated_at).getTime())
+      .slice(0, 20)
+      .map((p: any) => ({
+        id: p.id,
+        name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown',
+        employment_status: p.employment_status,
+        company_name: p.company_name,
+        current_job_title: p.current_job_title,
+        last_updated_at: p.last_updated_at,
+      }));
+
+    const withoutInfo = allProfiles
+      .filter((p: any) => !p.employment_status)
+      .map((p: any) => ({
+        id: p.id,
+        name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown',
+      }));
+
+    res.json({
+      overview: {
+        totalAlumni,
+        employed,
+        unemployed,
+        selfEmployed,
+        seeking,
+        students,
+        retired,
+        employmentRate: totalAlumni > 0 ? Math.round(((employed + selfEmployed) / totalAlumni) * 100) : 0,
+        missingInfo,
+      },
+      statusDistribution,
+      byIndustry,
+      bySalary,
+      topCompanies,
+      recentlyUpdated,
+      withoutInfo,
+    });
+  } catch (err) { next(err); }
+});
+
 router.get('/networking-growth', async (_req, res, next) => {
   try {
     const connections = await safeData(

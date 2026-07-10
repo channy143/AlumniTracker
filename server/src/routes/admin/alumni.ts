@@ -106,6 +106,11 @@ router.get('/export', async (req, res, next) => {
         phone: u.profile?.phone || '',
         city: u.profile?.city || '',
         province: u.profile?.province || '',
+        employment_status: u.profile?.employment_status || '',
+        current_job_title: u.profile?.current_job_title || '',
+        company_name: u.profile?.company_name || '',
+        industry: u.profile?.industry || '',
+        salary_range: u.profile?.salary_range || '',
         is_verified: u.is_verified,
         created_at: u.created_at,
       }));
@@ -194,7 +199,7 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const { email, profile, education: eduData } = req.body;
+    const { email, profile, education: eduData, career } = req.body;
     if (email) {
       const { error: emailError } = await supabase.from('users').update({ email }).eq('id', req.params.id);
       if (emailError) throw new AppError(emailError.message, 500);
@@ -202,6 +207,18 @@ router.put('/:id', async (req, res, next) => {
     if (profile) {
       const { error: profileError } = await supabase.from('profiles').update(profile).eq('user_id', req.params.id);
       if (profileError) throw new AppError(profileError.message, 500);
+    }
+    if (career) {
+      const careerFields: Record<string, any> = {};
+      const allowed = ['employment_status', 'current_job_title', 'company_name', 'industry', 'salary_range'];
+      for (const field of allowed) {
+        if (career[field] !== undefined) careerFields[field] = career[field];
+      }
+      if (Object.keys(careerFields).length > 0) {
+        careerFields.last_updated_at = new Date().toISOString();
+        const { error: careerError } = await supabase.from('profiles').update(careerFields).eq('user_id', req.params.id);
+        if (careerError) throw new AppError(careerError.message, 500);
+      }
     }
     if (eduData) {
       const { data: existing } = await supabase.from('education').select('id').eq('profile_id', req.params.id).maybeSingle();

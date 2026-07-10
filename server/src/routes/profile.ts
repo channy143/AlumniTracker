@@ -41,6 +41,35 @@ router.put('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   }
 });
 
+router.put('/career', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const allowedFields = ['employment_status', 'current_job_title', 'company_name', 'industry', 'salary_range'];
+    const updates: Record<string, any> = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        if (field === 'employment_status' && req.body[field] !== null) {
+          const valid = ['Employed', 'Unemployed', 'Self-employed', 'Student', 'Seeking Opportunities', 'Retired'];
+          if (!valid.includes(req.body[field])) {
+            throw new AppError('Invalid employment status', 400);
+          }
+        }
+        updates[field] = req.body[field];
+      }
+    }
+    updates.last_updated_at = new Date().toISOString();
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('user_id', req.user!.userId)
+      .select()
+      .single();
+
+    if (error) throw new AppError(error.message, 500);
+    res.json(profile);
+  } catch (err) { next(err); }
+});
+
 router.post('/photo', authenticate, upload.single('photo'), async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!req.file) throw new AppError('No file uploaded', 400);

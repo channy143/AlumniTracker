@@ -63,6 +63,7 @@ export const authApi = {
 export const profileApi = {
   get: () => api.get<any>('/profile'),
   update: (data: any) => api.put<any>('/profile', data),
+  updateCareer: (data: any) => api.put<any>('/profile/career', data),
   uploadPhoto: (file: File) => {
     const formData = new FormData();
     formData.append('photo', file);
@@ -201,6 +202,7 @@ export const adminApi = {
   careerOverview: () => api.get<any>('/admin/analytics/career-overview'),
   careerProgression: () => api.get<any>('/admin/analytics/career-progression'),
   networkingGrowth: () => api.get<any>('/admin/analytics/networking-growth'),
+  careerStatistics: (params: Record<string, any> = {}) => api.get<any>(`/admin/analytics/career-statistics?${toQuery(params)}`),
 };
 
 export const connectionsApi = {
@@ -234,4 +236,21 @@ export const networkingApi = {
   stats: () => api.get<any>('/networking/stats'),
   companyProfile: (companyId: string) => api.get<any>(`/networking/company/${companyId}`),
   jobAlumni: (jobId: string) => api.get<any[]>(`/networking/job-alumni/${jobId}`),
+};
+
+export const feedApi = {
+  list: (sort?: string) => api.get<any[]>(`/feed${sort ? `?sort=${sort}` : ''}`),
+  get: (id: string) => api.get<any>(`/feed/${id}`),
+  addComment: (postId: string, content: string) => api.post<any>(`/feed/${postId}/comments`, { content }),
+  toggleLike: (postId: string) => api.post<any>(`/feed/${postId}/like`, {}),
+  seed: () => api.post<any>('/feed/seed', {}),
+};
+
+export const activitiesApi = {
+  list: (limit?: number) => api.get<any[]>(`/activities${limit ? `?limit=${limit}` : ''}`),
+  add: (data: { user: string; action: string; target: string }) => api.post<any>('/activities', data),
+};
+
+export const eventsApi = {
+  list: () => api.get<any[]>('/events'),
 };

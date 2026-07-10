@@ -21,12 +21,45 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: #0f172a;
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #E8A050;
+    background: #d1d5db;
     border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hover {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.2s;
+  }
+  .scrollbar-hover:hover {
+    scrollbar-color: #d1d5db transparent;
+  }
+  .scrollbar-hover::-webkit-scrollbar {
+    width: 4px;
+    display: none;
+  }
+  .scrollbar-hover:hover::-webkit-scrollbar {
+    display: block;
+  }
+  .scrollbar-hover::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+  }
+  .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+  }
+  .scrollbar-hover::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
   }
 }
 
@@ -51,7 +84,7 @@
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6 relative;
+    @apply bg-white rounded-lg border border-gray-200 p-4 relative;
   }
 
   .input-field {

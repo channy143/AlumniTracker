@@ -10,8 +10,7 @@ import RegisterPage from '@/pages/auth/RegisterPage';
 import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import ProfilePage from '@/pages/alumni/ProfilePage';
-import EmploymentPage from '@/pages/employment/EmploymentPage';
-import AnalyticsPage from '@/pages/analytics/AnalyticsPage';
+
 import MentorshipPage from '@/pages/mentorship/MentorshipPage';
 import CommunityPage from '@/pages/community/CommunityPage';
 import JobsPage from '@/pages/jobs/JobsPage';
@@ -76,8 +75,7 @@ export default function App() {
       >
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/employment" element={<EmploymentPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/employment" element={<Navigate to="/profile" replace />} />
         <Route path="/mentorship" element={<MentorshipPage />} />
         <Route path="/community" element={<CommunityPage />} />
         <Route path="/jobs" element={<JobsPage />} />

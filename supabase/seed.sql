@@ -3,10 +3,10 @@
 
 -- USERS
 INSERT INTO public.users (id, email, password_hash, role, is_verified) VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'admin@ctu.edu.ph', '$2a$12$Nn7ZbrAyJpJ2nCj3dAieTuAOyaDnsgBj9EVyuniBN0tWShbM/MLFq', 'admin', TRUE),
-  ('a0000000-0000-0000-0000-000000000002', 'maria.santos@ctu.edu.ph', '$2a$12$Nn7ZbrAyJpJ2nCj3dAieTuAOyaDnsgBj9EVyuniBN0tWShbM/MLFq', 'alumni', TRUE),
-  ('a0000000-0000-0000-0000-000000000003', 'juan.delacruz@ctu.edu.ph', '$2a$12$Nn7ZbrAyJpJ2nCj3dAieTuAOyaDnsgBj9EVyuniBN0tWShbM/MLFq', 'alumni', TRUE),
-  ('a0000000-0000-0000-0000-000000000004', 'ana.gonzales@ctu.edu.ph', '$2a$12$Nn7ZbrAyJpJ2nCj3dAieTuAOyaDnsgBj9EVyuniBN0tWShbM/MLFq', 'alumni', TRUE);
+  ('a0000000-0000-0000-0000-000000000001', 'admin@ctu.edu.ph', '$2a$12$/tmPP7jjkqhyqH5.a1nc9uqu1YJFHtx6yK7hoNwVwYxNT2U/fEZKm', 'admin', TRUE),
+  ('a0000000-0000-0000-0000-000000000002', 'maria.santos@ctu.edu.ph', '$2a$12$/tmPP7jjkqhyqH5.a1nc9uqu1YJFHtx6yK7hoNwVwYxNT2U/fEZKm', 'alumni', TRUE),
+  ('a0000000-0000-0000-0000-000000000003', 'juan.delacruz@ctu.edu.ph', '$2a$12$/tmPP7jjkqhyqH5.a1nc9uqu1YJFHtx6yK7hoNwVwYxNT2U/fEZKm', 'alumni', TRUE),
+  ('a0000000-0000-0000-0000-000000000004', 'ana.gonzales@ctu.edu.ph', '$2a$12$/tmPP7jjkqhyqH5.a1nc9uqu1YJFHtx6yK7hoNwVwYxNT2U/fEZKm', 'alumni', TRUE);
 
 -- PROFILES
 INSERT INTO public.profiles (id, user_id, first_name, last_name, email, phone, city, headline, bio) VALUES

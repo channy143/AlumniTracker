@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { profileApi } from '@/services/api';
-import { CameraIcon } from '@heroicons/react/24/outline';
+import { CameraIcon, BriefcaseIcon } from '@heroicons/react/24/outline';
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
@@ -29,6 +29,11 @@ export default function ProfilePage() {
         city: data.city || '',
         province: data.province || '',
         bio: data.bio || '',
+        employment_status: data.employment_status || '',
+        current_job_title: data.current_job_title || '',
+        company_name: data.company_name || '',
+        industry: data.industry || '',
+        salary_range: data.salary_range || '',
       });
       setError('');
     } catch (err: any) {
@@ -50,8 +55,20 @@ export default function ProfilePage() {
       if (form.city !== undefined) payload.city = form.city;
       if (form.province !== undefined) payload.province = form.province;
       if (form.bio !== undefined) payload.bio = form.bio;
+      const careerFields: any = {};
+      const careerKeys = ['employment_status', 'current_job_title', 'company_name', 'industry', 'salary_range'];
+      let hasCareerChanges = false;
+      for (const key of careerKeys) {
+        if (form[key] !== profile?.[key]) {
+          careerFields[key] = form[key] || null;
+          hasCareerChanges = true;
+        }
+      }
       const updated = await profileApi.update(payload);
-      setProfile(updated);
+      if (hasCareerChanges) {
+        await profileApi.updateCareer(careerFields);
+      }
+      setProfile({ ...updated, ...careerFields });
       setEditing(false);
     } catch (err: any) {
       setError(err.message || 'Failed to update profile');
@@ -312,6 +329,104 @@ export default function ProfilePage() {
               ))
             ) : (
               <p className="text-gray-400 text-sm">No education records</p>
+            )}
+          </div>
+
+          <div className="card">
+            <h3 className="font-semibold text-ctu-charcoal mb-4 flex items-center gap-2">
+              <BriefcaseIcon className="w-5 h-5 text-ctu-gold" />
+              Employment Information
+            </h3>
+            {editing ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Employment Status</label>
+                  <select
+                    value={form.employment_status}
+                    onChange={(e) => setForm({ ...form, employment_status: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ctu-blue/20 focus:border-ctu-blue outline-none bg-white"
+                  >
+                    <option value="">Select status</option>
+                    <option value="Employed">Employed</option>
+                    <option value="Unemployed">Unemployed</option>
+                    <option value="Self-employed">Self-employed</option>
+                    <option value="Student">Student</option>
+                    <option value="Seeking Opportunities">Seeking Opportunities</option>
+                    <option value="Retired">Retired</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Current Job Title</label>
+                  <input
+                    value={form.current_job_title}
+                    onChange={(e) => setForm({ ...form, current_job_title: e.target.value })}
+                    placeholder="e.g. Software Engineer"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ctu-blue/20 focus:border-ctu-blue outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Company Name</label>
+                  <input
+                    value={form.company_name}
+                    onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+                    placeholder="e.g. Google"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ctu-blue/20 focus:border-ctu-blue outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Industry</label>
+                  <input
+                    value={form.industry}
+                    onChange={(e) => setForm({ ...form, industry: e.target.value })}
+                    placeholder="e.g. Technology"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ctu-blue/20 focus:border-ctu-blue outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Salary Range</label>
+                  <select
+                    value={form.salary_range}
+                    onChange={(e) => setForm({ ...form, salary_range: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ctu-blue/20 focus:border-ctu-blue outline-none bg-white"
+                  >
+                    <option value="">Select range</option>
+                    <option value="0-10000">₱0 - ₱10,000</option>
+                    <option value="10001-20000">₱10,001 - ₱20,000</option>
+                    <option value="20001-30000">₱20,001 - ₱30,000</option>
+                    <option value="30001-50000">₱30,001 - ₱50,000</option>
+                    <option value="50001-75000">₱50,001 - ₱75,000</option>
+                    <option value="75001-100000">₱75,001 - ₱100,000</option>
+                    <option value="100001+">₱100,001+</option>
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-500">Employment Status</label>
+                  <p className="text-ctu-charcoal font-medium">{form.employment_status || '---'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500">Current Job Title</label>
+                  <p className="text-ctu-charcoal font-medium">{form.current_job_title || '---'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500">Company Name</label>
+                  <p className="text-ctu-charcoal font-medium">{form.company_name || '---'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500">Industry</label>
+                  <p className="text-ctu-charcoal font-medium">{form.industry || '---'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500">Salary Range</label>
+                  <p className="text-ctu-charcoal font-medium">{form.salary_range ? `₱${form.salary_range.replace('-', ' - ₱')}` : '---'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500">Last Updated</label>
+                  <p className="text-ctu-charcoal font-medium">{profile?.last_updated_at ? new Date(profile.last_updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '---'}</p>
+                </div>
+              </div>
             )}
           </div>
         </div>

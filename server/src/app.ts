@@ -14,6 +14,9 @@ import connectionsRoutes from './routes/connections';
 import messagesRoutes from './routes/messages';
 import referralsRoutes from './routes/referrals';
 import networkingRoutes from './routes/networking';
+import feedRoutes from './routes/feed';
+import activitiesRoutes from './routes/activities';
+import eventsRoutes from './routes/events';
 
 const app = express();
 
@@ -37,6 +40,9 @@ app.use('/api/connections', connectionsRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/referrals', referralsRoutes);
 app.use('/api/networking', networkingRoutes);
+app.use('/api/feed', feedRoutes);
+app.use('/api/activities', activitiesRoutes);
+app.use('/api/events', eventsRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
