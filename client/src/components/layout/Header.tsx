@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { getInitials } from '@/utils/helpers';
-import { profileApi } from '@/services/api';
-import { Bars3Icon, BellIcon, ChatBubbleLeftRightIcon, MagnifyingGlassIcon, PlusIcon, UserIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { profileApi, activitiesApi } from '@/services/api';
+import { Bars3Icon, BellIcon, MagnifyingGlassIcon, PlusIcon, UserIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, AcademicCapIcon, BriefcaseIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 const SEARCH_PAGES = ['/career-trends', '/announcements', '/events', '/directory', '/connections'];
 
@@ -19,6 +19,11 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const lastNotifIdRef = useRef<string | null>(null);
+  const notifDropdownRef = useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -35,6 +40,52 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     window.addEventListener('avatar-updated', handler);
     return () => window.removeEventListener('avatar-updated', handler);
   }, []);
+
+  const playTing = useCallback(() => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+      osc1.frequency.value = 880;
+      osc1.type = 'sine';
+      osc2.frequency.value = 1320;
+      osc2.type = 'sine';
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc1.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 0.15);
+      osc2.start(ctx.currentTime + 0.1);
+      osc2.stop(ctx.currentTime + 0.4);
+    } catch {}
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const data = await activitiesApi.list(10);
+      if (data && data.length > 0) {
+        const latestId = String(data[0].id);
+        if (lastNotifIdRef.current && lastNotifIdRef.current !== latestId) {
+          playTing();
+          setUnreadCount((prev) => prev + 1);
+        }
+        if (!lastNotifIdRef.current) {
+          lastNotifIdRef.current = latestId;
+        }
+        setNotifications(data);
+      }
+    } catch {}
+  }, [playTing]);
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,6 +97,22 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target as Node)) {
+        setNotifDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const notifIcon = (action: string) => {
+    if (action.toLowerCase().includes('graduate') || action.toLowerCase().includes('education')) return AcademicCapIcon;
+    if (action.toLowerCase().includes('employ') || action.toLowerCase().includes('job') || action.toLowerCase().includes('position')) return BriefcaseIcon;
+    return ClockIcon;
+  };
 
   const handleLogout = () => {
     logout();
@@ -89,13 +156,49 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         </div>
 
         <div className="flex items-center gap-1 justify-end">
-          <button className="relative p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg" title="Messages">
-            <ChatBubbleLeftRightIcon className="w-5 h-5" />
-          </button>
-          <button className="relative p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg" title="Notifications">
-            <BellIcon className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full" />
-          </button>
+          <div className="relative" ref={notifDropdownRef}>
+            <button onClick={() => { setNotifDropdownOpen((v) => !v); if (notifDropdownOpen) setUnreadCount(0); }} className="relative p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg" title="Notifications">
+              <BellIcon className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-orange-500 text-white text-[9px] font-bold rounded-full px-1">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {notifDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                <div className="px-4 py-2.5 border-b border-gray-100">
+                  <p className="text-sm font-semibold text-gray-800">Recent Activity</p>
+                </div>
+                {notifications.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-sm text-gray-400">No recent activity</div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {notifications.map((n: any) => {
+                      const Icon = notifIcon(n.action);
+                      return (
+                        <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                          <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center shrink-0">
+                            <Icon className="w-4 h-4 text-orange-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-gray-800 leading-snug">
+                              <span className="font-medium">{n.user_name}</span>{' '}
+                              {n.action}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-0.5">{n.target}</p>
+                            <p className="text-[10px] text-gray-300 mt-0.5">
+                              {new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           {user?.role === 'admin' && (
             <button className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-full transition-colors" title="Create Post">
               <PlusIcon className="w-4 h-4" />

@@ -98,7 +98,7 @@ export default function Sidebar({
         {/* Toggle handle at center-right edge */}
         <button
           onClick={onToggleCollapse}
-          className="hidden lg:flex absolute top-1/2 -translate-y-1/2 -right-3 z-50 items-center justify-center w-6 h-10 rounded-r-full bg-white border border-l-0 border-gray-200 shadow-sm text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+          className="hidden lg:flex absolute top-1/2 -translate-y-1/2 -right-[22px] z-50 items-center justify-center w-6 h-10 rounded-r-full bg-white border border-l-0 border-gray-200 shadow-sm text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
         >
           <ChevronLeftIcon className={`w-4 h-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
         </button>

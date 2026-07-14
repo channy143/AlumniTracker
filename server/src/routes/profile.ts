@@ -8,6 +8,10 @@ import { AuthenticatedRequest } from '../types';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+async function logActivity(name: string, action: string, target: string) {
+  try { await supabase.from('activity_log').insert({ user_name: name, action, target }); } catch {}
+}
+
 router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { data: profile, error } = await supabase
@@ -38,6 +42,9 @@ router.put('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       .single();
 
     if (error) throw new AppError(error.message, 500);
+
+      const name = profile?.first_name || req.user!.email?.split('@')[0] || 'Someone';
+    logActivity(name, 'updated their profile', 'Profile information changed');
 
     res.json(profile);
   } catch (err) {
@@ -70,6 +77,10 @@ router.put('/career', authenticate, async (req: AuthenticatedRequest, res, next)
       .single();
 
     if (error) throw new AppError(error.message, 500);
+
+    const name = profile?.first_name || req.user!.email?.split('@')[0] || 'Someone';
+    logActivity(name, 'updated their career info', `Status: ${updates.employment_status || 'unchanged'}`);
+
     res.json(profile);
   } catch (err) { next(err); }
 });
@@ -223,7 +234,7 @@ router.put('/skills/batch', authenticate, async (req: AuthenticatedRequest, res,
   try {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, first_name')
       .eq('user_id', req.user!.userId)
       .single();
     if (!profile) throw new AppError('Profile not found', 404);
@@ -243,6 +254,10 @@ router.put('/skills/batch', authenticate, async (req: AuthenticatedRequest, res,
       }));
       const { data: inserted, error } = await supabase.from('skills').insert(rows).select();
       if (error) throw new AppError(error.message, 500);
+
+      const name = profile.first_name || req.user!.email?.split('@')[0] || 'Someone';
+      logActivity(name, 'updated their skills', `${skills.length} skill${skills.length !== 1 ? 's' : ''} updated`);
+
       return res.json(inserted);
     }
 
