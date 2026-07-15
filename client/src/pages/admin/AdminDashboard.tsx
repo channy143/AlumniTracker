@@ -200,17 +200,17 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
 
         <button
           onClick={() => goTo(selectedIndex - 1)}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/80 border border-gray-200 text-gray-600 hover:bg-white hover:text-gray-900 shadow-sm transition-all"
-          style={{ borderRadius: 0 }}
+          className="absolute top-1/2 -translate-y-1/2 z-20 p-2 text-white hover:text-orange-400 transition-colors"
+          style={{ left: `calc(50% - ${CARD_W / 2 + 40 + 16}px)`, borderRadius: 0 }}
         >
-          <ChevronLeftIcon className="w-5 h-5" />
+          <ChevronLeftIcon className="w-7 h-7" />
         </button>
         <button
           onClick={() => goTo(selectedIndex + 1)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/80 border border-gray-200 text-gray-600 hover:bg-white hover:text-gray-900 shadow-sm transition-all"
-          style={{ borderRadius: 0 }}
+          className="absolute top-1/2 -translate-y-1/2 z-20 p-2 text-white hover:text-orange-400 transition-colors"
+          style={{ left: `calc(50% + ${CARD_W / 2 + 20}px)`, borderRadius: 0 }}
         >
-          <ChevronRightIcon className="w-5 h-5" />
+          <ChevronRightIcon className="w-7 h-7" />
         </button>
       </div>
 
