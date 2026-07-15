@@ -14,9 +14,11 @@ export default function AdminEvents() {
 
   const getToken = () => sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
 
-  const headers = () => {
+  const headers = (): HeadersInit => {
     const token = getToken();
-    return token ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } : { 'Content-Type': 'application/json' };
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) h['Authorization'] = `Bearer ${token}`;
+    return h;
   };
 
   const load = async () => {

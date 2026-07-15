@@ -183,7 +183,7 @@ export default function GraduateTracerSurveys() {
                       const qs = [...form.questions]; qs[i] = { ...qs[i], title: e.target.value }; setForm({ ...form, questions: qs });
                     }} className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:border-orange-400" />
                     <select value={q.type} onChange={(e) => {
-                      const qs = [...form.questions]; qs[i] = { ...qs[i], type: e.target.value, options: e.target.value === 'mcq' ? [''] : undefined }; setForm({ ...form, questions: qs });
+                      const qs = [...form.questions]; qs[i] = { ...qs[i], type: e.target.value, options: e.target.value === 'mcq' ? [''] : [] }; setForm({ ...form, questions: qs });
                     }} className="text-xs border border-gray-200 rounded px-2 py-1 outline-none">
                       {questionTypes.map((t) => <option key={t} value={t}>{t.toUpperCase()}</option>)}
                     </select>
