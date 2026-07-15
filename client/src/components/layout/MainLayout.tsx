@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import NotificationContainer from '../ui/Notification';
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -9,6 +10,7 @@ export default function MainLayout() {
 
   return (
     <div className="min-h-screen flex bg-gray-50">
+      <NotificationContainer />
       <Sidebar
         mobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}

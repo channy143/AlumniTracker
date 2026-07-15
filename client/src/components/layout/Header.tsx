@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { getInitials } from '@/utils/helpers';
+import { getInitials, playTing } from '@/utils/helpers';
 import { profileApi, activitiesApi } from '@/services/api';
 import { Bars3Icon, BellIcon, MagnifyingGlassIcon, PlusIcon, UserIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, AcademicCapIcon, BriefcaseIcon, ClockIcon } from '@heroicons/react/24/outline';
 
@@ -39,28 +39,6 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     const handler = () => profileApi.get().then((p) => setAvatarUrl(p?.avatar_url || null)).catch(() => {});
     window.addEventListener('avatar-updated', handler);
     return () => window.removeEventListener('avatar-updated', handler);
-  }, []);
-
-  const playTing = useCallback(() => {
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc1.connect(gain);
-      osc2.connect(gain);
-      gain.connect(ctx.destination);
-      osc1.frequency.value = 880;
-      osc1.type = 'sine';
-      osc2.frequency.value = 1320;
-      osc2.type = 'sine';
-      gain.gain.setValueAtTime(0.2, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-      osc1.start(ctx.currentTime);
-      osc1.stop(ctx.currentTime + 0.15);
-      osc2.start(ctx.currentTime + 0.1);
-      osc2.stop(ctx.currentTime + 0.4);
-    } catch {}
   }, []);
 
   const fetchNotifications = useCallback(async () => {
@@ -183,7 +161,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm text-gray-800 leading-snug">
-                              <span className="font-medium">{n.user_name}</span>{' '}
+                              <span className="font-medium">{n.user}</span>{' '}
                               {n.action}
                             </p>
                             <p className="text-xs text-gray-400 mt-0.5">{n.target}</p>

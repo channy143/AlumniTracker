@@ -4,16 +4,7 @@ import { jobsApi } from '@/services/api';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { MapPinIcon, CurrencyDollarIcon, ClockIcon, BriefcaseIcon, GlobeAltIcon, EnvelopeIcon, BuildingOfficeIcon, AcademicCapIcon, ArrowRightIcon, SparklesIcon } from '@heroicons/react/24/outline';
 
-const fallbackJobs: any[] = [
-  { id: 'jb-1', company_name: 'Accenture', position: 'Senior Software Engineer', description: 'We are looking for a Senior Software Engineer with 3+ years of experience in full-stack development. Proficiency in React, Node.js, and cloud services (AWS/Azure) is required.', location: 'Cebu City', work_mode: 'onsite', job_type: 'full-time', salary_range: '₱80,000 - ₱150,000', is_alumni_exclusive: false, company_website: 'https://accenture.com', company_email: 'careers@accenture.com', created_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: 'jb-2', company_name: 'Google', position: 'Frontend Developer', description: 'Google is hiring a Frontend Developer to join our team in Manila. You will be working on user-facing features for our flagship products.', location: 'Manila', work_mode: 'hybrid', job_type: 'full-time', salary_range: '₱120,000 - ₱200,000', is_alumni_exclusive: false, company_website: 'https://careers.google.com', company_email: 'hiring@google.com', created_at: new Date(Date.now() - 172800000).toISOString() },
-  { id: 'jb-3', company_name: 'TechStart Solutions', position: 'Junior Web Developer', description: 'TechStart Solutions is hiring a Junior Web Developer for their growing team. Ideal candidates are recent IT/CS graduates with knowledge of HTML, CSS, JavaScript, and basic PHP.', location: 'Naga City', work_mode: 'onsite', job_type: 'full-time', salary_range: '₱25,000 - ₱35,000', is_alumni_exclusive: true, company_website: 'https://techstart.ph', company_email: 'hr@techstart.ph', created_at: new Date(Date.now() - 259200000).toISOString() },
-  { id: 'jb-4', company_name: 'IBM', position: 'Cloud Solutions Architect', description: 'IBM Philippines is seeking a Cloud Solutions Architect to design and implement cloud infrastructure solutions for enterprise clients.', location: 'Manila', work_mode: 'hybrid', job_type: 'full-time', salary_range: '₱150,000 - ₱250,000', is_alumni_exclusive: false, company_website: 'https://ibm.com/careers', company_email: 'careers.ph@ibm.com', created_at: new Date(Date.now() - 345600000).toISOString() },
-  { id: 'jb-5', company_name: 'CreativeHub PH', position: 'Remote Graphic Designer', description: 'Our creative agency is expanding and we need a talented graphic designer. Must be proficient in Adobe Creative Suite, Figma, and have a strong portfolio.', location: 'Naga City (Remote)', work_mode: 'remote', job_type: 'freelance', salary_range: '₱30,000 - ₱60,000', is_alumni_exclusive: false, company_website: 'https://creativehub.ph', company_email: 'jobs@creativehub.ph', created_at: new Date(Date.now() - 432000000).toISOString() },
-  { id: 'jb-6', company_name: 'UnionBank', position: 'Software Engineer Intern', description: 'UnionBank is looking for passionate IT students for our summer internship program. Work alongside our engineering team on real banking applications.', location: 'Makati City', work_mode: 'onsite', job_type: 'internship', salary_range: '₱15,000 - ₱20,000', is_alumni_exclusive: false, company_website: 'https://unionbankph.com/careers', company_email: 'internships@unionbank.com', created_at: new Date(Date.now() - 518400000).toISOString() },
-  { id: 'jb-7', company_name: 'DOST', position: 'Part-Time Research Assistant', description: 'DOST is hiring a part-time research assistant for a government-funded technology research project.', location: 'Quezon City', work_mode: 'onsite', job_type: 'part-time', salary_range: '₱20,000 - ₱30,000', is_alumni_exclusive: false, company_website: 'https://dost.gov.ph', company_email: 'research@dost.gov.ph', created_at: new Date(Date.now() - 604800000).toISOString() },
-  { id: 'jb-8', company_name: 'Accenture', position: 'Cybersecurity Analyst', description: 'Join our cybersecurity team to help protect enterprise clients from emerging threats. Security assessments, incident response, and implementing best practices.', location: 'Cebu City', work_mode: 'onsite', job_type: 'full-time', salary_range: '₱60,000 - ₱100,000', is_alumni_exclusive: false, company_website: 'https://accenture.com', company_email: 'careers@accenture.com', created_at: new Date(Date.now() - 691200000).toISOString() },
-];
+
 
 function formatDate(dateStr: string): string {
   const now = Date.now();
@@ -296,8 +287,8 @@ export default function JobsPage() {
   useEffect(() => {
     setLoading(true);
     jobsApi.list().then((data) => {
-      setJobs(data && data.length > 0 ? data : fallbackJobs);
-    }).catch(() => setJobs(fallbackJobs))
+      if (data) setJobs(data);
+    }).catch(() => {})
     .finally(() => setLoading(false));
   }, []);
 

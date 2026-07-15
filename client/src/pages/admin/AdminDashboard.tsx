@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { adminApi, jobsApi, feedApi } from '@/services/api';
+import { adminApi } from '@/services/api';
 import { Link } from 'react-router-dom';
 
 export default function AdminDashboard() {
@@ -7,9 +7,6 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [stats, setStats] = useState<any>(null);
   const [charts, setCharts] = useState<any>(null);
-  const [seeding, setSeeding] = useState<'jobs' | 'feed' | null>(null);
-  const [seedResult, setSeedResult] = useState<string | null>(null);
-
   useEffect(() => {
     loadData();
   }, []);
@@ -29,33 +26,6 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
-
-  const handleSeedJobs = async () => {
-    setSeeding('jobs');
-    setSeedResult(null);
-    try {
-      const res = await jobsApi.seed();
-      setSeedResult(`Jobs: ${res.message} (${res.count || ''})`);
-    } catch (err: any) {
-      setSeedResult(`Jobs seed failed: ${err.message}`);
-    } finally {
-      setSeeding(null);
-    }
-  };
-
-  const handleSeedFeed = async () => {
-    setSeeding('feed');
-    setSeedResult(null);
-    try {
-      const res = await feedApi.seed();
-      setSeedResult(`Feed: ${res.message} (${res.count || ''})`);
-    } catch (err: any) {
-      setSeedResult(`Feed seed failed: ${err.message}`);
-    } finally {
-      setSeeding(null);
-    }
-  };
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -217,22 +187,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-
-      <div className="card">
-        <h2 className="text-lg font-semibold text-ctu-charcoal mb-1">Seed Data</h2>
-        <p className="text-sm text-gray-500 mb-4">Insert sample data for testing and development. Admin-only operations.</p>
-        <div className="flex flex-wrap gap-3 items-center">
-          <button onClick={handleSeedJobs} disabled={seeding !== null} className="btn-primary text-sm disabled:opacity-50">
-            {seeding === 'jobs' ? 'Seeding Jobs...' : 'Seed Job Postings'}
-          </button>
-          <button onClick={handleSeedFeed} disabled={seeding !== null} className="btn-secondary text-sm disabled:opacity-50">
-            {seeding === 'feed' ? 'Seeding Feed...' : 'Seed Feed Posts'}
-          </button>
-          {seedResult && (
-            <span className="text-xs text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg">{seedResult}</span>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

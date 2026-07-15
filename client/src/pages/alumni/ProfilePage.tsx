@@ -7,6 +7,8 @@ import {
   TrophyIcon, ArrowTrendingUpIcon
 } from '@heroicons/react/24/outline';
 import { SkeletonCard } from '@/components/ui/Skeleton';
+import { playTing } from '@/utils/helpers';
+import { useUIStore } from '@/store/uiStore';
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: UserIcon },
@@ -249,6 +251,8 @@ export default function ProfilePage() {
       const fresh = await profileApi.get();
       setProfile(fresh);
       setEditing(false);
+      playTing();
+      useUIStore.getState().addNotification('You\'ve successfully updated your profile', 'success');
     } catch (err: any) {
       setError(err.message || 'Failed to update profile');
     } finally {

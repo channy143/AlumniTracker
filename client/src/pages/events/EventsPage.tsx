@@ -1,14 +1,9 @@
 import { useState, useEffect } from 'react';
 import { CalendarDaysIcon, MapPinIcon, ClockIcon, UserIcon, LinkIcon, XMarkIcon, PhotoIcon, ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { eventsApi } from '@/services/api';
+import { SkeletonCard } from '@/components/ui/Skeleton';
 
-const fallbackEvents = [
-  { id: 'e1', name: 'Alumni Homecoming 2026', description: 'Join us for the annual CTU-Naga Alumni Homecoming! This year\'s theme is "Building Bridges: Connecting Generations." Activities include a networking fair, faculty meet-and-greet, sportsfest, and the Grand Alumni Night. Register early to secure your slot!', date: 'December 10, 2026', time: '9:00 AM - 5:00 PM', location: 'CTU-Naga Main Campus, Gymnasium', organizer: 'Alumni Relations Office', banner: '', registration_link: 'https://forms.google.com/alumni-homecoming-2026', gallery: [], created_at: '2026-07-01T00:00:00Z' },
-  { id: 'e2', name: 'Career Fair 2026', description: 'The annual CTU-Naga Job Fair featuring over 30 companies hiring across various industries. Bring your resume, dress professionally, and network with top employers from IT, Engineering, Education, Business, and more. Free for all CTU-Naga alumni.', date: 'September 15, 2026', time: '8:00 AM - 5:00 PM', location: 'CTU-Naga Campus, University Quad', organizer: 'Career Services Office', banner: '', registration_link: 'https://forms.google.com/career-fair-2026', gallery: [], created_at: '2026-06-15T00:00:00Z' },
-  { id: 'e3', name: 'Webinar: Career Trends in IT 2026', description: 'An online webinar discussing the latest trends in the IT industry, including AI, cloud computing, cybersecurity, and data science. Guest speakers from Accenture, IBM, and Google will share insights and career tips. Q&A session after the talks.', date: 'August 20, 2026', time: '2:00 PM - 5:00 PM', location: 'Online via Zoom', organizer: 'College of Information Technology', banner: '', registration_link: 'https://zoom.us/webinar-registration', gallery: [], created_at: '2026-06-10T00:00:00Z' },
-  { id: 'e4', name: 'Leadership Seminar: Leading with Purpose', description: 'A half-day leadership seminar designed for alumni in supervisory and management roles. Topics include transformational leadership, emotional intelligence, conflict resolution, and strategic thinking. Certificate of participation will be provided.', date: 'October 5, 2026', time: '8:00 AM - 12:00 PM', location: 'CTU-Naga Audio-Visual Room', organizer: 'Alumni Association', banner: '', registration_link: 'https://forms.google.com/leadership-seminar', gallery: [], created_at: '2026-05-20T00:00:00Z' },
-  { id: 'e5', name: 'Alumni Sports Fest 2026', description: 'The annual sports festival for CTU-Naga alumni. Compete in basketball, volleyball, badminton, chess, and track events. Team registration is open until October 30. This is a great opportunity to reconnect with batchmates and foster camaraderie.', date: 'November 20-22, 2026', time: '7:00 AM - 6:00 PM', location: 'CTU-Naga Sports Complex', organizer: 'Alumni Sports Committee', banner: '', registration_link: 'https://forms.google.com/sports-fest-2026', gallery: [], created_at: '2026-05-10T00:00:00Z' },
-];
+
 
 export default function EventsPage() {
   const [events, setEvents] = useState<any[]>([]);
@@ -18,8 +13,8 @@ export default function EventsPage() {
 
   useEffect(() => {
     eventsApi.list()
-      .then((data: any) => { if (data?.length) setEvents(data); else setEvents(fallbackEvents); })
-      .catch(() => setEvents(fallbackEvents))
+      .then((data: any) => { if (data) setEvents(data); })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -157,10 +152,12 @@ export default function EventsPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-sm text-gray-500">Loading events...</div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+        </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">
-          No {filter} events found.
+          No {filter} events for now.
         </div>
       ) : (
         <div className="space-y-3">

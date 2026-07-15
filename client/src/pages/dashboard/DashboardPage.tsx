@@ -2,131 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/store/authStore';
-import { feedApi, eventsApi, careerTrendsApi, profileApi } from '@/services/api';
+import { feedApi, careerTrendsApi, profileApi } from '@/services/api';
 import { CalendarDaysIcon, MegaphoneIcon, UserGroupIcon, BuildingOfficeIcon, BriefcaseIcon, ChartBarIcon, CheckCircleIcon, ExclamationCircleIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { decodeUnicode } from '@/utils/helpers';
 
-const fallbackPosts: FeedPost[] = [
-  {
-    id: 'fb-1',
-    type: 'announcement',
-    title: 'Welcome to the CTU-Naga Alumni Network!',
-    content: 'We are excited to launch this new platform for all CTU-Naga alumni to connect, collaborate, and stay updated. This community is built for you — share your achievements, post job opportunities, and reconnect with old classmates. Make sure to complete your profile to get the most out of your experience!',
-    author: 'CTU-Naga Alumni Office',
-    author_avatar: '',
-    created_at: new Date().toISOString(),
-    like_count: 24,
-    comment_count: 3,
-    liked: false,
-    image_url: '/image/ChatGPT Image May 27, 2026, 04_38_30 AM.png',
-    tag: 'Announcement',
-    tag_color: 'bg-blue-100 text-blue-700',
-  },
-  {
-    id: 'fb-2',
-    type: 'guide',
-    title: 'Career Development Resources Now Available',
-    content: 'The Career Hub now offers resume templates, interview preparation guides, and job search strategies. Visit the Career Development section to access these resources and schedule a mock interview session with our career counselors. Members who have used our services report a 40% higher interview callback rate.',
-    author: 'Career Services',
-    author_avatar: '',
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-    like_count: 18,
-    comment_count: 2,
-    liked: false,
-    image_url: '',
-    tag: 'Guide',
-    tag_color: 'bg-purple-100 text-purple-700',
-  },
-  {
-    id: 'fb-3',
-    type: 'discussion',
-    title: 'What skills are most in demand for IT graduates in 2026?',
-    content: 'With the rapid changes in tech, I wanted to start a discussion on what skills we think are most valuable for new graduates entering the job market. From my experience in software development, cloud computing and AI/ML skills are becoming essential. What are your thoughts?',
-    author: 'Miguel Santos',
-    author_avatar: '',
-    created_at: new Date(Date.now() - 7200000).toISOString(),
-    like_count: 31,
-    comment_count: 7,
-    liked: false,
-    image_url: '',
-    tag: 'Discussion',
-    tag_color: 'bg-green-100 text-green-700',
-  },
-  {
-    id: 'fb-4',
-    type: 'event',
-    title: 'Annual Alumni Homecoming 2026',
-    content: 'Save the date! The CTU-Naga Annual Alumni Homecoming will be held on August 15, 2026 at the university main campus. This year\'s theme is "Building Bridges: Connecting Generations." Activities include a networking fair, faculty meet-and-greet, sportsfest, and the Grand Alumni Night. Register early to secure your slot!',
-    author: 'Alumni Relations',
-    author_avatar: '',
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    like_count: 45,
-    comment_count: 12,
-    liked: false,
-    image_url: '',
-    tag: 'Event',
-    tag_color: 'bg-amber-100 text-amber-700',
-  },
-  {
-    id: 'fb-5',
-    type: 'job',
-    title: 'Hiring: Junior Software Developer at TechStart Philippines',
-    content: 'TechStart Ph is looking for a Junior Software Developer with knowledge of React, Node.js, and PostgreSQL. Fresh graduates are encouraged to apply. We offer competitive salary, hybrid work setup, and professional development opportunities. Location: Cebu City. Send your resume to careers@techstart.ph',
-    author: 'Maria Reyes',
-    author_avatar: '',
-    created_at: new Date(Date.now() - 172800000).toISOString(),
-    like_count: 15,
-    comment_count: 4,
-    liked: false,
-    image_url: '',
-    tag: 'Job Posting',
-    tag_color: 'bg-red-100 text-red-700',
-  },
-  {
-    id: 'fb-6',
-    type: 'text',
-    title: 'Finally passed the board exam!',
-    content: 'After months of preparation and review, I\'m happy to share that I passed the Civil Engineering Licensure Examination! Thank you to all the professors at CTU-Naga who prepared us well. For those currently reviewing, keep pushing — it will all be worth it in the end. If anyone needs review tips, feel free to message me!',
-    author: 'Josefa Dimatulac',
-    author_avatar: '',
-    created_at: new Date(Date.now() - 259200000).toISOString(),
-    like_count: 62,
-    comment_count: 8,
-    liked: false,
-    image_url: '',
-    tag: 'Achievement',
-    tag_color: 'bg-yellow-100 text-yellow-700',
-  },
-  {
-    id: 'fb-7',
-    type: 'job',
-    title: 'Remote Graphic Designer Position Open',
-    content: 'Our creative agency is expanding and we need a talented graphic designer. Must be proficient in Adobe Creative Suite, Figma, and have a strong portfolio. Work-from-home arrangement with monthly team meetups in Naga City. Competitive compensation package. Apply at creativehub.ph/careers',
-    author: 'Carlos Mendez',
-    author_avatar: '',
-    created_at: new Date(Date.now() - 345600000).toISOString(),
-    like_count: 9,
-    comment_count: 1,
-    liked: false,
-    image_url: '',
-    tag: 'Job Posting',
-    tag_color: 'bg-red-100 text-red-700',
-  },
-  {
-    id: 'fb-8',
-    type: 'announcement',
-    title: 'Scholarship Opportunities for Graduate Studies',
-    content: 'The Alumni Association is proud to announce five (5) scholarship grants for alumni pursuing graduate studies. Each grant covers 50% of tuition fees for the entire program. Fields include Education, Engineering, Business Administration, and Information Technology. Deadline for applications is March 30, 2026. See the Alumni Office for details.',
-    author: 'Scholarship Committee',
-    author_avatar: '',
-    created_at: new Date(Date.now() - 432000000).toISOString(),
-    like_count: 37,
-    comment_count: 15,
-    liked: false,
-    image_url: '',
-    tag: 'Announcement',
-    tag_color: 'bg-blue-100 text-blue-700',
-  },
-];
+
 
 type PostType = 'text' | 'job' | 'announcement' | 'event' | 'discussion' | 'guide';
 
@@ -189,7 +69,7 @@ function InfoCard({ post, onViewDetails }: { post: FeedPost; onViewDetails: () =
         <h3 className="text-sm font-semibold text-gray-900 mb-1">{post.title}</h3>
 
         <p className="text-xs text-gray-600 leading-relaxed mb-1 line-clamp-3">
-          {post.content}
+          {decodeUnicode(post.content)}
         </p>
 
         {post.image_url && (
@@ -240,7 +120,7 @@ function PostDetailView({ post, onBack }: { post: FeedPost; onBack: () => void }
         <h3 className="text-base font-bold text-gray-900 mb-2">{post.title}</h3>
 
         <p className="text-sm text-gray-700 leading-relaxed mb-3 whitespace-pre-line">
-          {post.content}
+          {decodeUnicode(post.content)}
         </p>
 
         {post.image_url && (
@@ -274,10 +154,12 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
 
   useEffect(() => {
     Promise.all([
-      eventsApi.list().then((data: any) => { if (data?.length) setEvents(data.slice(0, 3)); }).catch(() => {}),
       feedApi.list().then((data: any) => {
-        const ann = data?.filter((p: any) => p.type === 'announcement').slice(0, 3);
+        if (!data) return;
+        const ann = data.filter((p: any) => p.type === 'announcement').slice(0, 3);
         if (ann?.length) setAnnouncements(ann.map((a: any) => ({ id: a.id, title: a.title, date: a.created_at ? new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '' })));
+        const evts = data.filter((p: any) => p.type === 'event').slice(0, 3);
+        if (evts?.length) setEvents(evts.map((e: any) => ({ id: e.id, name: e.title, date: e.event_date ? new Date(e.event_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : e.created_at ? new Date(e.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '' })));
       }).catch(() => {}),
       careerTrendsApi.list().then((data: any) => {
         if (!data) return;
@@ -329,7 +211,7 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
           Upcoming Events
         </h3>
         {events.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-4">No upcoming events.</p>
+          <p className="text-xs text-gray-400 text-center py-4">No upcoming events for now.</p>
         ) : (
           <div className="space-y-2">
             {events.map((event, i) => (
@@ -350,7 +232,7 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
             ))}
           </div>
         )}
-        <button onClick={() => navigate('/?filter=event')} className="mt-2 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors flex items-center gap-1">
+        <button onClick={() => navigate('/events')} className="mt-2 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors flex items-center gap-1">
           View All &rarr;
         </button>
       </div>
@@ -361,7 +243,7 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
           Latest Announcements
         </h3>
         {announcements.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-4">No announcements yet.</p>
+          <p className="text-xs text-gray-400 text-center py-4">No announcements for now.</p>
         ) : (
           <div className="space-y-2">
             {announcements.map((a) => (
@@ -375,7 +257,7 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
             ))}
           </div>
         )}
-        <button onClick={() => navigate('/?filter=announcement')} className="mt-2 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors flex items-center gap-1">
+        <button onClick={() => navigate('/announcements')} className="mt-2 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors flex items-center gap-1">
           View All &rarr;
         </button>
       </div>
@@ -546,9 +428,8 @@ export default function DashboardPage() {
   useEffect(() => {
     setLoading(true);
     feedApi.list().then((data) => {
-      const loaded = data && data.length > 0 ? data : fallbackPosts;
-      setFeedPosts(loaded);
-    }).catch(() => setFeedPosts(fallbackPosts))
+      if (data) setFeedPosts(data);
+    }).catch(() => {})
     .finally(() => setLoading(false));
   }, []);
 

@@ -145,7 +145,6 @@ export const jobsApi = {
   savedList: () => api.get<any[]>('/jobs/saved/list'),
   save: (jobId: string) => api.post<any>(`/jobs/saved/${jobId}`, {}),
   unsave: (jobId: string) => api.delete<any>(`/jobs/saved/${jobId}`),
-  seed: () => api.post<any>('/jobs/seed', {}),
 };
 
 export const surveyApi = {
@@ -283,7 +282,6 @@ export const feedApi = {
   toggleLike: (postId: string) => api.post<any>(`/feed/${postId}/like`, {}),
   myComments: () => api.get<any[]>('/feed/comments/mine'),
   deleteComment: (commentId: string) => api.delete(`/feed/comments/${commentId}`),
-  seed: () => api.post<any>('/feed/seed', {}),
 };
 
 export const activitiesApi = {

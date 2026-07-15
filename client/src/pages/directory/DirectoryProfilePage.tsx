@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon, BriefcaseIcon, AcademicCapIcon, MapPinIcon, LinkIcon, StarIcon, CheckBadgeIcon, TrophyIcon, ClockIcon, BuildingOfficeIcon, ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { directoryApi } from '@/services/api';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
+import { SkeletonCard, SkeletonRow, SkeletonText } from '@/components/ui/Skeleton';
 
 function SectionTitle({ icon, title }: { icon: any; title: string }) {
   const Icon = icon;
@@ -61,7 +62,28 @@ export default function DirectoryProfilePage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div className="text-center py-12 text-sm text-gray-500">Loading profile...</div>;
+  if (loading) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-4">
+        <div className="h-4 w-28 bg-gray-200 animate-pulse rounded" />
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-full bg-gray-200 animate-pulse shrink-0" />
+            <div className="space-y-2 flex-1">
+              <div className="h-4 w-48 bg-gray-200 animate-pulse rounded" />
+              <div className="h-3 w-32 bg-gray-200 animate-pulse rounded" />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SkeletonCard className="h-40" />
+          <SkeletonCard className="h-40" />
+        </div>
+        <SkeletonCard className="h-32" />
+        <SkeletonCard className="h-48" />
+      </div>
+    );
+  }
   if (!profile) return <div className="text-center py-12 text-sm text-gray-500">Profile not found.</div>;
 
   const current = profile.employment?.find((e: any) => e.is_current);

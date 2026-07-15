@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BriefcaseIcon, AcademicCapIcon, CalendarDaysIcon, FunnelIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { directoryApi } from '@/services/api';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
+import { SkeletonRow } from '@/components/ui/Skeleton';
 
 const statusColors: Record<string, string> = {
   'Employed': 'bg-emerald-100 text-emerald-700',
@@ -187,13 +188,17 @@ export default function DirectoryPage() {
           </button>
         )}
         <span className="text-xs text-gray-400 ml-auto whitespace-nowrap">
-          {loading ? 'Searching...' : `${total} alumni`}
+          {loading ? (
+            <span className="h-3 w-16 bg-gray-200 animate-pulse rounded inline-block align-middle" />
+          ) : `${total} alumni`}
         </span>
       </div>
 
       {/* Results */}
       {loading && (
-        <div className="text-center py-8 text-sm text-gray-500">Searching...</div>
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
+        </div>
       )}
 
       {!loading && results.length === 0 && (

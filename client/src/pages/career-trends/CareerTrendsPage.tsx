@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BriefcaseIcon, BuildingOfficeIcon, SparklesIcon, AcademicCapIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { careerTrendsApi } from '@/services/api';
+import { SkeletonCard, SkeletonStatCard, SkeletonRow } from '@/components/ui/Skeleton';
 
 const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#ea580c', '#d97706', '#c2410c', '#9a3412', '#7c2d12'];
 const STATUS_COLORS = ['#059669', '#d97706', '#dc2626', '#2563eb', '#7c3aed', '#6b7280'];
@@ -33,81 +34,7 @@ function formatNumber(n: number): string {
   return n.toLocaleString();
 }
 
-const fallbackOverview: Overview = {
-  totalAlumni: 2847,
-  totalEmployed: 2145,
-  employmentRate: 75,
-  topCareer: 'Software Engineer',
-  topIndustry: 'Information Technology',
-  topEmployer: 'Accenture',
-  topSkill: 'JavaScript',
-  averageExperienceYears: 3.2,
-};
 
-const fallbackCareers: CareerTrend[] = [
-  { position: 'Software Engineer', alumniCount: 186, currentInCareer: 142, topEmployers: [{ name: 'Accenture', count: 28 }, { name: 'IBM', count: 15 }, { name: 'Lexmark', count: 12 }], topIndustries: [{ name: 'Information Technology', count: 150 }, { name: 'Business Process Outsourcing', count: 20 }], mostCommonCourse: 'BSIT', topSkills: [{ name: 'JavaScript', count: 120 }, { name: 'React', count: 85 }, { name: 'Node.js', count: 60 }], averageExperienceYears: 2.8 },
-  { position: 'Web Developer', alumniCount: 74, currentInCareer: 58, topEmployers: [{ name: 'TechStart Solutions', count: 10 }, { name: 'CreativeHub PH', count: 6 }], topIndustries: [{ name: 'Information Technology', count: 50 }, { name: 'Design', count: 10 }], mostCommonCourse: 'BSIT', topSkills: [{ name: 'HTML/CSS', count: 60 }, { name: 'JavaScript', count: 50 }, { name: 'PHP', count: 30 }], averageExperienceYears: 2.1 },
-  { position: 'IT Support Specialist', alumniCount: 92, currentInCareer: 71, topEmployers: [{ name: 'Concentrix', count: 18 }, { name: 'Teleperformance', count: 14 }], topIndustries: [{ name: 'Information Technology', count: 60 }, { name: 'Business Process Outsourcing', count: 30 }], mostCommonCourse: 'BSIT', topSkills: [{ name: 'Network Administration', count: 45 }, { name: 'Troubleshooting', count: 40 }], averageExperienceYears: 3.2 },
-  { position: 'Data Analyst', alumniCount: 45, currentInCareer: 36, topEmployers: [{ name: 'Accenture', count: 8 }, { name: 'UnionBank', count: 5 }], topIndustries: [{ name: 'Information Technology', count: 25 }, { name: 'Finance', count: 10 }], mostCommonCourse: 'BS Mathematics', topSkills: [{ name: 'SQL', count: 30 }, { name: 'Python', count: 25 }, { name: 'Excel', count: 22 }], averageExperienceYears: 1.9 },
-  { position: 'Cybersecurity Analyst', alumniCount: 38, currentInCareer: 31, topEmployers: [{ name: 'Accenture', count: 10 }, { name: 'DOST', count: 4 }], topIndustries: [{ name: 'Information Technology', count: 25 }, { name: 'Government', count: 8 }], mostCommonCourse: 'BSIT', topSkills: [{ name: 'Network Security', count: 25 }, { name: 'Python', count: 15 }], averageExperienceYears: 3.5 },
-  { position: 'Civil Engineer', alumniCount: 67, currentInCareer: 52, topEmployers: [{ name: 'DPWH', count: 20 }, { name: 'AECOM', count: 8 }], topIndustries: [{ name: 'Government', count: 25 }, { name: 'Construction', count: 20 }], mostCommonCourse: 'BSCE', topSkills: [{ name: 'AutoCAD', count: 40 }, { name: 'Project Management', count: 25 }], averageExperienceYears: 4.1 },
-  { position: 'Teacher', alumniCount: 83, currentInCareer: 68, topEmployers: [{ name: 'DepEd', count: 35 }, { name: 'CTU-Naga', count: 10 }], topIndustries: [{ name: 'Education', count: 60 }, { name: 'Government', count: 15 }], mostCommonCourse: 'BSEd', topSkills: [{ name: 'Classroom Management', count: 40 }, { name: 'Curriculum Design', count: 20 }], averageExperienceYears: 5.2 },
-  { position: 'Business Analyst', alumniCount: 41, currentInCareer: 32, topEmployers: [{ name: 'Accenture', count: 10 }, { name: 'IBM', count: 5 }], topIndustries: [{ name: 'Information Technology', count: 20 }, { name: 'Business', count: 15 }], mostCommonCourse: 'BSBA', topSkills: [{ name: 'Data Analysis', count: 25 }, { name: 'Excel', count: 20 }], averageExperienceYears: 2.5 },
-];
-
-const fallbackEmployers = [
-  { name: 'Accenture', alumniCount: 156 }, { name: 'IBM', alumniCount: 89 }, { name: 'Lexmark', alumniCount: 67 },
-  { name: 'Globe', alumniCount: 54 }, { name: 'PLDT', alumniCount: 48 }, { name: 'Concentrix', alumniCount: 42 },
-  { name: 'Teleperformance', alumniCount: 38 }, { name: 'DepEd', alumniCount: 35 }, { name: 'UnionBank', alumniCount: 28 },
-  { name: 'DOST', alumniCount: 22 }, { name: 'TechStart Solutions', alumniCount: 18 }, { name: 'AECOM', alumniCount: 15 },
-];
-
-const fallbackIndustries = [
-  { name: 'Information Technology', value: 520, percentage: 52 },
-  { name: 'Education', value: 180, percentage: 18 },
-  { name: 'Business', value: 130, percentage: 13 },
-  { name: 'Government', value: 100, percentage: 10 },
-  { name: 'Healthcare', value: 70, percentage: 7 },
-];
-
-const fallbackStatus = [
-  { status: 'Employed', count: 1800, percentage: 63 },
-  { status: 'Self-employed', count: 340, percentage: 12 },
-  { status: 'Unemployed', count: 256, percentage: 9 },
-  { status: 'Student', count: 200, percentage: 7 },
-  { status: 'Seeking Opportunities', count: 170, percentage: 6 },
-  { status: 'Retired', count: 81, percentage: 3 },
-];
-
-const fallbackSkills = [
-  { name: 'JavaScript', count: 245 }, { name: 'React', count: 180 }, { name: 'Java', count: 160 },
-  { name: 'Node.js', count: 140 }, { name: 'Python', count: 125 }, { name: 'AWS', count: 110 },
-  { name: 'SQL', count: 105 }, { name: 'AutoCAD', count: 85 }, { name: 'PHP', count: 72 }, { name: 'C#', count: 65 },
-];
-
-const fallbackBatch = [
-  { year: 2019, total: 320, employed: 280, rate: 88 },
-  { year: 2020, total: 295, employed: 248, rate: 84 },
-  { year: 2021, total: 310, employed: 252, rate: 81 },
-  { year: 2022, total: 345, employed: 269, rate: 78 },
-  { year: 2023, total: 380, employed: 285, rate: 75 },
-  { year: 2024, total: 420, employed: 294, rate: 70 },
-  { year: 2025, total: 215, employed: 118, rate: 55 },
-];
-
-const fallbackTopBatches = [
-  { year: 2024, total: 420, employed: 294 },
-  { year: 2023, total: 380, employed: 285 },
-  { year: 2022, total: 345, employed: 269 },
-  { year: 2021, total: 310, employed: 252 },
-  { year: 2020, total: 295, employed: 248 },
-];
-
-const fallbackFastestGrowing = [
-  { position: 'Software Engineer', newAlumni: 18 },
-  { position: 'Data Analyst', newAlumni: 12 },
-  { position: 'Cybersecurity Analyst', newAlumni: 9 },
-];
 
 function CareerCard({ career }: { career: CareerTrend }) {
   const navigate = useNavigate();
@@ -156,10 +83,10 @@ function CareerCard({ career }: { career: CareerTrend }) {
 }
 
 function SidebarWidgets({ data }: { data: any }) {
-  const skills = data?.skillsDistribution?.length > 0 ? data.skillsDistribution : fallbackSkills;
-  const fastestGrowing = data?.fastestGrowing?.length > 0 ? data.fastestGrowing : fallbackFastestGrowing;
-  const employers = data?.topEmployers?.length > 0 ? data.topEmployers : fallbackEmployers;
-  const industries = data?.industryDistribution?.length > 0 ? data.industryDistribution : fallbackIndustries;
+  const { skillsDistribution = [], fastestGrowing = [], topEmployers = [], industryDistribution = [] } = data || {};
+  const skills = skillsDistribution;
+  const employers = topEmployers;
+  const industries = industryDistribution;
 
   return (
     <div className="space-y-3">
@@ -249,17 +176,18 @@ function matchQuery(text: string, query: string): boolean {
 
 export default function CareerTrendsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>({
-    overview: fallbackOverview,
-    topCareers: fallbackCareers,
-    topEmployers: fallbackEmployers,
-    topIndustries: fallbackIndustries.map((i) => ({ name: i.name, alumniCount: i.value, percentage: i.percentage })),
-    industryDistribution: fallbackIndustries,
-    skillsDistribution: fallbackSkills,
-    batchDistribution: fallbackBatch,
-    statusDistribution: fallbackStatus,
-    fastestGrowing: fallbackFastestGrowing,
-    topBatches: fallbackTopBatches,
+    overview: null,
+    topCareers: [],
+    topEmployers: [],
+    topIndustries: [],
+    industryDistribution: [],
+    skillsDistribution: [],
+    batchDistribution: [],
+    statusDistribution: [],
+    fastestGrowing: [],
+    topBatches: [],
   });
 
   useEffect(() => {
@@ -267,6 +195,7 @@ export default function CareerTrendsPage() {
     careerTrendsApi.list()
       .then((res) => { if (!cancelled) setData(res); })
       .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
 
@@ -349,6 +278,30 @@ export default function CareerTrendsPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-4">
+          <div className="h-5 w-32 bg-gray-200 animate-pulse rounded mb-1" />
+          <div className="h-3 w-64 bg-gray-200 animate-pulse rounded" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          {[1, 2, 3, 4].map((i) => <SkeletonStatCard key={i} className="h-20" />)}
+        </div>
+        <div className="flex gap-4">
+          <div className="flex-1 space-y-3">
+            {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+          </div>
+          <aside className="hidden lg:block w-80 shrink-0">
+            <div className="sticky top-16 space-y-3">
+              {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} className="h-32" />)}
+            </div>
+          </aside>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-4">
@@ -374,7 +327,7 @@ export default function CareerTrendsPage() {
             <ChartBarIcon className="w-5 h-5 text-orange-600" />
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-900 leading-none">{overview.topCareer}</p>
+            <p className="text-lg font-bold text-gray-900 leading-none">{overview?.topCareer ?? '—'}</p>
             <p className="text-[11px] text-gray-500 mt-0.5">Top Career</p>
           </div>
         </div>
@@ -383,7 +336,7 @@ export default function CareerTrendsPage() {
             <BuildingOfficeIcon className="w-5 h-5 text-orange-600" />
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-900 leading-none">{overview.topIndustry}</p>
+            <p className="text-lg font-bold text-gray-900 leading-none">{overview?.topIndustry ?? '—'}</p>
             <p className="text-[11px] text-gray-500 mt-0.5">Top Industry</p>
           </div>
         </div>
@@ -392,7 +345,7 @@ export default function CareerTrendsPage() {
             <UserGroupIcon className="w-5 h-5 text-orange-600" />
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-900 leading-none">{overview.employmentRate}%</p>
+            <p className="text-lg font-bold text-gray-900 leading-none">{overview?.employmentRate ?? 0}%</p>
             <p className="text-[11px] text-gray-500 mt-0.5">Employment Rate</p>
           </div>
         </div>
@@ -401,7 +354,7 @@ export default function CareerTrendsPage() {
             <ClockIcon className="w-5 h-5 text-orange-600" />
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-900 leading-none">{overview.averageExperienceYears}yrs</p>
+            <p className="text-lg font-bold text-gray-900 leading-none">{overview?.averageExperienceYears ?? 0}yrs</p>
             <p className="text-[11px] text-gray-500 mt-0.5">Avg Experience</p>
           </div>
         </div>

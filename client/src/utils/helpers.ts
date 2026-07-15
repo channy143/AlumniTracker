@@ -1,6 +1,28 @@
 import { clsx, type ClassValue } from 'clsx';
 import { format, parseISO } from 'date-fns';
 
+export function playTing() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+    osc1.frequency.value = 880;
+    osc1.type = 'sine';
+    osc2.frequency.value = 1320;
+    osc2.type = 'sine';
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.15);
+    osc2.start(ctx.currentTime + 0.1);
+    osc2.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
@@ -31,6 +53,10 @@ export const employmentStatusLabels: Record<string, string> = {
   entrepreneur: 'Entrepreneur',
   retired: 'Retired',
 };
+
+export function decodeUnicode(str: string) {
+  return str.replace(/\\u(\w{4})/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)));
+}
 
 export const jobTypeLabels: Record<string, string> = {
   'full-time': 'Full-Time',

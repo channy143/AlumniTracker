@@ -4,12 +4,13 @@ import { supabase } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
+import { addActivity } from '../services/activityStore';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 async function logActivity(name: string, action: string, target: string) {
-  try { await supabase.from('activity_log').insert({ user_name: name, action, target }); } catch {}
+  await addActivity(name, action, target);
 }
 
 router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
