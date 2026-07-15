@@ -50,6 +50,8 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
       subtitle: 'Share important updates',
       icon: MegaphoneIcon,
       gradient: 'from-red-500 to-orange-500',
+      image: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=400&h=300&fit=crop',
+      fallback: 'https://picsum.photos/seed/megaphone/400/300',
       badge: 'Most Used',
       badgeIcon: FireSolid,
       route: '/admin/announcements'
@@ -60,6 +62,8 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
       subtitle: 'Schedule alumni activities',
       icon: CalendarDaysIcon,
       gradient: 'from-teal-400 to-cyan-500',
+      image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&h=300&fit=crop',
+      fallback: 'https://picsum.photos/seed/events/400/300',
       badge: 'Quick',
       badgeIcon: RocketLaunchIcon,
       route: '/admin/events'
@@ -70,6 +74,8 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
       subtitle: 'Launch employment surveys',
       icon: ClipboardDocumentListIcon,
       gradient: 'from-purple-400 to-indigo-500',
+      image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&h=300&fit=crop',
+      fallback: 'https://picsum.photos/seed/survey/400/300',
       badge: 'New',
       badgeIcon: StarSolid,
       route: '/admin/surveys'
@@ -80,6 +86,8 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
       subtitle: 'Download analytics reports',
       icon: DocumentTextIcon,
       gradient: 'from-pink-400 to-rose-500',
+      image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop',
+      fallback: 'https://picsum.photos/seed/reports/400/300',
       badge: 'Popular',
       badgeIcon: FireIcon,
       route: '/admin/reports'
@@ -90,6 +98,8 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
       subtitle: 'Explore employment trends',
       icon: ChartBarIcon,
       gradient: 'from-amber-400 to-orange-500',
+      image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop',
+      fallback: 'https://picsum.photos/seed/analytics/400/300',
       badge: 'Essential',
       badgeIcon: StarIcon,
       route: '/admin/analytics'
@@ -100,6 +110,8 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
       subtitle: 'Create institutional reports',
       icon: DocumentTextIcon,
       gradient: 'from-blue-400 to-indigo-600',
+      image: 'https://images.unsplash.com/photo-1512314889357-e157c22f938d?w=400&h=300&fit=crop',
+      fallback: 'https://picsum.photos/seed/documents/400/300',
       badge: 'Premium',
       badgeIcon: BoltIcon,
       route: '/admin/reports/generate'
@@ -118,9 +130,9 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
     }
   };
 
-  const CARD_W = 550;
-  const CARD_H = 350;
-  const CARD_GAP = 530;
+  const CARD_W = 670;
+  const CARD_H = 380;
+  const CARD_GAP = 635;
 
   return (
     <>
@@ -158,24 +170,27 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
                   else goTo(index);
                 }}
               >
-                <div className={`relative h-full p-5 flex flex-col justify-between bg-gradient-to-br ${action.gradient}`}>
+                <div className={`relative h-full flex bg-gradient-to-br ${action.gradient}`}>
                   <div className="absolute inset-0 bg-white/0 transition-colors duration-300 hover:bg-white/10" />
-                  <div className="relative">
-                    <action.icon className="w-9 h-9 text-white/90 drop-shadow-md" />
+                  <div className="w-[70%] h-full relative overflow-hidden">
+                    <img src={action.image} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => { (e.currentTarget.src = action.fallback); e.currentTarget.onerror = null; }} />
+                    <div className="absolute inset-0 bg-black/20" />
                   </div>
-                  <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-white/20 border border-white/25 text-white text-[10px] font-medium backdrop-blur-sm">
-                      <action.badgeIcon className="w-3 h-3" />
-                      {action.badge}
-                    </span>
-                  </div>
-                  <div className="relative mt-auto">
-                    <h3 className="text-sm font-bold text-white drop-shadow-md leading-tight">
-                      {action.title}
-                    </h3>
-                    <p className="text-[11px] text-white/80 drop-shadow-sm mt-0.5">
-                      {action.subtitle}
-                    </p>
+                  <div className="w-[30%] h-full relative flex flex-col justify-center px-3 py-4">
+                    <div className="absolute top-[17px] right-3">
+                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-white/20 border border-white/25 text-white text-[10px] font-medium backdrop-blur-sm">
+                        <action.badgeIcon className="w-3 h-3" />
+                        {action.badge}
+                      </span>
+                    </div>
+                    <div className="-mt-[150px]">
+                      <h3 className="text-sm font-bold text-white drop-shadow-md leading-tight mb-1">
+                        {action.title}
+                      </h3>
+                      <p className="text-[10px] text-white/70 drop-shadow-sm leading-relaxed">
+                        {action.subtitle}. Quick access to manage and configure this feature directly from your dashboard.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
