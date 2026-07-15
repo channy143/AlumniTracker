@@ -11,7 +11,6 @@ import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import ProfilePage from '@/pages/alumni/ProfilePage';
 
-import MentorshipPage from '@/pages/mentorship/MentorshipPage';
 import CareerTrendsPage from '@/pages/career-trends/CareerTrendsPage';
 import CareerInsightsPage from '@/pages/career-trends/CareerInsightsPage';
 import DirectoryPage from '@/pages/directory/DirectoryPage';
@@ -20,18 +19,18 @@ import SupportPage from '@/pages/support/SupportPage';
 import UsefulLinksPage from '@/pages/links/UsefulLinksPage';
 import EventsPage from '@/pages/events/EventsPage';
 import AnnouncementsPage from '@/pages/announcements/AnnouncementsPage';
-import ConnectionsPage from '@/pages/connections/ConnectionsPage';
+
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AlumniManagement from '@/pages/admin/AlumniManagement';
-import EmployerManagement from '@/pages/admin/EmployerManagement';
 import JobManagement from '@/pages/admin/JobManagement';
-import SurveyManagement from '@/pages/admin/SurveyManagement';
+import GraduateTracerSurveys from '@/pages/admin/GraduateTracerSurveys';
 import AnnouncementManagement from '@/pages/admin/AnnouncementManagement';
-import ReportsPage from '@/pages/admin/ReportsPage';
+import AdminEvents from '@/pages/admin/AdminEvents';
 import CareerAnalytics from '@/pages/admin/CareerAnalytics';
-import UserManagement from '@/pages/admin/UserManagement';
+import CurriculumInsights from '@/pages/admin/CurriculumInsights';
+import EmployerInsights from '@/pages/admin/EmployerInsights';
+import ReportsPage from '@/pages/admin/ReportsPage';
 import SystemSettings from '@/pages/admin/SystemSettings';
-import AdminProfile from '@/pages/admin/AdminProfile';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore();
@@ -83,7 +82,7 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="employment" element={<Navigate to="/career-trends" replace />} />
-        <Route path="mentorship" element={<MentorshipPage />} />
+
         <Route path="career-trends" element={<CareerTrendsPage />} />
         <Route path="career-trends/:position" element={<CareerInsightsPage />} />
         <Route path="directory" element={<DirectoryPage />} />
@@ -92,7 +91,7 @@ export default function App() {
         <Route path="announcements" element={<AnnouncementsPage />} />
         <Route path="events" element={<EventsPage />} />
         <Route path="support" element={<SupportPage />} />
-        <Route path="connections" element={<ConnectionsPage />} />
+
       </Route>
 
       <Route path="/auth" element={<AuthLayout />}>
@@ -110,15 +109,15 @@ export default function App() {
       >
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/alumni" element={<AlumniManagement />} />
-        <Route path="/admin/employers" element={<EmployerManagement />} />
         <Route path="/admin/jobs" element={<JobManagement />} />
-        <Route path="/admin/surveys" element={<SurveyManagement />} />
+        <Route path="/admin/surveys" element={<GraduateTracerSurveys />} />
         <Route path="/admin/announcements" element={<AnnouncementManagement />} />
-        <Route path="/admin/reports" element={<ReportsPage />} />
+        <Route path="/admin/events" element={<AdminEvents />} />
         <Route path="/admin/analytics" element={<CareerAnalytics />} />
-        <Route path="/admin/users" element={<UserManagement />} />
+        <Route path="/admin/curriculum" element={<CurriculumInsights />} />
+        <Route path="/admin/employers" element={<EmployerInsights />} />
+        <Route path="/admin/reports" element={<ReportsPage />} />
         <Route path="/admin/settings" element={<SystemSettings />} />
-        <Route path="/admin/profile" element={<AdminProfile />} />
       </Route>
     </Routes>
   );

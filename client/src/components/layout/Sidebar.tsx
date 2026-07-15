@@ -10,7 +10,6 @@ import {
   LinkIcon,
   CalendarDaysIcon,
   QuestionMarkCircleIcon,
-  ShieldCheckIcon,
   BuildingOfficeIcon,
   ClipboardDocumentListIcon,
   MegaphoneIcon,
@@ -19,6 +18,7 @@ import {
   ChartBarIcon,
   UserIcon,
   BookOpenIcon,
+  AcademicCapIcon,
 } from '@heroicons/react/24/outline';
 
 type NavItem = { name: string; href: string; icon: any; end?: boolean };
@@ -37,17 +37,17 @@ const resourcesNav: NavItem[] = [
 ];
 
 const adminNav: NavItem[] = [
-  { name: 'Dashboard', href: '/admin', icon: ShieldCheckIcon, end: true },
-  { name: 'Profile', href: '/admin/profile', icon: UserIcon },
-  { name: 'Alumni', href: '/admin/alumni', icon: UsersIcon },
-  { name: 'Companies', href: '/admin/employers', icon: BuildingOfficeIcon },
-  { name: 'Job Postings', href: '/admin/jobs', icon: ClipboardDocumentListIcon },
-  { name: 'Surveys', href: '/admin/surveys', icon: DocumentTextIcon },
+  { name: 'Dashboard', href: '/admin', icon: HomeIcon, end: true },
+  { name: 'Alumni Management', href: '/admin/alumni', icon: UsersIcon },
+  { name: 'Career Opportunities', href: '/admin/jobs', icon: ClipboardDocumentListIcon },
+  { name: 'Graduate Tracer Surveys', href: '/admin/surveys', icon: DocumentTextIcon },
   { name: 'Announcements', href: '/admin/announcements', icon: MegaphoneIcon },
-  { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
+  { name: 'Events', href: '/admin/events', icon: CalendarDaysIcon },
   { name: 'Career Analytics', href: '/admin/analytics', icon: ChartBarIcon },
-  { name: 'Users', href: '/admin/users', icon: UsersIcon },
-  { name: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon },
+  { name: 'Curriculum Insights', href: '/admin/curriculum', icon: AcademicCapIcon },
+  { name: 'Employer Insights', href: '/admin/employers', icon: BuildingOfficeIcon },
+  { name: 'Reports & Exports', href: '/admin/reports', icon: ChartBarIcon },
+  { name: 'System Settings', href: '/admin/settings', icon: Cog6ToothIcon },
 ];
 
 export default function Sidebar({
