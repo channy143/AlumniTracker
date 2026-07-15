@@ -2,7 +2,24 @@ import { useState, useEffect } from 'react';
 import { adminApi } from '@/services/api';
 import { Link } from 'react-router-dom';
 import { SkeletonCard, SkeletonStatCard } from '@/components/ui/Skeleton';
-import { BriefcaseIcon, UserGroupIcon, ChartBarIcon, CurrencyDollarIcon, DocumentTextIcon, MegaphoneIcon, CalendarDaysIcon, BuildingOfficeIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
+import { 
+  BriefcaseIcon, 
+  UserGroupIcon, 
+  ChartBarIcon, 
+  CurrencyDollarIcon, 
+  DocumentTextIcon, 
+  MegaphoneIcon, 
+  CalendarDaysIcon, 
+  BuildingOfficeIcon, 
+  ClipboardDocumentListIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FireIcon,
+  StarIcon,
+  RocketLaunchIcon,
+  BoltIcon
+} from '@heroicons/react/24/outline';
+import { FireIcon as FireSolid, StarIcon as StarSolid } from '@heroicons/react/24/solid';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line } from 'recharts';
 
 const COLORS = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#6366f1'];
@@ -19,6 +36,182 @@ function SectionHeading({ label }: { label: string }) {
       <div className="w-1 h-4 bg-orange-500 rounded-full" />
       <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{label}</h2>
     </div>
+  );
+}
+
+// Quick Actions Carousel Component
+function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: string) => void }) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const actions = [
+    {
+      id: 1,
+      title: 'Create Announcement',
+      subtitle: 'Share important updates',
+      icon: MegaphoneIcon,
+      gradient: 'from-red-500 to-orange-500',
+      badge: 'Most Used',
+      badgeIcon: FireSolid,
+      route: '/admin/announcements'
+    },
+    {
+      id: 2,
+      title: 'Create Event',
+      subtitle: 'Schedule alumni activities',
+      icon: CalendarDaysIcon,
+      gradient: 'from-teal-400 to-cyan-500',
+      badge: 'Quick',
+      badgeIcon: RocketLaunchIcon,
+      route: '/admin/events'
+    },
+    {
+      id: 3,
+      title: 'Create Tracer Survey',
+      subtitle: 'Launch employment surveys',
+      icon: ClipboardDocumentListIcon,
+      gradient: 'from-purple-400 to-indigo-500',
+      badge: 'New',
+      badgeIcon: StarSolid,
+      route: '/admin/surveys'
+    },
+    {
+      id: 4,
+      title: 'Export Reports',
+      subtitle: 'Download analytics reports',
+      icon: DocumentTextIcon,
+      gradient: 'from-pink-400 to-rose-500',
+      badge: 'Popular',
+      badgeIcon: FireIcon,
+      route: '/admin/reports'
+    },
+    {
+      id: 5,
+      title: 'View Career Analytics',
+      subtitle: 'Explore employment trends',
+      icon: ChartBarIcon,
+      gradient: 'from-amber-400 to-orange-500',
+      badge: 'Essential',
+      badgeIcon: StarIcon,
+      route: '/admin/analytics'
+    },
+    {
+      id: 6,
+      title: 'Generate Report',
+      subtitle: 'Create institutional reports',
+      icon: DocumentTextIcon,
+      gradient: 'from-blue-400 to-indigo-600',
+      badge: 'Premium',
+      badgeIcon: BoltIcon,
+      route: '/admin/reports/generate'
+    }
+  ];
+
+  const goTo = (index: number) => {
+    setSelectedIndex(((index % actions.length) + actions.length) % actions.length);
+  };
+
+  const handleCardClick = (route: string) => {
+    if (onActionClick) {
+      onActionClick(route);
+    } else {
+      window.location.href = route;
+    }
+  };
+
+  const CARD_W = 550;
+  const CARD_H = 350;
+  const CARD_GAP = 530;
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 bg-orange-500 rounded-full" />
+          <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Quick Actions</h2>
+          <span className="text-[10px] text-gray-400">Admin shortcuts</span>
+        </div>
+      </div>
+
+      <div className="relative" style={{ height: `${CARD_H + 20}px` }}>
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+          {actions.map((action, index) => {
+            const rawOffset = index - selectedIndex;
+            const half = actions.length / 2;
+            const offset = rawOffset > half ? rawOffset - actions.length : rawOffset < -half ? rawOffset + actions.length : rawOffset;
+            const isSelected = offset === 0;
+            const isSide = Math.abs(offset) === 1;
+            return (
+              <div
+                key={action.id}
+                className="absolute cursor-pointer transition-all duration-500 ease-in-out"
+                style={{
+                  width: `${CARD_W}px`,
+                  height: `${CARD_H}px`,
+                  borderRadius: 0,
+                  transform: `translateX(${offset * CARD_GAP}px) scale(${isSelected ? 1 : 0.85})`,
+                  opacity: isSelected ? 1 : (isSide ? 0.2 : 0),
+                  zIndex: actions.length - Math.abs(offset),
+                  pointerEvents: isSelected ? 'auto' : 'none',
+                }}
+                onClick={() => {
+                  if (isSelected) handleCardClick(action.route);
+                  else goTo(index);
+                }}
+              >
+                <div className={`relative h-full p-5 flex flex-col justify-between bg-gradient-to-br ${action.gradient}`}>
+                  <div className="absolute inset-0 bg-white/0 transition-colors duration-300 hover:bg-white/10" />
+                  <div className="relative">
+                    <action.icon className="w-9 h-9 text-white/90 drop-shadow-md" />
+                  </div>
+                  <div className="absolute top-3 right-3">
+                    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-white/20 border border-white/25 text-white text-[10px] font-medium backdrop-blur-sm">
+                      <action.badgeIcon className="w-3 h-3" />
+                      {action.badge}
+                    </span>
+                  </div>
+                  <div className="relative mt-auto">
+                    <h3 className="text-sm font-bold text-white drop-shadow-md leading-tight">
+                      {action.title}
+                    </h3>
+                    <p className="text-[11px] text-white/80 drop-shadow-sm mt-0.5">
+                      {action.subtitle}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={() => goTo(selectedIndex - 1)}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/80 border border-gray-200 text-gray-600 hover:bg-white hover:text-gray-900 shadow-sm transition-all"
+          style={{ borderRadius: 0 }}
+        >
+          <ChevronLeftIcon className="w-5 h-5" />
+        </button>
+        <button
+          onClick={() => goTo(selectedIndex + 1)}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/80 border border-gray-200 text-gray-600 hover:bg-white hover:text-gray-900 shadow-sm transition-all"
+          style={{ borderRadius: 0 }}
+        >
+          <ChevronRightIcon className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="flex justify-center gap-1.5 mt-3">
+        {actions.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => goTo(index)}
+            className={`transition-all duration-300 ${
+              selectedIndex === index ? 'w-4 bg-orange-500' : 'w-1.5 bg-gray-300 hover:bg-gray-400'
+            }`}
+            style={{ height: '6px', borderRadius: 0 }}
+          />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -80,7 +273,8 @@ export default function AdminDashboard() {
         <p className="text-xs text-gray-500 mt-0.5">Alumni tracer overview and key career analytics</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+      {/* KPI Cards - Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {statCards.map((stat) => (
           <Link key={stat.label} to={stat.href} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-3 hover:shadow-sm transition-shadow">
             <div className={`w-10 h-10 rounded-lg ${stat.bg} flex items-center justify-center shrink-0`}>
@@ -94,6 +288,10 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      {/* Quick Actions Carousel */}
+      <QuickActionsCarousel />
+
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-3">
           <SectionHeading label="Graduate Outcomes" />
@@ -347,20 +545,6 @@ export default function AdminDashboard() {
               Upcoming Events
             </h3>
             <p className="text-xs text-gray-400 text-center py-4">No upcoming events for now.</p>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-lg p-3 border-l-4 border-l-orange-400">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <MegaphoneIcon className="w-4 h-4 text-orange-500" />
-              Quick Actions
-            </h3>
-            <div className="space-y-1">
-              <Link to="/admin/announcements" className="flex items-center gap-2 text-xs text-gray-600 hover:text-orange-600 py-1.5 px-2 rounded hover:bg-orange-50 transition-colors">Create Announcement</Link>
-              <Link to="/admin/events" className="flex items-center gap-2 text-xs text-gray-600 hover:text-orange-600 py-1.5 px-2 rounded hover:bg-orange-50 transition-colors">Create Event</Link>
-              <Link to="/admin/surveys" className="flex items-center gap-2 text-xs text-gray-600 hover:text-orange-600 py-1.5 px-2 rounded hover:bg-orange-50 transition-colors">Create Tracer Survey</Link>
-              <Link to="/admin/reports" className="flex items-center gap-2 text-xs text-gray-600 hover:text-orange-600 py-1.5 px-2 rounded hover:bg-orange-50 transition-colors">Export Reports</Link>
-              <Link to="/admin/analytics" className="flex items-center gap-2 text-xs text-gray-600 hover:text-orange-600 py-1.5 px-2 rounded hover:bg-orange-50 transition-colors">View Career Analytics</Link>
-            </div>
           </div>
         </div>
       </div>
