@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { getInitials, playTing } from '@/utils/helpers';
 import { profileApi, activitiesApi } from '@/services/api';
-import { Bars3Icon, BellIcon, MagnifyingGlassIcon, PlusIcon, UserIcon, ArrowRightOnRectangleIcon, AcademicCapIcon, BriefcaseIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, BellIcon, MagnifyingGlassIcon, UserIcon, ArrowRightOnRectangleIcon, AcademicCapIcon, BriefcaseIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 const SEARCH_PAGES = ['/career-trends', '/announcements', '/events', '/directory', '/connections'];
 
@@ -177,12 +177,6 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               </div>
             )}
           </div>
-          {user?.role === 'admin' && (
-            <button className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-full transition-colors" title="Create Post">
-              <PlusIcon className="w-4 h-4" />
-              <span className="hidden md:inline">Post</span>
-            </button>
-          )}
 
           <div className="relative ml-1 pl-2 border-l border-gray-200" ref={dropdownRef}>
             <button

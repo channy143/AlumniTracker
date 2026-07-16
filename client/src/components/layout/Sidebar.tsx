@@ -11,7 +11,6 @@ import {
   CalendarDaysIcon,
   QuestionMarkCircleIcon,
   BuildingOfficeIcon,
-  ClipboardDocumentListIcon,
   MegaphoneIcon,
   DocumentTextIcon,
   ChartBarIcon,
@@ -38,7 +37,6 @@ const resourcesNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { name: 'Dashboard', href: '/admin', icon: HomeIcon, end: true },
   { name: 'Alumni Management', href: '/admin/alumni', icon: UsersIcon },
-  { name: 'Career Opportunities', href: '/admin/jobs', icon: ClipboardDocumentListIcon },
   { name: 'Graduate Tracer Surveys', href: '/admin/surveys', icon: DocumentTextIcon },
   { name: 'Announcements', href: '/admin/announcements', icon: MegaphoneIcon },
   { name: 'Events', href: '/admin/events', icon: CalendarDaysIcon },
