@@ -5,6 +5,13 @@ import { directoryApi } from '@/services/api';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
 import { SkeletonCard, SkeletonRow, SkeletonText } from '@/components/ui/Skeleton';
 
+function normalizeStatus(s?: string): string {
+  if (!s) return '';
+  let result = s.charAt(0).toUpperCase() + s.slice(1);
+  if (result.toLowerCase() === 'student') return 'Unemployed';
+  return result;
+}
+
 function SectionTitle({ icon, title }: { icon: any; title: string }) {
   const Icon = icon;
   return (
@@ -162,7 +169,7 @@ export default function DirectoryProfilePage() {
         <SectionTitle icon={ChartBarIcon} title="Career Summary" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
           <div>
-            <InfoRow label="Employment Status" value={profile.employment_status || current?.employment_status || ''} />
+            <InfoRow label="Employment Status" value={normalizeStatus(profile.employment_status) || normalizeStatus(current?.employment_status) || ''} />
             <InfoRow label="Industry" value={profile.industry || current?.company_industry || ''} />
             <InfoRow label="Current Position" value={current?.position || ''} />
             <InfoRow label="Company" value={current?.company_name || ''} />

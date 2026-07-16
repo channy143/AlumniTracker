@@ -34,7 +34,7 @@ function calcProfileCompletion(profile: any): number {
   const filled = fields.filter(Boolean).length;
   const hasEducation = (profile.education || []).length > 0;
   const hasSkills = (profile.skills || []).length > 0;
-  const hasEmployment = (profile.employment || []).length > 0;
+  const hasEmployment = !!(profile.current_job_title || profile.company_name || profile.employment_status);
   const total = 8 + 3;
   let score = filled + (hasEducation ? 1 : 0) + (hasSkills ? 1 : 0) + (hasEmployment ? 1 : 0);
   return Math.min(100, Math.round((score / total) * 100));

@@ -192,13 +192,16 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
       }).catch(() => {}),
       profileApi.get().then((p: any) => {
         if (!p) return;
-        const personal = !!(p.first_name || p.last_name);
-        const edu = !!(p.education?.length);
-        const skills = !!(p.skills?.length);
-        const employment = !!(p.current_job_title || p.company_name || p.employment_status);
-        const checks = [personal, edu, skills, employment];
-        const filled = checks.filter(Boolean).length;
-        setProfileCompletion({ pct: Math.round((filled / 4) * 100), personal, edu, skills, employment });
+        const personalFields = [p.first_name, p.last_name, p.email, p.phone, p.city, p.bio, p.employment_status, p.headline];
+        const personalFilled = personalFields.filter(Boolean).length;
+        const hasEducation = !!(p.education?.length);
+        const hasSkills = !!(p.skills?.length);
+        const hasEmployment = !!(p.current_job_title || p.company_name || p.employment_status);
+        const total = 8 + 3;
+        const score = personalFilled + (hasEducation ? 1 : 0) + (hasSkills ? 1 : 0) + (hasEmployment ? 1 : 0);
+        const pct = Math.min(100, Math.round((score / total) * 100));
+        const personal = !!(p.first_name && p.last_name);
+        setProfileCompletion({ pct, personal, edu: hasEducation, skills: hasSkills, employment: hasEmployment });
       }).catch(() => {}),
     ]);
   }, [refreshKey]);
