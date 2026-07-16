@@ -1,12 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { BriefcaseIcon, BuildingOfficeIcon, SparklesIcon, AcademicCapIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { BriefcaseIcon, BuildingOfficeIcon, SparklesIcon, AcademicCapIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { careerTrendsApi } from '@/services/api';
 import { SkeletonCard, SkeletonStatCard, SkeletonRow } from '@/components/ui/Skeleton';
 
 const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#ea580c', '#d97706', '#c2410c', '#9a3412', '#7c2d12'];
 const STATUS_COLORS = ['#059669', '#d97706', '#dc2626', '#2563eb', '#7c3aed', '#6b7280'];
+
+const JOB_TYPE_LABELS: Record<string, string> = {
+  'full-time': 'Full-time',
+  'part-time': 'Part-time',
+  'contract': 'Contract',
+  'freelance': 'Freelance',
+  'internship': 'Internship',
+};
+
+const EXPERIENCE_RANGES = [
+  { value: '0-1', label: '0\u20131 Years' },
+  { value: '2-5', label: '2\u20135 Years' },
+  { value: '6-10', label: '6\u201310 Years' },
+  { value: '10+', label: '10+ Years' },
+];
+
+const SORT_OPTIONS = [
+  { value: 'all', label: 'Default' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'highest-salary', label: 'Highest Salary' },
+  { value: 'most-experienced', label: 'Most Experienced' },
+  { value: 'least-experienced', label: 'Least Experienced' },
+  { value: 'alphabetical', label: 'Alphabetical' },
+];
 
 interface CareerTrend {
   position: string;
@@ -17,6 +41,9 @@ interface CareerTrend {
   mostCommonCourse: string | null;
   topSkills: { name: string; count: number }[];
   averageExperienceYears: number;
+  jobTypes?: string[];
+  locations?: string[];
+  batches?: number[];
 }
 
 interface Overview {
@@ -30,8 +57,74 @@ interface Overview {
   averageExperienceYears: number;
 }
 
+interface FilterOptions {
+  employmentTypes: string[];
+  batches: number[];
+  locations: string[];
+}
+
 function formatNumber(n: number): string {
   return n.toLocaleString();
+}
+
+function FilterDropdown({ label, icon, options, selected, onChange, formatLabel }: {
+  label: string;
+  icon?: React.ReactNode;
+  options: string[];
+  selected: string | null;
+  onChange: (val: string | null) => void;
+  formatLabel?: (val: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors whitespace-nowrap ${
+          selected
+            ? 'bg-orange-50 border-orange-300 text-orange-700 font-medium'
+            : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+        }`}
+      >
+        {icon}{label}{selected && `: ${formatLabel ? formatLabel(selected) : selected}`}
+        <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-1 min-w-[160px] max-h-60 overflow-y-auto">
+          <button
+            onClick={() => { onChange(null); setOpen(false); }}
+            className={`w-full text-left px-3 py-1.5 text-xs rounded transition-colors ${!selected ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-gray-500 hover:bg-gray-50'}`}
+          >
+            All {label}
+          </button>
+          {options.map((opt) => (
+            <button
+              key={opt}
+              onClick={() => { onChange(opt); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-xs rounded transition-colors ${
+                selected === opt
+                  ? 'bg-orange-50 text-orange-700 font-semibold'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {formatLabel ? formatLabel(opt) : opt}
+              {selected === opt && <span className="float-right text-orange-500">&#10003;</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 
@@ -209,13 +302,41 @@ export default function CareerTrendsPage() {
   const allStatusData: any[] = data.statusDistribution;
   const allCompanies: any[] = data.topEmployers;
   const topBatches = data.topBatches;
+  const filterOptions: FilterOptions = data.filterOptions || { employmentTypes: [], batches: [], locations: [] };
 
-  const [sort, setSort] = useState<string>('all');
-  const [showFilter, setShowFilter] = useState<'career' | 'industry' | null>(null);
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
+  const [selectedIndustry, setSelectedIndustry] = useState<string | null>(null);
+  const [selectedEmploymentType, setSelectedEmploymentType] = useState<string | null>(null);
+  const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
+  const [selectedExperience, setSelectedExperience] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<string>('all');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const careerNames = [...new Set(allCareers.map((c) => c.position))];
   const careerIndustryNames = [...new Set(allCareers.flatMap((c) => c.topIndustries?.map((ind) => ind.name) || []))];
+  const hasAnyFilter = selectedPosition || selectedIndustry || selectedEmploymentType || selectedBatch || selectedExperience || selectedLocation;
+
+  const clearAllFilters = () => {
+    setSelectedPosition(null);
+    setSelectedIndustry(null);
+    setSelectedEmploymentType(null);
+    setSelectedBatch(null);
+    setSelectedExperience(null);
+    setSelectedLocation(null);
+    setSortBy('all');
+  };
+
+  const matchesExperience = (career: CareerTrend, range: string): boolean => {
+    const yrs = career.averageExperienceYears;
+    switch (range) {
+      case '0-1': return yrs >= 0 && yrs <= 1;
+      case '2-5': return yrs >= 2 && yrs <= 5;
+      case '6-10': return yrs >= 6 && yrs <= 10;
+      case '10+': return yrs > 10;
+      default: return true;
+    }
+  };
 
   const filteredCareers = (() => {
     let list = isSearching
@@ -227,22 +348,25 @@ export default function CareerTrendsPage() {
         )
       : [...allCareers];
 
-    if (selectedFilter && showFilter === 'career') {
-      list = list.filter((c) => c.position === selectedFilter);
-    }
+    if (selectedPosition) list = list.filter((c) => c.position === selectedPosition);
+    if (selectedIndustry) list = list.filter((c) => c.topIndustries?.some((ind) => matchQuery(ind.name, selectedIndustry)));
+    if (selectedEmploymentType) list = list.filter((c) => c.jobTypes?.includes(selectedEmploymentType));
+    if (selectedBatch) list = list.filter((c) => c.batches?.includes(Number(selectedBatch)));
+    if (selectedExperience) list = list.filter((c) => matchesExperience(c, selectedExperience));
+    if (selectedLocation) list = list.filter((c) => c.locations?.some((loc) => matchQuery(loc, selectedLocation)));
 
-    if (selectedFilter && showFilter === 'industry') {
-      list = list.filter((c) =>
-        c.topIndustries?.some((ind) => matchQuery(ind.name, selectedFilter))
-      );
-    }
-
-    switch (sort) {
-      case 'experienced':
+    switch (sortBy) {
+      case 'most-experienced':
         list.sort((a, b) => b.averageExperienceYears - a.averageExperienceYears);
         break;
       case 'least-experienced':
         list.sort((a, b) => a.averageExperienceYears - b.averageExperienceYears);
+        break;
+      case 'alphabetical':
+        list.sort((a, b) => a.position.localeCompare(b.position));
+        break;
+      case 'newest':
+        list.sort((a, b) => (b.batches?.[0] || 0) - (a.batches?.[0] || 0));
         break;
     }
     return list;
@@ -266,16 +390,6 @@ export default function CareerTrendsPage() {
     const next = new URLSearchParams(searchParams);
     next.delete('q');
     setSearchParams(next, { replace: true });
-  };
-
-  const toggleFilter = (type: 'career' | 'industry') => {
-    if (showFilter === type) {
-      setShowFilter(null);
-      setSelectedFilter(null);
-    } else {
-      setShowFilter(type);
-      setSelectedFilter(null);
-    }
   };
 
   if (loading) {
@@ -362,118 +476,89 @@ export default function CareerTrendsPage() {
 
       <div className="flex flex-wrap items-center gap-2 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
         <BriefcaseIcon className="w-4 h-4 text-gray-400 shrink-0" />
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
-            onClick={() => { setSort('all'); setShowFilter(null); setSelectedFilter(null); }}
+            onClick={() => { clearAllFilters(); }}
             className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-              sort === 'all' && showFilter === null
+              !hasAnyFilter && sortBy === 'all'
                 ? 'bg-orange-500 text-white shadow-sm'
                 : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             All Careers
           </button>
-          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <span className="w-px h-4 bg-gray-300 mx-0.5" />
 
-          <div className="relative">
-            <button
-              onClick={() => toggleFilter('career')}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors flex items-center gap-1 ${
-                showFilter === 'career'
-                  ? 'bg-orange-500 text-white shadow-sm'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              Type of Career
-              <svg className={`w-3 h-3 transition-transform ${showFilter === 'career' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {showFilter === 'career' && (
-              <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                {careerNames.map((name) => (
-                  <button
-                    key={name}
-                    onClick={() => { setSelectedFilter(selectedFilter === name ? null : name); setShowFilter(null); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                      selectedFilter === name
-                        ? 'bg-orange-50 text-orange-700 font-semibold'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {name}
-                    {selectedFilter === name && <span className="float-right text-orange-500">&#10003;</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <FilterDropdown
+            label="Job Position"
+            options={careerNames}
+            selected={selectedPosition}
+            onChange={setSelectedPosition}
+          />
+          <span className="w-px h-4 bg-gray-300 mx-0.5" />
 
-          <div className="relative">
-            <button
-              onClick={() => toggleFilter('industry')}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors flex items-center gap-1 ${
-                showFilter === 'industry'
-                  ? 'bg-orange-500 text-white shadow-sm'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              Type of Industry
-              <svg className={`w-3 h-3 transition-transform ${showFilter === 'industry' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {showFilter === 'industry' && (
-              <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                {careerIndustryNames.map((name) => (
-                  <button
-                    key={name}
-                    onClick={() => { setSelectedFilter(selectedFilter === name ? null : name); setShowFilter(null); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                      selectedFilter === name
-                        ? 'bg-orange-50 text-orange-700 font-semibold'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {name}
-                    {selectedFilter === name && <span className="float-right text-orange-500">&#10003;</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <FilterDropdown
+            label="Industry"
+            options={careerIndustryNames}
+            selected={selectedIndustry}
+            onChange={setSelectedIndustry}
+          />
+          <span className="w-px h-4 bg-gray-300 mx-0.5" />
 
-          <button
-            onClick={() => { setSort('experienced'); setShowFilter(null); setSelectedFilter(null); }}
-            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-              sort === 'experienced'
-                ? 'bg-orange-500 text-white shadow-sm'
-                : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            Most Experienced
-          </button>
-          <button
-            onClick={() => { setSort('least-experienced'); setShowFilter(null); setSelectedFilter(null); }}
-            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-              sort === 'least-experienced'
-                ? 'bg-orange-500 text-white shadow-sm'
-                : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            Least Experienced
-          </button>
+          <FilterDropdown
+            label="Employment Type"
+            options={filterOptions.employmentTypes}
+            selected={selectedEmploymentType}
+            onChange={setSelectedEmploymentType}
+            formatLabel={(v) => JOB_TYPE_LABELS[v] || v}
+          />
+          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+
+          <FilterDropdown
+            label="Batch"
+            options={filterOptions.batches.map(String)}
+            selected={selectedBatch}
+            onChange={setSelectedBatch}
+          />
+          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+
+          <FilterDropdown
+            label="Experience"
+            options={EXPERIENCE_RANGES.map((r) => r.value)}
+            selected={selectedExperience}
+            onChange={setSelectedExperience}
+            formatLabel={(v) => EXPERIENCE_RANGES.find((r) => r.value === v)?.label || v}
+          />
+          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+
+          <FilterDropdown
+            label="Location"
+            options={filterOptions.locations}
+            selected={selectedLocation}
+            onChange={setSelectedLocation}
+          />
+          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+
+          <FilterDropdown
+            label="Sort"
+            options={SORT_OPTIONS.map((s) => s.value)}
+            selected={sortBy}
+            onChange={(v) => setSortBy(v || 'all')}
+            formatLabel={(v) => SORT_OPTIONS.find((s) => s.value === v)?.label || v}
+          />
         </div>
       </div>
 
-      {selectedFilter && (
+      {hasAnyFilter && (
         <div className="flex items-center gap-2 mb-3 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5">
           <span className="text-xs text-orange-700">
-            Filtered by: <strong>{selectedFilter}</strong>
+            Filters active
           </span>
           <button
-            onClick={() => { setSelectedFilter(null); setShowFilter(null); }}
-            className="ml-auto p-0.5 text-orange-500 hover:text-orange-700 rounded"
+            onClick={() => { clearAllFilters(); }}
+            className="ml-auto p-0.5 text-orange-500 hover:text-orange-700 rounded flex items-center gap-1 text-xs"
           >
-            <XMarkIcon className="w-4 h-4" />
+            <XMarkIcon className="w-3.5 h-3.5" /> Clear all
           </button>
         </div>
       )}

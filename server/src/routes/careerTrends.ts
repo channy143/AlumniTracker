@@ -7,10 +7,10 @@ const router = Router();
 router.get('/', authenticate, async (_req, res, next) => {
   try {
     const [employmentRes, educationRes, skillsRes, profilesRes] = await Promise.all([
-      supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, start_date, end_date, is_current, salary_range').order('start_date', { ascending: false }),
+      supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, start_date, end_date, is_current, salary_range, job_type').order('start_date', { ascending: false }),
       supabase.from('education').select('profile_id, program, year_graduated, major'),
       supabase.from('skills').select('profile_id, name, category, proficiency_level'),
-      supabase.from('profiles').select('id, current_job_title, company_name, industry, employment_status'),
+      supabase.from('profiles').select('id, current_job_title, company_name, industry, employment_status, city, province'),
     ]);
 
     const employment = employmentRes.data || [];
@@ -32,6 +32,8 @@ router.get('/', authenticate, async (_req, res, next) => {
       profileSkills.get(s.profile_id)!.push(s.name);
     });
 
+    const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
+
     const employedProfiles = profiles.filter((p: any) => p.employment_status && p.employment_status !== 'Unemployed');
     const profileEmployment = employedProfiles.map((p: any) => ({
       profile_id: p.id,
@@ -43,6 +45,7 @@ router.get('/', authenticate, async (_req, res, next) => {
       start_date: null,
       end_date: null,
       salary_range: null,
+      job_type: null,
     }));
 
     const employedIds = new Set(employment.filter((e: any) => e.is_current).map((e: any) => e.profile_id));
@@ -63,6 +66,10 @@ router.get('/', authenticate, async (_req, res, next) => {
       allSkills: Map<string, number>;
       experienceMonths: number[];
     }>();
+
+    const careerJobTypes = new Map<string, Set<string>>();
+    const careerLocations = new Map<string, Set<string>>();
+    const careerBatches = new Map<string, Set<number>>();
 
     mergedEmployment.forEach((e: any) => {
       if (!e.position) return;
@@ -100,6 +107,28 @@ router.get('/', authenticate, async (_req, res, next) => {
         const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
         if (months > 0) career.experienceMonths.push(months);
       }
+
+      // Track filter data per career
+      if (e.job_type) {
+        if (!careerJobTypes.has(e.position)) careerJobTypes.set(e.position, new Set());
+        careerJobTypes.get(e.position)!.add(e.job_type);
+      }
+      const p = profileMap.get(e.profile_id);
+      if (p) {
+        const loc = [p.city, p.province].filter(Boolean).join(', ');
+        if (loc) {
+          if (!careerLocations.has(e.position)) careerLocations.set(e.position, new Set());
+          careerLocations.get(e.position)!.add(loc);
+        }
+      }
+      if (eduMap.has(e.profile_id)) {
+        eduMap.get(e.profile_id)!.forEach((ed) => {
+          if (ed.year) {
+            if (!careerBatches.has(e.position)) careerBatches.set(e.position, new Set());
+            careerBatches.get(e.position)!.add(ed.year);
+          }
+        });
+      }
     });
 
     const topCareers = Array.from(careerMap.entries())
@@ -123,6 +152,9 @@ router.get('/', authenticate, async (_req, res, next) => {
           mostCommonCourse: sortedCourses.length > 0 ? sortedCourses[0][0] : null,
           topSkills: sortedSkills.map(([name, count]) => ({ name, count })),
           averageExperienceYears: avgYears,
+          jobTypes: [...(careerJobTypes.get(position) || [])],
+          locations: [...(careerLocations.get(position) || [])],
+          batches: [...(careerBatches.get(position) || [])].sort((a, b) => b - a),
         };
       })
       .sort((a, b) => b.alumniCount - a.alumniCount);
@@ -228,6 +260,10 @@ router.get('/', authenticate, async (_req, res, next) => {
       ? Math.round((allExperienceMonths.reduce((a, b) => a + b, 0) / allExperienceMonths.length / 12) * 10) / 10
       : 0;
 
+    const distinctBatches = [...new Set(education.map((e: any) => e.year_graduated).filter(Boolean))].sort((a: any, b: any) => b - a);
+    const distinctLocations = [...new Set(profiles.map((p: any) => [p.city, p.province].filter(Boolean).join(', ')).filter(Boolean))].sort();
+    const distinctJobTypes = [...new Set(employment.map((e: any) => e.job_type).filter(Boolean))];
+
     res.json({
       overview: {
         totalAlumni,
@@ -248,6 +284,11 @@ router.get('/', authenticate, async (_req, res, next) => {
       statusDistribution,
       fastestGrowing,
       topBatches,
+      filterOptions: {
+        employmentTypes: distinctJobTypes,
+        batches: distinctBatches,
+        locations: distinctLocations,
+      },
     });
   } catch (err) { next(err); }
 });
