@@ -586,6 +586,7 @@ export default function ProfilePage() {
                           <option value="part-time">Part-time</option>
                           <option value="contract">Contract</option>
                           <option value="freelance">Freelance</option>
+                          <option value="self-employed">Self-employed</option>
                           <option value="internship">Internship</option>
                         </select>
                       </div>
