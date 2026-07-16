@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { profileApi, employmentApi, authApi } from '@/services/api';
+import { api, profileApi, employmentApi, authApi } from '@/services/api';
 import {
   CameraIcon, PencilIcon, BriefcaseIcon, MapPinIcon,
   AcademicCapIcon, CheckBadgeIcon, UserIcon, ClockIcon,
@@ -73,6 +73,7 @@ export default function ProfilePage() {
   const [editSkills, setEditSkills] = useState<string[]>([]);
   const [editEducation, setEditEducation] = useState<any[]>([]);
   const [skillInput, setSkillInput] = useState('');
+  const [skillSuggestions, setSkillSuggestions] = useState<string[]>([]);
   const [showSkillDropdown, setShowSkillDropdown] = useState(false);
   const skillRef = useRef<HTMLDivElement>(null);
   const [certifications, setCertifications] = useState<any[]>([]);
@@ -85,27 +86,6 @@ export default function ProfilePage() {
   const [editSection, setEditSection] = useState<'personal' | 'security'>('personal');
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
-
-  const COMMON_SKILLS = [
-    'React', 'Angular', 'Vue.js', 'Next.js', 'Nuxt.js', 'Svelte', 'Solid.js',
-    'TypeScript', 'JavaScript', 'HTML', 'CSS', 'SCSS', 'Tailwind CSS', 'Bootstrap',
-    'Node.js', 'Express', 'NestJS', 'Fastify', 'Deno', 'Bun',
-    'Python', 'Django', 'Flask', 'FastAPI', 'Ruby on Rails', 'PHP', 'Laravel', 'Symfony',
-    'Java', 'Spring Boot', 'Kotlin', 'C#', '.NET', 'Go', 'Rust', 'C++', 'C', 'Swift',
-    'PostgreSQL', 'MySQL', 'MongoDB', 'SQLite', 'Redis', 'Firebase', 'Supabase',
-    'Docker', 'Kubernetes', 'AWS', 'Google Cloud', 'Azure', 'Terraform', 'CI/CD',
-    'Git', 'GitHub', 'GitLab', 'Figma', 'Adobe XD', 'Sketch', 'Photoshop', 'Illustrator',
-    'After Effects', 'Premiere Pro', 'Blender', 'Canva', 'Notion', 'Jira', 'Trello',
-    'REST API', 'GraphQL', 'WebSocket', 'gRPC', 'MQTT',
-    'Linux', 'Nginx', 'Apache', 'Webpack', 'Vite', 'Babel', 'ESLint', 'Prettier',
-    'Jest', 'Vitest', 'Cypress', 'Playwright', 'Selenium', 'Testing Library',
-    'Data Science', 'Machine Learning', 'AI', 'Deep Learning', 'TensorFlow', 'PyTorch',
-    'Agile', 'Scrum', 'Project Management', 'UI/UX Design', 'Product Management',
-    'Digital Marketing', 'SEO', 'Content Writing', 'Data Analysis', 'Excel',
-    'AutoCAD', 'SolidWorks', 'MATLAB', 'R', 'Tableau', 'Power BI',
-    'Accounting', 'Finance', 'Human Resources', 'Customer Service', 'Sales',
-    'Public Speaking', 'Leadership', 'Team Management', 'Research', 'Technical Writing',
-  ];
 
   const closeSkillDropdown = useCallback(() => setShowSkillDropdown(false), []);
 
@@ -122,6 +102,7 @@ export default function ProfilePage() {
   useEffect(() => {
     loadProfile();
     loadCareerData();
+    api.get<string[]>('/profile/skills/suggestions').then(setSkillSuggestions).catch(() => {});
   }, []);
 
   const loadProfile = async () => {
@@ -637,11 +618,11 @@ export default function ProfilePage() {
                         placeholder="Type or select a skill..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
                       {showSkillDropdown && (
                         <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                          {COMMON_SKILLS.filter(s => s.toLowerCase().includes(skillInput.toLowerCase()) && !editSkills.includes(s)).slice(0, 20).map(s => (
+                          {skillSuggestions.filter(s => s.toLowerCase().includes(skillInput.toLowerCase()) && !editSkills.includes(s)).slice(0, 20).map(s => (
                             <button key={s} className="w-full text-left px-3 py-2 text-sm text-black hover:bg-orange-50 transition-colors cursor-pointer"
                               onClick={() => { setEditSkills(prev => [...prev, s]); setSkillInput(''); setShowSkillDropdown(false); }}>{s}</button>
                           ))}
-                          {skillInput.trim() && !COMMON_SKILLS.some(s => s.toLowerCase() === skillInput.trim().toLowerCase()) && (
+                          {skillInput.trim() && !skillSuggestions.some(s => s.toLowerCase() === skillInput.trim().toLowerCase()) && (
                             <button className="w-full text-left px-3 py-2 text-sm text-orange-600 font-medium hover:bg-orange-50 border-t border-gray-100 cursor-pointer"
                               onClick={() => { const val = skillInput.trim(); if (!editSkills.includes(val)) setEditSkills(prev => [...prev, val]); setSkillInput(''); setShowSkillDropdown(false); }}>
                               Add &ldquo;{skillInput.trim()}&rdquo;

@@ -36,8 +36,8 @@ router.get('/', authenticate, async (_req, res, next) => {
     const profileEmployment = employedProfiles.map((p: any) => ({
       profile_id: p.id,
       company_name: p.company_name || null,
-      position: p.current_job_title || 'Unknown',
-      company_industry: p.industry || 'Unknown',
+      position: p.current_job_title || null,
+      company_industry: p.industry || null,
       employment_status: p.employment_status?.toLowerCase().replace(/\s+/g, '-') || 'employed',
       is_current: true,
       start_date: null,
@@ -192,7 +192,8 @@ router.get('/', authenticate, async (_req, res, next) => {
 
     const statusCount = new Map<string, number>();
     profiles.forEach((p: any) => {
-      const status = p.employment_status || 'Unknown';
+      const status = p.employment_status;
+      if (!status) return;
       statusCount.set(status, (statusCount.get(status) || 0) + 1);
     });
     const statusDistribution = Array.from(statusCount.entries()).map(([status, count]) => ({

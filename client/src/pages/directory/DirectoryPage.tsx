@@ -42,6 +42,7 @@ function FilterDropdown({ label, options, selected, onChange }: {
 
   const toggle = (val: string) => {
     onChange(selected.includes(val) ? selected.filter((v) => v !== val) : [...selected, val]);
+    setOpen(false);
   };
 
   return (

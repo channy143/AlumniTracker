@@ -188,6 +188,74 @@ router.delete('/resume', authenticate, async (req: AuthenticatedRequest, res, ne
 
 // --- Skills ---
 
+// Comprehensive skill suggestions across all professions
+const SKILL_SUGGESTIONS = [
+  // Information Technology
+  'React', 'Angular', 'Vue.js', 'Next.js', 'TypeScript', 'JavaScript', 'HTML', 'CSS',
+  'Node.js', 'Express', 'Python', 'Django', 'Java', 'Spring Boot', 'C#', '.NET',
+  'PostgreSQL', 'MySQL', 'MongoDB', 'Docker', 'Kubernetes', 'AWS', 'Git',
+  'REST API', 'GraphQL', 'Linux', 'CI/CD', 'Agile', 'Scrum',
+
+  // Teaching & Education
+  'Lesson Planning', 'Curriculum Development', 'Classroom Management', 'Student Assessment',
+  'Differentiated Instruction', 'Educational Technology', 'Child Development', 'Special Education',
+  'Behavior Management', 'Learning Theory', 'Instructional Design', 'Reading Intervention',
+  'ESL Teaching', 'Science Education', 'Mathematics Instruction', 'Educational Research',
+  'Parent Communication', 'Coaching & Mentoring', 'Training & Facilitation', 'Test Preparation',
+
+  // Business & Management
+  'Project Management', 'Team Leadership', 'Strategic Planning', 'Business Development',
+  'Operations Management', 'Financial Analysis', 'Budgeting', 'Human Resources',
+  'Customer Relationship Management', 'Sales Management', 'Marketing Strategy',
+  'Digital Marketing', 'Content Creation', 'Social Media Management', 'Data Analysis',
+  'Risk Management', 'Negotiation', 'Conflict Resolution', 'Public Speaking',
+
+  // Accounting & Finance
+  'Bookkeeping', 'Tax Preparation', 'Auditing', 'Financial Reporting', 'QuickBooks',
+  'Payroll Management', 'Accounts Payable', 'Accounts Receivable', 'Financial Planning',
+  'Internal Controls', 'Cost Accounting', 'Budget Analysis', 'Excel', 'SAP',
+
+  // Engineering & Trades
+  'AutoCAD', 'SolidWorks', 'Civil Engineering', 'Electrical Engineering', 'Mechanical Engineering',
+  'Electronics', 'HVAC', 'Plumbing', 'Welding', 'Carpentry', 'Blueprint Reading',
+  'Quality Control', 'Safety Compliance', 'Technical Drawing', 'Surveying',
+
+  // Healthcare & Science
+  'Patient Care', 'Nursing', 'First Aid', 'Laboratory Skills', 'Medical Terminology',
+  'Pharmacology', 'Anatomy', 'Physiology', 'Microbiology', 'Chemistry', 'Biology',
+  'Physics', 'Research Methodology', 'Data Collection', 'Statistical Analysis',
+
+  // Hospitality & Home Economics
+  'Food Preparation', 'Baking & Pastry', 'Culinary Arts', 'Restaurant Management',
+  'Housekeeping', 'Event Planning', 'Interior Design', 'Fashion Design', 'Sewing',
+  'Nutrition', 'Food Safety', 'Hotel Management', 'Tourism Management', 'Customer Service',
+
+  // General Professional Skills
+  'Communication', 'Leadership', 'Teamwork', 'Problem Solving', 'Critical Thinking',
+  'Time Management', 'Adaptability', 'Creativity', 'Collaboration', 'Decision Making',
+  'Interpersonal Skills', 'Emotional Intelligence', 'Organizational Skills', 'Writing',
+  'Research', 'Presentation Skills', 'Multitasking', 'Attention to Detail',
+];
+
+router.get('/skills/suggestions', async (_req, res, next) => {
+  try {
+    // Get all distinct skills already stored in the database across all users
+    const { data: dbSkills } = await supabase
+      .from('skills')
+      .select('name')
+      .not('name', 'is', null);
+
+    const dbSkillNames = [...new Set((dbSkills || []).map((s: any) => s.name).filter(Boolean))];
+
+    // Merge with predefined suggestions, deduplicate, and sort
+    const all = [...new Set([...SKILL_SUGGESTIONS, ...dbSkillNames])].sort((a, b) =>
+      a.toLowerCase().localeCompare(b.toLowerCase())
+    );
+
+    res.json(all);
+  } catch (err) { next(err); }
+});
+
 router.post('/skills', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { data: profile } = await supabase

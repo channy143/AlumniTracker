@@ -392,7 +392,7 @@ export default function CareerTrendsPage() {
                 {careerNames.map((name) => (
                   <button
                     key={name}
-                    onClick={() => setSelectedFilter(selectedFilter === name ? null : name)}
+                    onClick={() => { setSelectedFilter(selectedFilter === name ? null : name); setShowFilter(null); }}
                     className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
                       selectedFilter === name
                         ? 'bg-orange-50 text-orange-700 font-semibold'
@@ -425,7 +425,7 @@ export default function CareerTrendsPage() {
                 {careerIndustryNames.map((name) => (
                   <button
                     key={name}
-                    onClick={() => setSelectedFilter(selectedFilter === name ? null : name)}
+                    onClick={() => { setSelectedFilter(selectedFilter === name ? null : name); setShowFilter(null); }}
                     className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
                       selectedFilter === name
                         ? 'bg-orange-50 text-orange-700 font-semibold'
