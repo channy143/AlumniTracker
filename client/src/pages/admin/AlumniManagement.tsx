@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
+import { generateYears } from '@/utils/helpers';
 
 export default function AlumniManagement() {
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [employers, setEmployers] = useState<string[]>([]);
+  const [locations, setLocations] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({ course: '', year: '', employment_status: '', employer: '', location: '', archived: 'false' });
@@ -19,6 +22,7 @@ export default function AlumniManagement() {
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', idNumber: '', program: '', yearGraduated: '' });
   const [error, setError] = useState('');
   const addNotification = useUIStore((s) => s.addNotification);
+  const batchYears = generateYears(2014, new Date().getFullYear());
 
   const limit = 15;
 
@@ -28,6 +32,8 @@ export default function AlumniManagement() {
       const res = await adminApi.alumniList({ page, limit, search, ...filters, archived: filters.archived });
       setData(res.data);
       setTotal(res.total);
+      if (res.employers) setEmployers(res.employers);
+      if (res.locations) setLocations(res.locations);
     } catch (err: any) { setError(err.message || 'Failed to load alumni'); }
     finally { setLoading(false); }
   }, [page, search, filters]);
@@ -159,17 +165,26 @@ export default function AlumniManagement() {
           <option value="">All Courses</option>
           {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED-HE', 'BTLED-ICT'].map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
-        <input type="number" value={filters.year} onChange={(e) => { setFilters((f) => ({ ...f, year: e.target.value })); setPage(1); }}
-          placeholder="Batch" className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400 w-16" />
+        <select value={filters.year} onChange={(e) => { setFilters((f) => ({ ...f, year: e.target.value })); setPage(1); }}
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
+          <option value="">All Batches</option>
+          {batchYears.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
         <select value={filters.employment_status} onChange={(e) => { setFilters((f) => ({ ...f, employment_status: e.target.value })); setPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="">All Status</option>
           {['Employed', 'Self-employed', 'Unemployed', 'Seeking Opportunities', 'Retired'].map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
-        <input type="text" value={filters.employer} onChange={(e) => { setFilters((f) => ({ ...f, employer: e.target.value })); setPage(1); }}
-          placeholder="Employer" className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400 w-24" />
-        <input type="text" value={filters.location} onChange={(e) => { setFilters((f) => ({ ...f, location: e.target.value })); setPage(1); }}
-          placeholder="Location" className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400 w-20" />
+        <select value={filters.employer} onChange={(e) => { setFilters((f) => ({ ...f, employer: e.target.value })); setPage(1); }}
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
+          <option value="">All Employers</option>
+          {employers.map((e) => <option key={e} value={e}>{e}</option>)}
+        </select>
+        <select value={filters.location} onChange={(e) => { setFilters((f) => ({ ...f, location: e.target.value })); setPage(1); }}
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
+          <option value="">All Locations</option>
+          {locations.map((l) => <option key={l} value={l}>{l}</option>)}
+        </select>
         <select value={filters.archived} onChange={(e) => { setFilters((f) => ({ ...f, archived: e.target.value })); setPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="false">Active</option>

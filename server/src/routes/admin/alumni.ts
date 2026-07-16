@@ -15,6 +15,8 @@ router.get('/', async (req, res, next) => {
     const year = (req.query.year as string) || '';
     const status = (req.query.status as string) || '';
     const employmentStatus = (req.query.employment_status as string) || '';
+    const employer = (req.query.employer as string) || '';
+    const location = (req.query.location as string) || '';
     const archived = req.query.archived === 'true';
 
     let query = supabase
@@ -123,9 +125,28 @@ router.get('/', async (req, res, next) => {
           return u;
         });
       }
+
+      // Filter by employer and location (exact match from dropdown values)
+      if (employer) {
+        result = result.filter((u: any) => {
+          const emp = (u.profile?.employment || [])[0];
+          return emp?.company_name === employer;
+        });
+      }
+      if (location) {
+        result = result.filter((u: any) => u.profile?.city === location);
+      }
     }
 
-    res.json({ data: result, total: count || 0, page, limit });
+    // Get distinct employers and locations for filter dropdowns
+    const [{ data: distinctCompanies }, { data: distinctCities }] = await Promise.all([
+      supabase.from('employment').select('company_name').not('company_name', 'is', null),
+      supabase.from('profiles').select('city').not('city', 'is', null),
+    ]);
+    const employers = [...new Set((distinctCompanies || []).map((e: any) => e.company_name).filter(Boolean))].sort();
+    const locations = [...new Set((distinctCities || []).map((p: any) => p.city).filter(Boolean))].sort();
+
+    res.json({ data: result, total: count || 0, page, limit, employers, locations });
   } catch (err) {
     next(err);
   }
