@@ -172,9 +172,9 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
         });
         setEmployers((data.topEmployers || []).slice(0, 5).map((e: any) => ({ name: e.name, count: e.alumniCount })));
         setHighlights({
-          mostCommonCareer: data.overview?.topCareer || 'N/A',
+          mostCommonCareer: data.overview?.topCareerPct != null && data.overview.topCareerPct < 40 ? 'Various' : (data.overview?.topCareer || 'N/A'),
           fastestGrowing: data.fastestGrowing?.[0]?.position || 'N/A',
-          topIndustry: data.overview?.topIndustry || 'N/A',
+          topIndustry: data.overview?.topIndustryPct != null && data.overview.topIndustryPct < 40 ? 'Various' : (data.overview?.topIndustry || 'N/A'),
           averageExperience: data.overview?.averageExperienceYears ? `${data.overview.averageExperienceYears} Years` : 'N/A',
         });
         if (data.statusDistribution?.length) {
