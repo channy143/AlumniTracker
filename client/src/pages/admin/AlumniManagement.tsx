@@ -295,92 +295,178 @@ export default function AlumniManagement() {
 
       {showDetail && detailData && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDetail(false)}>
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Header bar */}
+            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 sticky top-0 z-10">
               <h2 className="text-sm font-bold text-gray-900">Alumni Details</h2>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 {!editingDetail ? (
-                  <button onClick={handleEditDetail} className="px-3 py-1 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">Edit</button>
+                  <button onClick={handleEditDetail} className="px-3 py-1 text-xs font-medium bg-orange-500 text-white hover:bg-orange-600">Edit</button>
                 ) : (
                   <>
-                    <button onClick={handleSaveDetail} disabled={savingDetail} className="px-3 py-1 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">{savingDetail ? 'Saving...' : 'Save'}</button>
-                    <button onClick={() => setEditingDetail(false)} className="px-3 py-1 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
+                    <button onClick={handleSaveDetail} disabled={savingDetail} className="px-3 py-1 text-xs font-medium bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50">{savingDetail ? 'Saving...' : 'Save'}</button>
+                    <button onClick={() => setEditingDetail(false)} className="px-3 py-1 text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-100">Cancel</button>
                   </>
                 )}
-                <button onClick={() => setShowDetail(false)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+                <button onClick={() => setShowDetail(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none ml-1">&times;</button>
               </div>
             </div>
-            {editingDetail ? (
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div><span className="text-gray-500 block mb-1">Name:</span> <span className="font-medium">{detailData.profile?.first_name} {detailData.profile?.last_name}</span></div>
-                <div>
-                  <label className="text-gray-500 block mb-1">Email</label>
-                  <input type="email" value={editForm.email} onChange={(e) => setEditForm((f: any) => ({ ...f, email: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-orange-400" />
-                </div>
-                <div>
-                  <label className="text-gray-500 block mb-1">ID Number</label>
-                  <input type="text" value={editForm.id_number} onChange={(e) => setEditForm((f: any) => ({ ...f, id_number: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-orange-400" placeholder="e.g. CTU-2020-0001" />
-                </div>
-                <div>
-                  <label className="text-gray-500 block mb-1">Phone</label>
-                  <input type="text" value={editForm.phone} onChange={(e) => setEditForm((f: any) => ({ ...f, phone: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-orange-400" />
-                </div>
-                <div>
-                  <label className="text-gray-500 block mb-1">City</label>
-                  <input type="text" value={editForm.city} onChange={(e) => setEditForm((f: any) => ({ ...f, city: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-orange-400" />
-                </div>
-                <div>
-                  <label className="text-gray-500 block mb-1">Province</label>
-                  <input type="text" value={editForm.province} onChange={(e) => setEditForm((f: any) => ({ ...f, province: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-orange-400" />
-                </div>
-                <div>
-                  <label className="text-gray-500 block mb-1">Course</label>
-                  <select value={editForm.program} onChange={(e) => setEditForm((f: any) => ({ ...f, program: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-orange-400">
-                    <option value="">Select</option>
-                    {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED-HE', 'BTLED-ICT'].map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-gray-500 block mb-1">Year Graduated</label>
-                  <input type="number" value={editForm.year_graduated} onChange={(e) => setEditForm((f: any) => ({ ...f, year_graduated: e.target.value }))} className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-orange-400" min={2014} />
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div><span className="text-gray-500">Name:</span> <span className="font-medium">{detailData.profile?.first_name} {detailData.profile?.last_name}</span></div>
-                  <div><span className="text-gray-500">Email:</span> <span>{detailData.email}</span></div>
-                  <div><span className="text-gray-500">ID Number:</span> <span>{detailData.profile?.id_number || '---'}</span></div>
-                  <div><span className="text-gray-500">Phone:</span> <span>{detailData.profile?.phone || '---'}</span></div>
-                  <div><span className="text-gray-500">City:</span> <span>{detailData.profile?.city || '---'}</span></div>
-                  <div><span className="text-gray-500">Province:</span> <span>{detailData.profile?.province || '---'}</span></div>
-                  <div><span className="text-gray-500">Role:</span> <span className="capitalize">{detailData.role}</span></div>
-                  <div><span className="text-gray-500">Verified:</span> <span>{detailData.is_verified ? 'Yes' : 'No'}</span></div>
-                  <div><span className="text-gray-500">Active:</span> <span>{detailData.is_active !== false ? 'Yes' : 'No'}</span></div>
-                  <div><span className="text-gray-500">Joined:</span> <span>{new Date(detailData.created_at).toLocaleDateString()}</span></div>
-                </div>
-                {detailData.education?.length > 0 && (
-                  <div className="mt-4">
-                    <h3 className="text-xs font-semibold text-gray-800 mb-2">Education</h3>
-                    {detailData.education.map((edu: any, i: number) => (
-                      <div key={i} className="text-xs text-gray-600 py-1">{edu.program} ({edu.year_graduated})</div>
-                    ))}
+
+            <div className="flex flex-col md:flex-row">
+              {/* Left panel - 70% */}
+              <div className="w-full md:w-[70%] p-6 border-r border-gray-200">
+                {editingDetail ? (
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="col-span-2"><span className="text-gray-500 block mb-1">Name:</span> <span className="font-medium">{detailData.profile?.first_name} {detailData.profile?.last_name}</span></div>
+                    <div>
+                      <label className="text-gray-500 block mb-1">Email</label>
+                      <input type="email" value={editForm.email} onChange={(e) => setEditForm((f: any) => ({ ...f, email: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" />
+                    </div>
+                    <div>
+                      <label className="text-gray-500 block mb-1">ID Number</label>
+                      <input type="text" value={editForm.id_number} onChange={(e) => setEditForm((f: any) => ({ ...f, id_number: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" placeholder="e.g. CTU-2020-0001" />
+                    </div>
+                    <div>
+                      <label className="text-gray-500 block mb-1">Phone</label>
+                      <input type="text" value={editForm.phone} onChange={(e) => setEditForm((f: any) => ({ ...f, phone: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" />
+                    </div>
+                    <div>
+                      <label className="text-gray-500 block mb-1">City</label>
+                      <input type="text" value={editForm.city} onChange={(e) => setEditForm((f: any) => ({ ...f, city: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" />
+                    </div>
+                    <div>
+                      <label className="text-gray-500 block mb-1">Province</label>
+                      <input type="text" value={editForm.province} onChange={(e) => setEditForm((f: any) => ({ ...f, province: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" />
+                    </div>
+                    <div>
+                      <label className="text-gray-500 block mb-1">Course</label>
+                      <select value={editForm.program} onChange={(e) => setEditForm((f: any) => ({ ...f, program: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs">
+                        <option value="">Select</option>
+                        {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED-HE', 'BTLED-ICT'].map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-gray-500 block mb-1">Year Graduated</label>
+                      <input type="number" value={editForm.year_graduated} onChange={(e) => setEditForm((f: any) => ({ ...f, year_graduated: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" min={2014} />
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    {/* Quick summary */}
+                    <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
+                      <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-600 shrink-0">
+                        {((detailData.profile?.first_name?.[0] || '') + (detailData.profile?.last_name?.[0] || '')).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{detailData.profile?.first_name} {detailData.profile?.last_name}</p>
+                        <p className="text-xs text-gray-500">{detailData.email}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-[10px] px-1.5 py-0.5 font-medium ${detailData.is_verified ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{detailData.is_verified ? 'Verified' : 'Unverified'}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 font-medium ${detailData.is_active !== false ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>{detailData.is_active !== false ? 'Active' : 'Inactive'}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 font-medium capitalize">{detailData.role}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Education */}
+                    {detailData.education?.length > 0 && (
+                      <div className="mb-4">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Education</h3>
+                        <div className="space-y-2">
+                          {detailData.education.map((edu: any, i: number) => (
+                            <div key={i} className="text-xs bg-gray-50 px-3 py-2">
+                              <p className="font-medium text-gray-800">{edu.program || edu.course || 'N/A'}</p>
+                              <p className="text-gray-500 mt-0.5">
+                                {edu.institution && `${edu.institution} · `}{edu.year_graduated && `Batch ${edu.year_graduated}`}{edu.honors ? ` · ${edu.honors}` : ''}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Employment History */}
+                    {detailData.employment?.length > 0 && (
+                      <div className="mb-4">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Employment History</h3>
+                        <div className="space-y-2">
+                          {detailData.employment.map((emp: any, i: number) => (
+                            <div key={i} className="text-xs bg-gray-50 px-3 py-2">
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-medium text-gray-800">{emp.position || 'N/A'}</p>
+                                {emp.is_current && <span className="text-[10px] px-1 py-0.5 bg-emerald-100 text-emerald-700 font-medium">Current</span>}
+                              </div>
+                              <p className="text-gray-500 mt-0.5">
+                                {emp.company_name && `${emp.company_name}`}{emp.company_industry ? ` · ${emp.company_industry}` : ''}
+                                {emp.job_type && ` · ${emp.job_type}`}
+                                {emp.salary_range && ` · ₱${emp.salary_range}`}
+                              </p>
+                              {emp.start_date && <p className="text-gray-400 mt-0.5">{new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })} - {emp.is_current ? 'Present' : emp.end_date ? new Date(emp.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : ''}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Skills */}
+                    {detailData.skills?.length > 0 && (
+                      <div className="mb-4">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Skills</h3>
+                        <div className="flex flex-wrap gap-1.5">
+                          {detailData.skills.map((s: any, i: number) => (
+                            <span key={i} className="px-2 py-1 bg-orange-50 text-orange-700 text-[10px] font-medium">{s.name}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bio */}
+                    {detailData.profile?.bio && (
+                      <div className="mb-4">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">About</h3>
+                        <p className="text-xs text-gray-600 leading-relaxed">{detailData.profile.bio}</p>
+                      </div>
+                    )}
+                  </>
                 )}
-                {detailData.employment?.length > 0 && (
-                  <div className="mt-3">
-                    <h3 className="text-xs font-semibold text-gray-800 mb-2">Employment History</h3>
-                    {detailData.employment.map((emp: any, i: number) => (
-                      <div key={i} className="text-xs text-gray-600 border-b border-gray-100 py-1.5">
-                        <span className="font-medium">{emp.position}</span> at {emp.company_name} {emp.is_current ? '(Current)' : ''}
-                        {emp.job_type && <span className="text-gray-400 ml-2">· {emp.job_type}</span>}
-                        {emp.salary_range && <span className="text-gray-400 ml-2">· ₱{emp.salary_range}</span>}
+              </div>
+
+              {/* Right panel - 30% */}
+              <div className="w-full md:w-[30%] p-6 bg-gray-50">
+                {/* Avatar */}
+                <div className="flex flex-col items-center mb-4">
+                  <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center text-xl font-bold text-orange-600 mb-2">
+                    {detailData.profile?.avatar_url ? (
+                      <img src={detailData.profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      ((detailData.profile?.first_name?.[0] || '') + (detailData.profile?.last_name?.[0] || '')).toUpperCase()
+                    )}
+                  </div>
+                  <p className="text-sm font-bold text-gray-900 text-center">{detailData.profile?.first_name} {detailData.profile?.last_name}</p>
+                  <p className="text-xs text-gray-500 text-center">{detailData.profile?.id_number || ''}</p>
+                </div>
+
+                {/* Personal Information */}
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Personal Information</h3>
+                  <div className="space-y-2 text-xs">
+                    {[
+                      { label: 'Email', value: detailData.email },
+                      { label: 'Phone', value: detailData.profile?.phone },
+                      { label: 'City', value: detailData.profile?.city },
+                      { label: 'Province', value: detailData.profile?.province },
+                      { label: 'Employment Status', value: detailData.profile?.employment_status },
+                      { label: 'Joined', value: detailData.created_at ? new Date(detailData.created_at).toLocaleDateString() : '---' },
+                    ].map((item) => (
+                      <div key={item.label} className="flex justify-between py-1 border-b border-gray-200 last:border-0">
+                        <span className="text-gray-500">{item.label}</span>
+                        <span className="font-medium text-gray-800 text-right max-w-[55%] truncate">{item.value || '---'}</span>
                       </div>
                     ))}
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
