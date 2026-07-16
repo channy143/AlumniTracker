@@ -209,22 +209,21 @@ router.get('/:id', async (req, res, next) => {
       .eq('user_id', req.params.id)
       .maybeSingle();
 
-    const { data: education } = await supabase
-      .from('education')
-      .select('*')
-      .eq('profile_id', req.params.id);
+    const profileId = profile?.id || req.params.id;
 
-    const { data: employment } = await supabase
-      .from('employment')
-      .select('*')
-      .eq('profile_id', req.params.id);
+    const [educationRes, employmentRes, skillsRes] = await Promise.all([
+      supabase.from('education').select('*').eq('profile_id', profileId),
+      supabase.from('employment').select('*').eq('profile_id', profileId),
+      supabase.from('skills').select('*').eq('profile_id', profileId),
+    ]);
 
-    const { data: skills } = await supabase
-      .from('skills')
-      .select('*')
-      .eq('profile_id', req.params.id);
-
-    res.json({ ...user, profile, education: education || [], employment: employment || [], skills: skills || [] });
+    res.json({
+      ...user,
+      profile: profile || null,
+      education: educationRes.data || [],
+      employment: employmentRes.data || [],
+      skills: skillsRes.data || [],
+    });
   } catch (err) {
     next(err);
   }
