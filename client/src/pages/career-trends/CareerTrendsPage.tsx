@@ -13,6 +13,7 @@ const JOB_TYPE_LABELS: Record<string, string> = {
   'part-time': 'Part-time',
   'contract': 'Contract',
   'freelance': 'Freelance',
+  'self-employed': 'Self-employed',
   'internship': 'Internship',
 };
 
@@ -42,6 +43,7 @@ interface CareerTrend {
   topSkills: { name: string; count: number }[];
   averageExperienceYears: number;
   jobTypes?: string[];
+  employmentStatuses?: string[];
   locations?: string[];
   batches?: number[];
 }
@@ -350,7 +352,13 @@ export default function CareerTrendsPage() {
 
     if (selectedPosition) list = list.filter((c) => c.position === selectedPosition);
     if (selectedIndustry) list = list.filter((c) => c.topIndustries?.some((ind) => matchQuery(ind.name, selectedIndustry)));
-    if (selectedEmploymentType) list = list.filter((c) => c.jobTypes?.includes(selectedEmploymentType));
+    if (selectedEmploymentType) {
+      if (selectedEmploymentType === 'self-employed') {
+        list = list.filter((c) => c.employmentStatuses?.includes('self-employed'));
+      } else {
+        list = list.filter((c) => c.jobTypes?.includes(selectedEmploymentType));
+      }
+    }
     if (selectedBatch) list = list.filter((c) => c.batches?.includes(Number(selectedBatch)));
     if (selectedExperience) list = list.filter((c) => matchesExperience(c, selectedExperience));
     if (selectedLocation) list = list.filter((c) => c.locations?.some((loc) => matchQuery(loc, selectedLocation)));
@@ -507,7 +515,7 @@ export default function CareerTrendsPage() {
 
           <FilterDropdown
             label="Employment Type"
-            options={filterOptions.employmentTypes}
+            options={['full-time', 'part-time', 'contract', 'freelance', 'self-employed']}
             selected={selectedEmploymentType}
             onChange={setSelectedEmploymentType}
             formatLabel={(v) => JOB_TYPE_LABELS[v] || v}

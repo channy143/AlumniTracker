@@ -68,6 +68,7 @@ router.get('/', authenticate, async (_req, res, next) => {
     }>();
 
     const careerJobTypes = new Map<string, Set<string>>();
+    const careerEmploymentStatuses = new Map<string, Set<string>>();
     const careerLocations = new Map<string, Set<string>>();
     const careerBatches = new Map<string, Set<number>>();
 
@@ -113,6 +114,13 @@ router.get('/', authenticate, async (_req, res, next) => {
         if (!careerJobTypes.has(e.position)) careerJobTypes.set(e.position, new Set());
         careerJobTypes.get(e.position)!.add(e.job_type);
       }
+      if (e.employment_status) {
+        const normStatus = e.employment_status === 'employed' || e.employment_status === 'self-employed' ? e.employment_status : null;
+        if (normStatus) {
+          if (!careerEmploymentStatuses.has(e.position)) careerEmploymentStatuses.set(e.position, new Set());
+          careerEmploymentStatuses.get(e.position)!.add(normStatus);
+        }
+      }
       const p = profileMap.get(e.profile_id);
       if (p) {
         const loc = [p.city, p.province].filter(Boolean).join(', ');
@@ -153,6 +161,7 @@ router.get('/', authenticate, async (_req, res, next) => {
           topSkills: sortedSkills.map(([name, count]) => ({ name, count })),
           averageExperienceYears: avgYears,
           jobTypes: [...(careerJobTypes.get(position) || [])],
+          employmentStatuses: [...(careerEmploymentStatuses.get(position) || [])],
           locations: [...(careerLocations.get(position) || [])],
           batches: [...(careerBatches.get(position) || [])].sort((a, b) => b - a),
         };
