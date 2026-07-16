@@ -17,7 +17,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('*, education:education(*), skills:skills(*), certifications:certifications(*)')
+      .select('*, education:education(*), skills:skills(*), certifications:certifications(*), employment:employment(*)')
       .eq('user_id', req.user!.userId)
       .single();
 
