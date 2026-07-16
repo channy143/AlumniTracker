@@ -264,7 +264,7 @@ function SidebarWidgets({ data }: { data: any }) {
 }
 
 function matchQuery(text: string, query: string): boolean {
-  return text.toLowerCase().includes(query);
+  return text.toLowerCase().includes(query.toLowerCase());
 }
 
 export default function CareerTrendsPage() {
