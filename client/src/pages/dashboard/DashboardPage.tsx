@@ -276,7 +276,7 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
             {[
               { label: 'Total Alumni', value: snapshot.totalAlumni.toLocaleString() },
               { label: 'Employment Rate', value: `${snapshot.employmentRate}%` },
-              { label: 'Companies Hiring', value: snapshot.companiesHiring.toLocaleString() },
+              { label: 'Employing Companies', value: snapshot.companiesHiring.toLocaleString() },
               { label: 'Registered This Year', value: snapshot.registeredThisYear.toLocaleString() },
             ].map((stat, i) => (
               <div key={i} className="bg-gray-50 rounded-lg p-2 text-center">
