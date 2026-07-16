@@ -515,7 +515,7 @@ export default function CareerTrendsPage() {
 
           <FilterDropdown
             label="Employment Type"
-            options={['full-time', 'part-time', 'contract', 'freelance', 'self-employed']}
+            options={['full-time', 'part-time', 'contract', 'freelance', 'self-employed', 'internship']}
             selected={selectedEmploymentType}
             onChange={setSelectedEmploymentType}
             formatLabel={(v) => JOB_TYPE_LABELS[v] || v}
