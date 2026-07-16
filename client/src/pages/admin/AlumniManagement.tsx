@@ -295,7 +295,7 @@ export default function AlumniManagement() {
 
       {showDetail && detailData && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDetail(false)}>
-          <div className="bg-white max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white max-w-5xl w-full flex flex-col" style={{ height: '80vh' }} onClick={(e) => e.stopPropagation()}>
             {/* Header bar */}
             <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-gray-50 sticky top-0 z-10">
               <h2 className="text-sm font-bold text-gray-900">Alumni Details</h2>
@@ -312,9 +312,9 @@ export default function AlumniManagement() {
               </div>
             </div>
 
-            <div className="flex flex-col md:flex-row">
-              {/* Left panel - 70% */}
-              <div className="w-full md:w-[70%] p-6 border-r border-gray-200">
+            <div className="flex flex-1 overflow-hidden">
+              {/* Left panel - 70% - scrollable */}
+              <div className="w-full md:w-[70%] p-6 border-r border-gray-200 overflow-y-auto">
                 {/* Quick summary */}
                 <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
                   <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-600 shrink-0">
