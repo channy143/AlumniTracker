@@ -1,0 +1,9 @@
+ALTER TABLE public.feed_posts
+ADD COLUMN IF NOT EXISTS event_date DATE,
+ADD COLUMN IF NOT EXISTS event_time VARCHAR(50),
+ADD COLUMN IF NOT EXISTS event_location VARCHAR(300),
+ADD COLUMN IF NOT EXISTS event_gallery JSONB DEFAULT '[]'::jsonb;
+
+ALTER TABLE public.feed_posts
+ALTER COLUMN job_url TYPE VARCHAR(1000),
+ALTER COLUMN job_url DROP NOT NULL;
