@@ -24,14 +24,11 @@ router.get('/', async (req, res, next) => {
       .select('*', { count: 'exact' })
       .eq('role', 'alumni');
 
-    if (archived) query = query.eq('is_archived', true);
+    if (req.query.archived === 'true') query = query.eq('is_archived', true);
+    else if (req.query.archived === 'false') query = query.eq('is_archived', false);
 
     if (status === 'verified') query = query.eq('is_verified', true);
     else if (status === 'unverified') query = query.eq('is_verified', false);
-
-    if (search) {
-      query = query.or(`email.ilike.%${search}%`);
-    }
 
     query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
@@ -146,7 +143,7 @@ router.get('/', async (req, res, next) => {
     const employers = [...new Set((distinctCompanies || []).map((e: any) => e.company_name).filter(Boolean))].sort();
     const locations = [...new Set((distinctCities || []).map((p: any) => p.city).filter(Boolean))].sort();
 
-    res.json({ data: result, total: count || 0, page, limit, employers, locations });
+    res.json({ data: result, total: result.length, page, limit, employers, locations });
   } catch (err) {
     next(err);
   }

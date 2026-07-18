@@ -111,28 +111,36 @@ export default function AlumniManagement() {
   };
 
   const handleArchive = async (id: string) => {
-    await adminApi.alumniArchive(id);
-    addNotification('Alumni archived', 'success');
-    load();
+    try {
+      await adminApi.alumniArchive(id);
+      addNotification('Alumni archived', 'success');
+      load();
+    } catch (err: any) { addNotification(err.message || 'Failed to archive', 'error'); }
   };
 
   const handleRestore = async (id: string) => {
-    await adminApi.alumniRestore(id);
-    addNotification('Alumni restored', 'success');
-    load();
+    try {
+      await adminApi.alumniRestore(id);
+      addNotification('Alumni restored', 'success');
+      load();
+    } catch (err: any) { addNotification(err.message || 'Failed to restore', 'error'); }
   };
 
   const handleVerify = async (id: string) => {
-    await adminApi.alumniVerify(id);
-    addNotification('Alumni verified', 'success');
-    load();
+    try {
+      await adminApi.alumniVerify(id);
+      addNotification('Alumni verified', 'success');
+      load();
+    } catch (err: any) { addNotification(err.message || 'Failed to verify', 'error'); }
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Permanently delete this alumni? This cannot be undone.')) return;
-    await adminApi.alumniDelete(id);
-    addNotification('Alumni deleted', 'success');
-    load();
+    try {
+      await adminApi.alumniDelete(id);
+      addNotification('Alumni deleted', 'success');
+      load();
+    } catch (err: any) { addNotification(err.message || 'Failed to delete', 'error'); }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -207,6 +215,7 @@ export default function AlumniManagement() {
         </select>
         <select value={filters.archived} onChange={(e) => { setFilters((f) => ({ ...f, archived: e.target.value })); setPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
+          <option value="">All</option>
           <option value="false">Active</option>
           <option value="true">Archived</option>
         </select>
