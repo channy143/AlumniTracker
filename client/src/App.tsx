@@ -19,6 +19,7 @@ import SupportPage from '@/pages/support/SupportPage';
 import UsefulLinksPage from '@/pages/links/UsefulLinksPage';
 import EventsPage from '@/pages/events/EventsPage';
 import AnnouncementsPage from '@/pages/announcements/AnnouncementsPage';
+import SurveyPage from '@/pages/survey/SurveyPage';
 
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AlumniManagement from '@/pages/admin/AlumniManagement';
@@ -90,6 +91,7 @@ export default function App() {
         <Route path="links" element={<UsefulLinksPage />} />
         <Route path="announcements" element={<AnnouncementsPage />} />
         <Route path="events" element={<EventsPage />} />
+        <Route path="surveys/:id" element={<SurveyPage />} />
         <Route path="support" element={<SupportPage />} />
 
       </Route>

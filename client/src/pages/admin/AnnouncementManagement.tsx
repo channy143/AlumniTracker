@@ -10,7 +10,8 @@ export default function AnnouncementManagement() {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: '', content: '', image_url: '', document_url: '', is_pinned: false, status: 'draft', send_to_all: true });
+  const [form, setForm] = useState({ title: '', content: '', image_url: '', document_url: '', is_pinned: false, status: 'draft', send_to_all: true, linked_survey_id: '' });
+  const [availableSurveys, setAvailableSurveys] = useState<any[]>([]);
   const addNotification = useUIStore((s) => s.addNotification);
   const limit = 15;
 
@@ -26,13 +27,18 @@ export default function AnnouncementManagement() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    adminApi.surveyList({ status: 'active' }).then(setAvailableSurveys).catch(() => {});
+  }, []);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (editId) await adminApi.announcementUpdate(editId, form);
-      else await adminApi.announcementCreate(form);
+      const payload = { ...form, linked_survey_id: form.linked_survey_id || null };
+      if (editId) await adminApi.announcementUpdate(editId, payload);
+      else await adminApi.announcementCreate(payload);
       setShowForm(false); setEditId(null);
-      setForm({ title: '', content: '', image_url: '', document_url: '', is_pinned: false, status: 'draft', send_to_all: true });
+      setForm({ title: '', content: '', image_url: '', document_url: '', is_pinned: false, status: 'draft', send_to_all: true, linked_survey_id: '' });
       addNotification(editId ? 'Announcement updated' : 'Announcement created', 'success');
       load();
     } catch { addNotification('Failed to save announcement', 'error'); }
@@ -77,17 +83,18 @@ export default function AnnouncementManagement() {
         <div className="space-y-2">
           {data.map((item: any) => (
             <div key={item.id} className={`bg-white border border-gray-200 rounded-lg p-3 flex items-start justify-between ${item.is_pinned ? 'ring-1 ring-orange-300' : ''}`}>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  {item.is_pinned && <span className="text-[10px] text-orange-600 font-medium uppercase">Pinned</span>}
-                  <h3 className="text-sm font-semibold text-gray-900 truncate">{item.title}</h3>
-                  <span className={`px-1.5 py-0.5 text-[10px] rounded-full ${item.status === 'published' ? 'bg-emerald-50 text-emerald-700' : item.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-amber-50 text-amber-700'}`}>
-                    {item.status}
-                  </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    {item.is_pinned && <span className="text-[10px] text-orange-600 font-medium uppercase">Pinned</span>}
+                    <h3 className="text-sm font-semibold text-gray-900 truncate">{item.title}</h3>
+                    <span className={`px-1.5 py-0.5 text-[10px] rounded-full ${item.status === 'published' ? 'bg-emerald-50 text-emerald-700' : item.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-amber-50 text-amber-700'}`}>
+                      {item.status}
+                    </span>
+                    {item.linked_survey_id && <span className="text-[10px] text-orange-600 font-medium">Has Survey</span>}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.content}</p>
+                  <p className="text-[10px] text-gray-400 mt-1">By {item.user?.email} &middot; {new Date(item.created_at).toLocaleDateString()}</p>
                 </div>
-                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.content}</p>
-                <p className="text-[10px] text-gray-400 mt-1">By {item.user?.email} &middot; {new Date(item.created_at).toLocaleDateString()}</p>
-              </div>
               <div className="flex gap-1.5 ml-3 shrink-0">
                 {item.status === 'draft' && <button onClick={() => handlePublish(item.id)} className="text-[10px] text-emerald-600 hover:underline font-medium">Publish</button>}
                 <button onClick={() => handlePin(item.id, item.is_pinned)} className="text-[10px] text-orange-600 hover:underline font-medium">{item.is_pinned ? 'Unpin' : 'Pin'}</button>
@@ -109,9 +116,18 @@ export default function AnnouncementManagement() {
                 <div><label className="block text-xs font-medium text-gray-700 mb-1">Image URL</label><input type="url" value={form.image_url} onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" /></div>
                 <div><label className="block text-xs font-medium text-gray-700 mb-1">Document URL</label><input type="url" value={form.document_url} onChange={(e) => setForm((f) => ({ ...f, document_url: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" /></div>
               </div>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.is_pinned} onChange={(e) => setForm((f) => ({ ...f, is_pinned: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500" /> Pin Announcement</label>
-                <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.send_to_all} onChange={(e) => setForm((f) => ({ ...f, send_to_all: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500" /> Send to All Alumni</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Link to Survey <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <select value={form.linked_survey_id} onChange={(e) => setForm((f) => ({ ...f, linked_survey_id: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full">
+                    <option value="">No survey linked</option>
+                    {availableSurveys.map((s: any) => <option key={s.id} value={s.id}>{s.title}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-4 pt-5">
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.is_pinned} onChange={(e) => setForm((f) => ({ ...f, is_pinned: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500" /> Pin Announcement</label>
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.send_to_all} onChange={(e) => setForm((f) => ({ ...f, send_to_all: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500" /> Send to All</label>
+                </div>
               </div>
               <div className="flex gap-2 justify-end pt-1">
                 <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>

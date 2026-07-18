@@ -27,6 +27,15 @@ router.get('/', authenticate, async (_req, res, next) => {
           .single();
         if (user) createdBy = user.email;
       }
+      let linkedSurvey = null;
+      if (a.linked_survey_id) {
+        const { data: survey } = await supabase
+          .from('surveys')
+          .select('id, title, academic_year, status, is_active, expires_at')
+          .eq('id', a.linked_survey_id)
+          .single();
+        if (survey) linkedSurvey = survey;
+      }
       return {
         id: a.id,
         title: a.title,
@@ -36,6 +45,7 @@ router.get('/', authenticate, async (_req, res, next) => {
         is_pinned: a.is_pinned,
         created_at: a.created_at,
         created_by: createdBy,
+        linked_survey: linkedSurvey,
       };
     }));
 

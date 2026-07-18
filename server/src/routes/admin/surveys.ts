@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
+import { createSurveyNotifications } from '../notifications';
 
 const STANDARD_QUESTIONS = [
   { id: 'personal_info', section: 'Personal Information', type: 'section' },
@@ -76,6 +77,21 @@ router.post('/', async (req, res, next) => {
     const { title, description, academic_year, target_type, target_value, opens_at, closes_at, status, notes } = req.body;
     if (!title) throw new AppError('Survey title is required', 400);
 
+    if (status === 'published') {
+      const targetKey = target_type || 'all';
+      const targetVal = target_type === 'batch' || target_type === 'course' ? target_value : null;
+      let activeQuery = supabase.from('surveys')
+        .select('id')
+        .eq('is_active', true)
+        .eq('status', 'published')
+        .eq('target_type', targetKey);
+      if (targetVal) activeQuery = activeQuery.eq('target_value', targetVal);
+      const { data: active } = await activeQuery;
+      if (active && active.length > 0) {
+        throw new AppError(`There is already an active survey for this target (${targetKey}${targetVal ? ': ' + targetVal : ''}). Close it first.`, 400);
+      }
+    }
+
     const { data, error } = await supabase.from('surveys').insert({
       title,
       description: description || '',
@@ -91,6 +107,11 @@ router.post('/', async (req, res, next) => {
     }).select().single();
 
     if (error) throw new AppError(error.message, 500);
+
+    if (status === 'published' && data) {
+      createSurveyNotifications(data);
+    }
+
     res.status(201).json(data);
   } catch (err) {
     next(err);
@@ -132,8 +153,31 @@ router.put('/:id', async (req, res, next) => {
     if (status !== undefined) { updates.status = status; updates.is_active = status === 'published'; }
     if (notes !== undefined) updates.notes = notes;
 
+    if (status === 'published') {
+      const { data: current } = await supabase.from('surveys').select('target_type, target_value').eq('id', req.params.id).single();
+      const targetKey = (target_type || current?.target_type) || 'all';
+      const targetVal = target_value || current?.target_value;
+      let activeQuery = supabase.from('surveys')
+        .select('id')
+        .eq('is_active', true)
+        .eq('status', 'published')
+        .eq('target_type', targetKey)
+        .neq('id', req.params.id);
+      if (targetVal) activeQuery = activeQuery.eq('target_value', targetVal);
+      const { data: active } = await activeQuery;
+      if (active && active.length > 0) {
+        throw new AppError(`There is already an active survey for this target. Close it first.`, 400);
+      }
+    }
+
     const { error } = await supabase.from('surveys').update(updates).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
+
+    if (status === 'published') {
+      const { data: survey } = await supabase.from('surveys').select('*').eq('id', req.params.id).single();
+      if (survey) createSurveyNotifications(survey);
+    }
+
     res.json({ message: 'Survey updated' });
   } catch (err) {
     next(err);
@@ -152,8 +196,28 @@ router.delete('/:id', async (req, res, next) => {
 
 router.put('/:id/activate', async (req, res, next) => {
   try {
+    const { data: survey } = await supabase.from('surveys').select('*').eq('id', req.params.id).single();
+    if (!survey) throw new AppError('Survey not found', 404);
+
+    const targetKey = survey.target_type || 'all';
+    const targetVal = survey.target_value;
+    let activeQuery = supabase.from('surveys')
+      .select('id')
+      .eq('is_active', true)
+      .eq('status', 'published')
+      .eq('target_type', targetKey)
+      .neq('id', req.params.id);
+    if (targetVal) activeQuery = activeQuery.eq('target_value', targetVal);
+    const { data: active } = await activeQuery;
+    if (active && active.length > 0) {
+      throw new AppError(`There is already an active survey for this target. Close it first.`, 400);
+    }
+
     const { error } = await supabase.from('surveys').update({ is_active: true, status: 'published' }).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
+
+    createSurveyNotifications(survey);
+
     res.json({ message: 'Survey activated' });
   } catch (err) {
     next(err);

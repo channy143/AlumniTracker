@@ -2,8 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { getInitials, playTing } from '@/utils/helpers';
-import { profileApi, activitiesApi } from '@/services/api';
-import { Bars3Icon, BellIcon, MagnifyingGlassIcon, UserIcon, ArrowRightOnRectangleIcon, AcademicCapIcon, BriefcaseIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { profileApi, notificationsApi } from '@/services/api';
+import { Bars3Icon, BellIcon, MagnifyingGlassIcon, UserIcon, ArrowRightOnRectangleIcon, AcademicCapIcon, BriefcaseIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 
 const SEARCH_PAGES = ['/career-trends', '/announcements', '/events', '/directory', '/connections'];
 
@@ -43,12 +43,15 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const data = await activitiesApi.list(10);
+      const [data, { count }] = await Promise.all([
+        notificationsApi.list(10),
+        notificationsApi.unreadCount(),
+      ]);
+      setUnreadCount(count || 0);
       if (data && data.length > 0) {
         const latestId = String(data[0].id);
-        if (lastNotifIdRef.current && lastNotifIdRef.current !== latestId) {
+        if (lastNotifIdRef.current && lastNotifIdRef.current !== latestId && count > 0) {
           playTing();
-          setUnreadCount((prev) => prev + 1);
         }
         if (!lastNotifIdRef.current) {
           lastNotifIdRef.current = latestId;
@@ -56,7 +59,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         setNotifications(data);
       }
     } catch {}
-  }, [playTing]);
+  }, []);
 
   useEffect(() => {
     fetchNotifications();
@@ -86,10 +89,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const notifIcon = (action: string) => {
-    if (action.toLowerCase().includes('graduate') || action.toLowerCase().includes('education')) return AcademicCapIcon;
-    if (action.toLowerCase().includes('employ') || action.toLowerCase().includes('job') || action.toLowerCase().includes('position')) return BriefcaseIcon;
-    return ClockIcon;
+  const notifIcon = (type: string) => {
+    if (type === 'survey') return ClipboardDocumentCheckIcon;
+    return AcademicCapIcon;
   };
 
   const handleLogout = () => {
@@ -145,30 +147,42 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             </button>
             {notifDropdownOpen && (
               <div className="absolute right-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-                <div className="px-4 py-2.5 border-b border-gray-100">
-                  <p className="text-sm font-semibold text-gray-800">Recent Activity</p>
+                <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-gray-800">Notifications</p>
+                  {unreadCount > 0 && (
+                    <button onClick={() => { notificationsApi.markAllRead(); setUnreadCount(0); setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true }))); }} className="text-[10px] text-orange-600 hover:underline font-medium">Mark all read</button>
+                  )}
                 </div>
                 {notifications.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-gray-400">No recent activity</div>
+                  <div className="px-4 py-8 text-center text-sm text-gray-400">No notifications</div>
                 ) : (
                   <div className="divide-y divide-gray-50">
                     {notifications.map((n: any) => {
-                      const Icon = notifIcon(n.action);
+                      const Icon = notifIcon(n.type);
                       return (
-                        <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                        <div
+                          key={n.id}
+                          onClick={() => {
+                            if (!n.is_read) { notificationsApi.markRead(n.id); }
+                            setNotifDropdownOpen(false);
+                            if (n.link) navigate(n.link);
+                          }}
+                          className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer ${!n.is_read ? 'bg-orange-50/50' : ''}`}
+                        >
                           <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center shrink-0">
                             <Icon className="w-4 h-4 text-orange-600" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm text-gray-800 leading-snug">
-                              <span className="font-medium">{n.user}</span>{' '}
-                              {n.action}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-0.5">{n.target}</p>
-                            <p className="text-[10px] text-gray-300 mt-0.5">
-                              {new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                            </p>
+                            <p className="text-sm text-gray-800 leading-snug">{n.title}</p>
+                            {n.message && <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>}
+                            <div className="flex items-center gap-2 mt-1">
+                              {n.link && <span className="text-[10px] font-medium text-orange-600">Complete Survey &rarr;</span>}
+                              <span className="text-[10px] text-gray-300">
+                                {new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
+                            </div>
                           </div>
+                          {!n.is_read && <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0 mt-1.5" />}
                         </div>
                       );
                     })}

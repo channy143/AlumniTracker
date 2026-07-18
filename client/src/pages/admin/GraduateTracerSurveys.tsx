@@ -161,7 +161,10 @@ export default function GraduateTracerSurveys() {
         <div className="flex items-center gap-1.5 flex-wrap">
           <button onClick={() => { setSelectedSurvey(survey); setDetailTab('overview'); }} className="px-2.5 py-1 text-[10px] font-medium bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100">View</button>
           <button onClick={() => handleExport(survey.id)} className="px-2.5 py-1 text-[10px] font-medium bg-gray-50 text-gray-600 rounded-md hover:bg-gray-100">Export</button>
-          {survey.status !== 'closed' && (
+          {survey.status === 'draft' && (
+            <button onClick={async () => { try { await adminApi.surveyActivate(survey.id); addNotification('Survey published!', 'success'); load(); } catch (err: any) { addNotification(err.message || 'Failed to publish', 'error'); } }} className="px-2.5 py-1 text-[10px] font-medium bg-emerald-50 text-emerald-600 rounded-md hover:bg-emerald-100">Publish</button>
+          )}
+          {survey.status === 'published' && (
             <button onClick={() => handleClose(survey.id)} className="px-2.5 py-1 text-[10px] font-medium bg-red-50 text-red-600 rounded-md hover:bg-red-100">Close</button>
           )}
           <button onClick={() => handleDuplicate(survey.id)} className="px-2.5 py-1 text-[10px] font-medium bg-gray-50 text-gray-600 rounded-md hover:bg-gray-100">Duplicate</button>

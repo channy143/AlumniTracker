@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/store/authStore';
-import { feedApi, careerTrendsApi, profileApi } from '@/services/api';
-import { CalendarDaysIcon, MegaphoneIcon, UserGroupIcon, BuildingOfficeIcon, BriefcaseIcon, ChartBarIcon, CheckCircleIcon, ExclamationCircleIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { feedApi, careerTrendsApi, profileApi, surveyApi } from '@/services/api';
+import { CalendarDaysIcon, MegaphoneIcon, UserGroupIcon, BuildingOfficeIcon, BriefcaseIcon, ChartBarIcon, CheckCircleIcon, ExclamationCircleIcon, SparklesIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 import { decodeUnicode } from '@/utils/helpers';
 
 
@@ -76,12 +76,22 @@ function InfoCard({ post, onViewDetails }: { post: FeedPost; onViewDetails: () =
           <img src={post.image_url} alt="" className="w-full rounded-lg mb-2 max-h-80 object-cover" />
         )}
 
-        <button
-          onClick={onViewDetails}
-          className="mt-2 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors"
-        >
-          View Details &rarr;
-        </button>
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            onClick={onViewDetails}
+            className="text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors"
+          >
+            View Details &rarr;
+          </button>
+          {(post as any).linked_survey && (
+            <button
+              onClick={(e) => { e.stopPropagation(); window.location.href = `/surveys/${(post as any).linked_survey.id}`; }}
+              className="text-xs font-medium bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-600 transition-colors"
+            >
+              Complete Survey
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -126,6 +136,61 @@ function PostDetailView({ post, onBack }: { post: FeedPost; onBack: () => void }
         {post.image_url && (
           <img src={post.image_url} alt="" className="w-full rounded-lg mb-3" />
         )}
+      </div>
+    </div>
+  );
+}
+
+function SurveyBanner() {
+  const navigate = useNavigate();
+  const [active, setActive] = useState<{ survey: any; completed: boolean } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    surveyApi.getActive().then((data) => setActive(data)).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading || !active) return null;
+
+  const { survey, completed } = active;
+
+  if (completed) {
+    return (
+      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-3 flex items-center gap-2">
+        <CheckCircleIcon className="w-5 h-5 text-emerald-600 shrink-0" />
+        <div className="text-xs text-emerald-800">
+          <span className="font-medium">You have completed the {survey.title}.</span>
+          <br />
+          <span className="text-emerald-600">Thank you for participating.</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3 flex items-start gap-3">
+      <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
+        <ClipboardDocumentCheckIcon className="w-5 h-5 text-orange-600" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">{survey.title}</h3>
+            <div className="flex items-center gap-3 mt-1 text-xs text-gray-600">
+              <span><span className="font-medium">Status:</span> Open</span>
+              {survey.expires_at && (
+                <span><span className="font-medium">Due Date:</span> {new Date(survey.expires_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+              )}
+              <span><span className="font-medium">Est. Time:</span> 10 minutes</span>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate(`/surveys/${survey.id}`)}
+            className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 shrink-0"
+          >
+            Complete Survey
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -455,6 +520,8 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-500">Welcome to the CTU-Naga Alumni Network</p>
         </div>
       </div>
+
+      <SurveyBanner />
 
       <div className="flex items-center gap-3 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
         <SparklesIcon className="w-4 h-4 text-orange-500 shrink-0" />

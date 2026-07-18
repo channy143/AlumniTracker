@@ -31,7 +31,18 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       .eq('user_id', req.user!.userId);
 
     const likedPostIds = new Set((likes || []).map((l: any) => l.post_id));
-    const result = (posts || []).map((p: any) => ({ ...p, liked: likedPostIds.has(p.id) }));
+    const result = await Promise.all((posts || []).map(async (p: any) => {
+      let linkedSurvey = null;
+      if (p.linked_survey_id) {
+        const { data: survey } = await supabase
+          .from('surveys')
+          .select('id, title, status')
+          .eq('id', p.linked_survey_id)
+          .single();
+        if (survey) linkedSurvey = survey;
+      }
+      return { ...p, liked: likedPostIds.has(p.id), linked_survey: linkedSurvey };
+    }));
 
     res.json(result);
   } catch (err) { next(err); }

@@ -149,8 +149,17 @@ export const jobsApi = {
 
 export const surveyApi = {
   list: () => api.get<any[]>('/surveys'),
+  get: (id: string) => api.get<any>(`/surveys/${id}`),
+  getActive: () => api.get<any>('/surveys/active'),
   submit: (surveyId: string, responses: any) =>
-    api.post<any>(`/surveys/${surveyId}/respond`, responses),
+    api.post<any>(`/surveys/${surveyId}/respond`, { responses }),
+};
+
+export const notificationsApi = {
+  list: (limit = 20) => api.get<any[]>(`/notifications?limit=${limit}`),
+  unreadCount: () => api.get<{ count: number }>('/notifications/unread-count'),
+  markRead: (id: string) => api.post<any>(`/notifications/${id}/read`, {}),
+  markAllRead: () => api.post<any>('/notifications/mark-all-read', {}),
 };
 
 function toQuery(obj: Record<string, any>) {

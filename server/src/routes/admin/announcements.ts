@@ -38,7 +38,7 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { title, content, image_url, document_url, is_pinned, is_scheduled, scheduled_at, send_to_all, send_by_batch, send_by_course, target_batches, target_courses, status } = req.body;
+    const { title, content, image_url, document_url, is_pinned, is_scheduled, scheduled_at, send_to_all, send_by_batch, send_by_course, target_batches, target_courses, status, linked_survey_id } = req.body;
     if (!title || !content) throw new AppError('Title and content are required', 400);
 
     const { data, error } = await supabase.from('announcements').insert({
@@ -47,6 +47,7 @@ router.post('/', async (req, res, next) => {
       send_to_all: send_to_all !== false, send_by_batch: send_by_batch || false, send_by_course: send_by_course || false,
       target_batches: target_batches || [], target_courses: target_courses || [],
       status: status || 'draft', created_by: (req as any).user!.userId,
+      linked_survey_id: linked_survey_id || null,
     }).select().single();
 
     if (error) throw new AppError(error.message, 500);
