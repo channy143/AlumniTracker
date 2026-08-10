@@ -69,7 +69,7 @@ export default function AnnouncementManagement() {
           <h1 className="text-base font-bold text-gray-900">Announcement Management</h1>
           <p className="text-xs text-gray-500">{total} announcements</p>
         </div>
-        <button onClick={() => { setShowForm(true); setEditId(null); setForm({ title: '', content: '', image_url: '', document_url: '', is_pinned: false, status: 'draft', send_to_all: true }); }} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Create Announcement</button>
+        <button onClick={() => { setShowForm(true); setEditId(null); setForm({ title: '', content: '', image_url: '', document_url: '', is_pinned: false, status: 'draft', send_to_all: true, linked_survey_id: '' }); }} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Create Announcement</button>
       </div>
 
       {loading ? (
