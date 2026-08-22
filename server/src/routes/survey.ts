@@ -106,7 +106,7 @@ router.get('/active', authenticate, async (req: AuthenticatedRequest, res, next)
       .maybeSingle();
 
     res.json({
-      survey: { ...eligible, questions: STANDARD_QUESTIONS },
+      survey: { ...eligible, questions: eligible.questions || STANDARD_QUESTIONS },
       completed: !!existing,
     });
   } catch (err) { next(err); }
@@ -129,7 +129,7 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       && (!survey.expires_at || new Date(survey.expires_at) >= now);
 
     if (!isOpen) {
-      return res.json({ ...survey, questions: STANDARD_QUESTIONS, completed: false, closed: true });
+      return res.json({ ...survey, questions: survey.questions || STANDARD_QUESTIONS, completed: false, closed: true });
     }
 
     const { data: existing } = await supabase
@@ -141,7 +141,7 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
 
     res.json({
       ...survey,
-      questions: STANDARD_QUESTIONS,
+      questions: survey.questions || STANDARD_QUESTIONS,
       completed: !!existing,
       closed: false,
     });

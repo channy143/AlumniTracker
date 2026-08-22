@@ -31,12 +31,9 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-type JobFilter = 'all' | 'full-time' | 'part-time' | 'contract' | 'freelance' | 'internship' | 'exclusive' | 'remote' | 'onsite' | 'hybrid';
+type JobFilter = 'all' | 'full-time' | 'part-time' | 'contract' | 'freelance' | 'internship' | 'exclusive';
 
 function JobCard({ job, onViewDetails }: { job: any; onViewDetails: () => void }) {
-  const workModeLabel = job.work_mode === 'remote' ? 'Remote' : job.work_mode === 'hybrid' ? 'Hybrid' : null;
-  const workModeColor = job.work_mode === 'remote' ? 'bg-green-100 text-green-700' : job.work_mode === 'hybrid' ? 'bg-purple-100 text-purple-700' : '';
-
   return (
     <div className="bg-white border border-gray-200 rounded-lg">
       <div className="py-3 px-4">
@@ -51,12 +48,6 @@ function JobCard({ job, onViewDetails }: { job: any; onViewDetails: () => void }
             <>
               <span className="text-gray-400">&middot;</span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">Alumni Exclusive</span>
-            </>
-          )}
-          {workModeLabel && (
-            <>
-              <span className="text-gray-400">&middot;</span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${workModeColor}`}>{workModeLabel}</span>
             </>
           )}
         </div>
@@ -300,7 +291,6 @@ export default function JobsPage() {
   const filteredJobs = jobs.filter((job) => {
     if (filter === 'all') return true;
     if (filter === 'exclusive') return job.is_alumni_exclusive;
-    if (filter === 'remote' || filter === 'onsite' || filter === 'hybrid') return job.work_mode === filter;
     return job.job_type === filter;
   });
 
@@ -358,10 +348,6 @@ export default function JobsPage() {
             { value: 'contract', label: 'Contract' },
             { value: 'freelance', label: 'Freelance' },
             { value: 'internship', label: 'Internship' },
-            { type: 'divider' },
-            { value: 'remote', label: 'Remote' },
-            { value: 'onsite', label: 'On-site' },
-            { value: 'hybrid', label: 'Hybrid' },
             { type: 'divider' },
             { value: 'exclusive', label: 'Alumni Exclusive' },
           ] as const).map((item: any, i: number) =>

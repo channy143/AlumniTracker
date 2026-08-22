@@ -8,6 +8,7 @@ export default function AdminEvents() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', description: '', date: '', time: '', location: '' });
+  const [filter, setFilter] = useState<'upcoming' | 'past'>('upcoming');
   const addNotification = useUIStore((s) => s.addNotification);
 
   useEffect(() => { load(); }, []);
@@ -57,15 +58,6 @@ export default function AdminEvents() {
     } catch { addNotification('Failed to delete event', 'error'); }
   };
 
-  if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-4"><div className="h-5 w-32 bg-gray-200 animate-pulse rounded mb-1" /><div className="h-3 w-48 bg-gray-200 animate-pulse rounded" /></div>
-        <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 bg-gray-200 animate-pulse rounded-lg" />)}</div>
-      </div>
-    );
-  }
-
   const formatDate = (d: string) => {
     if (!d) return '';
     const dt = new Date(d);
@@ -81,6 +73,22 @@ export default function AdminEvents() {
     };
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-4"><div className="h-5 w-32 bg-gray-200 animate-pulse rounded mb-1" /><div className="h-3 w-48 bg-gray-200 animate-pulse rounded" /></div>
+        <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 bg-gray-200 animate-pulse rounded-lg" />)}</div>
+      </div>
+    );
+  }
+
+  const now = new Date();
+  const filteredEvents = events.filter((e: any) => {
+    const eventDate = new Date(e.date);
+    if (filter === 'upcoming') return eventDate >= now;
+    return eventDate < now;
+  });
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-4">
@@ -90,16 +98,21 @@ export default function AdminEvents() {
 
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">{['upcoming', 'past'].map((f) => (
-          <span key={f} className="px-3 py-1.5 text-xs font-medium text-gray-500">{f.charAt(0).toUpperCase() + f.slice(1)}</span>
+          <button key={f} onClick={() => setFilter(f as 'upcoming' | 'past')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              filter === f ? 'bg-orange-500 text-white' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
         ))}</div>
         <button onClick={() => { setShowForm(true); setEditId(null); setForm({ name: '', description: '', date: '', time: '', location: '' }); }}
           className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors">+ New Event</button>
       </div>
 
       <div className="space-y-2">
-        {events.length === 0 ? (
-          <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">No events for now.</div>
-        ) : events.slice(0, 10).map((e) => (
+        {filteredEvents.length === 0 ? (
+          <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">No {filter} events for now.</div>
+        ) : filteredEvents.slice(0, 10).map((e: any) => (
           <div key={e.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-orange-50 flex flex-col items-center justify-center shrink-0">

@@ -93,12 +93,13 @@ export default function DirectoryPage() {
   const [employmentStatuses, setEmploymentStatuses] = useState<string[]>(searchParams.get('employment_status')?.split(',').filter(Boolean) || []);
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'name');
 
-  const programOptions = ['BEEd', 'BSEd-Math', 'BTLED-HE', 'BTLED-ICT', 'BIT', 'BSIT'];
+  const [programOptions, setProgramOptions] = useState<string[]>([]);
   const [batchOptions, setBatchOptions] = useState<string[]>([]);
   const employmentStatusOptions = ['Employed', 'Self-employed', 'Unemployed', 'Seeking Opportunities', 'Retired'];
 
   useEffect(() => {
     directoryApi.stats().then(setStats).catch(() => {});
+    directoryApi.programs().then(setProgramOptions).catch(() => {});
   }, []);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { adminApi, analyticsApi } from '@/services/api';
+import { adminApi, careerTrendsApi } from '@/services/api';
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -19,7 +19,7 @@ export default function AdminPage() {
       setLoading(true);
       const [usersData, overviewData] = await Promise.all([
         adminApi.users(),
-        analyticsApi.overview(),
+        careerTrendsApi.list({}),
       ]);
       setUsers(usersData);
       setOverview(overviewData);

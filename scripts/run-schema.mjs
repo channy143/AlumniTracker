@@ -2,15 +2,23 @@ import { readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+dotenv.config({ path: resolve(__dirname, '..', 'server', '.env') });
+
 const serverPkg = resolve(__dirname, '..', 'server', 'package.json');
 const require = createRequire(serverPkg);
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = 'https://unfvgvnqqjxcyisievqf.supabase.co';
-const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVuZnZndm5xcWp4Y3lpc2lldnFmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTgxMzkyMywiZXhwIjoyMDk1Mzg5OTIzfQ.8RYIdjS04Y9YCFsAJXkxBPQmECsxNFG2bGelHGbejtw';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Error: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in server/.env');
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 

@@ -4,23 +4,31 @@ import { mentorshipApi } from '@/services/api';
 export default function MentorshipPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [mentorships, setMentorships] = useState<any[]>([]);
+  const [myMentorships, setMyMentorships] = useState<any[]>([]);
+  const [availableMentors, setAvailableMentors] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'find' | 'my'>('find');
   const [applying, setApplying] = useState<string | null>(null);
 
   useEffect(() => {
-    loadMentorships();
+    loadMyMentorships();
+    loadAvailableMentors();
   }, []);
 
-  const loadMentorships = async () => {
+  const loadMyMentorships = async () => {
     try {
-      setLoading(true);
       const data = await mentorshipApi.list();
-      setMentorships(data);
+      setMyMentorships(data);
     } catch {
       setError('Failed to load mentorship data');
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const loadAvailableMentors = async () => {
+    try {
+      const data = await mentorshipApi.discover();
+      setAvailableMentors(data);
+    } catch {
+      // Discover might fail if not implemented yet, ignore
     }
   };
 
@@ -28,21 +36,13 @@ export default function MentorshipPage() {
     try {
       setApplying(mentorId);
       await mentorshipApi.apply({ mentor_id: mentorId });
-      loadMentorships();
+      loadMyMentorships();
     } catch {
       setError('Failed to apply for mentorship');
     } finally {
       setApplying(null);
     }
   };
-
-  const availableMentors = mentorships.filter(
-    (m) => m.role === 'mentor' && m.status === 'available'
-  );
-
-  const myMentorships = mentorships.filter(
-    (m) => m.role === 'mentee' || m.status === 'active' || m.status === 'pending'
-  );
 
   if (loading) {
     return (
@@ -61,7 +61,7 @@ export default function MentorshipPage() {
         <div><h1 className="section-title">Mentorship Platform</h1></div>
         <div className="card text-center py-12">
           <p className="text-red-600">{error}</p>
-          <button onClick={loadMentorships} className="btn-primary mt-4">Retry</button>
+          <button onClick={loadMyMentorships} className="btn-primary mt-4">Retry</button>
         </div>
       </div>
     );
@@ -97,9 +97,9 @@ export default function MentorshipPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {availableMentors.map((mentor) => {
-              const profile = mentor.mentor_profile || mentor.profile || {};
+              const profile = mentor.mentor_profile || {};
               const name = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Mentor';
-              const title = profile.current_position || profile.bio || 'Alumni Mentor';
+              const title = profile.current_position || profile.company_name || 'Alumni Mentor';
               const expertise = mentor.expertise || [];
               return (
                 <div key={mentor.id} className="card">

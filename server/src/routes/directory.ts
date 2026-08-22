@@ -27,6 +27,14 @@ router.get('/stats', authenticate, async (req: AuthenticatedRequest, res, next) 
   } catch (err) { next(err); }
 });
 
+router.get('/programs', authenticate, async (_req, res, next) => {
+  try {
+    const { data: education } = await supabase.from('education').select('program');
+    const programs = [...new Set((education || []).map((e: any) => e.program).filter(Boolean))].sort();
+    res.json(programs);
+  } catch (err) { next(err); }
+});
+
 router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const q = (req.query.q as string) || '';

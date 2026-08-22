@@ -63,10 +63,6 @@ export const authApi = {
   me: () => api.get<{ user: any }>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<{ message: string }>('/auth/change-password', { currentPassword, newPassword }),
-  sendVerificationEmail: () =>
-    api.post<{ message: string }>('/auth/send-verification', {}),
-  verifyEmail: (otp: string) =>
-    api.post<{ message: string }>('/auth/verify-email', { otp }),
 };
 
 export const profileApi = {
@@ -107,18 +103,6 @@ export const employmentApi = {
   delete: (id: string) => api.delete(`/employment/${id}`),
 };
 
-export const analyticsApi = {
-  overview: () => api.get<any>('/analytics/overview'),
-  batchComparison: (batch: number) =>
-    api.get<any>(`/analytics/batch/${batch}`),
-  industryDistribution: () => api.get<any>('/analytics/industries'),
-  statistics: () => api.get<any>('/analytics/statistics'),
-  salaryStatistics: () => api.get<any>('/analytics/salary-statistics'),
-  userCareerStats: () => api.get<any>('/analytics/user-career-stats'),
-  industryTrends: () => api.get<any>('/analytics/industry-trends'),
-  employmentTimeSeries: () => api.get<any>('/analytics/employment-time-series'),
-};
-
 export const careerTrendsApi = {
   list: (params: Record<string, any> = {}) => api.get<any>(`/career-trends?${toQuery(params)}${Object.keys(params).length ? '&' : ''}_t=${Date.now()}`),
   get: (position: string) => api.get<any>(`/career-trends/${encodeURIComponent(position)}?_t=${Date.now()}`),
@@ -126,6 +110,7 @@ export const careerTrendsApi = {
 
 export const mentorshipApi = {
   list: () => api.get<any[]>('/mentorship'),
+  discover: () => api.get<any[]>('/mentorship/discover'),
   apply: (data: any) => api.post<any>('/mentorship/apply', data),
   updateStatus: (id: string, status: string) =>
     api.put<any>(`/mentorship/${id}`, { status }),
@@ -142,9 +127,6 @@ export const jobsApi = {
   list: () => api.get<any[]>('/jobs'),
   get: (id: string) => api.get<any>(`/jobs/${id}`),
   create: (data: any) => api.post<any>('/jobs', data),
-  savedList: () => api.get<any[]>('/jobs/saved/list'),
-  save: (jobId: string) => api.post<any>(`/jobs/saved/${jobId}`, {}),
-  unsave: (jobId: string) => api.delete<any>(`/jobs/saved/${jobId}`),
 };
 
 export const surveyApi = {
@@ -229,13 +211,14 @@ export const adminApi = {
   reportSurvey: (id: string, format = 'json') => api.get<Blob>(`/admin/reports/survey/${id}?format=${format}`),
   reportCareerProgress: (format = 'json') => api.get<Blob>(`/admin/reports/career-progress?format=${format}`),
 
-  employmentRate: (params: Record<string, any> = {}) => api.get<any>(`/admin/analytics/employment-rate?${toQuery(params)}`),
+employmentRate: (params: Record<string, any> = {}) => api.get<any>(`/admin/analytics/employment-rate?${toQuery(params)}`),
   employmentByCourse: (params: Record<string, any> = {}) => api.get<any[]>(`/admin/analytics/employment-by-course?${toQuery(params)}`),
+  employmentByCourseCsv: () => api.get<Blob>(`/admin/analytics/employment-by-course?format=csv`),
   employmentByBatch: () => api.get<any[]>('/admin/analytics/employment-by-batch'),
-  industryDistribution: () => api.get<any[]>('/admin/analytics/industry-distribution'),
-  topEmployers: () => api.get<any[]>('/admin/analytics/top-employers'),
   salaryDistribution: () => api.get<any[]>('/admin/analytics/salary-distribution'),
+  salaryDistributionCsv: () => api.get<Blob>('/admin/analytics/salary-distribution?format=csv'),
   degreeAlignment: () => api.get<any[]>('/admin/analytics/degree-alignment'),
+  degreeAlignmentCsv: () => api.get<Blob>('/admin/analytics/degree-alignment?format=csv'),
   avgTimeEmployment: () => api.get<any>('/admin/analytics/avg-time-employment'),
 
   userList: (params: Record<string, any> = {}) => api.get<any>(`/admin/users?${toQuery(params)}`),
@@ -272,42 +255,17 @@ export const connectionsApi = {
 };
 
 export const messagesApi = {
-  list: () => api.get<any[]>('/messages'),
-  conversations: () => api.get<any[]>('/messages/conversations'),
-  get: (profileId: string) => api.get<any[]>(`/messages/${profileId}`),
   send: (receiverId: string, body: string, subject?: string, connectionId?: string) =>
     api.post<any>('/messages', { receiver_id: receiverId, body, subject, connection_id: connectionId }),
-  unreadCount: () => api.get<{ count: number }>('/messages/unread/count'),
-};
-
-export const referralsApi = {
-  list: () => api.get<any[]>('/referrals'),
-  create: (data: { recipient_id: string; job_id?: string; company_id?: string; position_title?: string; company_name?: string; message?: string }) =>
-    api.post<any>('/referrals', data),
-  respond: (id: string, status: string) => api.put<any>(`/referrals/${id}/respond`, { status }),
-  count: () => api.get<{ count: number }>('/referrals/count'),
-};
-
-export const networkingApi = {
-  alumniAtCompany: (companyId: string) => api.get<any[]>(`/networking/alumni-at-company/${companyId}`),
-  alumniAtCompanyName: (companyName: string) => api.get<any[]>(`/networking/alumni-at-company-name/${encodeURIComponent(companyName)}`),
-  stats: () => api.get<any>('/networking/stats'),
-  companyProfile: (companyId: string) => api.get<any>(`/networking/company/${companyId}`),
-  jobAlumni: (jobId: string) => api.get<any[]>(`/networking/job-alumni/${jobId}`),
 };
 
 export const feedApi = {
   list: (sort?: string) => api.get<any[]>(`/feed${sort ? `?sort=${sort}` : ''}`),
   get: (id: string) => api.get<any>(`/feed/${id}`),
-  addComment: (postId: string, content: string) => api.post<any>(`/feed/${postId}/comments`, { content }),
-  toggleLike: (postId: string) => api.post<any>(`/feed/${postId}/like`, {}),
-  myComments: () => api.get<any[]>('/feed/comments/mine'),
-  deleteComment: (commentId: string) => api.delete(`/feed/comments/${commentId}`),
 };
 
 export const activitiesApi = {
   list: (limit?: number) => api.get<any[]>(`/activities${limit ? `?limit=${limit}` : ''}`),
-  add: (data: { user: string; action: string; target: string }) => api.post<any>('/activities', data),
 };
 
 export const eventsApi = {
@@ -326,6 +284,7 @@ export const directoryApi = {
   },
   get: (id: string) => api.get<any>(`/directory/${id}`),
   stats: () => api.get<{ totalAlumni: number; currentlyEmployed: number; employmentRate: number; programs: number }>('/directory/stats'),
+  programs: () => api.get<string[]>('/directory/programs'),
 };
 
 export const publicApi = {

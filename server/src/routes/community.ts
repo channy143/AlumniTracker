@@ -15,7 +15,14 @@ router.get('/groups', authenticate, async (_req, res, next) => {
 
     if (error) throw new AppError(error.message, 500);
 
-    res.json(groups);
+    // Ensure counts are included (from DB columns with triggers)
+    const groupsWithCounts = (groups || []).map(g => ({
+      ...g,
+      member_count: g.member_count || 0,
+      post_count: g.post_count || 0,
+    }));
+
+    res.json(groupsWithCounts);
   } catch (err) {
     next(err);
   }

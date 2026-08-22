@@ -17,6 +17,13 @@ function abbreviateProgram(name: string): string {
   return abbr && abbr.length >= 2 ? abbr : s;
 }
 
+function buildCsv(rows: Record<string, any>[]): string {
+  if (rows.length === 0) return '';
+  const headers = Object.keys(rows[0]);
+  const csv = rows.map((r) => headers.map((h) => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(','));
+  return [headers.join(','), ...csv].join('\n');
+}
+
 const router = Router();
 
 router.get('/employment-rate', async (req, res, next) => {
@@ -48,6 +55,7 @@ router.get('/employment-rate', async (req, res, next) => {
 
 router.get('/employment-by-course', async (req, res, next) => {
   try {
+    const format = (req.query.format as string) || 'json';
     const year = req.query.year as string;
     const { data: education } = await supabase.from('education').select('profile_id, program, year_graduated');
     const { data: employment } = await supabase.from('employment').select('profile_id, is_current').eq('is_current', true);
@@ -68,6 +76,17 @@ router.get('/employment-by-course', async (req, res, next) => {
       rate: stats.total > 0 ? Math.round((stats.employed / stats.total) * 100) : 0,
     }));
 
+    if (format === 'csv') {
+      const csv = buildCsv(data.map((d) => ({
+        Course: d.course,
+        Total: d.total,
+        Employed: d.employed,
+        'Rate (%)': d.rate,
+      })));
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=employment-rate-by-course.csv');
+      return res.send(csv);
+    }
     res.json(data);
   } catch (err) {
     next(err);
@@ -159,8 +178,9 @@ router.get('/top-employers', async (_req, res, next) => {
   }
 });
 
-router.get('/salary-distribution', async (_req, res, next) => {
+router.get('/salary-distribution', async (req, res, next) => {
   try {
+    const format = (req.query.format as string) || 'json';
     const { data: employment } = await supabase
       .from('employment')
       .select('salary_range, company_industry')
@@ -186,14 +206,26 @@ router.get('/salary-distribution', async (_req, res, next) => {
       }
     });
 
-    res.json(Object.entries(brackets).map(([range, count]) => ({ range, count })));
+    const data = Object.entries(brackets).map(([range, count]) => ({ range, count }));
+
+    if (format === 'csv') {
+      const csv = buildCsv(data.map((d) => ({
+        'Salary Range': d.range,
+        Count: d.count,
+      })));
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=salary-distribution.csv');
+      return res.send(csv);
+    }
+    res.json(data);
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/degree-alignment', async (_req, res, next) => {
+router.get('/degree-alignment', async (req, res, next) => {
   try {
+    const format = (req.query.format as string) || 'json';
     const { data: education } = await supabase.from('education').select('profile_id, program');
     const { data: employment } = await supabase.from('employment').select('profile_id, company_industry, is_current');
 
@@ -218,7 +250,8 @@ router.get('/degree-alignment', async (_req, res, next) => {
 
     const program = (p: string) => (p || '').toLowerCase();
 
-    const alignment: Record<string, { total: number; aligned: number }> = {};    eduMap.forEach((programName, profileId) => {
+    const alignment: Record<string, { total: number; aligned: number }> = {};
+    eduMap.forEach((programName, profileId) => {
       if (!programName) return;
       if (!alignment[programName]) alignment[programName] = { total: 0, aligned: 0 };
       alignment[programName].total++;
@@ -233,10 +266,23 @@ router.get('/degree-alignment', async (_req, res, next) => {
       if (isAligned) alignment[programName].aligned++;
     });
 
-    res.json(Object.entries(alignment).map(([course, stats]) => ({
+    const data = Object.entries(alignment).map(([course, stats]) => ({
       course, total: stats.total, aligned: stats.aligned,
       rate: stats.total > 0 ? Math.round((stats.aligned / stats.total) * 100) : 0,
-    })));
+    }));
+
+    if (format === 'csv') {
+      const csv = buildCsv(data.map((d) => ({
+        Course: d.course,
+        Total: d.total,
+        Aligned: d.aligned,
+        'Rate (%)': d.rate,
+      })));
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=degree-alignment.csv');
+      return res.send(csv);
+    }
+    res.json(data);
   } catch (err) {
     next(err);
   }
