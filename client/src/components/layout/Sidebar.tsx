@@ -18,12 +18,14 @@ import {
   BookOpenIcon,
   AcademicCapIcon,
   ClockIcon,
+  BriefcaseIcon,
 } from '@heroicons/react/24/outline';
 
 type NavItem = { name: string; href: string; icon: any; end?: boolean };
 
 const mainNav: NavItem[] = [
   { name: 'Home', href: '/', icon: HomeIcon, end: true },
+  { name: 'Job Postings', href: '/jobs', icon: BriefcaseIcon },
   { name: 'Career Trends', href: '/career-trends', icon: NewspaperIcon },
   { name: 'Alumni Directory', href: '/directory', icon: BookOpenIcon },
 ];
@@ -40,6 +42,7 @@ const adminNav: NavItem[] = [
   { name: 'Alumni Management', href: '/admin/alumni', icon: UsersIcon },
   { name: 'Graduate Tracer Surveys', href: '/admin/surveys', icon: DocumentTextIcon },
   { name: 'Announcements', href: '/admin/announcements', icon: MegaphoneIcon },
+  { name: 'Job Postings', href: '/admin/jobs', icon: BriefcaseIcon },
   { name: 'Events', href: '/admin/events', icon: CalendarDaysIcon },
   { name: 'Career Analytics', href: '/admin/analytics', icon: ChartBarIcon },
   { name: 'Curriculum Insights', href: '/admin/curriculum', icon: AcademicCapIcon },

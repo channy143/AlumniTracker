@@ -60,6 +60,7 @@ router.post('/', async (req, res, next) => {
     if (!company_name || !position || !description || !location) {
       throw new AppError('Company name, position, description, and location are required', 400);
     }
+    const defaultExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase.from('job_postings').insert({
       company_name, position, description, requirements: requirements || [],
       location, job_type: job_type || 'full-time', salary_range: salary_range || null,
@@ -69,7 +70,7 @@ router.post('/', async (req, res, next) => {
       required_skills: required_skills || [],
       experience_level: experience_level || 'entry',
       is_remote: is_remote || false,
-      expires_at: expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      expires_at: expires_at || defaultExpiry,
     }).select().single();
     if (error && (error.code === '42P01' || error.code === 'PGRST205')) throw new AppError('Job postings table not available', 400);
     if (error) throw new AppError(error.message, 500);
@@ -81,7 +82,27 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const { error } = await supabase.from('job_postings').update(req.body).eq('id', req.params.id);
+    const { company_name, position, description, requirements, location, job_type, salary_range, application_url, is_alumni_exclusive, expires_at, industry, required_skills, experience_level, is_remote } = req.body;
+
+    const payload: any = {};
+    if (company_name !== undefined) payload.company_name = company_name;
+    if (position !== undefined) payload.position = position;
+    if (description !== undefined) payload.description = description;
+    if (requirements !== undefined) payload.requirements = requirements || [];
+    if (location !== undefined) payload.location = location;
+    if (job_type !== undefined) payload.job_type = job_type;
+    if (salary_range !== undefined) payload.salary_range = salary_range || null;
+    if (application_url !== undefined) payload.application_url = application_url || null;
+    if (is_alumni_exclusive !== undefined) payload.is_alumni_exclusive = is_alumni_exclusive;
+    if (industry !== undefined) payload.industry = industry || null;
+    if (required_skills !== undefined) payload.required_skills = required_skills || [];
+    if (experience_level !== undefined) payload.experience_level = experience_level;
+    if (is_remote !== undefined) payload.is_remote = is_remote;
+    if (expires_at !== undefined) payload.expires_at = expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    if (Object.keys(payload).length === 0) throw new AppError('No fields provided to update', 400);
+
+    const { error } = await supabase.from('job_postings').update(payload).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
     res.json({ message: 'Job updated' });
   } catch (err) {

@@ -19,6 +19,7 @@ import SupportPage from '@/pages/support/SupportPage';
 import UsefulLinksPage from '@/pages/links/UsefulLinksPage';
 import EventsPage from '@/pages/events/EventsPage';
 import AnnouncementsPage from '@/pages/announcements/AnnouncementsPage';
+import JobsPage from '@/pages/jobs/JobsPage';
 import SurveyPage from '@/pages/survey/SurveyPage';
 
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -92,6 +93,7 @@ export default function App() {
         <Route path="directory/:id" element={<DirectoryProfilePage />} />
         <Route path="links" element={<UsefulLinksPage />} />
         <Route path="announcements" element={<AnnouncementsPage />} />
+        <Route path="jobs" element={<JobsPage />} />
         <Route path="events" element={<EventsPage />} />
         <Route path="surveys/:id" element={<SurveyPage />} />
         <Route path="support" element={<SupportPage />} />

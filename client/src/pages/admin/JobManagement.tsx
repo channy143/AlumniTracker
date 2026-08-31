@@ -1,7 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
-import { BriefcaseIcon } from '@heroicons/react/24/outline';
+import { BriefcaseIcon, MapPinIcon, CalendarDaysIcon, ClockIcon, CurrencyDollarIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
+
+const EMPTY_FORM = {
+  company_name: '', position: '', description: '', location: '', job_type: 'full-time',
+  salary_range: '', industry: '', experience_level: 'entry', required_skills: '',
+  application_url: '', is_alumni_exclusive: false, is_remote: false, expires_at: '',
+};
+
+function daysLeft(expiresAt: string): number {
+  return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000));
+}
 
 export default function JobManagement() {
   const [data, setData] = useState<any[]>([]);
@@ -11,7 +21,8 @@ export default function JobManagement() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ company_name: '', position: '', description: '', location: '', job_type: 'full-time', salary_range: '', industry: '', experience_level: 'entry', required_skills: '', application_url: '', is_alumni_exclusive: false, is_remote: false });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState<any>({ ...EMPTY_FORM });
   const [formError, setFormError] = useState('');
   const addNotification = useUIStore((s) => s.addNotification);
   const limit = 15;
@@ -28,125 +39,190 @@ export default function JobManagement() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openCreate = () => {
+    setEditId(null);
+    setForm({ ...EMPTY_FORM });
+    setFormError('');
+    setShowForm(true);
+  };
+
+  const openEdit = (job: any) => {
+    setEditId(job.id);
+    setForm({
+      company_name: job.company_name || '',
+      position: job.position || '',
+      description: job.description || '',
+      location: job.location || '',
+      job_type: job.job_type || 'full-time',
+      salary_range: job.salary_range || '',
+      industry: job.industry || '',
+      experience_level: job.experience_level || 'entry',
+      required_skills: (job.required_skills || []).join(', '),
+      application_url: job.application_url || '',
+      is_alumni_exclusive: !!job.is_alumni_exclusive,
+      is_remote: !!job.is_remote,
+      expires_at: job.expires_at ? job.expires_at.slice(0, 10) : '',
+    });
+    setFormError('');
+    setShowForm(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await adminApi.jobCreate({
+      const payload = {
         ...form,
-        required_skills: form.required_skills ? form.required_skills.split(',').map((s: string) => s.trim()) : [],
-      });
+        required_skills: form.required_skills ? form.required_skills.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        expires_at: form.expires_at ? new Date(form.expires_at + 'T23:59:59').toISOString() : undefined,
+      };
+      if (editId) await adminApi.jobUpdate(editId, payload);
+      else await adminApi.jobCreate(payload);
       setShowForm(false);
-      setForm({ company_name: '', position: '', description: '', location: '', job_type: 'full-time', salary_range: '', industry: '', experience_level: 'entry', required_skills: '', application_url: '', is_alumni_exclusive: false, is_remote: false });
-      addNotification('Job posted successfully', 'success');
+      setEditId(null);
+      setForm({ ...EMPTY_FORM });
+      addNotification(editId ? 'Job updated successfully' : 'Job posted successfully', 'success');
       load();
-    } catch (err: any) { setFormError(err.message); }
+    } catch (err: any) { setFormError(err.message || 'Failed to save job'); }
   };
 
   const handleClose = async (id: string) => {
-    await adminApi.jobClose(id);
-    addNotification('Job posting closed', 'success');
-    load();
+    if (!window.confirm('Close this job posting? It will no longer appear on the alumni career hub.')) return;
+    try {
+      await adminApi.jobClose(id);
+      addNotification('Job posting closed', 'success');
+      load();
+    } catch { addNotification('Failed to close job', 'error'); }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this job posting?')) return;
-    await adminApi.jobDelete(id);
-    addNotification('Job deleted', 'success');
-    load();
+    if (!window.confirm('Delete this job posting? This cannot be undone.')) return;
+    try {
+      await adminApi.jobDelete(id);
+      addNotification('Job deleted', 'success');
+      load();
+    } catch { addNotification('Failed to delete job', 'error'); }
   };
+
+  const setField = (key: string) => (e: any) => setForm((f: any) => ({ ...f, [key]: e.target.value }));
+  const toggleField = (key: string) => (e: any) => setForm((f: any) => ({ ...f, [key]: e.target.checked }));
 
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div>
           <h1 className="text-base font-bold text-gray-900">Career Opportunities</h1>
-          <p className="text-xs text-gray-500">{total} active listings</p>
+          <p className="text-xs text-gray-500">{total} job listing{total === 1 ? '' : 's'}</p>
         </div>
-        <button onClick={() => { setShowForm(true); setFormError(''); }} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Post Opportunity</button>
+        <button onClick={openCreate} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Post Opportunity</button>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-3">
         <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search jobs..." className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-48" />
         <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
-          <option value="">All</option>
+          <option value="">All Status</option>
           <option value="active">Active</option>
           <option value="expired">Expired</option>
         </select>
       </div>
 
       {loading ? (
-        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="bg-white border border-gray-200 rounded-lg animate-pulse h-12" />)}</div>
+        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="bg-white border border-gray-200 rounded-lg animate-pulse h-20" />)}</div>
       ) : data.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg text-center py-12">
           <BriefcaseIcon className="w-8 h-8 mx-auto text-gray-300 mb-2" />
           <p className="text-xs text-gray-400">No job postings found for now.</p>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left py-2.5 px-3 font-medium text-xs text-gray-500">Position</th>
-                  <th className="text-left py-2.5 px-3 font-medium text-xs text-gray-500">Company</th>
-                  <th className="text-left py-2.5 px-3 font-medium text-xs text-gray-500">Location</th>
-                  <th className="text-left py-2.5 px-3 font-medium text-xs text-gray-500">Type</th>
-                  <th className="text-left py-2.5 px-3 font-medium text-xs text-gray-500">Expires</th>
-                  <th className="text-right py-2.5 px-3 font-medium text-xs text-gray-500">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((job: any) => {
-                  const isExpired = new Date(job.expires_at) < new Date();
-                  return (
-                    <tr key={job.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-2.5 px-3 font-medium text-xs text-gray-900">{job.position}</td>
-                      <td className="py-2.5 px-3 text-xs text-gray-500">{job.company_name}</td>
-                      <td className="py-2.5 px-3 text-xs text-gray-500">{job.location}</td>
-                      <td className="py-2.5 px-3"><span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{job.job_type}</span></td>
-                      <td className="py-2.5 px-3 text-xs text-gray-400">{new Date(job.expires_at).toLocaleDateString()}</td>
-                      <td className="py-2.5 px-3 text-right">
-                        <div className="flex gap-1 justify-end">
-                          {!isExpired && <button onClick={() => handleClose(job.id)} className="text-xs text-orange-600 hover:underline px-1">Close</button>}
-                          <button onClick={() => handleDelete(job.id)} className="text-xs text-red-600 hover:underline px-1">Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="space-y-2">
+          {data.map((job: any) => {
+            const isExpired = new Date(job.expires_at) < new Date();
+            const dLeft = daysLeft(job.expires_at);
+            return (
+              <div key={job.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-3 hover:border-orange-200 hover:shadow-sm transition-all">
+                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-sm font-bold text-white shrink-0 overflow-hidden">
+                  {job.company_logo ? (
+                    <img src={job.company_logo} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    (job.company_name?.charAt(0) || '?').toUpperCase()
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{job.position}</p>
+                    {job.is_alumni_exclusive && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">Alumni Exclusive</span>}
+                    {job.is_remote && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">Remote</span>}
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${isExpired ? 'bg-gray-100 text-gray-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                      {isExpired ? 'Expired' : `${dLeft} day${dLeft === 1 ? '' : 's'} left`}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{job.company_name}</p>
+
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[11px] text-gray-400">
+                    {job.location && <span className="flex items-center gap-1"><MapPinIcon className="w-3 h-3" />{job.location}</span>}
+                    <span className="flex items-center gap-1"><BriefcaseIcon className="w-3 h-3" />{job.job_type}</span>
+                    {job.industry && <span className="flex items-center gap-1"><BuildingOfficeIcon className="w-3 h-3" />{job.industry}</span>}
+                    {job.experience_level && <span className="flex items-center gap-1"><ClockIcon className="w-3 h-3" />{job.experience_level}</span>}
+                    {job.salary_range && <span className="flex items-center gap-1"><CurrencyDollarIcon className="w-3 h-3" />{job.salary_range}</span>}
+                    <span className="flex items-center gap-1"><CalendarDaysIcon className="w-3 h-3" />Expires {job.expires_at ? new Date(job.expires_at).toLocaleDateString() : 'N/A'}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <div className="flex gap-2">
+                    <button onClick={() => openEdit(job)} className="text-xs text-gray-600 hover:underline font-medium">Edit</button>
+                    {!isExpired && <button onClick={() => handleClose(job.id)} className="text-xs text-orange-600 hover:underline font-medium">Close</button>}
+                    <button onClick={() => handleDelete(job.id)} className="text-xs text-red-600 hover:underline font-medium">Delete</button>
+                  </div>
+                  {typeof job.referral_count === 'number' && (
+                    <p className="text-[10px] text-gray-400">{job.referral_count} referral{job.referral_count === 1 ? '' : 's'}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {total > limit && (
+        <div className="flex items-center justify-center gap-3 mt-4">
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40">Prev</button>
+          <span className="text-xs text-gray-500">Page {page} of {Math.ceil(total / limit)}</span>
+          <button onClick={() => setPage((p) => p + 1)} disabled={page >= Math.ceil(total / limit)} className="px-3 py-1 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40">Next</button>
         </div>
       )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
           <div className="bg-white rounded-xl max-w-lg w-full p-6 overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-sm font-bold text-gray-900 mb-4">Post a Job Opportunity</h2>
+            <h2 className="text-sm font-bold text-gray-900 mb-4">{editId ? 'Edit Job Opportunity' : 'Post a Job Opportunity'}</h2>
             {formError && <div className="bg-red-50 text-red-700 px-3 py-2 rounded-lg mb-3 text-xs">{formError}</div>}
-            <form onSubmit={handleCreate} className="space-y-3">
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Company Name</label><input type="text" value={form.company_name} onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Position</label><input type="text" value={form.position} onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Description</label><textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" rows={3} required /></div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Location</label><input type="text" value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
+            <form onSubmit={handleSave} className="space-y-3">
+              <div><label className="block text-xs font-medium text-gray-700 mb-1">Company Name *</label><input type="text" value={form.company_name} onChange={setField('company_name')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
+              <div><label className="block text-xs font-medium text-gray-700 mb-1">Position *</label><input type="text" value={form.position} onChange={setField('position')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
+              <div><label className="block text-xs font-medium text-gray-700 mb-1">Description *</label><textarea value={form.description} onChange={setField('description')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" rows={3} required /></div>
+              <div><label className="block text-xs font-medium text-gray-700 mb-1">Location *</label><input type="text" value={form.location} onChange={setField('location')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Job Type</label><select value={form.job_type} onChange={(e) => setForm((f) => ({ ...f, job_type: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"><option value="full-time">Full-Time</option><option value="part-time">Part-Time</option><option value="contract">Contract</option><option value="freelance">Freelance</option><option value="internship">Internship</option></select></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Experience Level</label><select value={form.experience_level} onChange={(e) => setForm((f) => ({ ...f, experience_level: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"><option value="entry">Entry</option><option value="junior">Junior</option><option value="mid">Mid-Level</option><option value="senior">Senior</option><option value="lead">Lead</option><option value="executive">Executive</option></select></div>
+                <div><label className="block text-xs font-medium text-gray-700 mb-1">Job Type</label><select value={form.job_type} onChange={setField('job_type')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"><option value="full-time">Full-Time</option><option value="part-time">Part-Time</option><option value="contract">Contract</option><option value="freelance">Freelance</option><option value="internship">Internship</option></select></div>
+                <div><label className="block text-xs font-medium text-gray-700 mb-1">Experience Level</label><select value={form.experience_level} onChange={setField('experience_level')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"><option value="entry">Entry</option><option value="junior">Junior</option><option value="mid">Mid-Level</option><option value="senior">Senior</option><option value="lead">Lead</option><option value="executive">Executive</option></select></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Industry</label><input type="text" value={form.industry} onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="e.g. Technology" /></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Salary Range</label><input type="text" value={form.salary_range} onChange={(e) => setForm((f) => ({ ...f, salary_range: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="e.g. ₱20k-₱40k" /></div>
+                <div><label className="block text-xs font-medium text-gray-700 mb-1">Industry</label><input type="text" value={form.industry} onChange={setField('industry')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="e.g. Technology" /></div>
+                <div><label className="block text-xs font-medium text-gray-700 mb-1">Salary Range</label><input type="text" value={form.salary_range} onChange={setField('salary_range')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="e.g. ₱20k-₱40k" /></div>
               </div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Required Skills (comma separated)</label><input type="text" value={form.required_skills} onChange={(e) => setForm((f) => ({ ...f, required_skills: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="e.g. JavaScript, Python, SQL" /></div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">External Application URL</label><input type="url" value={form.application_url} onChange={(e) => setForm((f) => ({ ...f, application_url: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="https://company.com/careers" /></div>
+              <div><label className="block text-xs font-medium text-gray-700 mb-1">Required Skills (comma separated)</label><input type="text" value={form.required_skills} onChange={setField('required_skills')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="e.g. JavaScript, Python, SQL" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs font-medium text-gray-700 mb-1">External Application URL</label><input type="url" value={form.application_url} onChange={setField('application_url')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="https://company.com/careers" /></div>
+                <div><label className="block text-xs font-medium text-gray-700 mb-1">Expiry Date</label><input type="date" value={form.expires_at} onChange={setField('expires_at')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" /></div>
+              </div>
               <div className="flex items-center gap-4">
-                <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={form.is_alumni_exclusive} onChange={(e) => setForm((f) => ({ ...f, is_alumni_exclusive: e.target.checked }))} className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500" /><span className="text-xs text-gray-500">Alumni Exclusive</span></label>
-                <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={form.is_remote} onChange={(e) => setForm((f) => ({ ...f, is_remote: e.target.checked }))} className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500" /><span className="text-xs text-gray-500">Remote</span></label>
+                <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={form.is_alumni_exclusive} onChange={toggleField('is_alumni_exclusive')} className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500" /><span className="text-xs text-gray-500">Alumni Exclusive</span></label>
+                <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={form.is_remote} onChange={toggleField('is_remote')} className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500" /><span className="text-xs text-gray-500">Remote</span></label>
               </div>
               <div className="flex gap-2 justify-end pt-1">
                 <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">Post Job</button>
+                <button type="submit" className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">{editId ? 'Update Job' : 'Post Job'}</button>
               </div>
             </form>
           </div>

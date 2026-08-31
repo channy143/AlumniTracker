@@ -202,6 +202,8 @@ export const adminApi = {
   announcementCreate: (data: any) => api.post<any>('/admin/announcements', data),
   announcementUpdate: (id: string, data: any) => api.put<any>(`/admin/announcements/${id}`, data),
   announcementDelete: (id: string) => api.delete(`/admin/announcements/${id}`),
+  announcementHardDelete: (id: string) => api.delete(`/admin/announcements/${id}?hard=true`),
+  announcementRestore: (id: string, status?: string) => api.put<any>(`/admin/announcements/${id}/restore`, { status }),
   announcementPin: (id: string, isPinned: boolean) => api.put<any>(`/admin/announcements/${id}/pin`, { is_pinned: isPinned }),
   announcementPublish: (id: string) => api.put<any>(`/admin/announcements/${id}/publish`, {}),
 

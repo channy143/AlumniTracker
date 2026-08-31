@@ -59,7 +59,26 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const { error } = await supabase.from('announcements').update(req.body).eq('id', req.params.id);
+    const { title, content, image_url, document_url, is_pinned, is_scheduled, scheduled_at, send_to_all, send_by_batch, send_by_course, target_batches, target_courses, linked_survey_id } = req.body;
+
+    const payload: any = {};
+    if (title !== undefined) payload.title = title;
+    if (content !== undefined) payload.content = content;
+    if (image_url !== undefined) payload.image_url = image_url || null;
+    if (document_url !== undefined) payload.document_url = document_url || null;
+    if (is_pinned !== undefined) payload.is_pinned = is_pinned;
+    if (is_scheduled !== undefined) payload.is_scheduled = is_scheduled;
+    if (scheduled_at !== undefined) payload.scheduled_at = scheduled_at || null;
+    if (send_to_all !== undefined) payload.send_to_all = send_to_all;
+    if (send_by_batch !== undefined) payload.send_by_batch = send_by_batch;
+    if (send_by_course !== undefined) payload.send_by_course = send_by_course;
+    if (target_batches !== undefined) payload.target_batches = target_batches || [];
+    if (target_courses !== undefined) payload.target_courses = target_courses || [];
+    if (linked_survey_id !== undefined) payload.linked_survey_id = linked_survey_id || null;
+
+    payload.updated_at = new Date().toISOString();
+
+    const { error } = await supabase.from('announcements').update(payload).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
     res.json({ message: 'Announcement updated' });
   } catch (err) {
@@ -69,9 +88,30 @@ router.put('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
+    const isHardDelete = req.query.hard === 'true';
+    if (isHardDelete) {
+      const { error } = await supabase.from('announcements').delete().eq('id', req.params.id);
+      if (error) throw new AppError(error.message, 500);
+      return res.json({ message: 'Announcement deleted' });
+    }
     const { error } = await supabase.from('announcements').update({ status: 'archived' }).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
     res.json({ message: 'Announcement archived' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/:id/restore', async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const nextStatus = status === 'published' ? 'published' : 'draft';
+    const { error } = await supabase.from('announcements').update({
+      status: nextStatus,
+      published_at: nextStatus === 'published' ? new Date().toISOString() : null,
+    }).eq('id', req.params.id);
+    if (error) throw new AppError(error.message, 500);
+    res.json({ message: 'Announcement restored', status: nextStatus });
   } catch (err) {
     next(err);
   }
