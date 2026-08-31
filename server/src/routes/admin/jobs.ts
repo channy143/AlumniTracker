@@ -37,6 +37,7 @@ router.get('/', async (req, res, next) => {
 
     const jobIds = result.map((j: any) => j.id).filter(Boolean);
     const referralCounts: Record<string, number> = {};
+    const applicantCounts: Record<string, number> = {};
     if (jobIds.length > 0) {
       const { data: referrals } = await supabase
         .from('referral_requests')
@@ -45,8 +46,16 @@ router.get('/', async (req, res, next) => {
       referrals?.forEach((r: any) => {
         referralCounts[r.job_id] = (referralCounts[r.job_id] || 0) + 1;
       });
+
+      const { data: applications } = await supabase
+        .from('job_applications')
+        .select('job_id')
+        .in('job_id', jobIds);
+      applications?.forEach((a: any) => {
+        applicantCounts[a.job_id] = (applicantCounts[a.job_id] || 0) + 1;
+      });
     }
-    result = result.map((j: any) => ({ ...j, referral_count: referralCounts[j.id] || 0 }));
+    result = result.map((j: any) => ({ ...j, referral_count: referralCounts[j.id] || 0, applicant_count: applicantCounts[j.id] || 0 }));
 
     res.json({ data: result, total: count || 0, page, limit });
   } catch (err) {
@@ -78,6 +87,36 @@ router.post('/', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+router.get('/:id/applicants', async (req, res, next) => {
+  try {
+    const { data: applications, error } = await supabase
+      .from('job_applications')
+      .select('*')
+      .eq('job_id', req.params.id)
+      .order('applied_at', { ascending: false });
+
+    if (error && (error.code === '42P01' || error.code === 'PGRST205')) return res.json([]);
+    if (error) throw new AppError(error.message, 500);
+
+    res.json(applications || []);
+  } catch (err) { next(err); }
+});
+
+router.put('/applications/:applicationId/status', async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const allowed = ['pending', 'reviewed', 'shortlisted', 'accepted', 'rejected'];
+    if (!allowed.includes(status)) throw new AppError('Invalid application status', 400);
+
+    const { error } = await supabase
+      .from('job_applications')
+      .update({ status })
+      .eq('id', req.params.applicationId);
+    if (error) throw new AppError(error.message, 500);
+    res.json({ message: 'Application status updated', status });
+  } catch (err) { next(err); }
 });
 
 router.put('/:id', async (req, res, next) => {

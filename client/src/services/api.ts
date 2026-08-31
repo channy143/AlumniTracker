@@ -43,7 +43,10 @@ export const api = {
       },
       body: formData,
     }).then(async (res) => {
-      if (!res.ok) throw new Error('Upload failed');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Upload failed');
+      }
       return res.json() as T;
     });
   },
@@ -127,6 +130,14 @@ export const jobsApi = {
   list: () => api.get<any[]>('/jobs'),
   get: (id: string) => api.get<any>(`/jobs/${id}`),
   create: (data: any) => api.post<any>('/jobs', data),
+  myApplications: () => api.get<any[]>('/jobs/my-applications'),
+  myApplication: (id: string) => api.get<any>(`/jobs/${id}/my-application`),
+  apply: (jobId: string, data: { cover_letter?: string; resume?: File }) => {
+    const formData = new FormData();
+    if (data.cover_letter) formData.append('cover_letter', data.cover_letter);
+    if (data.resume) formData.append('resume', data.resume);
+    return api.upload<any>(`/jobs/${jobId}/apply`, formData);
+  },
 };
 
 export const surveyApi = {

@@ -1,8 +1,34 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { jobsApi } from '@/services/api';
+import { useUIStore } from '@/store/uiStore';
 import { SkeletonCard } from '@/components/ui/Skeleton';
-import { MapPinIcon, CurrencyDollarIcon, ClockIcon, BriefcaseIcon, GlobeAltIcon, EnvelopeIcon, BuildingOfficeIcon, AcademicCapIcon, ArrowRightIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, CurrencyDollarIcon, ClockIcon, BriefcaseIcon, GlobeAltIcon, EnvelopeIcon, BuildingOfficeIcon, AcademicCapIcon, ArrowRightIcon, SparklesIcon, DocumentTextIcon, XMarkIcon, CheckCircleIcon, PaperClipIcon } from '@heroicons/react/24/outline';
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  reviewed: 'bg-blue-100 text-blue-700',
+  shortlisted: 'bg-purple-100 text-purple-700',
+  accepted: 'bg-emerald-100 text-emerald-700',
+  rejected: 'bg-red-100 text-red-700',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  reviewed: 'Reviewed',
+  shortlisted: 'Shortlisted',
+  accepted: 'Qualified / Accepted',
+  rejected: 'Rejected',
+};
+
+function StatusBadge({ status }: { status?: string }) {
+  if (!status) return null;
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${STATUS_COLORS[status] || STATUS_COLORS.pending}`}>
+      {STATUS_LABELS[status] || 'Pending'}
+    </span>
+  );
+}
 
 
 
@@ -75,7 +101,7 @@ function JobCard({ job, onViewDetails }: { job: any; onViewDetails: () => void }
   );
 }
 
-function JobDetailView({ job, onBack }: { job: any; onBack: () => void }) {
+function JobDetailView({ job, onBack, applyStatus, onApply }: { job: any; onBack: () => void; applyStatus?: string; onApply?: () => void }) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg">
       <div className="px-4 py-2 border-b border-gray-100">
@@ -109,6 +135,26 @@ function JobDetailView({ job, onBack }: { job: any; onBack: () => void }) {
           <span className="flex items-center gap-1"><MapPinIcon className="w-4 h-4" /> {job.location || 'N/A'}</span>
           <span className="flex items-center gap-1"><BriefcaseIcon className="w-4 h-4" /> {job.job_type}</span>
           {job.salary_range && <span className="flex items-center gap-1"><CurrencyDollarIcon className="w-4 h-4" /> {job.salary_range}</span>}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-orange-50 border border-orange-100 rounded-lg px-3 py-2.5 mb-4">
+          {applyStatus ? (
+            <div className="flex items-center gap-2 text-xs">
+              <CheckCircleIcon className="w-4 h-4 text-emerald-600" />
+              <span className="font-medium text-gray-700">Application submitted</span>
+              <StatusBadge status={applyStatus} />
+            </div>
+          ) : (
+            <p className="text-xs text-gray-600">Ready to take the next step?</p>
+          )}
+          {!applyStatus && onApply && (
+            <button
+              onClick={onApply}
+              className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium rounded-lg transition-colors"
+            >
+              Apply for this Job
+            </button>
+          )}
         </div>
 
         <div className="text-sm text-gray-700 leading-relaxed mb-4 whitespace-pre-line">
@@ -269,11 +315,95 @@ function Sidebar({ jobs, onViewAll }: { jobs: any[]; onViewAll: () => void }) {
   );
 }
 
+function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void; onApplied: (status: string) => void }) {
+  const [resume, setResume] = useState<File | null>(null);
+  const [coverLetter, setCoverLetter] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const addNotification = useUIStore((s) => s.addNotification);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      await jobsApi.apply(job.id, { cover_letter: coverLetter || undefined, resume: resume || undefined });
+      addNotification('Application submitted successfully', 'success');
+      onApplied('pending');
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit application. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">Apply for {job.position}</h2>
+            <p className="text-xs text-gray-500">{job.company_name}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><XMarkIcon className="w-5 h-5" /></button>
+        </div>
+
+        {error && <div className="bg-red-50 text-red-700 px-3 py-2 rounded-lg mb-3 text-xs">{error}</div>}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Resume (PDF or DOC/DOCX)</label>
+            <label className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-3 cursor-pointer hover:border-orange-400">
+              <PaperClipIcon className="w-4 h-4 text-gray-400" />
+              <span className="text-xs text-gray-600 truncate">{resume ? resume.name : 'Choose a file (optional — uses your profile resume if blank)'}</span>
+              <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={(e) => setResume(e.target.files?.[0] || null)} />
+            </label>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Cover Letter (optional)</label>
+            <textarea
+              value={coverLetter}
+              onChange={(e) => setCoverLetter(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"
+              rows={4}
+              placeholder="Why are you a great fit for this role?"
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-1">
+            <a href={job.company_website || '#'} target="_blank" rel="noreferrer" className="text-xs text-gray-500 hover:underline flex items-center gap-1">
+              <GlobeAltIcon className="w-3.5 h-3.5" /> Learn more about {job.company_name}
+            </a>
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button type="submit" disabled={submitting} className="px-3 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50">
+                {submitting ? 'Submitting...' : 'Submit Application'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<any[]>([]);
   const [filter, setFilter] = useState<JobFilter>('all');
   const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [applyJob, setApplyJob] = useState<any>(null);
+  const [applyStatus, setApplyStatus] = useState<string | undefined>(undefined);
+  const addNotification = useUIStore((s) => s.addNotification);
+
+  const loadMyApplication = async (job: any) => {
+    try {
+      const app = await jobsApi.myApplication(job.id);
+      setApplyStatus(app?.status || undefined);
+    } catch { setApplyStatus(undefined); }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -282,6 +412,16 @@ export default function JobsPage() {
     }).catch(() => {})
     .finally(() => setLoading(false));
   }, []);
+
+  const handleViewDetails = (job: any) => {
+    setSelectedJob(job);
+    setApplyStatus(undefined);
+    loadMyApplication(job);
+  };
+
+  const handleApplied = (status: string) => {
+    setApplyStatus(status);
+  };
 
   const now = Date.now();
   const weekAgo = now - 7 * 86400000;
@@ -379,14 +519,14 @@ export default function JobsPage() {
               <SkeletonCard />
             </div>
           ) : selectedJob ? (
-            <JobDetailView job={selectedJob} onBack={() => setSelectedJob(null)} />
+            <JobDetailView job={selectedJob} onBack={() => setSelectedJob(null)} applyStatus={applyStatus} onApply={() => setApplyJob(selectedJob)} />
           ) : filteredJobs.length === 0 ? (
             <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">
               No job openings match this filter.
             </div>
           ) : (
             filteredJobs.map((job) => (
-              <JobCard key={job.id} job={job} onViewDetails={() => setSelectedJob(job)} />
+              <JobCard key={job.id} job={job} onViewDetails={() => handleViewDetails(job)} />
             ))
           )}
         </div>
@@ -397,6 +537,14 @@ export default function JobsPage() {
           </div>
         </aside>
       </div>
+
+      {applyJob && (
+        <ApplyModal
+          job={applyJob}
+          onClose={() => setApplyJob(null)}
+          onApplied={handleApplied}
+        />
+      )}
     </div>
   );
 }

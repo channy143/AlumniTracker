@@ -146,6 +146,32 @@ export interface JobPosting {
   created_at: string;
 }
 
+export type JobApplicationStatus = 'pending' | 'reviewed' | 'shortlisted' | 'accepted' | 'rejected';
+
+export interface JobApplication {
+  id: string;
+  job_id: string;
+  user_id: string;
+  status: JobApplicationStatus;
+  applied_at: string;
+  resume_url?: string | null;
+  cover_letter?: string | null;
+  applicant_name?: string | null;
+  applicant_email?: string | null;
+  job?: {
+    id: string;
+    company_name: string;
+    position: string;
+    location: string;
+    job_type: string;
+    salary_range?: string;
+    is_alumni_exclusive: boolean;
+    expires_at: string;
+    is_remote: boolean;
+  } | null;
+}
+
+
 export interface Survey {
   id: string;
   title: string;
