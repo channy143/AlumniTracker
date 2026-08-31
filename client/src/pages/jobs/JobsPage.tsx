@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { jobsApi } from '@/services/api';
+import { jobsApi, profileApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { MapPinIcon, CurrencyDollarIcon, ClockIcon, BriefcaseIcon, GlobeAltIcon, EnvelopeIcon, BuildingOfficeIcon, AcademicCapIcon, ArrowRightIcon, SparklesIcon, DocumentTextIcon, XMarkIcon, CheckCircleIcon, PaperClipIcon } from '@heroicons/react/24/outline';
@@ -317,13 +317,24 @@ function Sidebar({ jobs, onViewAll }: { jobs: any[]; onViewAll: () => void }) {
 
 function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void; onApplied: (status: string) => void }) {
   const [resume, setResume] = useState<File | null>(null);
+  const [profileResume, setProfileResume] = useState<string | null>(null);
   const [coverLetter, setCoverLetter] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const addNotification = useUIStore((s) => s.addNotification);
 
+  useEffect(() => {
+    profileApi.get().then((p) => {
+      if (p && p.resume_url) setProfileResume(p.resume_url);
+    }).catch(() => {});
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!resume && !profileResume) {
+      setError('You need a resume to apply. Attach one below or add it to your profile.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -352,11 +363,31 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
         {error && <div className="bg-red-50 text-red-700 px-3 py-2 rounded-lg mb-3 text-xs">{error}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-3">
+          {profileResume ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
+              <p className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
+                <CheckCircleIcon className="w-4 h-4" /> Your profile resume will be used
+              </p>
+              <p className="text-[11px] text-emerald-600 mt-0.5">No need to upload again. Use the option below only if you want to attach a different resume for this application.</p>
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+              <p className="text-xs text-amber-700 font-medium">Upload a resume to apply</p>
+              <p className="text-[11px] text-amber-600 mt-0.5">You don't have a resume on your profile yet, so please attach one below.</p>
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Resume (PDF or DOC/DOCX)</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Resume (PDF or DOC/DOCX){!profileResume && <span className="text-red-500"> *</span>}</label>
             <label className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-3 cursor-pointer hover:border-orange-400">
               <PaperClipIcon className="w-4 h-4 text-gray-400" />
-              <span className="text-xs text-gray-600 truncate">{resume ? resume.name : 'Choose a file (optional — uses your profile resume if blank)'}</span>
+              <span className="text-xs text-gray-600 truncate">
+                {resume
+                  ? resume.name
+                  : profileResume
+                    ? 'Choose a file (optional — attaches a different resume)'
+                    : 'Choose a file (required)'}
+              </span>
               <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={(e) => setResume(e.target.files?.[0] || null)} />
             </label>
           </div>
