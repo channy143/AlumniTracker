@@ -17,7 +17,7 @@ const ALLOWED_RESUME_MIME = [
 async function getProfileByUserId(userId: string) {
   const { data } = await supabase
     .from('profiles')
-    .select('id, first_name, last_name, avatar_url, resume_url, headline, email, phone, current_employment')
+    .select('id, first_name, last_name, avatar_url, resume_url, headline, email, phone')
     .eq('user_id', userId)
     .maybeSingle();
   return data;
@@ -153,9 +153,8 @@ router.post('/:id/apply', authenticate, upload.single('resume'), async (req: Aut
     if (new Date(job.expires_at) < new Date()) throw new AppError('This job posting has expired', 400);
 
     const profile = await getProfileByUserId(req.user!.userId);
-    if (!profile) throw new AppError('Profile not found. Please complete your profile first.', 404);
 
-    let resumeUrl = profile.resume_url || null;
+    let resumeUrl = profile?.resume_url || null;
 
     if (req.file) {
       if (!ALLOWED_RESUME_MIME.includes(req.file.mimetype)) {
@@ -176,14 +175,17 @@ router.post('/:id/apply', authenticate, upload.single('resume'), async (req: Aut
       throw new AppError('No resume found on your profile. Upload a resume or attach one to apply.', 400);
     }
 
+    const applicantName = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'Applicant';
+    const applicantEmail = profile?.email || req.user!.email || null;
+
     const { data, error } = await supabase.from('job_applications').insert({
       job_id: jobId,
       user_id: req.user!.userId,
       status: 'pending',
       resume_url: resumeUrl,
       cover_letter: coverLetter || null,
-      applicant_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-      applicant_email: profile.email || null,
+      applicant_name: applicantName,
+      applicant_email: applicantEmail,
     }).select().single();
 
     if (error) {
