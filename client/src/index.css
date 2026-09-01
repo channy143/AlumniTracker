@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply antialiased;
+  }
+
+  ::selection {
+    background-color: #E8A050;
+    color: white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hover {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.2s;
+  }
+  .scrollbar-hover:hover {
+    scrollbar-color: #d1d5db transparent;
+  }
+  .scrollbar-hover::-webkit-scrollbar {
+    width: 4px;
+    display: none;
+  }
+  .scrollbar-hover:hover::-webkit-scrollbar {
+    display: block;
+  }
+  .scrollbar-hover::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+  }
+  .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+  }
+  .scrollbar-hover::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-ctu-blue text-white px-6 py-2.5 rounded-lg font-medium
+      hover:bg-blue-900 transition-colors duration-200
+      focus:outline-none focus:ring-2 focus:ring-ctu-blue focus:ring-offset-2
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply border-2 border-ctu-blue text-ctu-blue px-6 py-2.5 rounded-lg font-medium
+      hover:bg-ctu-blue hover:text-white transition-colors duration-200
+      focus:outline-none focus:ring-2 focus:ring-ctu-blue focus:ring-offset-2;
+  }
+
+  .btn-gold {
+    @apply bg-ctu-gold text-white px-6 py-2.5 rounded-lg font-medium
+      hover:bg-yellow-600 transition-colors duration-200
+      focus:outline-none focus:ring-2 focus:ring-ctu-gold focus:ring-offset-2;
+  }
+
+  .card {
+    @apply bg-white rounded-lg border border-gray-200 p-4 relative;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2.5 border border-gray-300 rounded-lg
+      focus:outline-none focus:ring-2 focus:ring-ctu-blue focus:border-transparent
+      placeholder:text-gray-400 transition-all duration-200;
+  }
+
+  .section-title {
+    @apply text-2xl md:text-3xl font-bold text-ctu-charcoal;
+  }
+
+  .gradient-header {
+    @apply bg-gradient-to-r from-ctu-blue to-blue-900 text-white;
+  }
+
+  .gradient-mesh {
+    background:
+      radial-gradient(ellipse 80% 60% at 0% 0%, rgba(0, 51, 102, 0.3) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(232, 160, 80, 0.15) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0, 51, 102, 0.1) 0%, transparent 50%);
+  }
+
+  .card-tilt {
+    transform-style: preserve-3d;
+    perspective: 800px;
+  }
+
+  .floating {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .floating-delayed {
+    animation: float 6s ease-in-out infinite 2s;
+  }
+
+  .floating-slow {
+    animation: float 8s ease-in-out infinite 4s;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
