@@ -236,9 +236,13 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       .eq('email', email)
       .single();
 
-    // Regardless of whether the account exists, if this (email, IP) is
-    // temporarily rate-limited, block with 429 and a generic message.
-    const cooldown = getCoolDownMs(identifier, ip);
+    // Regardless of whether the account exists or the password is correct, if
+    // this (email, IP) is temporarily rate-limited, block with 429 and a
+    // generic message. This check MUST run before password validation so a
+    // correct password cannot bypass an active cooldown.
+    if (getCoolDownMs(identifier, ip) > 0) {
+      return res.status(429).json({ message: 'Too many unsuccessful attempts. Please try again later.' });
+    }
 
     const exists = !user.error && user.data;
     const passwordOk = exists
@@ -247,6 +251,8 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
 
     if (!exists || !passwordOk) {
       const attempts = recordFailedAttempt(identifier, ip);
+      // After recording, either the count reached the threshold or a lock was
+      // just applied in this request -> block with 429.
       if (attempts >= 5 || getCoolDownMs(identifier, ip) > 0) {
         return res.status(429).json({ message: 'Too many unsuccessful attempts. Please try again later.' });
       }
