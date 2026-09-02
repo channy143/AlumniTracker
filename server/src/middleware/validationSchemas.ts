@@ -25,9 +25,41 @@ export const registerSchema = z.object({
   otp: z.string().min(6).max(6),
 }).strict();
 
+export const registerV2Schema = z.object({
+  studentId: z.string().min(1, 'Student ID is required').max(50),
+  birthDate: z.string().min(1, 'Birthdate is required').max(20),
+  firstName: z.string().min(1, 'First name is required').max(100),
+  lastName: z.string().min(1, 'Last name is required').max(100),
+  email: z.string().email('Valid email is required').max(255),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(128),
+  program: z.string().min(1, 'Program is required').max(200),
+  yearGraduated: z.string().min(1).max(10),
+  otp: z.string().min(6).max(6),
+}).strict();
+
+export const verifyAlumniSchema = z.object({
+  studentId: z.string().min(1, 'Student ID is required').max(50),
+  birthDate: z.string().min(1, 'Birthdate is required').max(20),
+}).strict();
+
 export const loginSchema = z.object({
   email: z.string().email('Valid email is required').max(255),
   password: z.string().min(1, 'Password is required').max(128),
+}).strict();
+
+export const mfaVerifySchema = z.object({
+  email: z.string().email('Valid email is required').max(255),
+  otp: z.string().min(6).max(6),
+  mfaToken: z.string().min(1).max(4096),
+}).strict();
+
+export const mfaEnableSchema = z.object({
+  email: z.string().email('Valid email is required').max(255),
+  otp: z.string().min(6).max(6),
+}).strict();
+
+export const mfaSendCodeSchema = z.object({
+  email: z.string().email('Valid email is required').max(255),
 }).strict();
 
 export const resetPasswordSchema = z.object({
@@ -251,4 +283,17 @@ export const adminRoleSchema = z.object({
 
 export const adminResetPasswordSchema = z.object({
   newPassword: z.string().min(6, 'Password must be at least 6 characters').max(128),
+}).strict();
+
+// -----------------------------------------------------------------------------
+// Admin: Eligible alumni registry
+// -----------------------------------------------------------------------------
+
+export const adminEligibleCreateSchema = z.object({
+  student_id: z.string().min(1, 'Student ID is required').max(50),
+  first_name: z.string().min(1, 'First name is required').max(100),
+  last_name: z.string().min(1, 'Last name is required').max(100),
+  birth_date: z.string().min(1, 'Birthdate is required').max(20),
+  program: z.string().max(200).optional().nullable(),
+  year_graduated: z.number().int().min(1900).max(2100).optional().nullable(),
 }).strict();

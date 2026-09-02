@@ -1,10 +1,59 @@
 import bcrypt from 'bcryptjs';
 import { supabase } from '../services/supabase';
 
-export type OtpPurpose = 'register' | 'reset' | 'verify';
+export type OtpPurpose = 'register' | 'reset' | 'verify' | 'mfa';
 
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const MFA_OTP_TTL_MS = 5 * 60 * 1000; // MFA codes expire sooner (5 minutes)
 const RESEND_COOLDOWN_MS = 30 * 1000; // 30 seconds
+const MAX_MFA_ATTEMPTS = 5; // incorrect MFA codes allowed before rate-limit
+
+// In-memory map tracking consecutive wrong MFA attempts per email.
+const mfaAttempts = new Map<string, { count: number; lockedUntil: number }>();
+
+function mfaKey(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+/**
+ * Track a failed MFA code attempt for an email.
+ * Returns true if the email is now temporarily locked out of MFA.
+ */
+export function recordMfaFailure(email: string): boolean {
+  const key = mfaKey(email);
+  const existing = mfaAttempts.get(key);
+  const entry = existing || { count: 0, lockedUntil: 0 };
+  entry.count += 1;
+
+  if (entry.count >= MAX_MFA_ATTEMPTS) {
+    entry.lockedUntil = Date.now() + 15 * 60 * 1000; // 15-minute lockout
+    entry.count = 0;
+  }
+  mfaAttempts.set(key, entry);
+  return Date.now() < entry.lockedUntil;
+}
+
+/**
+ * Milliseconds remaining in the MFA lockout for an email, or 0 if not locked.
+ */
+export function getMfaLockoutMs(email: string): number {
+  const key = mfaKey(email);
+  const entry = mfaAttempts.get(key);
+  if (!entry) return 0;
+  const wait = entry.lockedUntil - Date.now();
+  if (wait <= 0) {
+    mfaAttempts.delete(key);
+    return 0;
+  }
+  return wait;
+}
+
+/**
+ * Reset the MFA attempt counter on a successful code.
+ */
+export function resetMfaFailures(email: string): void {
+  mfaAttempts.delete(mfaKey(email));
+}
 
 // Normalize the email used as the canonical identity for OTP records.
 function normalizeEmail(email: string): string {
@@ -32,7 +81,7 @@ export async function createOtp(purpose: OtpPurpose, email: string): Promise<{ c
     // Best-effort cleanup; insertion below still proceeds.
   }
 
-  const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
+  const expiresAt = new Date(Date.now() + (purpose === 'mfa' ? MFA_OTP_TTL_MS : OTP_TTL_MS)).toISOString();
   const { error } = await supabase
     .from('otp_codes')
     .insert({ email: normalized, purpose, code_hash: codeHash, expires_at: expiresAt });

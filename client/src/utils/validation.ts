@@ -5,8 +5,15 @@ export const loginSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
+export const verifyAlumniSchema = z.object({
+  studentId: z.string().min(3, 'Student ID is required'),
+  birthDate: z.string().min(1, 'Birthdate is required'),
+});
+
 export const registerSchema = z
   .object({
+    studentId: z.string().min(3, 'Student ID is required'),
+    birthDate: z.string().min(1, 'Birthdate is required'),
     firstName: z.string().min(2, 'First name is required'),
     lastName: z.string().min(2, 'Last name is required'),
     email: z.string().email('Invalid email address'),
@@ -19,6 +26,10 @@ export const registerSchema = z
     message: 'Passwords do not match',
     path: ['confirmPassword'],
   });
+
+export const mfaLoginSchema = z.object({
+  otp: z.string().length(6, 'Enter the 6-digit code'),
+});
 
 export const profileSchema = z.object({
   firstName: z.string().min(2, 'First name is required'),
@@ -44,6 +55,8 @@ export const employmentSchema = z.object({
 });
 
 export type LoginFormData = z.infer<typeof loginSchema>;
+export type VerifyAlumniFormData = z.infer<typeof verifyAlumniSchema>;
 export type RegisterFormData = z.infer<typeof registerSchema>;
+export type MfaLoginFormData = z.infer<typeof mfaLoginSchema>;
 export type ProfileFormData = z.infer<typeof profileSchema>;
 export type EmploymentFormData = z.infer<typeof employmentSchema>;

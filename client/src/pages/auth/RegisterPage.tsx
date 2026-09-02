@@ -1,12 +1,23 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeftIcon, CheckIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, CheckIcon, ShieldCheckIcon, IdentificationIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/store/authStore';
-import { authApi } from '@/services/api';
+import { authApi, type VerifyAlumniResponse } from '@/services/api';
 import { generateYears } from '@/utils/helpers';
 
+type Step = 'verify' | 'form' | 'captcha' | 'otp';
+
 export default function RegisterPage() {
+  const [step, setStep] = useState<Step>('verify');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Identity verification (Student ID + Birthdate)
+  const [identity, setIdentity] = useState({ studentId: '', birthDate: '' });
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
+
+  // Registration form
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -15,12 +26,9 @@ export default function RegisterPage() {
     confirmPassword: '',
     program: '',
     yearGraduated: '',
-    idNumber: '',
   });
+
   const [otp, setOtp] = useState('');
-  const [step, setStep] = useState<'form' | 'captcha' | 'otp'>('form');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [widgetRendered, setWidgetRendered] = useState(false);
   const captchaContainerRef = useRef<HTMLDivElement>(null);
@@ -71,6 +79,37 @@ export default function RegisterPage() {
     return () => { /* cleanup handled by component lifecycle */ };
   }, [step]);
 
+  const handleVerifyIdentity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!identity.studentId.trim() || !identity.birthDate) {
+      setError('Please enter your Student ID and Birthdate');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await authApi.verifyAlumni(identity.studentId.trim(), identity.birthDate);
+      if (res.verified) {
+        const idy = res.identity ?? {} as NonNullable<VerifyAlumniResponse['identity']>;
+        setFormData((prev) => ({
+          ...prev,
+          firstName: idy.firstName || prev.firstName,
+          lastName: idy.lastName || prev.lastName,
+          program: idy.program || prev.program,
+          yearGraduated: idy.yearGraduated || prev.yearGraduated,
+        }));
+        setVerificationToken('verified');
+        setStep('form');
+      }
+    } catch (err: any) {
+      setError(err.message || 'We could not verify your alumni information.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -78,7 +117,7 @@ export default function RegisterPage() {
   const handleCreateAccount = useCallback(async () => {
     setError('');
 
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.program || !formData.yearGraduated || !formData.idNumber || !formData.password) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.program || !formData.yearGraduated || !formData.password) {
       setError('Please fill in all fields');
       return;
     }
@@ -128,7 +167,13 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await authApi.register({ ...formData, otp });
+      const { confirmPassword: _dropped, ...payload } = { ...formData };
+      const res = await authApi.register({
+        studentId: identity.studentId.trim(),
+        birthDate: identity.birthDate,
+        ...payload,
+        otp,
+      });
       setToken(res.token);
       setUser(res.user);
       navigate('/');
@@ -137,7 +182,7 @@ export default function RegisterPage() {
     } finally {
       setLoading(false);
     }
-  }, [formData, otp, setToken, setUser, navigate]);
+  }, [identity, formData, otp, setToken, setUser, navigate]);
 
   const years = generateYears(2014, new Date().getFullYear());
 
@@ -148,7 +193,55 @@ export default function RegisterPage() {
       </Link>
 
       <AnimatePresence mode="wait">
-        {step === 'form' ? (
+        {step === 'verify' ? (
+          <motion.div
+            key="verify"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.25 }}
+          >
+            <div className="text-3xl font-bold text-ctu-charcoal mb-2 flex items-center gap-3">
+              Join the Community
+            </div>
+            <p className="text-gray-500 mb-2">First, let's confirm your alumni identity.</p>
+            <p className="text-gray-400 text-sm mb-8">
+              Enter the Student ID and Birthdate from your alumni record to begin.
+            </p>
+
+            {error && (
+              <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">{error}</div>
+            )}
+
+            <form onSubmit={handleVerifyIdentity} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">Student ID</label>
+                <input
+                  type="text"
+                  value={identity.studentId}
+                  onChange={(e) => setIdentity((p) => ({ ...p, studentId: e.target.value }))}
+                  className="input-field"
+                  placeholder="e.g. CTU-2020-0001"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">Birthdate</label>
+                <input
+                  type="date"
+                  value={identity.birthDate}
+                  onChange={(e) => setIdentity((p) => ({ ...p, birthDate: e.target.value }))}
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              <button type="submit" disabled={loading} className="btn-primary w-full">
+                {loading ? 'Verifying...' : 'Verify Identity & Continue'}
+              </button>
+            </form>
+          </motion.div>
+        ) : step === 'form' ? (
           <motion.div
             key="form"
             initial={{ opacity: 0, x: -20 }}
@@ -156,8 +249,13 @@ export default function RegisterPage() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.25 }}
           >
-            <h2 className="text-3xl font-bold text-ctu-charcoal mb-2">Join the Community</h2>
-            <p className="text-gray-500 mb-8">Create your alumni account</p>
+            <div className="flex items-center gap-2 mb-1">
+              <IdentificationIcon className="w-5 h-5 text-green-600" />
+              <h2 className="text-xl font-bold text-ctu-charcoal">Identity Confirmed</h2>
+            </div>
+            <p className="text-gray-500 mb-4 text-sm">
+              Student ID <span className="font-semibold">{identity.studentId}</span> verified. Now complete your registration.
+            </p>
 
             {error && (
               <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">{error}</div>
@@ -178,11 +276,6 @@ export default function RegisterPage() {
               <div>
                 <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">Email Address</label>
                 <input type="email" name="email" value={formData.email} onChange={handleChange} className="input-field" placeholder="alumni@ctu.edu.ph" required />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">ID Number</label>
-                <input type="text" name="idNumber" value={formData.idNumber} onChange={handleChange} className="input-field" placeholder="e.g. CTU-2020-0001" required />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -221,7 +314,10 @@ export default function RegisterPage() {
               </div>
 
               <button type="button" onClick={handleCreateAccount} disabled={loading} className="btn-primary w-full">
-                {loading ? 'Sending verification code...' : 'Create Account'}
+                {loading ? 'Sending verification code...' : 'Continue'}
+              </button>
+              <button type="button" onClick={() => { setStep('verify'); setError(''); }} className="w-full text-sm text-gray-400 hover:text-ctu-blue transition-colors text-center">
+                ← Back to identity verification
               </button>
             </div>
           </motion.div>
@@ -317,7 +413,7 @@ export default function RegisterPage() {
         )}
       </AnimatePresence>
 
-      {step === 'form' && (
+      {step === 'verify' && (
         <p className="mt-6 text-center text-sm text-gray-500">
           Already have an account?{' '}
           <Link to="/auth/login" className="text-ctu-blue font-medium hover:underline">Sign in</Link>

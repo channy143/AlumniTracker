@@ -223,6 +223,7 @@ export interface User {
   email: string;
   role: 'admin' | 'staff' | 'alumni';
   is_verified: boolean;
+  mfa_enabled?: boolean;
   created_at: string;
   first_name?: string;
   last_name?: string;

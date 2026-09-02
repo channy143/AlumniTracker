@@ -16,6 +16,7 @@ import curriculumInsightsRouter from './curriculum-insights';
 import usersRouter from './users';
 import settingsRouter from './settings';
 import auditLogsRouter from './audit-logs';
+import eligibleAlumniRouter from './eligibleAlumni';
 
 function groupBy<T extends Record<string, any>>(arr: T[], key: string): Record<string, T[]> {
   return (arr || []).reduce((acc: Record<string, T[]>, item: T) => {
@@ -44,6 +45,7 @@ router.use('/curriculum-insights', curriculumInsightsRouter);
 router.use('/users', usersRouter);
 router.use('/settings', settingsRouter);
 router.use('/audit-logs', auditLogsRouter);
+router.use('/eligible-alumni', eligibleAlumniRouter);
 
 router.get('/export', async (_req, res, next) => {
   try {

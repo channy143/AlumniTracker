@@ -85,6 +85,9 @@ export default function ProfilePage() {
   const [achievementForm, setAchievementForm] = useState<any>({ title: '', description: '', category: 'other', date_achieved: '' });
   const [editSection, setEditSection] = useState<'personal' | 'security'>('personal');
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaOtp, setMfaOtp] = useState('');
+  const [mfaLoading, setMfaLoading] = useState(false);
 
 
   const closeSkillDropdown = useCallback(() => setShowSkillDropdown(false), []);
@@ -270,6 +273,67 @@ export default function ProfilePage() {
       setError(err.message || 'Failed to change password');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const loadMfaStatus = async () => {
+    try {
+      const res = await authApi.me();
+      setMfaEnabled(!!res?.user?.mfa_enabled);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (editSection === 'security') {
+      loadMfaStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editSection]);
+
+  const handleEnableMfa = async () => {
+    if (!mfaOtp || mfaOtp.length !== 6) {
+      setError('Enter the 6-digit code sent to your email.');
+      return;
+    }
+    setError('');
+    setMfaLoading(true);
+    try {
+      await authApi.enableMfa(profile?.email || '', mfaOtp);
+      setMfaEnabled(true);
+      setMfaOtp('');
+      setError('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to enable MFA');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleSendMfaCode = async () => {
+    setError('');
+    setMfaLoading(true);
+    try {
+      await authApi.sendMfaCode(profile?.email || '');
+      setError('Verification code sent to your email.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to send code');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleDisableMfa = async () => {
+    setError('');
+    setMfaLoading(true);
+    try {
+      await authApi.disableMfa();
+      setMfaEnabled(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to disable MFA');
+    } finally {
+      setMfaLoading(false);
     }
   };
 
@@ -712,6 +776,42 @@ export default function ProfilePage() {
                         </button>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Two-Factor Authentication (MFA) */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                    <SectionLine label="Two-Factor Authentication (MFA)" />
+                    <p className="text-xs text-gray-500 mb-3 max-w-md">
+                      Adding MFA requires a one-time verification code to be entered on every sign-in after your password.
+                    </p>
+                    {mfaEnabled ? (
+                      <div className="flex items-center justify-between max-w-md">
+                        <div>
+                          <p className="text-sm font-medium text-green-700">MFA is enabled</p>
+                          <p className="text-xs text-gray-500">A verification code will be required at sign-in.</p>
+                        </div>
+                        <button onClick={handleDisableMfa} disabled={mfaLoading} className="px-4 py-2 border border-gray-300 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 cursor-pointer">
+                          {mfaLoading ? 'Disabling...' : 'Disable MFA'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-w-md">
+                        <div className="flex items-center gap-2">
+                          <button onClick={handleSendMfaCode} disabled={mfaLoading} className="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer">
+                            {mfaLoading ? 'Sending...' : 'Send Verification Code'}
+                          </button>
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <div className="flex-1">
+                            <label className="block text-xs text-gray-500 mb-1">Verification Code</label>
+                            <input type="text" value={mfaOtp} onChange={(e) => setMfaOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} maxLength={6} placeholder="000000" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                          </div>
+                          <button onClick={handleEnableMfa} disabled={mfaLoading || mfaOtp.length !== 6} className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer">
+                            {mfaLoading ? 'Enabling...' : 'Enable MFA'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

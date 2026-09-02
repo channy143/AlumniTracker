@@ -52,9 +52,31 @@ export const api = {
   },
 };
 
+export interface LoginResponse {
+  user?: { id: string; email: string; role: 'admin' | 'staff' | 'alumni' };
+  token?: string;
+  requiresMfa?: boolean;
+  mfaToken?: string;
+}
+
+export interface VerifyAlumniResponse {
+  verified: boolean;
+  identity?: {
+    studentId: string;
+    firstName: string;
+    lastName: string;
+    program: string;
+    yearGraduated: string;
+  };
+}
+
 export const authApi = {
   login: (email: string, password: string) =>
-    api.post<{ user: any; token: string }>('/auth/login', { email, password }),
+    api.post<LoginResponse>('/auth/login', { email, password }),
+  mfaVerify: (email: string, otp: string, mfaToken: string) =>
+    api.post<{ user: any; token: string }>('/auth/mfa-verify', { email, otp, mfaToken }),
+  verifyAlumni: (studentId: string, birthDate: string) =>
+    api.post<VerifyAlumniResponse>('/auth/verify-alumni', { studentId, birthDate }),
   register: (data: any) =>
     api.post<{ user: any; token: string }>('/auth/register', data),
   sendOtp: (email: string, turnstileToken?: string) =>
@@ -66,6 +88,12 @@ export const authApi = {
   me: () => api.get<{ user: any }>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<{ message: string }>('/auth/change-password', { currentPassword, newPassword }),
+  sendMfaCode: (email: string) =>
+    api.post<{ message: string }>('/auth/send-mfa-code', { email }),
+  enableMfa: (email: string, otp: string) =>
+    api.post<{ message: string }>('/auth/enable-mfa', { email, otp }),
+  disableMfa: () =>
+    api.post<{ message: string }>('/auth/disable-mfa', {}),
 };
 
 export const profileApi = {
@@ -241,6 +269,10 @@ employmentRate: (params: Record<string, any> = {}) => api.get<any>(`/admin/analy
   userSetRole: (id: string, role: string) => api.put<any>(`/admin/users/${id}/role`, { role }),
   userResetPassword: (id: string, newPassword: string) => api.post<any>(`/admin/users/${id}/reset-password`, { newPassword }),
   userLoginHistory: (id: string) => api.get<any[]>(`/admin/users/${id}/login-history`),
+
+  eligibleAlumniList: (params: Record<string, any> = {}) => api.get<any[]>(`/admin/eligible-alumni?${toQuery(params)}`),
+  eligibleAlumniCreate: (data: any) => api.post<any>('/admin/eligible-alumni', data),
+  eligibleAlumniDelete: (id: string) => api.delete(`/admin/eligible-alumni/${id}`),
 
   settingsGet: () => api.get<any>('/admin/settings'),
   settingsUpdate: (data: any) => api.put<any>('/admin/settings', data),

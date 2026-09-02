@@ -79,6 +79,7 @@ async function main() {
     { path: './supabase/migration_audit_triggers.sql', label: 'Audit triggers migration' },
     { path: './supabase/migration_rls_hardening.sql', label: 'RLS hardening migration' },
     { path: './supabase/migration_rls_hardening_skills.sql', label: 'RLS skills policies migration' },
+    { path: './supabase/migration_alumni_eligible.sql', label: 'Alumni eligibility registry migration' },
   ];
 
   for (const f of files) {

@@ -21,6 +21,13 @@ export default function AlumniManagement() {
   const [savingDetail, setSavingDetail] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', idNumber: '', program: '', yearGraduated: '' });
   const [error, setError] = useState('');
+  const [tab, setTab] = useState<'registered' | 'eligible'>('registered');
+  const [eligible, setEligible] = useState<any[]>([]);
+  const [showEligibleForm, setShowEligibleForm] = useState(false);
+  const [eligibleForm, setEligibleForm] = useState<any>({ student_id: '', first_name: '', last_name: '', birth_date: '', program: '', year_graduated: '' });
+  const [eligError, setEligError] = useState('');
+  const [savingEligible, setSavingEligible] = useState(false);
+  const [deletingEligible, setDeletingEligible] = useState<string | null>(null);
   const addNotification = useUIStore((s) => s.addNotification);
   const batchYears = generateYears(2014, new Date().getFullYear());
 
@@ -161,6 +168,60 @@ export default function AlumniManagement() {
     URL.revokeObjectURL(url);
   };
 
+  const loadEligible = useCallback(async () => {
+    try {
+      const res = await adminApi.eligibleAlumniList({});
+      setEligible(Array.isArray(res) ? res : []);
+    } catch { addNotification('Failed to load eligible alumni', 'error'); }
+  }, [addNotification]);
+
+  useEffect(() => {
+    if (tab === 'eligible') loadEligible();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, loadEligible]);
+
+  const openEligibleForm = () => {
+    setEligibleForm({ student_id: '', first_name: '', last_name: '', birth_date: '', program: '', year_graduated: '' });
+    setEligError('');
+    setShowEligibleForm(true);
+  };
+
+  const handleCreateEligible = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEligError('');
+    if (!eligibleForm.student_id.trim() || !eligibleForm.first_name.trim() || !eligibleForm.last_name.trim() || !eligibleForm.birth_date) {
+      setEligError('Student ID, names, and birthdate are required.');
+      return;
+    }
+    setSavingEligible(true);
+    try {
+      await adminApi.eligibleAlumniCreate({
+        student_id: eligibleForm.student_id.trim(),
+        first_name: eligibleForm.first_name.trim(),
+        last_name: eligibleForm.last_name.trim(),
+        birth_date: eligibleForm.birth_date,
+        program: eligibleForm.program.trim() || null,
+        year_graduated: eligibleForm.year_graduated ? Number(eligibleForm.year_graduated) : null,
+      });
+      setShowEligibleForm(false);
+      addNotification('Alumni added to eligible registry', 'success');
+      loadEligible();
+    } catch (err: any) { setEligError(err.message || 'Failed to add alumni record'); }
+    finally { setSavingEligible(false); }
+  };
+
+  const handleDeleteEligible = async (id: string) => {
+    if (deletingEligible) return;
+    if (!window.confirm('Remove this record from the eligible registry? Alumni with this student ID will no longer be able to verify their identity.')) return;
+    setDeletingEligible(id);
+    try {
+      await adminApi.eligibleAlumniDelete(id);
+      addNotification('Registry entry removed', 'success');
+      if (tab === 'eligible') loadEligible();
+    } catch { addNotification('Failed to remove entry', 'error'); }
+    finally { setDeletingEligible(null); }
+  };
+
   const courseShort = (name: string) => {
     const normalized = name.toLowerCase().trim();
     if (normalized.includes('bsit') || normalized.includes('bachelor of science in information technology')) return 'BSIT';
@@ -172,22 +233,39 @@ export default function AlumniManagement() {
     return name;
   };
 
+  const s = search.trim().toLowerCase();
+  const eligibleCards = (tab === 'eligible')
+    ? eligible.filter((e: any) => !s || (e.student_id || '').toLowerCase().includes(s) || `${e.first_name || ''} ${e.last_name || ''}`.toLowerCase().includes(s))
+    : [];
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div>
           <h1 className="text-base font-bold text-gray-900">Alumni Management</h1>
-          <p className="text-xs text-gray-500">{total} total alumni</p>
+          <p className="text-xs text-gray-500">{tab === 'registered' ? `${total} registered alumni` : `${eligible.length} eligible (unclaimed) alumni`}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExport} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Export CSV</button>
+          {tab === 'registered' && <button onClick={handleExport} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Export CSV</button>}
           <button onClick={() => { setShowForm(true); setError(''); }} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Add Alumni</button>
+          <button onClick={openEligibleForm} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Eligible Alumni</button>
         </div>
+      </div>
+
+      <div className="flex gap-1 mb-3 flex-wrap">
+        <button onClick={() => setTab('registered')} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'registered' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
+          Registered
+        </button>
+        <button onClick={() => setTab('eligible')} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'eligible' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
+          Eligible / Unclaimed
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-3">
         <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Search by name, email, or ID..." className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-56" />
+          placeholder={tab === 'eligible' ? "Search eligible by name or student ID..." : "Search by name, email, or ID..."} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-56" />
+        {tab === 'registered' && (
+          <>
         <select value={filters.course} onChange={(e) => { setFilters((f) => ({ ...f, course: e.target.value })); setPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="">All Courses</option>
@@ -219,8 +297,12 @@ export default function AlumniManagement() {
           <option value="false">Active</option>
           <option value="true">Archived</option>
         </select>
+          </>
+        )}
       </div>
 
+      {tab === 'registered' && (
+        <>
       {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-xs mb-3">{error}</div>}
 
       {loading ? (
@@ -308,6 +390,43 @@ export default function AlumniManagement() {
             </div>
           )}
         </>
+      )}
+        </>
+      )}
+
+      {tab === 'eligible' && (
+        eligibleCards.length === 0 ? (
+          <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">
+            {search.trim() ? 'No eligible alumni match your search' : 'No eligible alumni yet. Use "+ Eligible Alumni" to add records so they can verify and register.'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {eligibleCards.map((item: any) => (
+              <div key={item.id} className="bg-white border border-gray-200 hover:shadow-md transition-shadow flex flex-col">
+                <div className="relative">
+                  <div className="w-full h-44 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center overflow-hidden">
+                    <span className="text-2xl font-bold text-orange-400">{((item.first_name?.[0] || '') + (item.last_name?.[0] || '')).toUpperCase()}</span>
+                  </div>
+                  <div className="absolute top-1.5 right-1.5">
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-50 text-amber-700">Unclaimed</span>
+                  </div>
+                </div>
+                <div className="p-[15px] flex-1 flex flex-col gap-1">
+                  <p className="text-xs font-semibold text-gray-900 leading-tight">{item.first_name || ''} {item.last_name || ''}</p>
+                  <div className="space-y-0.5 text-[10px] text-gray-500">
+                    <p><span className="text-gray-400">ID:</span> {item.student_id || '---'}</p>
+                    <p><span className="text-gray-400">Course:</span> {item.program ? courseShort(item.program) : '---'}</p>
+                    <p><span className="text-gray-400">Batch:</span> {item.year_graduated || '---'}</p>
+                    <p><span className="text-gray-400">Birthdate:</span> {item.birth_date ? new Date(item.birth_date).toLocaleDateString() : '---'}</p>
+                  </div>
+                </div>
+                <div className="px-2.5 pb-2.5 flex flex-wrap gap-1">
+                  <button onClick={() => handleDeleteEligible(item.id)} disabled={deletingEligible === item.id} className="text-[10px] px-2 py-1 font-medium bg-red-50 text-red-500 rounded-md hover:bg-red-100 disabled:opacity-40">{deletingEligible === item.id ? 'Removing...' : 'Remove'}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       {showDetail && detailData && (
@@ -557,12 +676,38 @@ export default function AlumniManagement() {
               <div><label className="block text-xs font-medium text-gray-700 mb-0.5">ID Number</label><input type="text" value={form.idNumber} onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" placeholder="e.g. CTU-2020-0001" /></div>
               <div className="grid grid-cols-2 gap-2">
                 <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Course</label><select value={form.program} onChange={(e) => setForm((f) => ({ ...f, program: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none"><option value="">Select</option><option value="BSIT">BSIT</option><option value="BIT">BIT</option><option value="BEEd">BEEd</option><option value="BSEd-Math">BSEd-Math</option><option value="BTLED-HE">BTLED-HE</option><option value="BTLED-ICT">BTLED-ICT</option></select></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Year Graduated</label><input type="number" value={form.yearGraduated} onChange={(e) => setForm((f) => ({ ...f, yearGraduated: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" min={2014} /></div>
+                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Year Graduated</label><select value={form.yearGraduated} onChange={(e) => setForm((f) => ({ ...f, yearGraduated: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400"><option value="">Select</option>{batchYears.map((y) => <option key={y} value={y}>{y}</option>)}</select></div>
               </div>
               <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Password</label><input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
               <div className="flex gap-2 justify-end pt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
                 <button type="submit" className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">Create Alumni</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEligibleForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowEligibleForm(false)}>
+          <div className="bg-white rounded-lg max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-sm font-bold text-gray-900 mb-4">Add Eligible Alumni</h2>
+            <p className="text-xs text-gray-500 mb-4">Add this person to the eligible registry so they can verify their identity and register.</p>
+            <form onSubmit={handleCreateEligible} className="space-y-3">
+              <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Student ID *</label><input type="text" value={eligibleForm.student_id} onChange={(e) => setEligibleForm((f: any) => ({ ...f, student_id: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" placeholder="e.g. CTU-2020-0001" required /></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">First Name *</label><input type="text" value={eligibleForm.first_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, first_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
+                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Last Name *</label><input type="text" value={eligibleForm.last_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, last_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
+              </div>
+              <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Birthdate *</label><input type="date" value={eligibleForm.birth_date} onChange={(e) => setEligibleForm((f: any) => ({ ...f, birth_date: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Course</label><select value={eligibleForm.program} onChange={(e) => setEligibleForm((f: any) => ({ ...f, program: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400"><option value="">Select</option><option value="BSIT">BSIT</option><option value="BIT">BIT</option><option value="BEEd">BEEd</option><option value="BSEd-Math">BSEd-Math</option><option value="BTLED-HE">BTLED-HE</option><option value="BTLED-ICT">BTLED-ICT</option></select></div>
+                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Year Graduated</label><select value={eligibleForm.year_graduated} onChange={(e) => setEligibleForm((f: any) => ({ ...f, year_graduated: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400"><option value="">Select</option>{batchYears.map((y) => <option key={y} value={y}>{y}</option>)}</select></div>
+              </div>
+              {eligError && <p className="text-xs text-red-600">{eligError}</p>}
+              <div className="flex gap-2 justify-end pt-2">
+                <button type="button" onClick={() => setShowEligibleForm(false)} className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
+                <button type="submit" disabled={savingEligible} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">{savingEligible ? 'Saving...' : 'Add Record'}</button>
               </div>
             </form>
           </div>

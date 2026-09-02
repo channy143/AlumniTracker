@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS public.otp_codes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email VARCHAR(255) NOT NULL,
-  purpose VARCHAR(20) NOT NULL CHECK (purpose IN ('register', 'reset', 'verify')),
+  purpose VARCHAR(20) NOT NULL CHECK (purpose IN ('register', 'reset', 'verify', 'mfa')),
   code_hash TEXT NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   consumed_at TIMESTAMPTZ,
