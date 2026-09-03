@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { BriefcaseIcon, BuildingOfficeIcon, SparklesIcon, AcademicCapIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon, FunnelIcon } from '@heroicons/react/24/outline';
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { BriefcaseIcon, BuildingOfficeIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { careerTrendsApi } from '@/services/api';
 import { SkeletonCard, SkeletonStatCard, SkeletonRow } from '@/components/ui/Skeleton';
-
-const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5', '#ea580c', '#d97706', '#c2410c', '#9a3412', '#7c2d12'];
-const STATUS_COLORS = ['#059669', '#d97706', '#dc2626', '#2563eb', '#7c3aed', '#6b7280'];
+import CareerLeaderboardNav from './CareerLeaderboardNav';
 
 const JOB_TYPE_LABELS: Record<string, string> = {
   'full-time': 'Full-time',
@@ -177,94 +175,6 @@ function CareerCard({ career }: { career: CareerTrend }) {
   );
 }
 
-function SidebarWidgets({ data }: { data: any }) {
-  const { skillsDistribution = [], fastestGrowing = [], topEmployers = [], industryDistribution = [] } = data || {};
-  const skills = skillsDistribution;
-  const employers = topEmployers;
-  const industries = industryDistribution;
-
-  return (
-    <div className="space-y-3">
-      <div className="bg-white border border-gray-200 rounded-lg p-3">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <SparklesIcon className="w-4 h-4 text-orange-500" />
-          Career Highlights
-        </h3>
-        {fastestGrowing.length > 0 && (
-          <div className="text-xs">
-            <span className="text-gray-500">Fastest Growing:</span>
-            <p className="font-semibold text-gray-800">{fastestGrowing[0].position}</p>
-            <p className="text-orange-600 font-medium">+{fastestGrowing[0].newAlumni} Alumni This Year</p>
-          </div>
-        )}
-        {fastestGrowing.length > 1 && (
-          <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
-            {fastestGrowing.slice(1).map((fg: any) => (
-              <p key={fg.position} className="text-xs text-gray-600">
-                {fg.position} <span className="text-orange-600 font-medium">+{fg.newAlumni}</span>
-              </p>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-lg p-3">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <BuildingOfficeIcon className="w-4 h-4 text-orange-500" />
-          Top Employers
-        </h3>
-        <div className="space-y-1.5">
-          {employers.slice(0, 5).map((emp: any, i: number) => (
-            <div key={emp.name} className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full bg-orange-100 flex items-center justify-center text-[9px] font-bold text-orange-600 shrink-0">
-                  {i + 1}
-                </span>
-                <span className="text-gray-700 truncate">{emp.name}</span>
-              </div>
-              <span className="text-gray-400 shrink-0 ml-2">{formatNumber(emp.alumniCount)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-lg p-3">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <ChartBarIcon className="w-4 h-4 text-orange-500" />
-          Top Industries
-        </h3>
-        <div className="space-y-1.5">
-          {industries.slice(0, 4).map((ind: any, i: number) => (
-            <div key={ind.name}>
-              <div className="flex items-center justify-between text-xs mb-0.5">
-                <span className="text-gray-700 truncate">{ind.name}</span>
-                <span className="text-gray-400 shrink-0 ml-2">{ind.percentage}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${ind.percentage}%`, backgroundColor: COLORS[i % COLORS.length] }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-lg p-3">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <AcademicCapIcon className="w-4 h-4 text-orange-500" />
-          Trending Skills
-        </h3>
-        <div className="flex flex-wrap gap-1.5">
-          {skills.slice(0, 8).map((skill: any) => (
-            <span key={skill.name} className="px-2 py-1 bg-orange-50 text-orange-700 text-[10px] font-medium rounded-full">
-              {skill.name}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function matchQuery(text: string, query: string): boolean {
   return text.toLowerCase().includes(query.toLowerCase());
 }
@@ -303,7 +213,6 @@ export default function CareerTrendsPage() {
   const allIndustryData: any[] = data.industryDistribution;
   const allStatusData: any[] = data.statusDistribution;
   const allCompanies: any[] = data.topEmployers;
-  const topBatches = data.topBatches;
   const filterOptions: FilterOptions = data.filterOptions || { employmentTypes: [], batches: [], locations: [] };
 
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
@@ -577,160 +486,6 @@ export default function CareerTrendsPage() {
             <CareerCard key={career.position} career={career} />
           ))}
 
-          {filteredStatus.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <UserGroupIcon className="w-4 h-4 text-orange-500" />
-                  Employment Status
-                </h3>
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <div className="h-44 w-44 shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={filteredStatus}
-                          dataKey="count"
-                          nameKey="status"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={70}
-                          paddingAngle={2}
-                        >
-                          {filteredStatus.map((_: any, i: number) => (
-                            <Cell key={i} fill={STATUS_COLORS[i % STATUS_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: number, _: any, entry: any) => {
-                          const total = filteredStatus.reduce((s: number, d: any) => s + d.count, 0);
-                          const pct = total > 0 ? Math.round((value / total) * 100) : 0;
-                          return [`${Math.round(value)} alumni (${pct}%)`, entry.payload.status];
-                        }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-1.5 w-full">
-                    {filteredStatus.map((d: any, i: number) => {
-                      const total = filteredStatus.reduce((s: number, x: any) => s + x.count, 0);
-                      const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
-                      return (
-                        <div key={d.status} className="flex items-center gap-2 text-xs">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_COLORS[i % STATUS_COLORS.length] }} />
-                          <span className="flex-1 truncate text-gray-700">{d.status}</span>
-                          <span className="font-medium text-gray-900">{Math.round(d.count)}</span>
-                          <span className="text-gray-400 w-8 text-right">{pct}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {filteredCompanies.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-lg p-3">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                    <BuildingOfficeIcon className="w-4 h-4 text-orange-500" />
-                    Top Companies Employing Alumni
-                  </h3>
-                  <div className="space-y-1">
-                    {filteredCompanies.slice(0, 8).map((emp: any, i: number) => (
-                      <div key={emp.name} className="flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-gray-50">
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded bg-orange-100 flex items-center justify-center text-[10px] font-bold text-orange-600 shrink-0">
-                            {i + 1}
-                          </span>
-                          <span className="text-gray-700 font-medium">{emp.name}</span>
-                        </div>
-                        <span className="text-gray-500">{formatNumber(emp.alumniCount)} alumni</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {filteredIndustries.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <ChartBarIcon className="w-4 h-4 text-orange-500" />
-                  Employment by Industry
-                </h3>
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <div className="h-44 w-44 shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={filteredIndustries}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={70}
-                          paddingAngle={2}
-                        >
-                          {filteredIndustries.map((_: any, i: number) => (
-                            <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: number, _: any, entry: any) => {
-                          const total = filteredIndustries.reduce((s: number, d: any) => s + d.value, 0);
-                          const pct = total > 0 ? Math.round((value / total) * 100) : 0;
-                          return [`${Math.round(value)} alumni (${pct}%)`, entry.payload.name];
-                        }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-1.5 w-full">
-                    {filteredIndustries.map((d: any, i: number) => {
-                      const total = filteredIndustries.reduce((s: number, x: any) => s + x.value, 0);
-                      const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
-                      return (
-                        <div key={d.name} className="flex items-center gap-2 text-xs">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                          <span className="flex-1 truncate text-gray-700">{d.name}</span>
-                          <span className="font-medium text-gray-900">{Math.round(d.value)}</span>
-                          <span className="text-gray-400 w-8 text-right">{pct}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <AcademicCapIcon className="w-4 h-4 text-orange-500" />
-                  Top 5 Most Active Batches
-                </h3>
-                <div className="space-y-2">
-                  {topBatches.map((b: any, i: number) => (
-                    <div key={b.year} className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded bg-orange-100 flex items-center justify-center text-[10px] font-bold text-orange-600 shrink-0">
-                        {i + 1}
-                      </span>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between text-xs mb-0.5">
-                          <span className="font-medium text-gray-800">Batch {b.year}</span>
-                          <span className="text-gray-500">{formatNumber(b.total)} alumni</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-orange-500"
-                            style={{ width: `${topBatches.length > 0 ? Math.round((b.total / topBatches[0].total) * 100) : 0}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="bg-white border border-gray-200 rounded-lg p-3">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
               <UserGroupIcon className="w-4 h-4 text-orange-500" />
@@ -749,9 +504,9 @@ export default function CareerTrendsPage() {
           </div>
         </div>
 
-        <aside className="hidden lg:block w-80 shrink-0">
-          <div className="sticky top-16">
-            <SidebarWidgets data={data} />
+        <aside className="hidden lg:block w-80 shrink-0 self-stretch">
+          <div className="sticky top-16 h-[calc(100vh-4rem)]">
+            <CareerLeaderboardNav data={data} />
           </div>
         </aside>
       </div>
