@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login Page & Security Documentation — CTU-Naga Alumni Tracker</title>
+<style>
+  :root { --accent: #2563eb; --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0; --text: #1e293b; --muted: #64748b; --red: #dc2626; --green: #16a34a; --orange: #ea580c; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; padding: 2rem; }
+  .container { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin-bottom: .25rem; }
+  .subtitle { color: var(--muted); margin-bottom: 2rem; font-size: .95rem; }
+  h2 { font-size: 1.25rem; margin: 2rem 0 .75rem; padding-bottom: .4rem; border-bottom: 2px solid var(--accent); color: var(--accent); }
+  h3 { font-size: 1.05rem; margin: 1.25rem 0 .5rem; }
+  p, li { font-size: .92rem; }
+  ul, ol { padding-left: 1.4rem; margin: .5rem 0; }
+  li { margin-bottom: .3rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin: 1rem 0; }
+  .tag { display: inline-block; font-size: .75rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-right: 4px; }
+  .tag-green { background: #dcfce7; color: var(--green); }
+  .tag-red { background: #fee2e2; color: var(--red); }
+  .tag-orange { background: #fff7ed; color: var(--orange); }
+  .tag-blue { background: #dbeafe; color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; margin: .75rem 0; font-size: .88rem; }
+  th, td { text-align: left; padding: 8px 12px; border: 1px solid var(--border); }
+  th { background: #f1f5f9; font-weight: 600; }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: .85rem; }
+  .flow { background: #f1f5f9; border-radius: 8px; padding: 1rem 1.25rem; margin: .75rem 0; font-size: .88rem; font-family: 'Consolas', monospace; line-height: 1.9; }
+  .severity-high { color: var(--red); font-weight: 700; }
+  .severity-med { color: var(--orange); font-weight: 700; }
+  .severity-low { color: var(--green); font-weight: 700; }
+  .note { background: #fffbeb; border-left: 4px solid var(--orange); padding: .75rem 1rem; margin: .75rem 0; border-radius: 0 6px 6px 0; font-size: .88rem; }
+  .file { font-family: 'Consolas', monospace; font-size: .82rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Login Page &amp; Security Documentation</h1>
+<p class="subtitle">CTU-Naga Alumni Tracker &mdash; Full Technical Context<br>Generated: September 2, 2026</p>
+
+<!-- ============================== -->
+<h2>1. Login Page Overview</h2>
+<!-- ============================== -->
+
+<div class="card">
+  <p><strong>File:</strong> <code class="file">client/src/pages/auth/LoginPage.tsx</code></p>
+  <p><strong>Route:</strong> <code>/auth/login</code> (nested under <code>AuthLayout</code>)</p>
+  <p>The login page is a simple, single-step form that authenticates an alumni or staff user via email + password and redirects them to the dashboard.</p>
+</div>
+
+<h3>1.1 Login Form Fields</h3>
+
+<table>
+  <tr><th>Field</th><th>HTML Type</th><th>State Variable</th><th>Placeholder</th><th>Required</th><th>Validation</th></tr>
+  <tr>
+    <td><strong>Email Address</strong></td>
+    <td><code>type="text"</code></td>
+    <td><code>email</code></td>
+    <td><code>alumni@ctu.edu.ph</code></td>
+    <td>Yes (HTML)</td>
+    <td>Client: Zod <code>.email()</code><br>Server: Zod <code>.email().max(255)</code></td>
+  </tr>
+  <tr>
+    <td><strong>Password</strong></td>
+    <td><code>type="password"</code></td>
+    <td><code>password</code></td>
+    <td><code>Enter your password</code></td>
+    <td>Yes (HTML)</td>
+    <td>Client: Zod <code>.min(6)</code><br>Server: Zod <code>.min(1).max(128)</code></td>
+  </tr>
+  <tr>
+    <td><strong>Remember Me</strong></td>
+    <td><code>type="checkbox"</code></td>
+    <td><code>rememberMe</code></td>
+    <td>&mdash;</td>
+    <td>No</td>
+    <td>Boolean toggle</td>
+  </tr>
+</table>
+
+<h3>1.2 UI Elements</h3>
+<ul>
+  <li><strong>Back Arrow</strong> &mdash; links to <code>/</code> (home page)</li>
+  <li><strong>Heading:</strong> "Welcome Back" / Subheading: "Sign in to your alumni account"</li>
+  <li><strong>Error Banner</strong> &mdash; conditionally rendered red box showing server error message</li>
+  <li><strong>Sign In Button</strong> &mdash; disabled during loading; shows "Signing in..." spinner state</li>
+  <li><strong>Forgot Password Link</strong> &mdash; navigates to <code>/auth/forgot-password</code></li>
+  <li><strong>Register Link</strong> &mdash; navigates to <code>/auth/register</code></li>
+</ul>
+
+<h3>1.3 Post-Login Redirect Logic</h3>
+<div class="flow">
+  if (user.role === 'admin') &rarr; redirect to <code>/admin</code><br>
+  else &rarr; redirect to <code>/</code> (dashboard)
+</div>
+
+<!-- ============================== -->
+<h2>2. Authentication Flow</h2>
+<!-- ============================== -->
+
+<h3>2.1 Client-Side Flow</h3>
+<ol>
+  <li>User enters email + password and optionally checks "Remember Me"</li>
+  <li>On submit, <code>authApi.login(email, password)</code> fires a <code>POST /api/auth/login</code> request</li>
+  <li>On success: JWT token + user object are returned</li>
+  <li>Token is stored in <code>localStorage</code> under key <code>access_token</code> via the Zustand auth store</li>
+  <li>User object is set in the Zustand store</li>
+  <li>Navigation occurs based on role</li>
+</ol>
+
+<h3>2.2 Server-Side Flow</h3>
+<ol>
+  <li>Request hits Express at <code>POST /api/auth/login</code></li>
+  <li>Passes through <strong>CORS</strong> &rarr; <strong>Helmet</strong> &rarr; <strong>Global Rate Limiter</strong> (300/15min) &rarr; <strong>Auth Rate Limiter</strong> (20/15min)</li>
+  <li>Body validated against Zod <code>loginSchema</code> via <code>validate()</code> middleware</li>
+  <li>Supabase query: fetch <code>id, email, password_hash, role</code> from <code>users</code> table</li>
+  <li>If user not found: generic "Invalid email or password" (401) &mdash; no user enumeration</li>
+  <li><code>bcrypt.compare()</code> validates password against stored hash</li>
+  <li>If invalid: same generic error (401)</li>
+  <li><code>last_login</code> timestamp updated in database</li>
+  <li>JWT signed with <code>JWT_SECRET</code>; expiry set by role:
+    <ul>
+      <li><strong>Admin:</strong> <code>2h</code></li>
+      <li><strong>Staff / Alumni:</strong> <code>7d</code></li>
+    </ul>
+  </li>
+  <li>Response: <code>{ user: { id, email, role }, token }</code></li>
+</ol>
+
+<h3>2.3 Complete Request Lifecycle Diagram</h3>
+<div class="flow">
+Client<br>
+&nbsp;&nbsp;&darr; POST /api/auth/login { email, password }<br><br>
+Express Server<br>
+&nbsp;&nbsp;&darr; CORS middleware (origin: CLIENT_URL)<br>
+&nbsp;&nbsp;&darr; Helmet (security headers)<br>
+&nbsp;&nbsp;&darr; apiLimiter (300 req / 15 min per IP)<br>
+&nbsp;&nbsp;&darr; authLimiter (20 req / 15 min per IP)<br>
+&nbsp;&nbsp;&darr; express.json() body parser<br>
+&nbsp;&nbsp;&darr; validate(loginSchema) &mdash; Zod strict mode<br>
+&nbsp;&nbsp;&darr; Route handler:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Supabase: SELECT from users WHERE email = ?<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bcrypt.compare(password, password_hash)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;UPDATE users SET last_login = NOW()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jwt.sign({ userId, email, role }, JWT_SECRET, { expiresIn })<br>
+&nbsp;&nbsp;&darr; Response: { user, token }<br><br>
+Client<br>
+&nbsp;&nbsp;&darr; localStorage.setItem('access_token', token)<br>
+&nbsp;&nbsp;&darr; Navigate to / or /admin
+</div>
+
+<!-- ============================== -->
+<h2>3. Security Measures</h2>
+<!-- ============================== -->
+
+<h3>3.1 Password Security</h3>
+<div class="card">
+  <table>
+    <tr><th>Measure</th><th>Details</th><th>Severity</th></tr>
+    <tr>
+      <td>Password Hashing</td>
+      <td><code>bcryptjs</code> with <strong>12 salt rounds</strong></td>
+      <td><span class="severity-high">CRITICAL</span></td>
+    </tr>
+    <tr>
+      <td>Constant-Time Comparison</td>
+      <td><code>bcrypt.compare()</code> is inherently timing-safe</td>
+      <td><span class="severity-high">CRITICAL</span></td>
+    </tr>
+    <tr>
+      <td>Generic Error Messages</td>
+      <td>Both "user not found" and "wrong password" return: <em>"Invalid email or password"</em> &mdash; prevents user enumeration</td>
+      <td><span class="severity-high">HIGH</span></td>
+    </tr>
+    <tr>
+      <td>Password Length Constraints</td>
+      <td>Client: min 6 chars. Server: min 1 / max 128 chars</td>
+      <td><span class="severity-med">MEDIUM</span></td>
+    </tr>
+  </table>
+</div>
+
+<h3>3.2 JWT Token Security</h3>
+<div class="card">
+  <table>
+    <tr><th>Measure</th><th>Details</th><th>Severity</th></tr>
+    <tr>
+      <td>Secret Validation</td>
+      <td>Server validates <code>JWT_SECRET</code> is &ge; 32 chars at startup; hard exits if missing</td>
+      <td><span class="severity-high">CRITICAL</span></td>
+    </tr>
+    <tr>
+      <td>Role-Based Expiry</td>
+      <td>Admin tokens: <strong>2 hours</strong>. Staff/Alumni: <strong>7 days</strong></td>
+      <td><span class="severity-high">HIGH</span></td>
+    </tr>
+    <tr>
+      <td>Admin Token Age Enforcement</td>
+      <td>Middleware checks <code>iat</code> claim; admin tokens older than 2 hours are rejected even if not yet expired</td>
+      <td><span class="severity-high">HIGH</span></td>
+    </tr>
+    <tr>
+      <td>Algorithm</td>
+      <td>HMAC-SHA256 (<code>HS256</code>) via <code>jsonwebtoken</code></td>
+      <td><span class="severity-med">MEDIUM</span></td>
+    </tr>
+    <tr>
+      <td>Payload Contents</td>
+      <td><code>{ userId, email, role }</code> &mdash; no sensitive data (no password hash, no PII beyond email)</td>
+      <td><span class="severity-med">MEDIUM</span></td>
+    </tr>
+  </table>
+</div>
+
+<h3>3.3 Rate Limiting</h3>
+<div class="card">
+  <table>
+    <tr><th>Limiter</th><th>Window</th><th>Max Requests</th><th>Applied To</th></tr>
+    <tr>
+      <td><code>apiLimiter</code></td>
+      <td>15 minutes</td>
+      <td>300</td>
+      <td>All <code>/api</code> routes (global)</td>
+    </tr>
+    <tr>
+      <td><code>authLimiter</code></td>
+      <td>15 minutes</td>
+      <td>20</td>
+      <td>All <code>/api/auth</code> routes</td>
+    </tr>
+    <tr>
+      <td><code>writeLimiter</code></td>
+      <td>60 minutes</td>
+      <td>100</td>
+      <td>Mentorship, Connections, Messages, Referrals</td>
+    </tr>
+    <tr>
+      <td>OTP Cooldown</td>
+      <td>30 seconds</td>
+      <td>1 resend per email+purpose</td>
+      <td>Send OTP, Forgot Password, Send Verification</td>
+    </tr>
+  </table>
+  <p style="margin-top:.5rem"><span class="tag tag-green">PREVENTION</span> Brute-force login attempts are throttled to <strong>20 per 15 minutes per IP</strong>.</p>
+</div>
+
+<h3>3.4 Input Validation</h3>
+<div class="card">
+  <table>
+    <tr><th>Layer</th><th>Library</th><th>Enforcement</th></tr>
+    <tr>
+      <td>Client-Side</td>
+      <td>Zod (<code>loginSchema</code>)</td>
+      <td><code>email: .email()</code>, <code>password: .min(6)</code></td>
+    </tr>
+    <tr>
+      <td>Server-Side</td>
+      <td>Zod (<code>loginSchema</code>) + <code>.strict()</code></td>
+      <td><code>email: .email().max(255)</code>, <code>password: .min(1).max(128)</code></td>
+    </tr>
+    <tr>
+      <td>Middleware</td>
+      <td><code>validate()</code></td>
+      <td>Returns <strong>400</strong> with field-level errors on validation failure. Replaces <code>req.body</code> with parsed (sanitized) data on success.</td>
+    </tr>
+  </table>
+  <p style="margin-top:.5rem"><span class="tag tag-blue">NOTE</span> Server schemas use <code>.strict()</code> which rejects any unknown/extra fields in the request body.</p>
+</div>
+
+<h3>3.5 CORS Configuration</h3>
+<div class="card">
+  <p><strong>Origin:</strong> <code>process.env.CLIENT_URL</code> (defaults to <code>http://localhost:5173</code>)</p>
+  <p><strong>Credentials:</strong> <code>true</code> (allows cookies/auth headers)</p>
+  <p><span class="tag tag-green">SECURE</span> Only requests from the configured client origin are allowed. All other origins are blocked by the browser's same-origin policy.</p>
+</div>
+
+<h3>3.6 HTTP Security Headers (Helmet)</h3>
+<div class="card">
+  <p><code>helmet()</code> is applied globally in <code>app.ts</code>, setting standard security headers:</p>
+  <ul>
+    <li><code>X-Content-Type-Options: nosniff</code></li>
+    <li><code>X-Frame-Options: DENY</code></li>
+    <li><code>X-XSS-Protection</code> (legacy browser support)</li>
+    <li><code>Strict-Transport-Security</code> (HSTS)</li>
+    <li><code>Content-Security-Policy</code></li>
+    <li><code>Referrer-Policy</code></li>
+    <li>And more (all Helmet defaults)</li>
+  </ul>
+</div>
+
+<h3>3.7 CAPTCHA / Bot Protection</h3>
+<div class="card">
+  <table>
+    <tr><th>Feature</th><th>Login Page</th><th>Register Page</th><th>Forgot Password</th></tr>
+    <tr>
+      <td>Cloudflare Turnstile</td>
+      <td><span class="tag tag-red">NOT PRESENT</span></td>
+      <td><span class="tag tag-green">REQUIRED</span></td>
+      <td><span class="tag tag-green">REQUIRED</span></td>
+    </tr>
+  </table>
+  <div class="note" style="margin-top: .75rem;">
+    <strong>Observation:</strong> The login page does <em>not</em> use Cloudflare Turnstile. While rate limiting (20 req/15min) mitigates brute-force, adding Turnstile on the login page would provide an additional layer of bot protection.
+  </div>
+</div>
+
+<h3>3.8 Cross-Tab Session Management</h3>
+<div class="card">
+  <ul>
+    <li>Auth store listens for <code>StorageEvent</code> and <code>visibilitychange</code> events</li>
+    <li><code>syncToken()</code> detects when another browser tab logs in/out and syncs state</li>
+    <li>On logout, <code>localStorage</code> is cleared and Zustand store is reset</li>
+    <li><code>useAuth</code> hook decodes JWT payload on page load (client-side only, no verification) to restore session</li>
+  </ul>
+</div>
+
+<h3>3.9 Server-Side Authentication Middleware</h3>
+<div class="card">
+  <p><strong>File:</strong> <code class="file">server/src/middleware/auth.ts</code></p>
+  <ul>
+    <li><code>authenticate</code> &mdash; extracts Bearer token from <code>Authorization</code> header, verifies with <code>jwt.verify()</code>, attaches decoded payload to <code>req.user</code></li>
+    <li><code>authorize(...roles)</code> &mdash; role-based access control; returns <strong>403</strong> if role not in allowed list</li>
+    <li>Admin tokens undergo an additional max-age check (2 hours) independent of the JWT <code>exp</code> claim</li>
+  </ul>
+</div>
+
+<!-- ============================== -->
+<h2>4. Authentication Endpoints Summary</h2>
+<!-- ============================== -->
+
+<table>
+  <tr><th>Endpoint</th><th>Method</th><th>Auth Required</th><th>Turnstile</th><th>Rate Limit</th></tr>
+  <tr><td><code>/api/auth/send-otp</code></td><td>POST</td><td>No</td><td>Yes</td><td>Auth (20/15min)</td></tr>
+  <tr><td><code>/api/auth/register</code></td><td>POST</td><td>No</td><td>No (uses OTP)</td><td>Auth (20/15min)</td></tr>
+  <tr><td><code>/api/auth/login</code></td><td>POST</td><td>No</td><td>No</td><td>Auth (20/15min)</td></tr>
+  <tr><td><code>/api/auth/forgot-password</code></td><td>POST</td><td>No</td><td>Yes</td><td>Auth (20/15min)</td></tr>
+  <tr><td><code>/api/auth/reset-password</code></td><td>POST</td><td>No</td><td>No (uses OTP)</td><td>Auth (20/15min)</td></tr>
+  <tr><td><code>/api/auth/change-password</code></td><td>POST</td><td>Yes (JWT)</td><td>No</td><td>Auth (20/15min)</td></tr>
+  <tr><td><code>/api/auth/send-verification</code></td><td>POST</td><td>Yes (JWT)</td><td>No</td><td>Auth (20/15min)</td></tr>
+  <tr><td><code>/api/auth/verify-email</code></td><td>POST</td><td>Yes (JWT)</td><td>No</td><td>Auth (20/15min)</td></tr>
+  <tr><td><code>/api/auth/me</code></td><td>GET</td><td>Yes (JWT)</td><td>No</td><td>Auth (20/15min)</td></tr>
+</table>
+
+<!-- ============================== -->
+<h2>5. Validation Schemas</h2>
+<!-- ============================== -->
+
+<h3>5.1 Client-Side Login Schema</h3>
+<div class="card">
+  <p class="file">client/src/utils/validation.ts</p>
+<pre style="background:#f8fafc;padding:.75rem;border-radius:6px;font-size:.84rem;overflow-x:auto;">
+export const loginSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+</pre>
+</div>
+
+<h3>5.2 Server-Side Login Schema</h3>
+<div class="card">
+  <p class="file">server/src/middleware/validationSchemas.ts</p>
+<pre style="background:#f8fafc;padding:.75rem;border-radius:6px;font-size:.84rem;overflow-x:auto;">
+export const loginSchema = z.object({
+  email: z.string().email('Valid email is required').max(255),
+  password: z.string().min(1, 'Password is required').max(128),
+}).strict();
+</pre>
+  <p style="margin-top:.5rem"><span class="tag tag-blue">STRICT MODE</span> Extra/unknown fields in the request body cause a 400 rejection.</p>
+</div>
+
+<!-- ============================== -->
+<h2>6. Token Storage &amp; Lifecycle</h2>
+<!-- ============================== -->
+
+<div class="card">
+  <table>
+    <tr><th>Aspect</th><th>Details</th></tr>
+    <tr><td>Storage Key</td><td><code>access_token</code> in <code>localStorage</code></td></tr>
+    <tr><td>"Remember Me"</td><td>Always writes to <code>localStorage</code> (checkbox is accepted but does not change storage behavior)</td></tr>
+    <tr><td>Cross-Tab Sync</td><td><code>StorageEvent</code> listener + <code>visibilitychange</code> listener</td></tr>
+    <tr><td>Logout</td><td>Removes <code>access_token</code> from <code>localStorage</code>, resets Zustand store</td></tr>
+    <tr><td>HTTP Attachment</td><td><code>Authorization: Bearer &lt;token&gt;</code> header on every API request (via <code>api.ts</code>)</td></tr>
+    <tr><td>Server Verification</td><td><code>jwt.verify()</code> with HS256 + <code>JWT_SECRET</code> (&ge; 32 chars)</td></tr>
+    <tr><td>Admin Expiry</td><td>2 hours (enforced both by <code>exp</code> claim and manual <code>iat</code> check)</td></tr>
+    <tr><td>Non-Admin Expiry</td><td>7 days</td></tr>
+  </table>
+</div>
+
+<!-- ============================== -->
+<h2>7. File Reference Map</h2>
+<!-- ============================== -->
+
+<table>
+  <tr><th>File</th><th>Purpose</th></tr>
+  <tr><td><code class="file">client/src/pages/auth/LoginPage.tsx</code></td><td>Login page UI component</td></tr>
+  <tr><td><code class="file">client/src/pages/auth/RegisterPage.tsx</code></td><td>Registration page (3-step with Turnstile + OTP)</td></tr>
+  <tr><td><code class="file">client/src/pages/auth/ForgotPasswordPage.tsx</code></td><td>Password reset page (3-step with Turnstile + OTP)</td></tr>
+  <tr><td><code class="file">client/src/store/authStore.ts</code></td><td>Zustand auth state management</td></tr>
+  <tr><td><code class="file">client/src/utils/validation.ts</code></td><td>Client Zod schemas (login, register, profile)</td></tr>
+  <tr><td><code class="file">client/src/services/api.ts</code></td><td>HTTP client with auto-attached Bearer token</td></tr>
+  <tr><td><code class="file">client/src/hooks/useAuth.ts</code></td><td>Auth initialization, cross-tab sync, session restore</td></tr>
+  <tr><td><code class="file">client/src/components/layout/AuthLayout.tsx</code></td><td>Auth page layout wrapper; redirects authenticated users</td></tr>
+  <tr><td><code class="file">server/src/routes/auth.ts</code></td><td>All auth endpoints (login, register, OTP, password)</td></tr>
+  <tr><td><code class="file">server/src/middleware/auth.ts</code></td><td>JWT verification + role authorization middleware</td></tr>
+  <tr><td><code class="file">server/src/middleware/validate.ts</code></td><td>Generic Zod validation middleware</td></tr>
+  <tr><td><code class="file">server/src/middleware/validationSchemas.ts</code></td><td>All server-side Zod schemas</td></tr>
+  <tr><td><code class="file">server/src/middleware/rateLimiter.ts</code></td><td>Rate limiting configs (api, auth, write)</td></tr>
+  <tr><td><code class="file">server/src/middleware/errorHandler.ts</code></td><td>Error handling + AppError class</td></tr>
+  <tr><td><code class="file">server/src/services/otpService.ts</code></td><td>OTP creation, verification, cooldown logic</td></tr>
+  <tr><td><code class="file">server/src/services/email.ts</code></td><td>Nodemailer SMTP email sender</td></tr>
+  <tr><td><code class="file">server/src/app.ts</code></td><td>Express app setup (CORS, Helmet, routes, rate limits)</td></tr>
+  <tr><td><code class="file">server/src/index.ts</code></td><td>Server entry; validates JWT_SECRET before boot</td></tr>
+  <tr><td><code class="file">server/src/types/index.ts</code></td><td>AuthPayload &amp; AuthenticatedRequest types</td></tr>
+</table>
+
+<!-- ============================== -->
+<h2>8. Security Observations &amp; Recommendations</h2>
+<!-- ============================== -->
+
+<div class="card">
+  <h3>Current Strengths</h3>
+  <ul>
+    <li><span class="tag tag-green">STRONG</span> bcrypt with 12 salt rounds for password hashing</li>
+    <li><span class="tag tag-green">STRONG</span> Generic error messages prevent user enumeration</li>
+    <li><span class="tag tag-green">STRONG</span> Dual-layer rate limiting (global + auth-specific)</li>
+    <li><span class="tag tag-green">STRONG</span> Admin tokens limited to 2-hour lifetime with server-side enforcement</li>
+    <li><span class="tag tag-green">STRONG</span> Zod strict mode on server rejects unknown fields</li>
+    <li><span class="tag tag-green">STRONG</span> JWT_SECRET validated at server startup (&ge; 32 chars)</li>
+    <li><span class="tag tag-green">STRONG</span> Helmet security headers applied globally</li>
+    <li><span class="tag tag-green">STRONG</span> CORS restricted to single origin</li>
+    <li><span class="tag tag-green">STRONG</span> OTP codes are bcrypt-hashed before storage</li>
+    <li><span class="tag tag-green">STRONG</span> OTP resend cooldown (30 seconds per email+purpose)</li>
+  </ul>
+
+  <h3>Areas for Improvement</h3>
+  <ul>
+    <li><span class="tag tag-orange">RECOMMENDATION</span> <strong>Add Cloudflare Turnstile to the login page</strong> &mdash; Currently only registration and forgot-password have bot protection. Login is the most targeted endpoint.</li>
+    <li><span class="tag tag-orange">RECOMMENDATION</span> <strong>Account lockout mechanism</strong> &mdash; After N consecutive failed login attempts, temporarily lock the account (not just IP-based rate limiting).</li>
+    <li><span class="tag tag-orange">RECOMMENDATION</span> <strong>Login attempt logging/audit trail</strong> &mdash; Record failed login attempts for security monitoring.</li>
+    <li><span class="tag tag-orange">RECOMMENDATION</span> <strong>Password complexity requirements</strong> &mdash; Current minimum is 6 characters; consider requiring uppercase, lowercase, number, and special character.</li>
+    <li><span class="tag tag-blue">INFO</span> The "Remember Me" checkbox always stores in <code>localStorage</code> regardless of the checkbox state. The <code>persist</code> parameter is accepted but not differentiated.</li>
+    <li><span class="tag tag-blue">INFO</span> The login email input uses <code>type="text"</code> instead of <code>type="email"</code>, which means no built-in browser email validation.</li>
+  </ul>
+</div>
+
+<!-- ============================== -->
+<h2>9. Environment Variables</h2>
+<!-- ============================== -->
+
+<div class="card">
+  <table>
+    <tr><th>Variable</th><th>Used By</th><th>Purpose</th></tr>
+    <tr><td><code>VITE_SUPABASE_URL</code></td><td>Client</td><td>Supabase project URL</td></tr>
+    <tr><td><code>VITE_SUPABASE_ANON_KEY</code></td><td>Client</td><td>Supabase anonymous (public) API key</td></tr>
+    <tr><td><code>SUPABASE_URL</code></td><td>Server</td><td>Supabase project URL</td></tr>
+    <tr><td><code>SUPABASE_SERVICE_KEY</code></td><td>Server</td><td>Supabase service role key (bypasses RLS)</td></tr>
+    <tr><td><code>JWT_SECRET</code></td><td>Server</td><td>HMAC signing key for JWT tokens (&ge; 32 chars)</td></tr>
+    <tr><td><code>JWT_EXPIRES_IN</code></td><td>Server</td><td>Default token expiry (set in .env but overridden by role-based logic)</td></tr>
+    <tr><td><code>SMTP_USER</code></td><td>Server</td><td>Gmail SMTP username for OTP emails</td></tr>
+    <tr><td><code>SMTP_PASS</code></td><td>Server</td><td>Gmail SMTP app password</td></tr>
+    <tr><td><code>TURNSTILE_SECRET_KEY</code></td><td>Server</td><td>Cloudflare Turnstile secret for captcha verification</td></tr>
+    <tr><td><code>CLIENT_URL</code></td><td>Server</td><td>Allowed CORS origin (client URL)</td></tr>
+    <tr><td><code>PORT</code></td><td>Server</td><td>Express server port (default: 5000)</td></tr>
+    <tr><td><code>NODE_ENV</code></td><td>Server</td><td>Environment mode (development/production)</td></tr>
+  </table>
+</div>
+
+<!-- ============================== -->
+<h2>10. User Roles</h2>
+<!-- ============================== -->
+
+<div class="card">
+  <table>
+    <tr><th>Role</th><th>Token Expiry</th><th>Admin Panel Access</th><th>Default on Registration</th></tr>
+    <tr><td><code>admin</code></td><td>2 hours</td><td>Yes (<code>/admin</code>)</td><td>No</td></tr>
+    <tr><td><code>staff</code></td><td>7 days</td><td>No</td><td>No</td></tr>
+    <tr><td><code>alumni</code></td><td>7 days</td><td>No</td><td>Yes (default)</td></tr>
+  </table>
+</div>
+
+<p style="text-align:center;color:var(--muted);margin-top:3rem;font-size:.82rem;">End of Document</p>
+
+</div>
+</body>
+</html>
