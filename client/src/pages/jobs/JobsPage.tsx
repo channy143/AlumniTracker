@@ -642,8 +642,8 @@ function JobDetailView({
           </div>
         )}
 
-        {/* Application Action Banner with Skeleton Loading */}
-        {loadingApplication ? (
+        {/* Application Action Banner (only shown if not yet applied) */}
+        {loadingApplication && !application ? (
           <div className="bg-orange-50/70 border border-orange-100 rounded-lg px-3 py-2.5 mb-4 animate-pulse">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -653,15 +653,7 @@ function JobDetailView({
               <div className="h-7 w-28 bg-orange-200/80 rounded-lg" />
             </div>
           </div>
-        ) : application ? (
-          <div className="flex items-center justify-between gap-3 flex-wrap bg-orange-50 border border-orange-100 rounded-lg px-3 py-2.5 mb-4">
-            <div className="flex items-center gap-2 text-xs">
-              <CheckCircleIcon className="w-4 h-4 text-emerald-600" />
-              <span className="font-medium text-gray-700">Application submitted</span>
-              <StatusBadge status={application.status || (application.is_screened ? 'screened' : 'pending')} />
-            </div>
-          </div>
-        ) : (
+        ) : !application ? (
           <div className="flex items-center justify-between gap-3 flex-wrap bg-orange-50 border border-orange-100 rounded-lg px-3 py-2.5 mb-4">
             <p className="text-xs text-gray-600">Ready to take the next step?</p>
             {onApply && (
@@ -673,7 +665,7 @@ function JobDetailView({
               </button>
             )}
           </div>
-        )}
+        ) : null}
 
         {/* Stepper Skeleton while checking application status */}
         {loadingApplication && (
