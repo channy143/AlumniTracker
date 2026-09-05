@@ -75,7 +75,6 @@ function isJobMatch(app: any, job: any): boolean {
     app.job_posting_id,
     app.jobId,
     app.jobPostingId,
-    app.id,
   ].filter(Boolean).map((id) => String(id).trim());
 
   return candidateIds.includes(targetId);

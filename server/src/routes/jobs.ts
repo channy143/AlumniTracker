@@ -104,7 +104,7 @@ router.get('/my-applications', authenticate, async (req: AuthenticatedRequest, r
     const db = createUserScopedClient(req.token!);
     const { data: applications, error } = await db
       .from('job_applications')
-      .select('id, job_id, status, applied_at, resume_url, cover_letter, match_percentage, matched_skills, missing_skills, screening_notes, is_screened, screened_at, job:job_postings(id, company_name, position, location, job_type, salary_range, is_alumni_exclusive, expires_at, is_remote, required_skills, experience_level)')
+      .select('id, job_id, status, applied_at, resume_url, cover_letter, match_percentage, matched_skills, missing_skills, screening_notes, is_screened, job:job_postings(id, company_name, position, location, job_type, salary_range, is_alumni_exclusive, expires_at, is_remote, required_skills, experience_level)')
       .eq('user_id', req.user!.userId)
       .order('applied_at', { ascending: false });
 
@@ -124,10 +124,14 @@ router.get('/my-applications', authenticate, async (req: AuthenticatedRequest, r
       });
     }
 
-    const enriched = (applications || []).map((a: any) => ({
-      ...a,
-      screening: screeningMap.get(a.id) || null,
-    }));
+    const enriched = (applications || []).map((a: any) => {
+      const sc = screeningMap.get(a.id) || null;
+      return {
+        ...a,
+        screened_at: sc?.screened_at || null,
+        screening: sc,
+      };
+    });
 
     res.json(enriched);
   } catch (err) {
