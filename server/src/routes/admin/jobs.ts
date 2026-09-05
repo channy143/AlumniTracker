@@ -324,6 +324,109 @@ router.get('/:id/applicants', async (req: AuthenticatedRequest, res, next) => {
   } catch (err) { next(err); }
 });
 
+async function syncHiredApplicationToEmployment(applicationId: string) {
+  try {
+    const { data: application, error: appError } = await supabase
+      .from('job_applications')
+      .select('id, job_id, user_id, status')
+      .eq('id', applicationId)
+      .maybeSingle();
+    if (appError || !application) return;
+
+    const { data: job, error: jobError } = await supabase
+      .from('job_postings')
+      .select('id, position, company_name, industry, job_type, salary_range')
+      .eq('id', application.job_id)
+      .maybeSingle();
+    if (jobError || !job) return;
+
+    // Get applicant profile
+    const { data: profile, error: profError } = await supabase
+      .from('profiles')
+      .select('id, current_job_title, company_name, industry, employment_status')
+      .eq('user_id', application.user_id)
+      .maybeSingle();
+    if (profError || !profile) return;
+
+    // Check if an employment record already exists for this profile + position + company
+    const { data: existingEmployment } = await supabase
+      .from('employment')
+      .select('id')
+      .eq('profile_id', profile.id)
+      .ilike('company_name', job.company_name)
+      .ilike('position', job.position)
+      .maybeSingle();
+
+    if (!existingEmployment) {
+      // Mark any prior current employment as not current
+      await supabase
+        .from('employment')
+        .update({ is_current: false })
+        .eq('profile_id', profile.id)
+        .eq('is_current', true);
+
+      // Insert new current employment
+      await supabase.from('employment').insert({
+        profile_id: profile.id,
+        company_name: job.company_name,
+        position: job.position,
+        company_industry: job.industry || null,
+        employment_status: 'employed',
+        is_current: true,
+        start_date: new Date().toISOString().split('T')[0],
+        salary_range: job.salary_range || null,
+        job_type: job.job_type || 'full-time',
+      });
+    }
+
+    // Update profiles table
+    await supabase
+      .from('profiles')
+      .update({
+        current_job_title: job.position,
+        company_name: job.company_name,
+        industry: job.industry || profile.industry || null,
+        employment_status: 'Employed',
+      })
+      .eq('id', profile.id);
+
+    // Ensure company exists in companies table
+    if (job.company_name) {
+      const { data: existingCompany } = await supabase
+        .from('companies')
+        .select('id, industry')
+        .ilike('name', job.company_name)
+        .maybeSingle();
+
+      if (!existingCompany) {
+        await supabase.from('companies').insert({
+          name: job.company_name,
+          industry: job.industry || 'Technology',
+          is_verified: true,
+        });
+      } else if (!existingCompany.industry && job.industry) {
+        await supabase
+          .from('companies')
+          .update({ industry: job.industry })
+          .eq('id', existingCompany.id);
+      }
+    }
+
+    // Notify the alumnus
+    try {
+      await supabase.from('notifications').insert({
+        user_id: application.user_id,
+        title: 'Hired for ' + job.position + '!',
+        message: `Congratulations! You have been marked as hired for ${job.position} at ${job.company_name}. Your profile and employment history have been automatically updated.`,
+        type: 'job',
+        is_read: false,
+      });
+    } catch {}
+  } catch (err) {
+    console.error('Failed to sync hired application to employment:', err);
+  }
+}
+
 router.put('/applications/:applicationId/status', validate(applicationStatusSchema), async (req, res, next) => {
   try {
     const { status } = req.body;
@@ -335,6 +438,11 @@ router.put('/applications/:applicationId/status', validate(applicationStatusSche
       .update({ status })
       .eq('id', req.params.applicationId);
     if (error) throw new AppError(error.message, 500);
+
+    if (status === 'hired' || status === 'accepted') {
+      await syncHiredApplicationToEmployment(req.params.applicationId);
+    }
+
     res.json({ message: 'Application status updated', status });
   } catch (err) { next(err); }
 });
@@ -392,6 +500,10 @@ router.put('/applications/:applicationId/screen', validate(screenApplicationSche
       throw new AppError('Screening columns not available. Run the screening migration first.', 500);
     }
     if (error) throw new AppError(error.message, 500);
+
+    if (status === 'hired' || status === 'accepted') {
+      await syncHiredApplicationToEmployment(req.params.applicationId);
+    }
 
     try {
       await supabase.from('application_screening').insert({

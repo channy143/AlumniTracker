@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon, BriefcaseIcon, BuildingOfficeIcon, UserGroupIcon, CurrencyDollarIcon, MapPinIcon, AcademicCapIcon, ClockIcon, TagIcon } from '@heroicons/react/24/outline';
 import { careerTrendsApi } from '@/services/api';
 import type { RankCard } from './CareerLeaderboardNav';
@@ -36,8 +37,9 @@ export default function CareerCardInsightsPanel({ card, onBack }: {
   card: RankCard;
   onBack: () => void;
 }) {
+  const navigate = useNavigate();
   const meta = KIND_META[card.kind] || { label: 'Details', type: 'position' };
-  const [data, setData] = useState<any>({ alumni: [], summary: {} });
+  const [data, setData] = useState<any>({ alumni: [], summary: {}, activeJobs: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -58,15 +60,30 @@ export default function CareerCardInsightsPanel({ card, onBack }: {
   if (card.kind === 'employer') {
     statCards.push({ label: 'Positions', value: summary.positions ?? 0 });
     statCards.push({ label: 'Industries', value: summary.industries ?? 0 });
-    statCards.push({ label: 'Salary Share', value: `${summary.salaryShare ?? 0}%` });
+    if (summary.activeJobsCount) {
+      statCards.push({ label: 'Active Jobs', value: summary.activeJobsCount });
+    } else {
+      statCards.push({ label: 'Salary Share', value: `${summary.salaryShare ?? 0}%` });
+    }
   } else if (card.kind === 'industry') {
     statCards.push({ label: 'Companies', value: summary.companies ?? 0 });
     statCards.push({ label: 'Positions', value: summary.positions ?? 0 });
-    statCards.push({ label: 'Salary Share', value: `${summary.salaryShare ?? 0}%` });
+    if (summary.activeJobsCount) {
+      statCards.push({ label: 'Active Jobs', value: summary.activeJobsCount });
+    } else {
+      statCards.push({ label: 'Salary Share', value: `${summary.salaryShare ?? 0}%` });
+    }
   } else {
     statCards.push({ label: 'Companies', value: summary.companies ?? 0 });
     statCards.push({ label: 'Industries', value: summary.industries ?? 0 });
-    statCards.push({ label: 'Salary Share', value: `${summary.salaryShare ?? 0}%` });
+    if (summary.activeJobsCount) {
+      statCards.push({ label: 'Active Jobs', value: summary.activeJobsCount });
+    } else {
+      statCards.push({ label: 'Salary Share', value: `${summary.salaryShare ?? 0}%` });
+    }
+  }
+  if (summary.hiredThroughPortalCount > 0) {
+    statCards.push({ label: 'Portal Hires', value: summary.hiredThroughPortalCount });
   }
 
   return (
@@ -141,6 +158,44 @@ export default function CareerCardInsightsPanel({ card, onBack }: {
               ))}
             </div>
 
+            {/* Active Job Openings for this employer, career, or industry */}
+            {data.activeJobs && data.activeJobs.length > 0 && (
+              <div className="mb-4 bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3.5">
+                <div className="flex items-center justify-between gap-2 mb-2.5">
+                  <h4 className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                    <BriefcaseIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Active Job Openings ({data.activeJobs.length})</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/jobs?filter=${encodeURIComponent(card.name)}`)}
+                    className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                  >
+                    View in Job Postings &rarr;
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {data.activeJobs.map((job: any) => (
+                    <div key={job.id} className="bg-white border border-emerald-100 rounded-lg p-2.5 flex items-center justify-between gap-3 shadow-2xs">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-900 truncate">{job.position}</p>
+                        <p className="text-[11px] text-gray-500 truncate">
+                          {job.company_name} {job.location ? `• ${job.location}` : ''} {job.salary_range ? `• ₱${job.salary_range}` : ''}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/jobs?filter=${encodeURIComponent(job.position)}`)}
+                        className="px-2.5 py-1 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md shrink-0 transition-colors shadow-2xs cursor-pointer"
+                      >
+                        Apply Now
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {data.alumni.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-8">No alumni found for "{card.name}".</p>
             ) : (
@@ -167,9 +222,17 @@ export default function CareerCardInsightsPanel({ card, onBack }: {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <p className="font-bold text-gray-900 text-sm truncate leading-snug">{a.name}</p>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 border ${statusColor(a.employmentStatus)}`}>
-                              {a.employmentStatus}
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                              {a.hiredViaJob && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                  Hired via Portal
+                                </span>
+                              )}
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 border ${statusColor(a.employmentStatus)}`}>
+                                {a.employmentStatus}
+                              </span>
+                            </div>
                           </div>
 
                           {/* Position & Company */}

@@ -21,6 +21,8 @@ export interface RankCard {
   topEmployer?: string | null;
   experience?: string | null;
   percentage?: number;
+  activeJobsCount?: number;
+  hiredViaJobsCount?: number;
   details?: { label: string; value: string }[];
 }
 
@@ -156,19 +158,25 @@ export default function CareerLeaderboardNav({
     const career = lookupEmployerCareer(e.name, topCareers);
     const pct = Math.round((e.alumniCount / maxEmployerCount) * 100);
     const sharePct = totalEmployed > 0 ? Math.round((e.alumniCount / totalEmployed) * 100) : 0;
+    const activeJobs = e.activeJobsCount || 0;
+    const hiredCount = e.hiredViaJobsCount || 0;
+
     return {
       rank: i + 1,
       name: e.name,
       count: e.alumniCount,
       metric: `${e.alumniCount}`,
-      metricLabel: 'alumni',
+      metricLabel: activeJobs > 0 ? `${e.alumniCount} alumni • ${activeJobs} open job${activeJobs > 1 ? 's' : ''}` : 'alumni',
       kind: 'employer' as const,
       industry: ind || 'General',
       percentage: pct,
+      activeJobsCount: activeJobs,
+      hiredViaJobsCount: hiredCount,
       details: [
         { label: 'Industry', value: ind || 'General' },
         { label: 'Top Career', value: career?.position || 'Various' },
-        ...(career?.averageExperienceYears ? [{ label: 'Avg Experience', value: formatExperience(career.averageExperienceYears) }] : []),
+        ...(activeJobs > 0 ? [{ label: 'Active Jobs', value: `${activeJobs} open role${activeJobs > 1 ? 's' : ''}` }] : []),
+        ...(hiredCount > 0 ? [{ label: 'Hired via Portal', value: `${hiredCount} alumni` }] : []),
         { label: 'Workforce Share', value: `${sharePct}% of employed` },
       ],
     };
@@ -182,20 +190,26 @@ export default function CareerLeaderboardNav({
     const topInd = c.topIndustries?.[0]?.name || null;
     const pct = Math.round((c.alumniCount / maxCareerCount) * 100);
     const sharePct = totalEmployed > 0 ? Math.round((c.alumniCount / totalEmployed) * 100) : 0;
+    const activeJobs = c.activeJobsCount || 0;
+    const hiredCount = c.hiredViaJobsCount || 0;
+
     return {
       rank: i + 1,
       name: c.position,
       count: c.alumniCount,
       metric: `${c.alumniCount}`,
-      metricLabel: 'alumni',
+      metricLabel: activeJobs > 0 ? `${c.alumniCount} alumni • ${activeJobs} open job${activeJobs > 1 ? 's' : ''}` : 'alumni',
       kind: 'career' as const,
       topEmployer: topEmp,
       experience: exp,
       industry: topInd,
       percentage: pct,
+      activeJobsCount: activeJobs,
+      hiredViaJobsCount: hiredCount,
       details: [
         { label: 'Top Employer', value: topEmp || 'Various' },
-        ...(c.averageExperienceYears ? [{ label: 'Avg Experience', value: formatExperience(c.averageExperienceYears) }] : []),
+        ...(activeJobs > 0 ? [{ label: 'Active Jobs', value: `${activeJobs} open role${activeJobs > 1 ? 's' : ''}` }] : []),
+        ...(hiredCount > 0 ? [{ label: 'Hired via Portal', value: `${hiredCount} alumni` }] : []),
         { label: 'Industry', value: topInd || 'General' },
         { label: 'Workforce Share', value: `${sharePct}% of employed` },
       ],
@@ -203,21 +217,28 @@ export default function CareerLeaderboardNav({
   });
 
   // 3. Industries & Status Card Data
-  const industryCards: RankCard[] = industries.slice(0, 8).map((ind, i) => ({
-    rank: i + 1,
-    name: ind.name,
-    count: ind.alumniCount,
-    percentage: ind.percentage,
-    metric: `${ind.percentage}%`,
-    metricLabel: `${ind.alumniCount} alumni`,
-    kind: 'industry' as const,
-    details: [
-      { label: 'Industry Sector', value: ind.name },
-      { label: 'Alumni Share', value: `${ind.percentage}%` },
-      { label: 'Ranking', value: `#${i + 1} of ${industries.length}` },
-      { label: 'Category', value: 'Industry' },
-    ],
-  }));
+  const industryCards: RankCard[] = industries.slice(0, 8).map((ind, i) => {
+    const activeJobs = ind.activeJobsCount || 0;
+    const hiredCount = ind.hiredViaJobsCount || 0;
+    return {
+      rank: i + 1,
+      name: ind.name,
+      count: ind.alumniCount,
+      percentage: ind.percentage,
+      metric: `${ind.percentage}%`,
+      metricLabel: activeJobs > 0 ? `${ind.alumniCount} alumni • ${activeJobs} open job${activeJobs > 1 ? 's' : ''}` : `${ind.alumniCount} alumni`,
+      kind: 'industry' as const,
+      activeJobsCount: activeJobs,
+      hiredViaJobsCount: hiredCount,
+      details: [
+        { label: 'Industry Sector', value: ind.name },
+        { label: 'Alumni Share', value: `${ind.percentage}%` },
+        ...(activeJobs > 0 ? [{ label: 'Active Jobs', value: `${activeJobs} open role${activeJobs > 1 ? 's' : ''}` }] : []),
+        ...(hiredCount > 0 ? [{ label: 'Hired via Portal', value: `${hiredCount} alumni` }] : []),
+        { label: 'Ranking', value: `#${i + 1} of ${industries.length}` },
+      ],
+    };
+  });
 
   const statusCards: RankCard[] = statuses.map((s, i) => ({
     rank: i + 1,

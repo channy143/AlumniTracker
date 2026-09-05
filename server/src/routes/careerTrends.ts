@@ -8,12 +8,14 @@ router.get('/', authenticate, async (req, res, next) => {
   try {
     const course = req.query.course as string;
 
-    const [employmentRes, educationRes, skillsRes, profilesRes, usersRes] = await Promise.all([
+    const [employmentRes, educationRes, skillsRes, profilesRes, usersRes, jobPostingsRes, jobApplicationsRes] = await Promise.all([
       supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, start_date, end_date, is_current, salary_range, job_type').order('start_date', { ascending: false }),
       supabase.from('education').select('profile_id, program, year_graduated, major'),
       supabase.from('skills').select('profile_id, name, category, proficiency_level'),
-      supabase.from('profiles').select('id, current_job_title, company_name, industry, employment_status, city, province'),
+      supabase.from('profiles').select('id, user_id, current_job_title, company_name, industry, employment_status, city, province'),
       supabase.from('users').select('id, created_at').eq('role', 'alumni'),
+      supabase.from('job_postings').select('id, position, company_name, industry, location, is_remote, salary_range, job_type, expires_at'),
+      supabase.from('job_applications').select('id, job_id, user_id, status, applied_at').in('status', ['hired', 'accepted']),
     ]);
 
     const employment = employmentRes.data || [];
@@ -21,6 +23,14 @@ router.get('/', authenticate, async (req, res, next) => {
     const skills = skillsRes.data || [];
     const profiles = profilesRes.data || [];
     const users = usersRes.data || [];
+    const allJobPostings = jobPostingsRes.data || [];
+    const jobPostMap = new Map(allJobPostings.map((j: any) => [j.id, j]));
+    const nowIso = new Date().toISOString();
+    const activeJobs = allJobPostings.filter((j: any) => !j.expires_at || j.expires_at >= nowIso);
+    const hiredApplications = (jobApplicationsRes.data || []).map((app: any) => ({
+      ...app,
+      job: jobPostMap.get(app.job_id) || null,
+    }));
 
     const registeredThisYear = users.filter((u: any) => {
       if (!u.created_at) return false;
@@ -61,6 +71,7 @@ router.get('/', authenticate, async (req, res, next) => {
     });
 
     const profileMap = new Map(profilesFiltered.map((p: any) => [p.id, p]));
+    const userToProfileMap = new Map(profilesFiltered.filter((p: any) => p.user_id).map((p: any) => [p.user_id, p]));
 
     const employedProfiles = profilesFiltered.filter((p: any) => p.employment_status && p.employment_status !== 'Unemployed');
     const profileEmployment = employedProfiles.map((p: any) => ({
@@ -82,7 +93,52 @@ router.get('/', authenticate, async (req, res, next) => {
       ...profileEmployment.filter((p: any) => !employedIds.has(p.profile_id)),
     ];
 
-    const currentJobs = mergedEmployment.filter((e: any) => e.is_current);
+    // Automatically incorporate hired applications into employment records
+    const hiredCareerCount = new Map<string, number>();
+    const hiredEmployerCount = new Map<string, number>();
+    const hiredIndustryCount = new Map<string, number>();
+
+    const hiredEmploymentFallback: any[] = [];
+    const existingEmploymentKeys = new Set(
+      mergedEmployment.map((e: any) => `${e.profile_id}__${(e.position || '').toLowerCase()}__${(e.company_name || '').toLowerCase()}`)
+    );
+
+    hiredApplications.forEach((app: any) => {
+      const job = app.job;
+      if (!job) return;
+
+      const normPos = (job.position || '').trim().toLowerCase();
+      const normEmp = (job.company_name || '').trim().toLowerCase();
+      const normInd = (job.industry || '').trim().toLowerCase();
+
+      if (normPos) hiredCareerCount.set(normPos, (hiredCareerCount.get(normPos) || 0) + 1);
+      if (normEmp && normEmp !== 'unknown') hiredEmployerCount.set(normEmp, (hiredEmployerCount.get(normEmp) || 0) + 1);
+      if (normInd && normInd !== 'unknown') hiredIndustryCount.set(normInd, (hiredIndustryCount.get(normInd) || 0) + 1);
+
+      const prof = userToProfileMap.get(app.user_id);
+      if (prof) {
+        const key = `${prof.id}__${normPos}__${normEmp}`;
+        if (!existingEmploymentKeys.has(key)) {
+          existingEmploymentKeys.add(key);
+          hiredEmploymentFallback.push({
+            profile_id: prof.id,
+            company_name: job.company_name || null,
+            position: job.position || null,
+            company_industry: job.industry || null,
+            employment_status: 'employed',
+            is_current: true,
+            start_date: app.applied_at || null,
+            end_date: null,
+            salary_range: job.salary_range || null,
+            job_type: job.job_type || null,
+            hired_via_job: true,
+          });
+        }
+      }
+    });
+
+    const fullEmployment = [...mergedEmployment, ...hiredEmploymentFallback];
+    const currentJobs = fullEmployment.filter((e: any) => e.is_current);
     const totalEmployed = currentJobs.length;
     const employmentRate = totalAlumni > 0 ? Math.round((totalEmployed / totalAlumni) * 100) : 0;
 
@@ -183,6 +239,14 @@ router.get('/', authenticate, async (req, res, next) => {
         const avgYears = Math.round((avgMonths / 12) * 100) / 100;
         const alumniCount = data.alumni.size;
 
+        const normPos = position.trim().toLowerCase();
+        const matchingActiveJobs = activeJobs.filter((j: any) => {
+          if (!j.position) return false;
+          const jp = j.position.trim().toLowerCase();
+          return jp === normPos || jp.includes(normPos) || normPos.includes(jp);
+        });
+        const hiredCount = hiredCareerCount.get(normPos) || 0;
+
         return {
           position,
           alumniCount,
@@ -196,6 +260,17 @@ router.get('/', authenticate, async (req, res, next) => {
           employmentStatuses: [...(careerEmploymentStatuses.get(position) || [])],
           locations: [...(careerLocations.get(position) || [])],
           batches: [...(careerBatches.get(position) || [])].sort((a, b) => b - a),
+          activeJobsCount: matchingActiveJobs.length,
+          activeJobPostings: matchingActiveJobs.slice(0, 5).map((j: any) => ({
+            id: j.id,
+            position: j.position,
+            company_name: j.company_name,
+            location: j.location,
+            is_remote: j.is_remote,
+            salary_range: j.salary_range,
+            job_type: j.job_type,
+          })),
+          hiredViaJobsCount: hiredCount,
         };
       })
       .sort((a, b) => b.alumniCount - a.alumniCount);
@@ -217,7 +292,16 @@ router.get('/', authenticate, async (req, res, next) => {
       .map(([name, alumni]) => {
         const indMap = employerIndustryMap.get(name);
         const topInd = indMap ? Array.from(indMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] : null;
-        return { name, alumniCount: alumni.size, industry: topInd || null };
+        const normName = name.trim().toLowerCase();
+        const empActiveJobs = activeJobs.filter((j: any) => (j.company_name || '').trim().toLowerCase() === normName);
+        const hiredCount = hiredEmployerCount.get(normName) || 0;
+        return {
+          name,
+          alumniCount: alumni.size,
+          industry: topInd || null,
+          activeJobsCount: empActiveJobs.length,
+          hiredViaJobsCount: hiredCount,
+        };
       })
       .sort((a, b) => b.alumniCount - a.alumniCount);
 
@@ -232,17 +316,29 @@ router.get('/', authenticate, async (req, res, next) => {
     });
     const totalEmployedCount = currentJobs.length;
     const topIndustries = Array.from(industryMap.entries())
-      .map(([name, alumni]) => ({
-        name,
-        alumniCount: alumni.size,
-        percentage: totalEmployedCount > 0 ? Math.round((alumni.size / totalEmployedCount) * 100) : 0,
-      }))
+      .map(([name, alumni]) => {
+        const normInd = name.trim().toLowerCase();
+        const indActiveJobs = activeJobs.filter((j: any) => {
+          const ji = (j.industry || '').trim().toLowerCase();
+          return ji === normInd || ji.includes(normInd) || normInd.includes(ji);
+        });
+        const hiredCount = hiredIndustryCount.get(normInd) || 0;
+        return {
+          name,
+          alumniCount: alumni.size,
+          percentage: totalEmployedCount > 0 ? Math.round((alumni.size / totalEmployedCount) * 100) : 0,
+          activeJobsCount: indActiveJobs.length,
+          hiredViaJobsCount: hiredCount,
+        };
+      })
       .sort((a, b) => b.alumniCount - a.alumniCount);
 
     const industryDistribution = topIndustries.slice(0, 10).map((ind) => ({
       name: ind.name,
       value: ind.alumniCount,
       percentage: ind.percentage,
+      activeJobsCount: ind.activeJobsCount,
+      hiredViaJobsCount: ind.hiredViaJobsCount,
     }));
 
     const skillCount = new Map<string, number>();
@@ -291,7 +387,7 @@ router.get('/', authenticate, async (req, res, next) => {
 
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    const recentJobs = mergedEmployment.filter((e: any) => e.start_date && new Date(e.start_date) >= threeMonthsAgo);
+    const recentJobs = fullEmployment.filter((e: any) => e.start_date && new Date(e.start_date) >= threeMonthsAgo);
     const recentCareers = new Map<string, number>();
     recentJobs.forEach((j: any) => {
       if (j.position) recentCareers.set(j.position, (recentCareers.get(j.position) || 0) + 1);
@@ -303,7 +399,7 @@ router.get('/', authenticate, async (req, res, next) => {
 
     // === OVERALL AVERAGE EXPERIENCE ===
     const allExperienceMonths: number[] = [];
-    mergedEmployment.forEach((e: any) => {
+    fullEmployment.forEach((e: any) => {
       if (e.start_date) {
         const end = e.end_date ? new Date(e.end_date) : new Date();
         const start = new Date(e.start_date);
@@ -321,7 +417,7 @@ router.get('/', authenticate, async (req, res, next) => {
 
     const distinctBatches = [...new Set(educationFiltered.map((e: any) => e.year_graduated).filter(Boolean))].sort((a: any, b: any) => b - a);
     const distinctLocations = [...new Set(profilesFiltered.map((p: any) => [p.city, p.province].filter(Boolean).join(', ')).filter(Boolean))].sort();
-    const distinctJobTypes = [...new Set(employmentFiltered.map((e: any) => e.job_type).filter(Boolean))];
+    const distinctJobTypes = [...new Set(fullEmployment.map((e: any) => e.job_type).filter(Boolean))];
     const programs = [...new Set(educationFiltered.map((e: any) => e.program).filter(Boolean))].sort();
 
     res.json({
@@ -337,6 +433,8 @@ router.get('/', authenticate, async (req, res, next) => {
         topEmployer: topEmployers[0]?.name || 'N/A',
         topSkill: topSkills[0]?.name || 'N/A',
         averageExperienceYears: avgOverallExperience,
+        totalActiveJobs: activeJobs.length,
+        totalHiredThroughJobs: hiredApplications.length,
       },
       topCareers: topCareers.slice(0, 20),
       topEmployers: topEmployers.slice(0, 15),
@@ -362,21 +460,33 @@ router.get('/alumni', authenticate, async (req, res, next) => {
     const type = (req.query.type as string) || 'position';
     const value = decodeURIComponent((req.query.value as string) || '').trim();
 
-    if (!value) return res.json({ alumni: [], summary: {} });
+    if (!value) return res.json({ alumni: [], summary: {}, activeJobs: [] });
 
-    const [employmentRes, educationRes, skillsRes, profilesRes] = await Promise.all([
+    const [employmentRes, educationRes, skillsRes, profilesRes, jobPostingsRes, jobApplicationsRes] = await Promise.all([
       supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, start_date, end_date, is_current, salary_range, job_type'),
       supabase.from('education').select('profile_id, program, year_graduated, major'),
       supabase.from('skills').select('profile_id, name, category, proficiency_level'),
-      supabase.from('profiles').select('id, first_name, last_name, avatar_url, current_job_title, company_name, industry, employment_status, city, province'),
+      supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, current_job_title, company_name, industry, employment_status, city, province'),
+      supabase.from('job_postings').select('id, position, company_name, industry, location, is_remote, salary_range, job_type, expires_at'),
+      supabase.from('job_applications').select('id, job_id, user_id, status, applied_at').in('status', ['hired', 'accepted']),
     ]);
 
     const employment = employmentRes.data || [];
     const education = educationRes.data || [];
     const skills = skillsRes.data || [];
     const profiles = profilesRes.data || [];
+    const allJobs = jobPostingsRes.data || [];
+    const jobMap = new Map(allJobs.map((j: any) => [j.id, j]));
+    const nowIso = new Date().toISOString();
+    const activeJobs = allJobs.filter((j: any) => !j.expires_at || j.expires_at >= nowIso);
+    const hiredApps = (jobApplicationsRes.data || []).map((app: any) => ({
+      ...app,
+      job: jobMap.get(app.job_id) || null,
+    }));
+    const hiredUserIds = new Set(hiredApps.map((a: any) => a.user_id));
 
     const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
+    const userToProfileMap = new Map(profiles.filter((p: any) => p.user_id).map((p: any) => [p.user_id, p]));
     const eduMap = new Map<string, any[]>();
     education.forEach((e: any) => {
       if (!eduMap.has(e.profile_id)) eduMap.set(e.profile_id, []);
@@ -388,8 +498,6 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       skillMap.get(s.profile_id)!.push(s.name);
     });
 
-    // Mirror the sidebar's merged employment so counts line up exactly:
-    // employment rows + profile fallback for employed profiles without an employment row.
     const employedProfiles = profiles.filter((p: any) => p.employment_status && p.employment_status !== 'Unemployed');
     const profileEmployment = employedProfiles.map((p: any) => ({
       profile_id: p.id,
@@ -404,10 +512,41 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       job_type: null,
     }));
     const employedIds = new Set(employment.filter((e: any) => e.is_current).map((e: any) => e.profile_id));
-    const mergedEmployment = [
+    const mergedEmployment: any[] = [
       ...employment,
       ...profileEmployment.filter((p: any) => !employedIds.has(p.profile_id)),
     ];
+
+    // Merge hired applications
+    const existingKeys = new Set(
+      mergedEmployment.map((e: any) => `${e.profile_id}__${(e.position || '').toLowerCase()}__${(e.company_name || '').toLowerCase()}`)
+    );
+    hiredApps.forEach((app: any) => {
+      const job = app.job;
+      const prof = userToProfileMap.get(app.user_id);
+      if (prof && job) {
+        const normPos = (job.position || '').trim().toLowerCase();
+        const normComp = (job.company_name || '').trim().toLowerCase();
+        const key = `${prof.id}__${normPos}__${normComp}`;
+        if (!existingKeys.has(key)) {
+          existingKeys.add(key);
+          mergedEmployment.push({
+            profile_id: prof.id,
+            company_name: job.company_name || null,
+            position: job.position || null,
+            company_industry: job.industry || null,
+            employment_status: 'employed',
+            is_current: true,
+            start_date: app.applied_at || null,
+            end_date: null,
+            salary_range: job.salary_range || null,
+            job_type: job.job_type || null,
+            hired_via_job: true,
+          } as any);
+        }
+      }
+    });
+
     const currentJobs = mergedEmployment;
     const norm = (str: string) => str ? str.toLowerCase().replace(/\s*&\s*/g, ' and ').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim() : '';
 
@@ -467,6 +606,7 @@ router.get('/alumni', authenticate, async (req, res, next) => {
         program,
         batch: gradYear,
         skills: (skillMap.get(j.profile_id) || []).slice(0, 5),
+        hiredViaJob: !!j.hired_via_job || (p.user_id && hiredUserIds.has(p.user_id)),
       });
     });
 
@@ -475,6 +615,19 @@ router.get('/alumni', authenticate, async (req, res, next) => {
     const positions = new Set(alumni.map((a: any) => a.position).filter(Boolean));
     const salaries = alumni.filter((a: any) => a.salary).map((a: any) => a.salary);
     const withSalary = salaries.length;
+
+    // Filter matching active jobs based on filter type
+    const valNorm = value.toLowerCase();
+    const relevantActiveJobs = activeJobs.filter((job: any) => {
+      if (type === 'employer') {
+        return (job.company_name || '').toLowerCase().includes(valNorm);
+      } else if (type === 'industry') {
+        return (job.industry || '').toLowerCase().includes(valNorm);
+      } else if (type === 'position') {
+        return (job.position || '').toLowerCase().includes(valNorm);
+      }
+      return false;
+    });
 
     res.json({
       alumni,
@@ -485,7 +638,10 @@ router.get('/alumni', authenticate, async (req, res, next) => {
         positions: positions.size,
         withSalary,
         salaryShare: alumni.length > 0 ? Math.round((withSalary / alumni.length) * 100) : 0,
+        activeJobsCount: relevantActiveJobs.length,
+        hiredThroughPortalCount: alumni.filter((a: any) => a.hiredViaJob).length,
       },
+      activeJobs: relevantActiveJobs.slice(0, 6),
     });
   } catch (err) { next(err); }
 });
@@ -493,19 +649,23 @@ router.get('/alumni', authenticate, async (req, res, next) => {
 router.get('/:position', authenticate, async (req, res, next) => {
   try {
     const position = decodeURIComponent(req.params.position);
-    const { data: employment, error } = await supabase
-      .from('employment')
-      .select('*, profile:profiles!employment_profile_id_fkey(first_name, last_name, avatar_url, city, province, employment_status)')
-      .ilike('position', position);
+    const [employmentRes, allJobsRes, hiredAppsRes] = await Promise.all([
+      supabase
+        .from('employment')
+        .select('*, profile:profiles!employment_profile_id_fkey(id, user_id, first_name, last_name, avatar_url, city, province, employment_status)')
+        .ilike('position', position),
+      supabase.from('job_postings').select('*'),
+      supabase.from('job_applications').select('id, job_id, user_id, status, applied_at').in('status', ['hired', 'accepted']),
+    ]);
 
-    if (error) return res.json({ error: error.message });
+    if (employmentRes.error) return res.json({ error: employmentRes.error.message });
 
-    const jobs = employment || [];
+    const jobs = employmentRes.data || [];
     const profileIds = [...new Set(jobs.map((j: any) => j.profile_id))];
 
     const { data: profileFallback } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, company_name, industry, city, province, current_job_title, employment_status')
+      .select('id, user_id, first_name, last_name, company_name, industry, city, province, current_job_title, employment_status')
       .ilike('current_job_title', position);
 
     if (profileFallback) {
@@ -531,6 +691,55 @@ router.get('/:position', authenticate, async (req, res, next) => {
           });
         }
       }
+    }
+
+    // Link job postings & hired applications
+    const allJobs = allJobsRes.data || [];
+    const jobPostMap = new Map(allJobs.map((j: any) => [j.id, j]));
+    const nowIso = new Date().toISOString();
+    const activeJobs = allJobs.filter((j: any) => !j.expires_at || j.expires_at >= nowIso);
+    const posNorm = position.trim().toLowerCase();
+
+    // Check if any hired applications match this position
+    const hiredAppsForPos = (hiredAppsRes.data || []).filter((a: any) => {
+      const j = jobPostMap.get(a.job_id);
+      if (!j || !j.position) return false;
+      const jp = j.position.trim().toLowerCase();
+      return jp === posNorm || jp.includes(posNorm) || posNorm.includes(jp);
+    });
+
+    const hiredUserIds = new Set(hiredAppsForPos.map((a: any) => a.user_id));
+    if (hiredUserIds.size > 0) {
+      const { data: hiredProfiles } = await supabase
+        .from('profiles')
+        .select('id, user_id, first_name, last_name, avatar_url, city, province, current_job_title, company_name, industry, employment_status')
+        .in('user_id', Array.from(hiredUserIds));
+
+      (hiredProfiles || []).forEach((hp: any) => {
+        if (!profileIds.includes(hp.id)) {
+          profileIds.push(hp.id);
+          const app = hiredAppsForPos.find((a: any) => a.user_id === hp.user_id);
+          const j = app ? jobPostMap.get(app.job_id) : null;
+          jobs.push({
+            profile_id: hp.id,
+            company_name: j?.company_name || hp.company_name,
+            position: j?.position || hp.current_job_title || position,
+            company_industry: j?.industry || hp.industry,
+            is_current: true,
+            start_date: app?.applied_at || null,
+            end_date: null,
+            hired_via_job: true,
+            profile: {
+              first_name: hp.first_name,
+              last_name: hp.last_name,
+              avatar_url: hp.avatar_url || null,
+              city: hp.city,
+              province: hp.province,
+              employment_status: hp.employment_status || 'Employed',
+            },
+          });
+        }
+      });
     }
 
     const { data: education } = await supabase
@@ -599,6 +808,21 @@ router.get('/:position', authenticate, async (req, res, next) => {
       .sort((a, b) => b.count - a.count);
     const topIndustry = industryDistribution[0]?.name || null;
 
+    // Active job openings for this position & industry
+    const positionActiveJobs = activeJobs.filter((j: any) => {
+      if (!j.position) return false;
+      const jp = j.position.trim().toLowerCase();
+      return jp === posNorm || jp.includes(posNorm) || posNorm.includes(jp);
+    });
+    const industryActiveJobs = topIndustry ? activeJobs.filter((j: any) => {
+      if (!j.industry) return false;
+      const ji = j.industry.trim().toLowerCase();
+      const ti = topIndustry.trim().toLowerCase();
+      return (ji === ti || ji.includes(ti) || ti.includes(ji)) && !positionActiveJobs.some((pj: any) => pj.id === j.id);
+    }) : [];
+
+    const matchingActiveJobs = [...positionActiveJobs, ...industryActiveJobs];
+
     // === EMPLOYMENT TIMELINE ===
     const yearMap = new Map<number, number>();
     jobs.forEach((j: any) => {
@@ -628,7 +852,10 @@ router.get('/:position', authenticate, async (req, res, next) => {
     const experienceNote = avgYears > 0
       ? `The average reported experience is ${avgYears} years.`
       : '';
-    const careerOverview = `${position}s are among the most common careers of CTU-Naga alumni. Most alumni in this field work in the ${topIndustryName} industry, primarily at ${topEmployerName}. ${courseNote} ${experienceNote}`.trim();
+    const hiringNote = hiredAppsForPos.length > 0
+      ? ` ${hiredAppsForPos.length} alumni were directly hired into this role through CTU Naga Job Postings.`
+      : '';
+    const careerOverview = `${position}s are among the most common careers of CTU-Naga alumni. Most alumni in this field work in the ${topIndustryName} industry, primarily at ${topEmployerName}. ${courseNote} ${experienceNote}${hiringNote}`.trim();
 
     // === RELATED CAREERS ===
     const jobPositions = new Map<string, Set<string>>();
@@ -673,6 +900,7 @@ router.get('/:position', authenticate, async (req, res, next) => {
           batch: gradYear,
           employmentStatus: empStatus,
           avatar_url: j.profile?.avatar_url || null,
+          hiredViaJob: !!j.hired_via_job,
         };
       })
       .filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i)
@@ -693,6 +921,8 @@ router.get('/:position', authenticate, async (req, res, next) => {
       relatedCareers,
       suggestedSkills,
       recentAlumni: enrichedAlumni,
+      activeJobs: matchingActiveJobs.slice(0, 8),
+      hiredCount: hiredAppsForPos.length,
     });
   } catch (err) { next(err); }
 });

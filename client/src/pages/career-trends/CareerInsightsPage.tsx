@@ -78,7 +78,7 @@ export default function CareerInsightsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mt-3">
           <div className="bg-gray-50 rounded-lg p-2.5 text-center">
             <p className="text-sm font-bold text-gray-900">{data.alumniCount}</p>
             <p className="text-[10px] text-gray-500">Total Alumni</p>
@@ -95,16 +95,30 @@ export default function CareerInsightsPage() {
             <p className="text-sm font-bold text-gray-900 truncate" title={data.topIndustry || 'N/A'}>{data.topIndustry || 'N/A'}</p>
             <p className="text-[10px] text-gray-500">Top Industry</p>
           </div>
+          <div className="bg-emerald-50/80 border border-emerald-100 rounded-lg p-2.5 text-center">
+            <p className="text-sm font-bold text-emerald-700">{data.activeJobs?.length || 0}</p>
+            <p className="text-[10px] text-emerald-600 font-medium">Active Openings</p>
+          </div>
         </div>
       </div>
 
-      {/* Overview + Course */}
+      {/* Overview + Course + Hiring Connection */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <SparklesIcon className="w-4 h-4 text-orange-500" />
           Career Overview
         </h3>
         <p className="text-sm text-gray-700 leading-relaxed">{data.careerOverview}</p>
+        
+        {data.hiredCount > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-amber-900 bg-amber-50/70 px-3 py-2 rounded-lg border border-amber-200/60">
+            <SparklesIcon className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>{data.hiredCount} alumni</strong> were directly hired into this role through CTU Naga Job Postings, driving this career's growth in Career Trends!
+            </span>
+          </div>
+        )}
+
         {data.mostCommonCourse && (
           <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs">
             <AcademicCapIcon className="w-4 h-4 text-orange-500 shrink-0" />
@@ -113,6 +127,60 @@ export default function CareerInsightsPage() {
           </div>
         )}
       </div>
+
+      {/* Active Job Openings Section */}
+      {data.activeJobs && data.activeJobs.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+              <BriefcaseIcon className="w-4 h-4 text-emerald-600" />
+              Active Job Openings in this Field ({data.activeJobs.length})
+            </h3>
+            <button
+              onClick={() => navigate(`/jobs?filter=${encodeURIComponent(position || '')}`)}
+              className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              Browse in Job Postings &rarr;
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {data.activeJobs.map((job: any) => (
+              <div
+                key={job.id}
+                className="bg-gray-50/70 border border-gray-200/80 rounded-xl p-3.5 flex flex-col justify-between hover:border-orange-300 hover:bg-white transition-all shadow-2xs"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h4 className="text-sm font-bold text-gray-900 line-clamp-1">{job.position}</h4>
+                    {job.is_remote && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 shrink-0">
+                        Remote
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 font-medium truncate">{job.company_name}</p>
+                  <p className="text-[11px] text-gray-400 mt-1 truncate">
+                    {[job.location, job.salary_range ? `₱${job.salary_range}` : null, job.job_type].filter(Boolean).join(' • ')}
+                  </p>
+                </div>
+
+                <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                    Hiring Now
+                  </span>
+                  <button
+                    onClick={() => navigate(`/jobs?filter=${encodeURIComponent(job.position)}`)}
+                    className="px-3 py-1 text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors cursor-pointer"
+                  >
+                    Apply Now
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Where They Work: Top Employers & Alumni */}
       {(data.topEmployers?.length > 0 || data.recentAlumni?.length > 0) && (
@@ -162,12 +230,19 @@ export default function CareerInsightsPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="text-right shrink-0 text-xs leading-tight">
-                        {alumni.employmentStatus && (
-                          <span className="inline-block text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                            {alumni.employmentStatus}
-                          </span>
-                        )}
+                      <div className="text-right shrink-0 text-xs leading-tight flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-1 flex-wrap justify-end">
+                          {alumni.hiredViaJob && (
+                            <span className="inline-block text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/80">
+                              Hired via Portal
+                            </span>
+                          )}
+                          {alumni.employmentStatus && (
+                            <span className="inline-block text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                              {alumni.employmentStatus}
+                            </span>
+                          )}
+                        </div>
                         {alumni.batch && <p className="text-[11px] text-gray-400 mt-0.5">Batch {alumni.batch}</p>}
                       </div>
                     </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { jobsApi, profileApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
 import { SkeletonCard } from '@/components/ui/Skeleton';
@@ -1050,6 +1050,14 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
 }
 
 export default function JobsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlFilter = searchParams.get('filter') || searchParams.get('search') || searchParams.get('company') || searchParams.get('industry') || '';
+  const [queryFilter, setQueryFilter] = useState(urlFilter);
+
+  useEffect(() => {
+    if (urlFilter) setQueryFilter(urlFilter);
+  }, [urlFilter]);
+
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<any[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -1204,9 +1212,16 @@ export default function JobsPage() {
   const newThisWeek = jobs.filter((j: any) => new Date(j.created_at).getTime() > weekAgo).length;
 
   const filteredJobs = jobs.filter((job) => {
-    if (filter === 'all') return true;
-    if (filter === 'exclusive') return job.is_alumni_exclusive;
-    return job.job_type === filter;
+    if (filter === 'exclusive' && !job.is_alumni_exclusive) return false;
+    if (filter !== 'all' && filter !== 'exclusive' && job.job_type !== filter) return false;
+    if (queryFilter) {
+      const q = queryFilter.toLowerCase().trim();
+      const posMatch = (job.position || '').toLowerCase().includes(q);
+      const compMatch = (job.company_name || '').toLowerCase().includes(q);
+      const indMatch = (job.industry || '').toLowerCase().includes(q);
+      return posMatch || compMatch || indMatch;
+    }
+    return true;
   });
 
   const savedJobs = jobs.filter((job) => savedJobIds.has(job.id));
@@ -1306,6 +1321,32 @@ export default function JobsPage() {
               <p className="text-[11px] text-gray-500 mt-0.5">New This Week</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Active Filter from Career Trends */}
+      {queryFilter && activeTab === 'opportunities' && !selectedJob && (
+        <div className="flex items-center justify-between gap-2 mb-3 bg-orange-50 border border-orange-200 rounded-lg px-3.5 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <BriefcaseIcon className="w-4 h-4 text-orange-600 shrink-0" />
+            <span className="text-xs text-orange-800">
+              Showing opportunities matching <strong>"{queryFilter}"</strong> from Career Trends ({filteredJobs.length} found)
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setQueryFilter('');
+              const next = new URLSearchParams(searchParams);
+              next.delete('filter');
+              next.delete('search');
+              next.delete('company');
+              next.delete('industry');
+              setSearchParams(next, { replace: true });
+            }}
+            className="text-xs font-semibold text-orange-600 hover:text-orange-800 flex items-center gap-1 hover:underline cursor-pointer shrink-0"
+          >
+            Clear Filter <XMarkIcon className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
