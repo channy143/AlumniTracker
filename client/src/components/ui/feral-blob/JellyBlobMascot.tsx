@@ -354,8 +354,13 @@ const svgMotionStyle = {
 } as CSSProperties
 
 const centerMotionStyle = {
-  transformBox: 'fill-box',
-  transformOrigin: 'center',
+  // view-box pins the transform origin to the SVG coordinate system (not the element's own
+  // bounding box), so the origin never shifts as children animate. fill-box recomputes the
+  // bounding-box origin every frame — when children animate, the box shifts mid-frame,
+  // creating a feedback loop that makes eyes / cheeks visibly jitter.
+  // 450 360 = centre of the 900×720 viewBox; all face elements are designed to orbit this point.
+  transformBox: 'view-box',
+  transformOrigin: '450px 360px',
 } as CSSProperties
 
 const nodMotionStyle = {
