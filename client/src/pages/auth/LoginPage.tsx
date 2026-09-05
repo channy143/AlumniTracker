@@ -59,12 +59,11 @@ export default function LoginPage() {
     }
   };
 
-  const sendMfaCode = async (tokenOverride?: string) => {
-    const token = tokenOverride || mfaToken;
+  const sendMfaCode = async () => {
     setMfaSending(true);
     setError('');
     try {
-      await authApi.sendMfaCode(email, token);
+      await authApi.sendMfaCode(email, mfaToken);
       setCooldownSeconds(30);
     } catch (err: any) {
       setError(err.message || 'Failed to send verification code.');
@@ -135,7 +134,7 @@ export default function LoginPage() {
 
           <button
             type="button"
-            onClick={sendMfaCode}
+            onClick={() => sendMfaCode()}
             disabled={mfaSending || cooldownSeconds > 0}
             className="w-full text-sm text-ctu-blue hover:underline disabled:opacity-50 text-center"
           >
