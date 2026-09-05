@@ -268,6 +268,12 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     // If MFA is enabled, do NOT issue a full token yet. Issue an MFA challenge
     // JWT and require a verified code before completing authentication.
     if (record.mfa_enabled) {
+      const cooldown = await getOtpCooldownMs('mfa', record.email);
+      if (cooldown === 0) {
+        const { code: otp } = await createOtp('mfa', record.email);
+        await sendOtpEmail(record.email, otp);
+      }
+
       const mfaPending = jwt.sign(
         { userId: record.id, email: record.email, role: record.role, mfa: 'pending' },
         getJwtSecret(),
@@ -553,11 +559,36 @@ router.post('/verify-email', authenticate, validate(verifyEmailSchema), async (r
   } catch (err) { next(err); }
 });
 
-router.post('/send-mfa-code', authenticate, validate(mfaSendCodeSchema), async (req: AuthenticatedRequest, res, next) => {
+router.post('/send-mfa-code', validate(mfaSendCodeSchema), async (req, res, next) => {
   try {
-    const { email } = req.body;
-    // Only allow sending an MFA code to the authenticated user's own email.
-    if (req.user?.email.toLowerCase() !== email.trim().toLowerCase()) {
+    const { email, mfaToken } = req.body;
+    const authHeader = req.headers.authorization;
+    let tokenEmail: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, getJwtSecret()) as any;
+        tokenEmail = decoded.email;
+      } catch {
+        throw new AppError('Invalid or expired token', 401);
+      }
+    } else if (mfaToken) {
+      try {
+        const decoded = jwt.verify(mfaToken, getJwtSecret()) as any;
+        if (decoded.mfa !== 'pending') {
+          throw new AppError('Invalid verification token', 401);
+        }
+        tokenEmail = decoded.email;
+      } catch {
+        throw new AppError('Invalid or expired verification token', 401);
+      }
+    } else {
+      throw new AppError('Authentication required', 401);
+    }
+
+    // Only allow sending an MFA code to the token's own email.
+    if (!tokenEmail || tokenEmail.toLowerCase() !== email.trim().toLowerCase()) {
       throw new AppError('Forbidden', 403);
     }
 

@@ -60,6 +60,7 @@ export const mfaEnableSchema = z.object({
 
 export const mfaSendCodeSchema = z.object({
   email: z.string().email('Valid email is required').max(255),
+  mfaToken: z.string().max(4096).optional(),
 }).strict();
 
 export const resetPasswordSchema = z.object({

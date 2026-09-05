@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/store/authStore';
@@ -21,6 +21,14 @@ export default function LoginPage() {
   const { setUser, setToken } = useAuthStore();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -31,8 +39,8 @@ export default function LoginPage() {
       if (res.requiresMfa) {
         setMfaToken(res.mfaToken || '');
         setMfaRequired(true);
+        setCooldownSeconds(30);
         setLoading(false);
-        void sendMfaCode();
         return;
       }
       setToken(res.token!, rememberMe);
@@ -51,11 +59,12 @@ export default function LoginPage() {
     }
   };
 
-  const sendMfaCode = async () => {
+  const sendMfaCode = async (tokenOverride?: string) => {
+    const token = tokenOverride || mfaToken;
     setMfaSending(true);
     setError('');
     try {
-      await authApi.sendMfaCode(email);
+      await authApi.sendMfaCode(email, token);
       setCooldownSeconds(30);
     } catch (err: any) {
       setError(err.message || 'Failed to send verification code.');

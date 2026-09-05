@@ -103,8 +103,8 @@ export const authApi = {
   me: () => api.get<{ user: any }>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<{ message: string }>('/auth/change-password', { currentPassword, newPassword }),
-  sendMfaCode: (email: string) =>
-    api.post<{ message: string }>('/auth/send-mfa-code', { email }),
+  sendMfaCode: (email: string, mfaToken?: string) =>
+    api.post<{ message: string }>('/auth/send-mfa-code', { email, mfaToken }),
   enableMfa: (email: string, otp: string) =>
     api.post<{ message: string }>('/auth/enable-mfa', { email, otp }),
   disableMfa: () =>

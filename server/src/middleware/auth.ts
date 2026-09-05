@@ -24,6 +24,11 @@ export function authenticate(req: AuthenticatedRequest, res: Response, next: Nex
     const secret = getJwtSecret();
     const decoded = jwt.verify(token, secret) as AuthPayload;
 
+    // Pending MFA challenge tokens cannot access authenticated routes
+    if ((decoded as any).mfa === 'pending') {
+      return res.status(401).json({ message: 'MFA verification required' });
+    }
+
     // Enforce shorter max lifetime for admin tokens
     if (decoded.role === 'admin' && typeof decoded.iat === 'number') {
       const tokenAge = Math.floor(Date.now() / 1000) - decoded.iat;
