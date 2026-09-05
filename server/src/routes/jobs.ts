@@ -31,6 +31,17 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
 
     if (error) throw new AppError(error.message, 500);
 
+    // Batch-fetch poster profiles so we can show the alumni's profile picture
+    const posterIds = (jobs || []).map((j: any) => j.posted_by).filter(Boolean);
+    const posterMap = new Map<string, any>();
+    if (posterIds.length > 0) {
+      const { data: posters } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, avatar_url')
+        .in('id', posterIds);
+      (posters || []).forEach((p: any) => posterMap.set(p.id, p));
+    }
+
     const result = await Promise.all((jobs || []).map(async (job: any) => {
       let companyInfo: any = null;
       if (job.company_name) {
@@ -41,6 +52,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
           .maybeSingle();
         companyInfo = company;
       }
+      const poster = job.posted_by ? posterMap.get(job.posted_by) || null : null;
       return {
         id: job.id,
         company_name: job.company_name,
@@ -57,6 +69,8 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
         company_email: companyInfo?.contact_email || null,
         company_logo: companyInfo?.logo || null,
         company_industry: companyInfo?.industry || null,
+        poster_avatar_url: poster?.avatar_url || null,
+        poster_name: poster ? `${poster.first_name || ''} ${poster.last_name || ''}`.trim() : null,
       };
     }));
 
@@ -105,6 +119,17 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       companyInfo = company;
     }
 
+    // Fetch poster profile for the alumni icon
+    let poster: any = null;
+    if (job.posted_by) {
+      const { data: posterData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, avatar_url')
+        .eq('id', job.posted_by)
+        .maybeSingle();
+      poster = posterData;
+    }
+
     res.json({
       id: job.id,
       company_name: job.company_name,
@@ -121,6 +146,8 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       company_email: companyInfo?.contact_email || null,
       company_logo: companyInfo?.logo || null,
       company_industry: companyInfo?.industry || null,
+      poster_avatar_url: poster?.avatar_url || null,
+      poster_name: poster ? `${poster.first_name || ''} ${poster.last_name || ''}`.trim() : null,
     });
   } catch (err) { next(err); }
 });

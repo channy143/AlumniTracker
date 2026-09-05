@@ -146,8 +146,12 @@ function JobCard({ job, onViewDetails }: { job: any; onViewDetails: () => void }
     <div className="bg-white border border-gray-200 rounded-lg">
       <div className="py-3 px-4">
         <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-          <div className="w-5 h-5 rounded-full bg-blue-800 flex items-center justify-center text-[9px] font-bold text-white shrink-0">
-            {job.company_name?.charAt(0) || '?'}
+          <div className="w-5 h-5 rounded-full bg-blue-800 flex items-center justify-center text-[9px] font-bold text-white shrink-0 overflow-hidden" title={job.poster_name || job.company_name}>
+            {job.poster_avatar_url ? (
+              <img src={job.poster_avatar_url} alt={job.poster_name || ''} className="w-full h-full object-cover" />
+            ) : (
+              (job.company_name?.charAt(0) || '?').toUpperCase()
+            )}
           </div>
           <span className="font-medium text-gray-700">{job.company_name}</span>
           <span className="text-gray-400">&middot;</span>
@@ -197,8 +201,12 @@ function JobDetailView({ job, onBack, application, onApply }: { job: any; onBack
 
       <div className="px-4 py-3">
         <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-          <div className="w-6 h-6 rounded-full bg-blue-800 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-            {job.company_name?.charAt(0) || '?'}
+          <div className="w-6 h-6 rounded-full bg-blue-800 flex items-center justify-center text-[10px] font-bold text-white shrink-0 overflow-hidden" title={job.poster_name || job.company_name}>
+            {job.poster_avatar_url ? (
+              <img src={job.poster_avatar_url} alt={job.poster_name || ''} className="w-full h-full object-cover" />
+            ) : (
+              (job.company_name?.charAt(0) || '?').toUpperCase()
+            )}
           </div>
           <span className="font-medium text-gray-700">{job.company_name}</span>
           <span className="text-gray-400">&middot;</span>

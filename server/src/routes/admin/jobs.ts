@@ -39,7 +39,7 @@ router.get('/', async (req, res, next) => {
     if (posterIds.length > 0) {
       const { data: posters } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, avatar_url')
         .in('id', posterIds);
       const posterMap = new Map((posters || []).map((p: any) => [p.id, p]));
       result = result.map((j: any) => ({ ...j, profiles: posterMap.get(j.posted_by) || null }));

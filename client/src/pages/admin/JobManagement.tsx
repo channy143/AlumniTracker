@@ -146,8 +146,10 @@ export default function JobManagement() {
             const dLeft = daysLeft(job.expires_at);
             return (
               <div key={job.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-3 hover:border-orange-200 hover:shadow-sm transition-all">
-                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-sm font-bold text-white shrink-0 overflow-hidden">
-                  {job.company_logo ? (
+                <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-sm font-bold text-white shrink-0 overflow-hidden" title={job.profiles ? `${job.profiles.first_name || ''} ${job.profiles.last_name || ''}`.trim() : job.company_name}>
+                  {job.profiles?.avatar_url ? (
+                    <img src={job.profiles.avatar_url} alt={`${job.profiles.first_name || ''} ${job.profiles.last_name || ''}`.trim()} className="w-full h-full object-cover" />
+                  ) : job.company_logo ? (
                     <img src={job.company_logo} alt="" className="w-full h-full object-cover" />
                   ) : (
                     (job.company_name?.charAt(0) || '?').toUpperCase()
