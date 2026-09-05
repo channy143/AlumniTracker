@@ -506,28 +506,28 @@ export function JellyBlobMascot({ mood = 'neutral', className, onOverpoke, happy
   const attentionPose = reduce
     ? { x: 0, y: 0 }
     : {
-        x: gazeX * 0.18,
-        y: gazeY * 0.08 + gazeAmount * 1.5,
-      }
+      x: gazeX * 0.18,
+      y: gazeY * 0.08 + gazeAmount * 1.5,
+    }
   const eyeGaze = reduce ? { x: 0, y: 0 } : { x: gazeX, y: gazeY }
   const glossGaze = reduce ? { x: 0, y: 0 } : { x: gazeX * -0.08, y: gazeY * 0.04 }
   const nodPose = !reduce && nod
     ? {
-        x: [0, 2.2, -1.8, 1.3, -0.8, 0],
-        y: [0, 3.2, -1.2, 2, -0.5, 0],
-        rotate: [0, -1.6, 1.35, -0.75, 0.45, 0],
-        scaleX: [1, 1.024, 0.987, 1.014, 0.996, 1],
-        scaleY: [1, 0.984, 1.012, 0.992, 1.005, 1],
-      }
+      x: [0, 2.2, -1.8, 1.3, -0.8, 0],
+      y: [0, 3.2, -1.2, 2, -0.5, 0],
+      rotate: [0, -1.6, 1.35, -0.75, 0.45, 0],
+      scaleX: [1, 1.024, 0.987, 1.014, 0.996, 1],
+      scaleY: [1, 0.984, 1.012, 0.992, 1.005, 1],
+    }
     : { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 }
   const nodTransition: Transition = !reduce && nod
     ? {
-        duration: 1.18,
-        times: [0, 0.22, 0.48, 0.7, 0.88, 1],
-        ease: 'easeInOut',
-        repeat: Infinity,
-        repeatDelay: 0.02,
-      }
+      duration: 1.18,
+      times: [0, 0.22, 0.48, 0.7, 0.88, 1],
+      ease: 'easeInOut',
+      repeat: Infinity,
+      repeatDelay: 0.02,
+    }
     : { type: 'spring' as const, stiffness: 260, damping: 20 }
 
   // rAF loop drives path every frame — no keyframe hand-off to stutter
@@ -669,7 +669,7 @@ export function JellyBlobMascot({ mood = 'neutral', className, onOverpoke, happy
             animate={
               mood === 'neutral'
                 ? // breathe via OPACITY only — animating rx/ry re-runs the blur every frame and stutters
-                  { rx: 212, ry: 31, opacity: [0.46, 0.36, 0.46] }
+                { rx: 212, ry: 31, opacity: [0.46, 0.36, 0.46] }
                 : mood === 'happy'
                   ? { rx: 152, ry: 22, opacity: 0.28 }
                   : mood === 'sad'
@@ -702,390 +702,390 @@ export function JellyBlobMascot({ mood = 'neutral', className, onOverpoke, happy
           transition={{ type: 'spring', stiffness: 180, damping: 18 }}
           style={{ scaleX: boopX, scaleY: boop, rotate: shake, transformBox: 'fill-box', transformOrigin: 'center bottom' }}
         >
-        <motion.g id="typing-nod" initial={false} animate={nodPose} transition={nodTransition} style={nodMotionStyle}>
-        <motion.g id="arms" initial={false} animate={mood}>
-          {/* variants flow through this plain <g> via motion context, so the mood animation is unaffected */}
-          <g transform={armRest.current!.left}>
-          <motion.g id="left-arm" variants={LEFT_ARM_TRANSFORMS} style={leftArmStyle}>
-            <motion.g style={{ rotate: larmRot, y: larmY, transformBox: 'fill-box', transformOrigin: '70% 38%' }}>
-              <path
-                id="left-arm-base"
-                d="M216 380 C195 380 180 396 180 416 C180 438 195 452 216 452 C237 452 250 438 250 416 C250 396 237 380 216 380 Z"
-                fill={`url(#${armFill})`}
-                stroke="var(--jelly-arm-deep, #9c5de2)"
-                strokeWidth="5.5"
-                strokeLinejoin="round"
-              />
-              <path id="left-arm-inner-shadow" d="M234 396 C214 402 208 428 220 446" fill="none" stroke="var(--jelly-arm-deep, #8d54db)" strokeWidth="9" strokeLinecap="round" opacity="0.14" filter={`url(#${softBlur})`} />
-              <ellipse id="left-arm-small-highlight" cx="196" cy="405" rx="5.6" ry="9" fill="#ffffff" opacity="0.6" transform="rotate(24 196 405)" />
-            </motion.g>
-          </motion.g>
-          </g>
-
-          <g transform={armRest.current!.right}>
-          <motion.g id="right-arm" variants={RIGHT_ARM_TRANSFORMS} style={rightArmStyle}>
-            <motion.g style={{ rotate: rarmRot, y: rarmY, transformBox: 'fill-box', transformOrigin: '30% 38%' }}>
-              <path
-                id="right-arm-base"
-                d="M684 380 C705 380 720 396 720 416 C720 438 705 452 684 452 C663 452 650 438 650 416 C650 396 663 380 684 380 Z"
-                fill={`url(#${armFill})`}
-                stroke="var(--jelly-arm-deep, #9c5de2)"
-                strokeWidth="5.5"
-                strokeLinejoin="round"
-              />
-              <path id="right-arm-inner-shadow" d="M666 396 C686 402 692 428 680 446" fill="none" stroke="var(--jelly-arm-deep, #8d54db)" strokeWidth="9" strokeLinecap="round" opacity="0.14" filter={`url(#${softBlur})`} />
-              <ellipse id="right-arm-small-highlight" cx="704" cy="405" rx="5.6" ry="9" fill="#ffffff" opacity="0.6" transform="rotate(-24 704 405)" />
-            </motion.g>
-          </motion.g>
-          </g>
-        </motion.g>
-
-        <motion.g id="body" initial={false} animate={mood} variants={BODY_TRANSFORMS} style={svgMotionStyle}>
-          <motion.path
-            initial={false}
-            id="body-main-shape"
-            d={bodyDMV}
-            fill={`url(#${bodyFill})`}
-            stroke={`url(#${bodyEdge})`}
-            strokeWidth="5.8"
-            strokeLinejoin="round"
-          />
-
-          <g id="body-shading-clipped" clipPath={`url(#${bodyClip})`}>
-            <path id="left-inner-shine" d="M300 210C262 300 258 430 286 512" fill="none" stroke="#ffffff" strokeWidth="22" strokeLinecap="round" opacity="0.13" filter={`url(#${wideSoftBlur})`} />
-            <path id="right-inner-shade" d="M672 270C698 360 684 500 616 548" fill="none" stroke="var(--jelly-outline, #7e47cf)" strokeWidth="24" strokeLinecap="round" opacity="0.14" filter={`url(#${wideSoftBlur})`} />
-            <ellipse id="top-soft-sheen" cx="470" cy="175" rx="92" ry="27" fill="#ffffff" opacity="0.14" transform="rotate(1 470 175)" filter={`url(#${softBlur})`} />
-            <ellipse id="right-body-shine" cx="592" cy="252" rx="16" ry="36" fill="#ffffff" opacity="0.14" transform="rotate(-26 592 252)" filter={`url(#${softBlur})`} />
-          </g>
-
-          {/* belly glow lives outside the clip: clip+transform drops content for the big sad y-shift */}
-          <motion.g id="lower-jelly-belly" animate={mood} variants={HIGHLIGHT_TRANSFORMS} style={centerMotionStyle}>
-            <ellipse id="bottom-belly-glow" cx="450" cy="504" rx="240" ry="62" fill={`url(#${bellyGlow})`} opacity="0.95" />
-          </motion.g>
-
-          {/* NOT clipped: sad gloss translates big y, clip+transform drops it */}
-          <g>
-            <motion.g id="highlights" animate={mood} variants={HEAD_HIGHLIGHT_TRANSFORMS} style={centerMotionStyle}>
-              <motion.g id="head-gloss" animate={mood} variants={GLOSS_MOOD} style={centerMotionStyle}>
-                <motion.g id="head-gloss-gaze" initial={false} animate={glossGaze} transition={{ type: 'spring', stiffness: 180, damping: 18 }}>
-                  <ellipse id="large-highlight" cx="372" cy="212" rx="37" ry="21" fill="#ffffff" opacity="0.9" transform="rotate(-36 372 212)" />
-                  <g id="small-highlights">
-                    <circle id="small-head-highlight" cx="320" cy="268" r="12" fill="#ffffff" opacity="0.86" />
-                    <motion.circle id="top-dot-highlight" cx="424" cy="172" r="10" fill="#ffffff" initial={false} animate={{ opacity: mood === 'sad' ? 0 : 0.84 }} transition={{ duration: 0.2 }} />
-                  </g>
-                </motion.g>
-              </motion.g>
-              <ellipse id="left-side-faint-gloss" cx="252" cy="470" rx="17" ry="56" fill="#ffffff" opacity="0.09" transform="rotate(-6 252 470)" filter={`url(#${softBlur})`} />
-              <ellipse id="right-side-faint-gloss" cx="648" cy="470" rx="17" ry="56" fill="#ffffff" opacity="0.09" transform="rotate(8 648 470)" filter={`url(#${softBlur})`} />
-            </motion.g>
-          </g>
-        </motion.g>
-
-        <motion.g id="face" initial={false} animate={mood} variants={FACE_TRANSFORMS} style={centerMotionStyle}>
-          <motion.g id="left-cheek" variants={CHEEK_TRANSFORMS} style={centerMotionStyle}>
-            <ellipse id="left-cheek-base" cx="309" cy="430" rx="35" ry="23" fill={`url(#${cheekFill})`} opacity="0.82" />
-            <ellipse id="left-cheek-highlight-large" cx="294" cy="421" rx="6.2" ry="4.2" fill="#ffffff" opacity="0.44" transform="rotate(-20 294 421)" />
-            <ellipse id="left-cheek-highlight-small" cx="319" cy="420" rx="5.8" ry="4" fill="#ffffff" opacity="0.36" transform="rotate(22 319 420)" />
-          </motion.g>
-
-          <motion.g id="right-cheek" variants={CHEEK_TRANSFORMS} style={centerMotionStyle}>
-            <ellipse id="right-cheek-base" cx="617" cy="430" rx="35" ry="23" fill={`url(#${cheekFill})`} opacity="0.82" />
-            <ellipse id="right-cheek-highlight-large" cx="602" cy="421" rx="6.2" ry="4.2" fill="#ffffff" opacity="0.44" transform="rotate(-20 602 421)" />
-            <ellipse id="right-cheek-highlight-small" cx="627" cy="420" rx="5.8" ry="4" fill="#ffffff" opacity="0.36" transform="rotate(22 627 420)" />
-          </motion.g>
-
-          <motion.g id="eyes" initial={false} animate={eyeGaze} transition={{ type: 'spring', stiffness: 220, damping: 20 }} style={centerMotionStyle}>
-            <motion.g id="left-eye" animate={mood} variants={LEFT_EYE_MOOD} transition={{ delay: 0.05, type: 'spring', stiffness: 240, damping: 17 }} style={centerMotionStyle}>
-              <motion.g initial={false} animate={{ opacity: (mood === 'happy' && happyEyes === 'smile') || mood === 'password' || mood === 'sideEye' ? 0 : 1 }} transition={{ duration: 0.13, ease: 'easeOut' }}>
-                <motion.g animate={mood} variants={EYE_TRANSFORMS} style={centerMotionStyle}>
-                  <motion.g style={{ ...centerMotionStyle, scaleX: blinkLX, scaleY: blinkL }}>
-                    <ellipse id="left-eye-base" cx="353" cy="371" rx="32" ry="39" fill={`url(#${eyeFill})`} />
-                    <ellipse id="left-eye-lower-shade" cx="353" cy="393" rx="23" ry="12" fill="var(--jelly-eye-light, #2a1640)" opacity="0.3" />
-                    {/* main glint cross-fades to a 4-point star in happy (star mode only) */}
-                    <motion.circle id="left-eye-main-highlight" cx="364" cy="353" r="10.5" fill="#ffffff" initial={false} animate={{ opacity: mood === 'happy' && happyEyes === 'star' ? 0 : 0.96 }} transition={{ duration: 0.16 }} />
-                    <motion.path
-                      id="left-eye-star"
-                      d="M364 340 C366.4 349.4 367.6 350.6 377 353 C367.6 355.4 366.4 356.6 364 366 C361.6 356.6 360.4 355.4 351 353 C360.4 350.6 361.6 349.4 364 340 Z"
-                      fill="#ffffff"
-                      initial={false}
-                      animate={{ opacity: mood === 'happy' && happyEyes === 'star' ? 1 : 0, scale: mood === 'happy' && happyEyes === 'star' ? 1 : 0.5 }}
-                      transition={{ delay: mood === 'happy' ? 0.12 : 0, type: 'spring', stiffness: 300, damping: 16 }}
-                      style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+          <motion.g id="typing-nod" initial={false} animate={nodPose} transition={nodTransition} style={nodMotionStyle}>
+            <motion.g id="arms" initial={false} animate={mood}>
+              {/* variants flow through this plain <g> via motion context, so the mood animation is unaffected */}
+              <g transform={armRest.current!.left}>
+                <motion.g id="left-arm" variants={LEFT_ARM_TRANSFORMS} style={leftArmStyle}>
+                  <motion.g style={{ rotate: larmRot, y: larmY, transformBox: 'fill-box', transformOrigin: '70% 38%' }}>
+                    <path
+                      id="left-arm-base"
+                      d="M216 380 C195 380 180 396 180 416 C180 438 195 452 216 452 C237 452 250 438 250 416 C250 396 237 380 216 380 Z"
+                      fill={`url(#${armFill})`}
+                      stroke="var(--jelly-arm-deep, #9c5de2)"
+                      strokeWidth="5.5"
+                      strokeLinejoin="round"
                     />
-                    <circle id="left-eye-secondary-highlight" cx="359" cy="347" r="3.2" fill="#ffffff" opacity="0.58" />
-                    <circle id="left-eye-violet-sparkle" cx="339" cy="391" r="5.8" fill="var(--jelly-eye-sparkle, #b471e6)" opacity="0.62" />
+                    <path id="left-arm-inner-shadow" d="M234 396 C214 402 208 428 220 446" fill="none" stroke="var(--jelly-arm-deep, #8d54db)" strokeWidth="9" strokeLinecap="round" opacity="0.14" filter={`url(#${softBlur})`} />
+                    <ellipse id="left-arm-small-highlight" cx="196" cy="405" rx="5.6" ry="9" fill="#ffffff" opacity="0.6" transform="rotate(24 196 405)" />
                   </motion.g>
                 </motion.g>
-              </motion.g>
-              {/* smile arc — only shown when happyEyes="smile" */}
-              <motion.path
-                id="left-eye-happy-arc"
-                d="M325 380 C341 330 365 330 381 380"
-                fill="none"
-                stroke={`url(#${eyeFill})`}
-                strokeWidth="11"
-                strokeLinecap="round"
-                initial={false}
-                animate={{ opacity: mood === 'happy' && happyEyes === 'smile' ? 1 : 0, scaleY: mood === 'happy' && happyEyes === 'smile' ? 1 : 0.4 }}
-                transition={{ delay: mood === 'happy' && happyEyes === 'smile' ? 0.1 : 0, type: 'spring', stiffness: 260, damping: 18 }}
-                style={{ transformBox: 'fill-box', transformOrigin: 'center bottom' }}
-              />
-            </motion.g>
-            <motion.g id="right-eye" animate={mood} variants={RIGHT_EYE_MOOD} transition={{ delay: 0.05, type: 'spring', stiffness: 240, damping: 17 }} style={centerMotionStyle}>
-              <motion.g initial={false} animate={{ opacity: (mood === 'happy' && happyEyes === 'smile') || mood === 'password' || mood === 'sideEye' ? 0 : 1 }} transition={{ duration: 0.13, ease: 'easeOut' }}>
-                <motion.g animate={mood} variants={EYE_TRANSFORMS} style={centerMotionStyle}>
-                  <motion.g style={{ ...centerMotionStyle, scaleX: blinkRX, scaleY: blinkR }}>
-                    <ellipse id="right-eye-base" cx="551" cy="371" rx="32" ry="39" fill={`url(#${eyeFill})`} />
-                    <ellipse id="right-eye-lower-shade" cx="551" cy="393" rx="23" ry="12" fill="var(--jelly-eye-light, #2a1640)" opacity="0.3" />
-                    {/* main glint cross-fades to a 4-point star in happy (star mode only) */}
-                    <motion.circle id="right-eye-main-highlight" cx="540" cy="353" r="10.5" fill="#ffffff" initial={false} animate={{ opacity: mood === 'happy' && happyEyes === 'star' ? 0 : 0.96 }} transition={{ duration: 0.16 }} />
-                    <motion.path
-                      id="right-eye-star"
-                      d="M540 340 C542.4 349.4 543.6 350.6 553 353 C543.6 355.4 542.4 356.6 540 366 C537.6 356.6 536.4 355.4 527 353 C536.4 350.6 537.6 349.4 540 340 Z"
-                      fill="#ffffff"
-                      initial={false}
-                      animate={{ opacity: mood === 'happy' && happyEyes === 'star' ? 1 : 0, scale: mood === 'happy' && happyEyes === 'star' ? 1 : 0.5 }}
-                      transition={{ delay: mood === 'happy' ? 0.12 : 0, type: 'spring', stiffness: 300, damping: 16 }}
-                      style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+              </g>
+
+              <g transform={armRest.current!.right}>
+                <motion.g id="right-arm" variants={RIGHT_ARM_TRANSFORMS} style={rightArmStyle}>
+                  <motion.g style={{ rotate: rarmRot, y: rarmY, transformBox: 'fill-box', transformOrigin: '30% 38%' }}>
+                    <path
+                      id="right-arm-base"
+                      d="M684 380 C705 380 720 396 720 416 C720 438 705 452 684 452 C663 452 650 438 650 416 C650 396 663 380 684 380 Z"
+                      fill={`url(#${armFill})`}
+                      stroke="var(--jelly-arm-deep, #9c5de2)"
+                      strokeWidth="5.5"
+                      strokeLinejoin="round"
                     />
-                    <circle id="right-eye-secondary-highlight" cx="545" cy="347" r="3.2" fill="#ffffff" opacity="0.58" />
-                    <circle id="right-eye-violet-sparkle" cx="565" cy="391" r="5.8" fill="var(--jelly-eye-sparkle, #b471e6)" opacity="0.62" />
+                    <path id="right-arm-inner-shadow" d="M666 396 C686 402 692 428 680 446" fill="none" stroke="var(--jelly-arm-deep, #8d54db)" strokeWidth="9" strokeLinecap="round" opacity="0.14" filter={`url(#${softBlur})`} />
+                    <ellipse id="right-arm-small-highlight" cx="704" cy="405" rx="5.6" ry="9" fill="#ffffff" opacity="0.6" transform="rotate(-24 704 405)" />
                   </motion.g>
                 </motion.g>
-              </motion.g>
-              {/* smile arc — only shown when happyEyes="smile" */}
-              <motion.path
-                id="right-eye-happy-arc"
-                d="M523 380 C539 330 563 330 579 380"
-                fill="none"
-                stroke={`url(#${eyeFill})`}
-                strokeWidth="11"
-                strokeLinecap="round"
-                initial={false}
-                animate={{ opacity: mood === 'happy' && happyEyes === 'smile' ? 1 : 0, scaleY: mood === 'happy' && happyEyes === 'smile' ? 1 : 0.4 }}
-                transition={{ delay: mood === 'happy' && happyEyes === 'smile' ? 0.1 : 0, type: 'spring', stiffness: 260, damping: 18 }}
-                style={{ transformBox: 'fill-box', transformOrigin: 'center bottom' }}
-              />
+              </g>
             </motion.g>
-          </motion.g>
 
-          <motion.g
-            id="password-face"
-            pointerEvents="none"
-            initial={false}
-            animate={{
-              opacity: mood === 'password' ? 1 : 0,
-              y: mood === 'password' ? [0, -1.5, 0] : 0,
-            }}
-            transition={mood === 'password' && !reduce ? { opacity: { duration: 0.13, ease: 'easeOut' }, y: { duration: 2.8, ease: 'easeInOut', repeat: Infinity } } : { duration: 0.13, ease: 'easeOut' }}
-            style={centerMotionStyle}
-          >
-            {/* curves DOWN (not up) so it reads as looking down/away, not happy-closed.
+            <motion.g id="body" initial={false} animate={mood} variants={BODY_TRANSFORMS} style={svgMotionStyle}>
+              <motion.path
+                initial={false}
+                id="body-main-shape"
+                d={bodyDMV}
+                fill={`url(#${bodyFill})`}
+                stroke={`url(#${bodyEdge})`}
+                strokeWidth="5.8"
+                strokeLinejoin="round"
+              />
+
+              <g id="body-shading-clipped" clipPath={`url(#${bodyClip})`}>
+                <path id="left-inner-shine" d="M300 210C262 300 258 430 286 512" fill="none" stroke="#ffffff" strokeWidth="22" strokeLinecap="round" opacity="0.13" filter={`url(#${wideSoftBlur})`} />
+                <path id="right-inner-shade" d="M672 270C698 360 684 500 616 548" fill="none" stroke="var(--jelly-outline, #7e47cf)" strokeWidth="24" strokeLinecap="round" opacity="0.14" filter={`url(#${wideSoftBlur})`} />
+                <ellipse id="top-soft-sheen" cx="470" cy="175" rx="92" ry="27" fill="#ffffff" opacity="0.14" transform="rotate(1 470 175)" filter={`url(#${softBlur})`} />
+                <ellipse id="right-body-shine" cx="592" cy="252" rx="16" ry="36" fill="#ffffff" opacity="0.14" transform="rotate(-26 592 252)" filter={`url(#${softBlur})`} />
+              </g>
+
+              {/* belly glow lives outside the clip: clip+transform drops content for the big sad y-shift */}
+              <motion.g id="lower-jelly-belly" animate={mood} variants={HIGHLIGHT_TRANSFORMS} style={centerMotionStyle}>
+                <ellipse id="bottom-belly-glow" cx="450" cy="504" rx="240" ry="62" fill={`url(#${bellyGlow})`} opacity="0.95" />
+              </motion.g>
+
+              {/* NOT clipped: sad gloss translates big y, clip+transform drops it */}
+              <g>
+                <motion.g id="highlights" animate={mood} variants={HEAD_HIGHLIGHT_TRANSFORMS} style={centerMotionStyle}>
+                  <motion.g id="head-gloss" animate={mood} variants={GLOSS_MOOD} style={centerMotionStyle}>
+                    <motion.g id="head-gloss-gaze" initial={false} animate={glossGaze} transition={{ type: 'spring', stiffness: 180, damping: 18 }}>
+                      <ellipse id="large-highlight" cx="372" cy="212" rx="37" ry="21" fill="#ffffff" opacity="0.9" transform="rotate(-36 372 212)" />
+                      <g id="small-highlights">
+                        <circle id="small-head-highlight" cx="320" cy="268" r="12" fill="#ffffff" opacity="0.86" />
+                        <motion.circle id="top-dot-highlight" cx="424" cy="172" r="10" fill="#ffffff" initial={false} animate={{ opacity: mood === 'sad' ? 0 : 0.84 }} transition={{ duration: 0.2 }} />
+                      </g>
+                    </motion.g>
+                  </motion.g>
+                  <ellipse id="left-side-faint-gloss" cx="252" cy="470" rx="17" ry="56" fill="#ffffff" opacity="0.09" transform="rotate(-6 252 470)" filter={`url(#${softBlur})`} />
+                  <ellipse id="right-side-faint-gloss" cx="648" cy="470" rx="17" ry="56" fill="#ffffff" opacity="0.09" transform="rotate(8 648 470)" filter={`url(#${softBlur})`} />
+                </motion.g>
+              </g>
+            </motion.g>
+
+            <motion.g id="face" initial={false} animate={mood} variants={FACE_TRANSFORMS} style={centerMotionStyle}>
+              <motion.g id="left-cheek" variants={CHEEK_TRANSFORMS} style={centerMotionStyle}>
+                <ellipse id="left-cheek-base" cx="309" cy="430" rx="35" ry="23" fill={`url(#${cheekFill})`} opacity="0.82" />
+                <ellipse id="left-cheek-highlight-large" cx="294" cy="421" rx="6.2" ry="4.2" fill="#ffffff" opacity="0.44" transform="rotate(-20 294 421)" />
+                <ellipse id="left-cheek-highlight-small" cx="319" cy="420" rx="5.8" ry="4" fill="#ffffff" opacity="0.36" transform="rotate(22 319 420)" />
+              </motion.g>
+
+              <motion.g id="right-cheek" variants={CHEEK_TRANSFORMS} style={centerMotionStyle}>
+                <ellipse id="right-cheek-base" cx="617" cy="430" rx="35" ry="23" fill={`url(#${cheekFill})`} opacity="0.82" />
+                <ellipse id="right-cheek-highlight-large" cx="602" cy="421" rx="6.2" ry="4.2" fill="#ffffff" opacity="0.44" transform="rotate(-20 602 421)" />
+                <ellipse id="right-cheek-highlight-small" cx="627" cy="420" rx="5.8" ry="4" fill="#ffffff" opacity="0.36" transform="rotate(22 627 420)" />
+              </motion.g>
+
+              <motion.g id="eyes" initial={false} animate={eyeGaze} transition={{ type: 'spring', stiffness: 220, damping: 20 }} style={centerMotionStyle}>
+                <motion.g id="left-eye" animate={mood} variants={LEFT_EYE_MOOD} transition={{ delay: 0.05, type: 'spring', stiffness: 240, damping: 17 }} style={centerMotionStyle}>
+                  <motion.g initial={false} animate={{ opacity: (mood === 'happy' && happyEyes === 'smile') || mood === 'password' || mood === 'sideEye' ? 0 : 1 }} transition={{ duration: 0.13, ease: 'easeOut' }}>
+                    <motion.g animate={mood} variants={EYE_TRANSFORMS} style={centerMotionStyle}>
+                      <motion.g style={{ ...centerMotionStyle, scaleX: blinkLX, scaleY: blinkL }}>
+                        <ellipse id="left-eye-base" cx="353" cy="371" rx="32" ry="39" fill={`url(#${eyeFill})`} />
+                        <ellipse id="left-eye-lower-shade" cx="353" cy="393" rx="23" ry="12" fill="var(--jelly-eye-light, #2a1640)" opacity="0.3" />
+                        {/* main glint cross-fades to a 4-point star in happy (star mode only) */}
+                        <motion.circle id="left-eye-main-highlight" cx="364" cy="353" r="10.5" fill="#ffffff" initial={false} animate={{ opacity: mood === 'happy' && happyEyes === 'star' ? 0 : 0.96 }} transition={{ duration: 0.16 }} />
+                        <motion.path
+                          id="left-eye-star"
+                          d="M364 340 C366.4 349.4 367.6 350.6 377 353 C367.6 355.4 366.4 356.6 364 366 C361.6 356.6 360.4 355.4 351 353 C360.4 350.6 361.6 349.4 364 340 Z"
+                          fill="#ffffff"
+                          initial={false}
+                          animate={{ opacity: mood === 'happy' && happyEyes === 'star' ? 1 : 0, scale: mood === 'happy' && happyEyes === 'star' ? 1 : 0.5 }}
+                          transition={{ delay: mood === 'happy' ? 0.12 : 0, type: 'spring', stiffness: 300, damping: 16 }}
+                          style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+                        />
+                        <circle id="left-eye-secondary-highlight" cx="359" cy="347" r="3.2" fill="#ffffff" opacity="0.58" />
+                        <circle id="left-eye-violet-sparkle" cx="339" cy="391" r="5.8" fill="var(--jelly-eye-sparkle, #b471e6)" opacity="0.62" />
+                      </motion.g>
+                    </motion.g>
+                  </motion.g>
+                  {/* smile arc — only shown when happyEyes="smile" */}
+                  <motion.path
+                    id="left-eye-happy-arc"
+                    d="M325 380 C341 330 365 330 381 380"
+                    fill="none"
+                    stroke={`url(#${eyeFill})`}
+                    strokeWidth="11"
+                    strokeLinecap="round"
+                    initial={false}
+                    animate={{ opacity: mood === 'happy' && happyEyes === 'smile' ? 1 : 0, scaleY: mood === 'happy' && happyEyes === 'smile' ? 1 : 0.4 }}
+                    transition={{ delay: mood === 'happy' && happyEyes === 'smile' ? 0.1 : 0, type: 'spring', stiffness: 260, damping: 18 }}
+                    style={{ transformBox: 'fill-box', transformOrigin: 'center bottom' }}
+                  />
+                </motion.g>
+                <motion.g id="right-eye" animate={mood} variants={RIGHT_EYE_MOOD} transition={{ delay: 0.05, type: 'spring', stiffness: 240, damping: 17 }} style={centerMotionStyle}>
+                  <motion.g initial={false} animate={{ opacity: (mood === 'happy' && happyEyes === 'smile') || mood === 'password' || mood === 'sideEye' ? 0 : 1 }} transition={{ duration: 0.13, ease: 'easeOut' }}>
+                    <motion.g animate={mood} variants={EYE_TRANSFORMS} style={centerMotionStyle}>
+                      <motion.g style={{ ...centerMotionStyle, scaleX: blinkRX, scaleY: blinkR }}>
+                        <ellipse id="right-eye-base" cx="551" cy="371" rx="32" ry="39" fill={`url(#${eyeFill})`} />
+                        <ellipse id="right-eye-lower-shade" cx="551" cy="393" rx="23" ry="12" fill="var(--jelly-eye-light, #2a1640)" opacity="0.3" />
+                        {/* main glint cross-fades to a 4-point star in happy (star mode only) */}
+                        <motion.circle id="right-eye-main-highlight" cx="540" cy="353" r="10.5" fill="#ffffff" initial={false} animate={{ opacity: mood === 'happy' && happyEyes === 'star' ? 0 : 0.96 }} transition={{ duration: 0.16 }} />
+                        <motion.path
+                          id="right-eye-star"
+                          d="M540 340 C542.4 349.4 543.6 350.6 553 353 C543.6 355.4 542.4 356.6 540 366 C537.6 356.6 536.4 355.4 527 353 C536.4 350.6 537.6 349.4 540 340 Z"
+                          fill="#ffffff"
+                          initial={false}
+                          animate={{ opacity: mood === 'happy' && happyEyes === 'star' ? 1 : 0, scale: mood === 'happy' && happyEyes === 'star' ? 1 : 0.5 }}
+                          transition={{ delay: mood === 'happy' ? 0.12 : 0, type: 'spring', stiffness: 300, damping: 16 }}
+                          style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+                        />
+                        <circle id="right-eye-secondary-highlight" cx="545" cy="347" r="3.2" fill="#ffffff" opacity="0.58" />
+                        <circle id="right-eye-violet-sparkle" cx="565" cy="391" r="5.8" fill="var(--jelly-eye-sparkle, #b471e6)" opacity="0.62" />
+                      </motion.g>
+                    </motion.g>
+                  </motion.g>
+                  {/* smile arc — only shown when happyEyes="smile" */}
+                  <motion.path
+                    id="right-eye-happy-arc"
+                    d="M523 380 C539 330 563 330 579 380"
+                    fill="none"
+                    stroke={`url(#${eyeFill})`}
+                    strokeWidth="11"
+                    strokeLinecap="round"
+                    initial={false}
+                    animate={{ opacity: mood === 'happy' && happyEyes === 'smile' ? 1 : 0, scaleY: mood === 'happy' && happyEyes === 'smile' ? 1 : 0.4 }}
+                    transition={{ delay: mood === 'happy' && happyEyes === 'smile' ? 0.1 : 0, type: 'spring', stiffness: 260, damping: 18 }}
+                    style={{ transformBox: 'fill-box', transformOrigin: 'center bottom' }}
+                  />
+                </motion.g>
+              </motion.g>
+
+              <motion.g
+                id="password-face"
+                pointerEvents="none"
+                initial={false}
+                animate={{
+                  opacity: mood === 'password' ? 1 : 0,
+                  y: mood === 'password' ? [0, -1.5, 0] : 0,
+                }}
+                transition={mood === 'password' && !reduce ? { opacity: { duration: 0.13, ease: 'easeOut' }, y: { duration: 2.8, ease: 'easeInOut', repeat: Infinity } } : { duration: 0.13, ease: 'easeOut' }}
+                style={centerMotionStyle}
+              >
+                {/* curves DOWN (not up) so it reads as looking down/away, not happy-closed.
                 Same 58px length as the side-eye brows so idle<->typing align. */}
-            <path
-              id="left-password-eye"
-              d="M314 353 C331 365 355 365 372 353"
-              fill="none"
-              stroke="#21102f"
-              strokeWidth="12"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity="0.92"
-            />
-            <path
-              id="right-password-eye"
-              d="M520 353 C537 365 561 365 578 353"
-              fill="none"
-              stroke="#21102f"
-              strokeWidth="12"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity="0.92"
-            />
-            <ellipse id="password-dot-mouth" cx="452" cy="397" rx="13" ry="9" fill="#21102f" opacity="0.92" />
-          </motion.g>
+                <path
+                  id="left-password-eye"
+                  d="M314 353 C331 365 355 365 372 353"
+                  fill="none"
+                  stroke="#21102f"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity="0.92"
+                />
+                <path
+                  id="right-password-eye"
+                  d="M520 353 C537 365 561 365 578 353"
+                  fill="none"
+                  stroke="#21102f"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity="0.92"
+                />
+                <ellipse id="password-dot-mouth" cx="452" cy="397" rx="13" ry="9" fill="#21102f" opacity="0.92" />
+              </motion.g>
 
-          <motion.g
-            id="side-eye-eyes"
-            pointerEvents="none"
-            initial={false}
-            animate={{
-              opacity: mood === 'sideEye' ? 1 : 0,
-              x: mood === 'sideEye' ? -4 : 0,
-              y: mood === 'sideEye' ? 1 : 0,
-            }}
-            transition={{ type: 'spring', stiffness: 230, damping: 18, opacity: { duration: 0.13, ease: 'easeOut' } }}
-            style={centerMotionStyle}
-          >
-            {/* IDENTICAL shape NOT mirrored so both blobs sit on the right corner — consistent sly glance right.
+              <motion.g
+                id="side-eye-eyes"
+                pointerEvents="none"
+                initial={false}
+                animate={{
+                  opacity: mood === 'sideEye' ? 1 : 0,
+                  x: mood === 'sideEye' ? -4 : 0,
+                  y: mood === 'sideEye' ? 1 : 0,
+                }}
+                transition={{ type: 'spring', stiffness: 230, damping: 18, opacity: { duration: 0.13, ease: 'easeOut' } }}
+                style={centerMotionStyle}
+              >
+                {/* IDENTICAL shape NOT mirrored so both blobs sit on the right corner — consistent sly glance right.
                 Brow length matches the password eyes so idle<->typing align. */}
-            <path
-              id="left-side-eye"
-              d="M314 357 C331 337 353 336 372 351"
-              fill="none"
-              stroke="#21102f"
-              strokeWidth="11"
-              strokeLinecap="round"
-              opacity="0.92"
-            />
-            <ellipse id="left-side-eye-blob" cx="373" cy="360" rx="10.5" ry="13.5" fill="#21102f" opacity="0.92" transform="rotate(-16 373 360)" />
-            <path
-              id="right-side-eye"
-              d="M520 357 C537 337 559 336 578 351"
-              fill="none"
-              stroke="#21102f"
-              strokeWidth="11"
-              strokeLinecap="round"
-              opacity="0.92"
-            />
-            <ellipse id="right-side-eye-blob" cx="579" cy="360" rx="10.5" ry="13.5" fill="#21102f" opacity="0.92" transform="rotate(-16 579 360)" />
+                <path
+                  id="left-side-eye"
+                  d="M314 357 C331 337 353 336 372 351"
+                  fill="none"
+                  stroke="#21102f"
+                  strokeWidth="11"
+                  strokeLinecap="round"
+                  opacity="0.92"
+                />
+                <ellipse id="left-side-eye-blob" cx="373" cy="360" rx="10.5" ry="13.5" fill="#21102f" opacity="0.92" transform="rotate(-16 373 360)" />
+                <path
+                  id="right-side-eye"
+                  d="M520 357 C537 337 559 336 578 351"
+                  fill="none"
+                  stroke="#21102f"
+                  strokeWidth="11"
+                  strokeLinecap="round"
+                  opacity="0.92"
+                />
+                <ellipse id="right-side-eye-blob" cx="579" cy="360" rx="10.5" ry="13.5" fill="#21102f" opacity="0.92" transform="rotate(-16 579 360)" />
+              </motion.g>
+
+              <motion.g
+                id="hmm-lids"
+                pointerEvents="none"
+                initial={false}
+                animate={{
+                  opacity: mood === 'hmm' ? 0.52 : 0,
+                  x: mood === 'hmm' ? -2 : 0,
+                  y: 2,
+                }}
+                transition={{ type: 'spring', stiffness: 230, damping: 18 }}
+                style={centerMotionStyle}
+              >
+                <path
+                  id="left-hmm-lid"
+                  d="M324 345 C342 336 365 337 383 345"
+                  fill="none"
+                  stroke="#21102f"
+                  strokeWidth="6.5"
+                  strokeLinecap="round"
+                  opacity="0.62"
+                />
+                <path
+                  id="right-hmm-lid"
+                  d="M521 345 C541 336 564 337 581 345"
+                  fill="none"
+                  stroke="#21102f"
+                  strokeWidth="6.5"
+                  strokeLinecap="round"
+                  opacity="0.62"
+                />
+              </motion.g>
+
+              <motion.g
+                id="sad-brows"
+                pointerEvents="none"
+                initial={false}
+                animate={{
+                  opacity: mood === 'sad' ? 1 : 0,
+                  y: mood === 'sad' ? 0 : -2,
+                }}
+                transition={reduce ? { duration: 0 } : { duration: 0.16, ease: 'easeOut' }}
+                style={centerMotionStyle}
+              >
+                <path
+                  id="left-sad-brow"
+                  d="M318 342 C342 328 370 324 392 331"
+                  fill="none"
+                  stroke="#21102f"
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                  opacity="0.58"
+                />
+                <path
+                  id="right-sad-brow"
+                  d="M512 331 C534 324 562 328 586 342"
+                  fill="none"
+                  stroke="#21102f"
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                  opacity="0.58"
+                />
+              </motion.g>
+
+              <motion.g id="happy-open-mouth" initial={false} animate={{ opacity: mood === 'happy' ? 1 : 0 }} transition={{ delay: mood === 'happy' ? 0.1 : 0, duration: 0.18 }} style={centerMotionStyle}>
+                <path id="open-mouth-fill" d="M420 402 C440 384 465 384 485 402 C470 446 435 446 420 402 Z" fill="#3a0f24" stroke="none" />
+                <path id="open-mouth-tongue" d="M438 424 C440 442 465 442 467 424 C462 418 444 418 438 424 Z" fill="var(--jelly-cheek, #ff8fc0)" stroke="none" />
+                <ellipse id="open-mouth-tongue-shine" cx="452" cy="427" rx="9" ry="3.4" fill="#ffc2dc" opacity="0.7" />
+              </motion.g>
+
+              <motion.path
+                initial={false}
+                id="mouth"
+                d={MOUTH_PATHS[mood]}
+                animate={{ d: MOUTH_PATHS[mood], opacity: mouth || mood === 'password' ? 0 : 1 }}
+                transition={reduce ? { duration: 0 } : { delay: 0.05, type: 'spring', stiffness: 240, damping: 16 }}
+                fill="none"
+                stroke="#21102f"
+                strokeWidth={mood === 'sad' ? 9 : 8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <motion.path
+                id="mouth-oh"
+                d={TALK_MOUTH_PATHS.open[0]}
+                fill="#21102f"
+                initial={false}
+                animate={
+                  mouth
+                    ? {
+                      opacity: 1,
+                      d: mouth === 'wide' ? TALK_MOUTH_PATHS.wide : TALK_MOUTH_PATHS.open,
+                      y: [0, -0.5, 0.35, -0.2, 0],
+                      scaleX: [1, 1.03, 0.96, 1.04, 1],
+                      scaleY: [0.94, 1.04, 0.98, 1.02, 0.94],
+                    }
+                    : { opacity: 0, d: TALK_MOUTH_PATHS.open[0], y: 0, scaleX: 0.72, scaleY: 0.35 }
+                }
+                transition={
+                  mouth
+                    ? {
+                      d: { duration: 0.56, ease: 'easeInOut', repeat: Infinity },
+                      y: { duration: 0.56, ease: 'easeInOut', repeat: Infinity },
+                      scaleX: { duration: 0.56, ease: 'easeInOut', repeat: Infinity },
+                      scaleY: { duration: 0.56, ease: 'easeInOut', repeat: Infinity },
+                      opacity: { duration: 0.1 },
+                    }
+                    : { type: 'spring', stiffness: 320, damping: 26 }
+                }
+                style={centerMotionStyle}
+              />
+            </motion.g>
+
+            <motion.g id="emotion-fx" initial={false} animate={mood} variants={EFFECT_TRANSFORMS} style={centerMotionStyle} filter={mood === 'happy' || mood === 'sad' || mood === 'angry' ? `url(#${goo})` : undefined}>
+
+              <motion.g
+                id="sad-tears"
+                animate={{
+                  opacity: mood === 'sad' ? [0.72, 0.94, 0.72] : 0,
+                  y: mood === 'sad' ? [0, 5, 0] : 0,
+                }}
+                transition={mood === 'sad' ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.12 }}
+              >
+                <path d="M335 397 C324 414 326 428 338 434 C351 427 349 413 335 397Z" fill="#9de8ff" opacity="0.82" />
+                <ellipse cx="335" cy="410" rx="3.2" ry="5.8" fill="#ffffff" opacity="0.48" transform="rotate(18 335 410)" />
+                <path d="M570 397 C559 414 561 428 573 434 C586 427 584 413 570 397Z" fill="#9de8ff" opacity="0.82" />
+                <ellipse cx="570" cy="410" rx="3.2" ry="5.8" fill="#ffffff" opacity="0.48" transform="rotate(18 570 410)" />
+              </motion.g>
+
+              <motion.g animate={{ opacity: mood === 'angry' ? 1 : 0, x: mood === 'angry' ? [0, 4, -3, 0] : 0 }} transition={{ duration: 0.32, repeat: mood === 'angry' ? Infinity : 0 }}>
+                <path d="M617 286 L639 268 M636 292 L660 287 M630 313 L653 329" stroke="var(--jelly-outline, #813ad6)" strokeWidth="9" strokeLinecap="round" opacity="0.86" />
+                <circle cx="260" cy="306" r="13" fill="var(--jelly-body-rim, #cf8dff)" opacity="0.55" />
+                <circle cx="241" cy="292" r="8" fill="var(--jelly-body-rim, #cf8dff)" opacity="0.45" />
+                <circle cx="683" cy="304" r="13" fill="var(--jelly-body-rim, #cf8dff)" opacity="0.55" />
+                <circle cx="704" cy="290" r="8" fill="var(--jelly-body-rim, #cf8dff)" opacity="0.45" />
+              </motion.g>
+            </motion.g>
+
+            {/* happy decorations outside the goo filter so they stay crisp */}
+            <motion.g id="happy-decor" initial={false} animate={{ opacity: mood === 'happy' ? 1 : 0 }} transition={{ delay: mood === 'happy' ? 0.14 : 0, duration: 0.22 }} style={centerMotionStyle}>
+              <motion.path id="happy-spark-yellow" d="M636 318 C638 332 642 336 656 338 C642 340 638 344 636 358 C634 344 630 340 616 338 C630 336 634 332 636 318 Z" fill="#ffe07a" animate={mood === 'happy' ? { y: [-4, -12, -4] } : { y: 0 }} transition={{ duration: 1.6, repeat: mood === 'happy' ? Infinity : 0, ease: 'easeInOut' }} style={{ transformBox: 'fill-box', transformOrigin: 'center' }} />
+              <circle id="happy-spark-yellow-dot" cx="662" cy="318" r="4" fill="#fff2a8" />
+              <motion.path id="happy-heart-pink" d="M270 326 C264 318 252 320 252 331 C252 341 263 348 270 354 C277 348 288 341 288 331 C288 320 276 318 270 326 Z" fill="var(--jelly-cheek, #ff8fc6)" animate={mood === 'happy' ? { y: [-3, -11, -3] } : { y: 0 }} transition={{ duration: 1.8, repeat: mood === 'happy' ? Infinity : 0, ease: 'easeInOut', delay: 0.3 }} style={{ transformBox: 'fill-box', transformOrigin: 'center' }} />
+              <circle id="happy-heart-dot" cx="263" cy="328" r="2.6" fill="#ffd0e6" opacity="0.85" />
+            </motion.g>
           </motion.g>
-
-          <motion.g
-            id="hmm-lids"
-            pointerEvents="none"
-            initial={false}
-            animate={{
-              opacity: mood === 'hmm' ? 0.52 : 0,
-              x: mood === 'hmm' ? -2 : 0,
-              y: 2,
-            }}
-            transition={{ type: 'spring', stiffness: 230, damping: 18 }}
-            style={centerMotionStyle}
-          >
-            <path
-              id="left-hmm-lid"
-              d="M324 345 C342 336 365 337 383 345"
-              fill="none"
-              stroke="#21102f"
-              strokeWidth="6.5"
-              strokeLinecap="round"
-              opacity="0.62"
-            />
-            <path
-              id="right-hmm-lid"
-              d="M521 345 C541 336 564 337 581 345"
-              fill="none"
-              stroke="#21102f"
-              strokeWidth="6.5"
-              strokeLinecap="round"
-              opacity="0.62"
-            />
-          </motion.g>
-
-          <motion.g
-            id="sad-brows"
-            pointerEvents="none"
-            initial={false}
-            animate={{
-              opacity: mood === 'sad' ? 1 : 0,
-              y: mood === 'sad' ? 0 : -2,
-            }}
-            transition={reduce ? { duration: 0 } : { duration: 0.16, ease: 'easeOut' }}
-            style={centerMotionStyle}
-          >
-            <path
-              id="left-sad-brow"
-              d="M318 342 C342 328 370 324 392 331"
-              fill="none"
-              stroke="#21102f"
-              strokeWidth="7"
-              strokeLinecap="round"
-              opacity="0.58"
-            />
-            <path
-              id="right-sad-brow"
-              d="M512 331 C534 324 562 328 586 342"
-              fill="none"
-              stroke="#21102f"
-              strokeWidth="7"
-              strokeLinecap="round"
-              opacity="0.58"
-            />
-          </motion.g>
-
-          <motion.g id="happy-open-mouth" initial={false} animate={{ opacity: mood === 'happy' ? 1 : 0 }} transition={{ delay: mood === 'happy' ? 0.1 : 0, duration: 0.18 }} style={centerMotionStyle}>
-            <path id="open-mouth-fill" d="M420 402 C440 384 465 384 485 402 C470 446 435 446 420 402 Z" fill="#3a0f24" stroke="none" />
-            <path id="open-mouth-tongue" d="M438 424 C440 442 465 442 467 424 C462 418 444 418 438 424 Z" fill="var(--jelly-cheek, #ff8fc0)" stroke="none" />
-            <ellipse id="open-mouth-tongue-shine" cx="452" cy="427" rx="9" ry="3.4" fill="#ffc2dc" opacity="0.7" />
-          </motion.g>
-
-          <motion.path
-            initial={false}
-            id="mouth"
-            d={MOUTH_PATHS[mood]}
-            animate={{ d: MOUTH_PATHS[mood], opacity: mouth || mood === 'password' ? 0 : 1 }}
-            transition={reduce ? { duration: 0 } : { delay: 0.05, type: 'spring', stiffness: 240, damping: 16 }}
-            fill="none"
-            stroke="#21102f"
-            strokeWidth={mood === 'sad' ? 9 : 8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <motion.path
-            id="mouth-oh"
-            d={TALK_MOUTH_PATHS.open[0]}
-            fill="#21102f"
-            initial={false}
-            animate={
-              mouth
-                ? {
-                    opacity: 1,
-                    d: mouth === 'wide' ? TALK_MOUTH_PATHS.wide : TALK_MOUTH_PATHS.open,
-                    y: [0, -0.5, 0.35, -0.2, 0],
-                    scaleX: [1, 1.03, 0.96, 1.04, 1],
-                    scaleY: [0.94, 1.04, 0.98, 1.02, 0.94],
-                  }
-                : { opacity: 0, d: TALK_MOUTH_PATHS.open[0], y: 0, scaleX: 0.72, scaleY: 0.35 }
-            }
-            transition={
-              mouth
-                ? {
-                    d: { duration: 0.56, ease: 'easeInOut', repeat: Infinity },
-                    y: { duration: 0.56, ease: 'easeInOut', repeat: Infinity },
-                    scaleX: { duration: 0.56, ease: 'easeInOut', repeat: Infinity },
-                    scaleY: { duration: 0.56, ease: 'easeInOut', repeat: Infinity },
-                    opacity: { duration: 0.1 },
-                  }
-                : { type: 'spring', stiffness: 320, damping: 26 }
-            }
-            style={centerMotionStyle}
-          />
-        </motion.g>
-
-        <motion.g id="emotion-fx" initial={false} animate={mood} variants={EFFECT_TRANSFORMS} style={centerMotionStyle} filter={mood === 'happy' || mood === 'sad' || mood === 'angry' ? `url(#${goo})` : undefined}>
-
-          <motion.g
-            id="sad-tears"
-            animate={{
-              opacity: mood === 'sad' ? [0.72, 0.94, 0.72] : 0,
-              y: mood === 'sad' ? [0, 5, 0] : 0,
-            }}
-            transition={mood === 'sad' ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.12 }}
-          >
-            <path d="M335 397 C324 414 326 428 338 434 C351 427 349 413 335 397Z" fill="#9de8ff" opacity="0.82" />
-            <ellipse cx="335" cy="410" rx="3.2" ry="5.8" fill="#ffffff" opacity="0.48" transform="rotate(18 335 410)" />
-            <path d="M570 397 C559 414 561 428 573 434 C586 427 584 413 570 397Z" fill="#9de8ff" opacity="0.82" />
-            <ellipse cx="570" cy="410" rx="3.2" ry="5.8" fill="#ffffff" opacity="0.48" transform="rotate(18 570 410)" />
-          </motion.g>
-
-          <motion.g animate={{ opacity: mood === 'angry' ? 1 : 0, x: mood === 'angry' ? [0, 4, -3, 0] : 0 }} transition={{ duration: 0.32, repeat: mood === 'angry' ? Infinity : 0 }}>
-            <path d="M617 286 L639 268 M636 292 L660 287 M630 313 L653 329" stroke="var(--jelly-outline, #813ad6)" strokeWidth="9" strokeLinecap="round" opacity="0.86" />
-            <circle cx="260" cy="306" r="13" fill="var(--jelly-body-rim, #cf8dff)" opacity="0.55" />
-            <circle cx="241" cy="292" r="8" fill="var(--jelly-body-rim, #cf8dff)" opacity="0.45" />
-            <circle cx="683" cy="304" r="13" fill="var(--jelly-body-rim, #cf8dff)" opacity="0.55" />
-            <circle cx="704" cy="290" r="8" fill="var(--jelly-body-rim, #cf8dff)" opacity="0.45" />
-          </motion.g>
-        </motion.g>
-
-        {/* happy decorations outside the goo filter so they stay crisp */}
-        <motion.g id="happy-decor" initial={false} animate={{ opacity: mood === 'happy' ? 1 : 0 }} transition={{ delay: mood === 'happy' ? 0.14 : 0, duration: 0.22 }} style={centerMotionStyle}>
-          <motion.path id="happy-spark-yellow" d="M636 318 C638 332 642 336 656 338 C642 340 638 344 636 358 C634 344 630 340 616 338 C630 336 634 332 636 318 Z" fill="#ffe07a" animate={mood === 'happy' ? { y: [-4, -12, -4] } : { y: 0 }} transition={{ duration: 1.6, repeat: mood === 'happy' ? Infinity : 0, ease: 'easeInOut' }} style={{ transformBox: 'fill-box', transformOrigin: 'center' }} />
-          <circle id="happy-spark-yellow-dot" cx="662" cy="318" r="4" fill="#fff2a8" />
-          <motion.path id="happy-heart-pink" d="M270 326 C264 318 252 320 252 331 C252 341 263 348 270 354 C277 348 288 341 288 331 C288 320 276 318 270 326 Z" fill="var(--jelly-cheek, #ff8fc6)" animate={mood === 'happy' ? { y: [-3, -11, -3] } : { y: 0 }} transition={{ duration: 1.8, repeat: mood === 'happy' ? Infinity : 0, ease: 'easeInOut', delay: 0.3 }} style={{ transformBox: 'fill-box', transformOrigin: 'center' }} />
-          <circle id="happy-heart-dot" cx="263" cy="328" r="2.6" fill="#ffd0e6" opacity="0.85" />
-        </motion.g>
-        </motion.g>
         </motion.g>
       </svg>
     </MotionConfig>
@@ -1182,11 +1182,11 @@ export function BlobSpeech({ mood = 'neutral', messages, className }: BlobSpeech
         reduce
           ? { duration: 0 }
           : {
-              opacity: { duration: 0.22, ease: [0.19, 1, 0.22, 1] },
-              scale: { type: 'spring', bounce: 0.16, duration: 0.4 },
-              y: follow.ty,
-              rotate: follow.tr,
-            }
+            opacity: { duration: 0.22, ease: [0.19, 1, 0.22, 1] },
+            scale: { type: 'spring', bounce: 0.16, duration: 0.4 },
+            y: follow.ty,
+            rotate: follow.tr,
+          }
       }
     >
       <span ref={measureRef} className="blob-bubble-measure" aria-hidden="true">

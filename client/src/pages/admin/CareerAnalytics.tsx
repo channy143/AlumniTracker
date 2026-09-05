@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { adminApi } from '@/services/api';
 import { Link } from 'react-router-dom';
 import { SkeletonCard } from '@/components/ui/Skeleton';
+import { formatExperience } from '@/utils/formatExperience';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line,
@@ -254,7 +255,7 @@ export default function CareerAnalytics() {
         { Metric: 'Average Salary', Value: formatPeso(overview.averageSalary) },
         { Metric: 'Average Time to Employment', Value: formatMonths(overview.averageTimeToEmployment) },
         { Metric: 'Work Alignment Rate', Value: `${overview.workAlignmentRate}%` },
-        { Metric: 'Average Years of Experience', Value: overview.averageYearsExperience ? `${overview.averageYearsExperience} yrs` : 'N/A' },
+        { Metric: 'Average Experience', Value: overview.averageYearsExperience ? formatExperience(overview.averageYearsExperience) : 'N/A' },
         { Metric: 'Tracer Survey Response Rate', Value: `${overview.tracerSurveyResponseRate}%` },
       ],
     },
@@ -406,7 +407,7 @@ export default function CareerAnalytics() {
             <KpiCard icon={BanknotesIcon} label="Average Salary" value={formatPeso(overview.averageSalary)} />
             <KpiCard icon={ClockIcon} label="Time to Employment" value={formatMonths(overview.averageTimeToEmployment)} />
             <KpiCard icon={CheckBadgeIcon} label="Work Alignment Rate" value={`${overview.workAlignmentRate}%`} />
-            <KpiCard icon={BuildingOfficeIcon} label="Avg Years Experience" value={overview.averageYearsExperience ? `${overview.averageYearsExperience} yrs` : '—'} />
+            <KpiCard icon={BuildingOfficeIcon} label="Avg Experience" value={overview.averageYearsExperience ? formatExperience(overview.averageYearsExperience) : '—'} />
             <KpiCard icon={ClipboardDocumentCheckIcon} label="Tracer Response Rate" value={`${overview.tracerSurveyResponseRate}%`} sub={overview.activeSurveyCount ? `${overview.activeSurveyCount} active survey(s)` : undefined} />
           </div>
 

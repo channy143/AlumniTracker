@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore';
 import { feedApi, careerTrendsApi, profileApi, surveyApi } from '@/services/api';
 import { CalendarDaysIcon, MegaphoneIcon, UserGroupIcon, BuildingOfficeIcon, BriefcaseIcon, ChartBarIcon, CheckCircleIcon, ExclamationCircleIcon, SparklesIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 import { decodeUnicode } from '@/utils/helpers';
+import { formatExperience } from '@/utils/formatExperience';
 
 
 
@@ -258,7 +259,7 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
           mostCommonCareer: data.overview?.topCareerPct != null && data.overview.topCareerPct < 40 ? 'Various' : (data.overview?.topCareer || 'N/A'),
           fastestGrowing: data.fastestGrowing?.[0]?.position || 'N/A',
           topIndustry: data.overview?.topIndustryPct != null && data.overview.topIndustryPct < 40 ? 'Various' : (data.overview?.topIndustry || 'N/A'),
-          averageExperience: data.overview?.averageExperienceYears ? `${data.overview.averageExperienceYears} Years` : 'N/A',
+          averageExperience: data.overview?.averageExperienceYears ? formatExperience(data.overview.averageExperienceYears) : 'N/A',
         });
         if (data.statusDistribution?.length) {
           const grouped: Record<string, number> = {};

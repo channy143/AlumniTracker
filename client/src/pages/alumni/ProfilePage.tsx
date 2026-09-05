@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { playTing } from '@/utils/helpers';
+import { formatExperienceFromDate } from '@/utils/formatExperience';
 import { useUIStore } from '@/store/uiStore';
 
 const tabs = [
@@ -466,12 +467,12 @@ export default function ProfilePage() {
   const programInfo = firstEdu ? firstEdu.program || '' : '';
   const batchInfo = firstEdu?.year_graduated || '';
   const currentEmp = profile?.employment?.find((e: any) => e.is_current);
-  const totalYearsExp = (() => {
+  const totalExpFormatted = (() => {
     const emps = profile?.employment || [];
-    if (emps.length === 0) return 0;
+    if (emps.length === 0) return 'None';
     const startDates = emps.map((e: any) => e.start_date).filter(Boolean).sort();
-    if (startDates.length === 0) return 0;
-    return calcYears(startDates[0]);
+    if (startDates.length === 0) return 'None';
+    return formatExperienceFromDate(startDates[0]);
   })();
   const careerPositions = (profile?.employment || []).length;
   const profileCompletion = calcProfileCompletion(profile);
@@ -483,8 +484,8 @@ export default function ProfilePage() {
       icon: BriefcaseIcon,
     },
     {
-      label: 'Years of Experience',
-      value: `${totalYearsExp} Year${totalYearsExp !== 1 ? 's' : ''}`,
+      label: 'Experience',
+      value: totalExpFormatted,
       icon: ChartBarIcon,
     },
     {
@@ -864,7 +865,7 @@ export default function ProfilePage() {
                 {emp.salary_range && <p className="text-[11px] text-gray-400">₱{emp.salary_range}</p>}
                 {emp.start_date && (
                   <p className="text-[10px] text-gray-400 mt-0.5">
-                    {calcYears(emp.start_date)} year{calcYears(emp.start_date) !== 1 ? 's' : ''}
+                    {formatExperienceFromDate(emp.start_date, emp.end_date)}
                   </p>
                 )}
               </div>

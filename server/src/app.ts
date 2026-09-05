@@ -24,6 +24,7 @@ import announcementsRoutes from './routes/announcements';
 import careerTrendsRoutes from './routes/careerTrends';
 import directoryRoutes from './routes/directory';
 import publicRoutes from './routes/public';
+import employerRoutes from './routes/employer';
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.use('/api/announcements', announcementsRoutes);
 app.use('/api/career-trends', careerTrendsRoutes);
 app.use('/api/directory', directoryRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/employer', employerRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

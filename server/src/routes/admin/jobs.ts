@@ -10,7 +10,9 @@ import {
   adminUpdateJobSchema,
   applicationStatusSchema,
   screenApplicationSchema,
+  createEmployerSchema,
 } from '../../middleware/validationSchemas';
+import { calculateMatchScore } from '../../utils/matchScoring';
 
 const router = Router();
 
@@ -73,30 +75,107 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+router.get('/employers', async (_req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from('employers')
+      .select('*')
+      .order('company_name', { ascending: true });
+    if (error && (error.code === '42P01' || error.code === 'PGRST205')) return res.json([]);
+    if (error) throw new AppError(error.message, 500);
+    res.json(data || []);
+  } catch (err) { next(err); }
+});
+
+router.post('/employers', validate(createEmployerSchema), async (req, res, next) => {
+  try {
+    const { company_name, industry, contact_person, contact_email } = req.body;
+    const { data, error } = await supabase
+      .from('employers')
+      .insert({
+        company_name,
+        industry: industry || null,
+        contact_person: contact_person || null,
+        contact_email: contact_email || null,
+      })
+      .select()
+      .single();
+    if (error) throw new AppError(error.message, 500);
+    res.status(201).json(data);
+  } catch (err) { next(err); }
+});
+
 router.post('/', validate(adminCreateJobSchema), async (req, res, next) => {
   try {
-    const { company_id, position, description, requirements, location, job_type, salary_range, application_url, is_alumni_exclusive, expires_at, industry, required_skills, experience_level, is_remote } = req.body;
+    const {
+      company_id,
+      employer_id,
+      company_name,
+      position,
+      description,
+      requirements,
+      location,
+      job_type,
+      salary_range,
+      application_url,
+      is_alumni_exclusive,
+      expires_at,
+      industry,
+      required_skills,
+      experience_level,
+      is_remote,
+    } = req.body;
 
-    // Resolve the company and require it to be verified before posting a job.
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('id, name, is_verified')
-      .eq('id', company_id)
-      .maybeSingle();
-    if (companyError) throw new AppError(companyError.message, 500);
-    if (!company) throw new AppError('Company not found', 404);
-    if (!company.is_verified) throw new AppError('Only verified companies can be used for job postings', 400);
+    let resolvedCompanyName = (company_name || '').trim();
+    let resolvedEmployerId = employer_id || null;
+    let resolvedCompanyId = company_id || null;
+    let resolvedIndustry = industry || null;
+
+    if (resolvedEmployerId) {
+      const { data: emp } = await supabase
+        .from('employers')
+        .select('id, company_name, industry')
+        .eq('id', resolvedEmployerId)
+        .maybeSingle();
+      if (emp) {
+        resolvedCompanyName = emp.company_name;
+        if (!resolvedIndustry && emp.industry) resolvedIndustry = emp.industry;
+      }
+    } else if (resolvedCompanyId) {
+      const { data: company, error: companyError } = await supabase
+        .from('companies')
+        .select('id, name, is_verified, industry')
+        .eq('id', resolvedCompanyId)
+        .maybeSingle();
+      if (companyError) throw new AppError(companyError.message, 500);
+      if (company) {
+        resolvedCompanyName = company.name;
+        if (!resolvedIndustry && company.industry) resolvedIndustry = company.industry;
+      }
+    }
+
+    if (!resolvedCompanyName) {
+      throw new AppError('Employer / Company name is required', 400);
+    }
 
     if (!position || !description || !location) {
       throw new AppError('Position, description, and location are required', 400);
     }
     const defaultExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase.from('job_postings').insert({
-      company_id, company_name: company.name, position, description: sanitizeRichText(description), requirements: (requirements || []).map((r: string) => r),
-      location, job_type: job_type || 'full-time', salary_range: salary_range || null,
-      application_url: application_url || null, is_alumni_exclusive: is_alumni_exclusive || false,
+      company_id: resolvedCompanyId,
+      employer_id: resolvedEmployerId,
+      company_name: resolvedCompanyName,
+      position,
+      description: sanitizeRichText(description),
+      requirements: (requirements || []).map((r: string) => r),
+      location,
+      job_type: job_type || 'full-time',
+      salary_range: salary_range || null,
+      application_url: application_url || null,
+      is_alumni_exclusive: is_alumni_exclusive || false,
       posted_by: null,
-      industry: industry || null,
+      industry: resolvedIndustry,
       required_skills: required_skills || [],
       experience_level: experience_level || 'entry',
       is_remote: is_remote || false,
@@ -124,7 +203,7 @@ router.get('/:id/applicants', async (req: AuthenticatedRequest, res, next) => {
 
     const { data: job, error: jobError } = await supabase
       .from('job_postings')
-      .select('id, required_skills, position, company_name')
+      .select('id, required_skills, position, company_name, industry, experience_level')
       .eq('id', req.params.id)
       .maybeSingle();
     if (jobError) throw new AppError(jobError.message, 500);
@@ -141,29 +220,114 @@ router.get('/:id/applicants', async (req: AuthenticatedRequest, res, next) => {
     }
     if (error) throw new AppError(error.message, 500);
 
-    const applicants = (applications || []).map((a: any) => ({
-      id: a.id,
-      applicant_name: a.applicant_name,
-      applicant_email: a.applicant_email,
-      resume_url: a.resume_url,
-      applied_at: a.applied_at,
-      status: a.status,
-      cover_letter: a.cover_letter,
-      match_percentage: a.match_percentage ?? null,
-      matched_skills: a.matched_skills || [],
-      missing_skills: a.missing_skills || [],
-      is_screened: a.is_screened || false,
-      screening_notes: a.screening_notes || null,
-    }));
+    const userIds = (applications || []).map((a: any) => a.user_id).filter(Boolean);
+    const profileMap = new Map<string, any>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, user_id, first_name, last_name, email, education:education(*), skills:skills(*), employment:employment(*)')
+        .in('user_id', userIds);
+      (profiles || []).forEach((p: any) => profileMap.set(p.user_id, p));
+    }
 
-    res.json({ job: { required_skills: job.required_skills || [] }, applicants });
+    const appIds = (applications || []).map((a: any) => a.id);
+    const screeningMap = new Map<string, any>();
+    if (appIds.length > 0) {
+      const { data: screenings } = await supabase
+        .from('application_screening')
+        .select('*')
+        .in('application_id', appIds)
+        .order('screened_at', { ascending: false });
+      (screenings || []).forEach((s: any) => {
+        if (!screeningMap.has(s.application_id)) screeningMap.set(s.application_id, s);
+      });
+    }
+
+    const applicants = (applications || []).map((a: any) => {
+      const prof = profileMap.get(a.user_id) || null;
+      const applicantEducation = prof?.education || [];
+      const applicantSkills = prof?.skills || [];
+      const applicantEmployment = prof?.employment || [];
+      const screeningRecord = screeningMap.get(a.id) || null;
+
+      const sortedEd = [...applicantEducation].sort((x: any, y: any) => (y.year_graduated || 0) - (x.year_graduated || 0));
+      const batchYear = sortedEd[0]?.year_graduated ? String(sortedEd[0].year_graduated) : null;
+      const program = sortedEd[0]?.program || null;
+
+      const scoreResult = calculateMatchScore(
+        {
+          required_skills: job.required_skills || [],
+          experience_level: job.experience_level || 'entry',
+          position: job.position || '',
+          industry: job.industry || '',
+        },
+        {
+          skills: applicantSkills,
+          employment: applicantEmployment,
+          education: applicantEducation,
+        }
+      );
+
+      const overall = screeningRecord?.overall_match_score != null
+        ? Number(screeningRecord.overall_match_score)
+        : (a.match_percentage != null && a.match_percentage > 0 ? a.match_percentage : scoreResult.overall_score);
+
+      const skillsScore = screeningRecord?.skills_match_score != null
+        ? Number(screeningRecord.skills_match_score)
+        : scoreResult.skills_score;
+
+      const experienceScore = screeningRecord?.experience_match_score != null
+        ? Number(screeningRecord.experience_match_score)
+        : scoreResult.experience_score;
+
+      const educationScore = screeningRecord?.education_match_score != null
+        ? Number(screeningRecord.education_match_score)
+        : scoreResult.education_score;
+
+      return {
+        id: a.id,
+        applicant_name: a.applicant_name || (prof ? `${prof.first_name || ''} ${prof.last_name || ''}`.trim() : 'Applicant'),
+        applicant_email: a.applicant_email || prof?.email || '',
+        batch_year: batchYear,
+        program: program,
+        resume_url: a.resume_url,
+        applied_at: a.applied_at,
+        status: a.status || 'pending',
+        cover_letter: a.cover_letter,
+        match_percentage: overall,
+        skills_match_score: skillsScore,
+        experience_match_score: experienceScore,
+        education_match_score: educationScore,
+        overall_match_score: overall,
+        skills_breakdown: scoreResult.skills_breakdown,
+        matched_skills: a.matched_skills && a.matched_skills.length > 0
+          ? a.matched_skills
+          : scoreResult.skills_breakdown.filter((s) => s.status !== 'missing').map((s) => s.skill),
+        missing_skills: a.missing_skills && a.missing_skills.length > 0
+          ? a.missing_skills
+          : scoreResult.skills_breakdown.filter((s) => s.status === 'missing').map((s) => s.skill),
+        is_screened: a.is_screened || false,
+        screening_notes: a.screening_notes || screeningRecord?.screening_notes || null,
+        screened_at: a.screened_at || screeningRecord?.screened_at || null,
+      };
+    });
+
+    res.json({
+      job: {
+        id: job.id,
+        required_skills: job.required_skills || [],
+        position: job.position,
+        company_name: job.company_name,
+      },
+      applicants,
+    });
   } catch (err) { next(err); }
 });
 
 router.put('/applications/:applicationId/status', validate(applicationStatusSchema), async (req, res, next) => {
   try {
     const { status } = req.body;
-    const allowed = ['pending', 'reviewed', 'shortlisted', 'accepted', 'rejected'];
+    const allowed = ['pending', 'under_review', 'shortlisted', 'rejected', 'hired', 'reviewed', 'accepted'];
     if (!allowed.includes(status)) throw new AppError('Invalid application status', 400);
 
     const { error } = await supabase
@@ -177,11 +341,19 @@ router.put('/applications/:applicationId/status', validate(applicationStatusSche
 
 router.put('/applications/:applicationId/screen', validate(screenApplicationSchema), async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { matched_skills, screening_notes } = req.body;
+    const {
+      matched_skills,
+      screening_notes,
+      status,
+      skills_match_score,
+      experience_match_score,
+      education_match_score,
+      overall_match_score,
+    } = req.body;
 
     const { data: application, error: appError } = await supabase
       .from('job_applications')
-      .select('id, job_id')
+      .select('id, job_id, user_id')
       .eq('id', req.params.applicationId)
       .maybeSingle();
     if (appError) throw new AppError(appError.message, 500);
@@ -196,25 +368,45 @@ router.put('/applications/:applicationId/screen', validate(screenApplicationSche
 
     const requiredSkills: string[] = job?.required_skills || [];
     const missingSkills = requiredSkills.filter((s) => !matched_skills.includes(s));
-    const matchPercentage = requiredSkills.length > 0
-      ? Math.round((matched_skills.length / requiredSkills.length) * 100)
-      : 0;
+    const finalOverall = overall_match_score != null
+      ? overall_match_score
+      : (requiredSkills.length > 0 ? Math.round((matched_skills.length / requiredSkills.length) * 100) : 0);
+
+    const updatePayload: any = {
+      matched_skills,
+      missing_skills: missingSkills,
+      match_percentage: finalOverall,
+      screening_notes: screening_notes || null,
+      is_screened: true,
+      screened_at: new Date().toISOString(),
+    };
+    if (status) {
+      updatePayload.status = status;
+    }
 
     const { error } = await supabase
       .from('job_applications')
-      .update({
-        matched_skills,
-        missing_skills: missingSkills,
-        match_percentage: matchPercentage,
-        screening_notes: screening_notes || null,
-        is_screened: true,
-        screened_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', req.params.applicationId);
     if (error && (error.code === '42P01' || error.code === 'PGRST205')) {
       throw new AppError('Screening columns not available. Run the screening migration first.', 500);
     }
     if (error) throw new AppError(error.message, 500);
+
+    try {
+      await supabase.from('application_screening').insert({
+        application_id: req.params.applicationId,
+        skills_match_score: skills_match_score ?? finalOverall,
+        experience_match_score: experience_match_score ?? 0,
+        education_match_score: education_match_score ?? 0,
+        overall_match_score: finalOverall,
+        screening_notes: screening_notes || null,
+        screened_by: req.user?.userId || null,
+        screened_at: new Date().toISOString(),
+      });
+    } catch (scErr) {
+      console.warn('Could not insert application_screening record:', scErr);
+    }
 
     try {
       await supabase.from('audit_logs').insert({
@@ -223,9 +415,10 @@ router.put('/applications/:applicationId/screen', validate(screenApplicationSche
         entity: 'job_application',
         entity_id: req.params.applicationId,
         details: {
-          matched_skills: matched_skills,
+          matched_skills,
           missing_skills: missingSkills,
-          match_percentage: matchPercentage,
+          match_percentage: finalOverall,
+          status: status || null,
         },
       });
     } catch {}
@@ -251,7 +444,7 @@ router.get('/:id/applicants/export', async (req: AuthenticatedRequest, res, next
         entity_id: req.params.id,
         details: { description: 'Admin exported screened applicants as CSV' },
       });
-    } catch {}
+    } catch { }
 
     const { data: job, error: jobError } = await supabase
       .from('job_postings')

@@ -27,10 +27,14 @@ const pg = new Client({ connectionString: databaseUrl, ssl: { rejectUnauthorized
 async function runSqlFile(filePath, label) {
   try {
     const sql = readFileSync(filePath, 'utf8');
-    const statements = sql
+    const lines = sql.split('\n');
+    const cleaned = lines
+      .filter(l => !l.trim().startsWith('--'))
+      .join('\n');
+    const statements = cleaned
       .split(';')
       .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'));
+      .filter(s => s.length > 0);
     let applied = 0;
     for (const stmt of statements) {
       try {
@@ -80,6 +84,7 @@ async function main() {
     { path: './supabase/migration_rls_hardening.sql', label: 'RLS hardening migration' },
     { path: './supabase/migration_rls_hardening_skills.sql', label: 'RLS skills policies migration' },
     { path: './supabase/migration_alumni_eligible.sql', label: 'Alumni eligibility registry migration' },
+    { path: './supabase/migrations/20260906000000_job_system_upgrade.sql', label: 'Job system upgrade migration' },
   ];
 
   for (const f of files) {

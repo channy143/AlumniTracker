@@ -45,7 +45,7 @@ export default function CareerCardInsightsPanel({ card, onBack }: {
     setLoading(true);
     careerTrendsApi.alumni(meta.type, card.name)
       .then((res) => { if (!cancelled) setData(res); })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [card.name, card.kind, meta.type]);
@@ -149,76 +149,79 @@ export default function CareerCardInsightsPanel({ card, onBack }: {
                   <UserGroupIcon className="w-4 h-4 text-orange-500" />
                   Alumni
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {data.alumni.map((a: any, idx: number) => (
                     <div
                       key={a.id}
-                      className="flex items-start gap-3 text-xs py-2.5 px-1 border border-gray-100 rounded-lg hover:bg-orange-50/40 transition-colors"
+                      className="p-3.5 bg-white border border-gray-200/90 rounded-xl hover:border-orange-300/80 hover:shadow-xs transition-all duration-150"
                     >
-                      <div className={`w-9 h-9 rounded-full ${AVATAR_COLORS[idx % AVATAR_COLORS.length]} flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden`}>
-                        {a.avatar_url ? (
-                          <img src={a.avatar_url} alt={a.name || ''} className="w-full h-full object-cover" />
-                        ) : (
-                          (a.name || '?').charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-semibold text-gray-800 truncate">{a.name}</p>
-                          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-medium shrink-0 ${statusColor(a.employmentStatus)}`}>
-                            {a.employmentStatus}
-                          </span>
+                      <div className="flex items-start gap-3">
+                        <div className={`w-10 h-10 rounded-full ${AVATAR_COLORS[idx % AVATAR_COLORS.length]} flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden shadow-2xs border border-white`}>
+                          {a.avatar_url ? (
+                            <img src={a.avatar_url} alt={a.name || ''} className="w-full h-full object-cover" />
+                          ) : (
+                            (a.name || '?').charAt(0).toUpperCase()
+                          )}
                         </div>
 
-                        <div className="mt-1 space-y-0.5">
-                          {a.position && (
-                            <p className="text-gray-600 flex items-center gap-1">
-                              <BriefcaseIcon className="w-3 h-3 text-gray-400 shrink-0" />
-                              <span className="truncate">{a.position}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-bold text-gray-900 text-sm truncate leading-snug">{a.name}</p>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 border ${statusColor(a.employmentStatus)}`}>
+                              {a.employmentStatus}
+                            </span>
+                          </div>
+
+                          {/* Position & Company */}
+                          {(a.position || a.company) && (
+                            <p className="text-xs text-gray-700 font-medium mt-0.5 truncate flex items-center gap-1.5">
+                              <BriefcaseIcon className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                              <span className="truncate">
+                                <span className="font-semibold text-gray-900">{a.position || 'Alumni'}</span>
+                                {a.company && <span className="text-gray-500 font-normal"> at <strong className="font-medium text-gray-800">{a.company}</strong></span>}
+                              </span>
                             </p>
                           )}
-                          {a.company && (
-                            <p className="text-gray-500 flex items-center gap-1">
-                              <BuildingOfficeIcon className="w-3 h-3 text-gray-400 shrink-0" />
-                              <span className="truncate">{a.company}</span>
-                            </p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-gray-500">
-                            {a.salary && (
-                              <span className="flex items-center gap-1 text-emerald-600 font-medium">
-                                <CurrencyDollarIcon className="w-3 h-3 shrink-0" />
-                                {a.salary}
+
+                          {/* Meta Information Section */}
+                          <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-gray-500">
+                            {(a.program || a.batch) && (
+                              <span className="flex items-center gap-1 text-[11px] text-gray-600">
+                                <AcademicCapIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                <span className="truncate max-w-[220px]">
+                                  {a.program}
+                                  {a.batch ? ` (Batch ${a.batch})` : ''}
+                                </span>
                               </span>
                             )}
+
                             {a.location && (
-                              <span className="flex items-center gap-1">
-                                <MapPinIcon className="w-3 h-3 text-gray-400 shrink-0" />
-                                {a.location}
+                              <span className="flex items-center gap-1 text-[11px] text-gray-500">
+                                <MapPinIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                <span className="truncate">{a.location}</span>
                               </span>
                             )}
+
                             {a.jobType && (
-                              <span className="flex items-center gap-1 capitalize">
-                                <TagIcon className="w-3 h-3 text-gray-400 shrink-0" />
-                                {a.jobType}
+                              <span className="flex items-center gap-1 text-[11px] text-gray-500 capitalize">
+                                <TagIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                <span>{a.jobType}</span>
                               </span>
                             )}
-                            {a.batch && (
-                              <span className="flex items-center gap-1">
-                                <AcademicCapIcon className="w-3 h-3 text-gray-400 shrink-0" />
-                                Batch {a.batch}
-                              </span>
-                            )}
-                            {a.program && (
-                              <span className="flex items-center gap-1 truncate max-w-full">
-                                <ClockIcon className="w-3 h-3 text-gray-400 shrink-0" />
-                                {a.program}
+
+                            {a.salary && (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/80">
+                                <CurrencyDollarIcon className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                                <span>₱{a.salary}</span>
                               </span>
                             )}
                           </div>
+
+                          {/* Skills Section */}
                           {a.skills && a.skills.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
+                            <div className="flex flex-wrap items-center gap-1 mt-2.5">
                               {a.skills.map((s: string) => (
-                                <span key={s} className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded-md text-[9px] font-medium">
+                                <span key={s} className="px-2 py-0.5 bg-orange-50/80 text-orange-700 rounded-md text-[10px] font-medium border border-orange-100">
                                   {s}
                                 </span>
                               ))}

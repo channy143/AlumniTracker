@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { adminApi } from '@/services/api';
+import { adminApi, jobsApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
 import { BriefcaseIcon, MapPinIcon, CalendarDaysIcon, ClockIcon, CurrencyDollarIcon, BuildingOfficeIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import ApplicantScreeningModal from '@/components/admin/ApplicantScreeningModal';
 
 const EMPTY_FORM = {
-  company_name: '', position: '', description: '', location: '', job_type: 'full-time',
+  employer_id: '', company_name: '', position: '', description: '', location: '', job_type: 'full-time',
   salary_range: '', industry: '', experience_level: 'entry', required_skills: [] as string[],
   application_url: '', is_alumni_exclusive: false, is_remote: false, expires_at: '',
 };
@@ -25,10 +25,34 @@ export default function JobManagement() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<any>({ ...EMPTY_FORM });
   const [formError, setFormError] = useState('');
+  const [employers, setEmployers] = useState<any[]>([]);
+  const [showNewEmployer, setShowNewEmployer] = useState(false);
+  const [newEmployer, setNewEmployer] = useState({ company_name: '', industry: '', contact_person: '', contact_email: '' });
+  const [creatingEmployer, setCreatingEmployer] = useState(false);
+  const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+  const [skillInput, setSkillInput] = useState('');
   const addNotification = useUIStore((s) => s.addNotification);
   const limit = 15;
 
   const [screeningJob, setScreeningJob] = useState<any>(null);
+
+  const loadEmployers = async () => {
+    try {
+      const list: any = await adminApi.employersList();
+      setEmployers(Array.isArray(list) ? list : []);
+    } catch {
+      setEmployers([]);
+    }
+  };
+
+  const loadSkills = async () => {
+    try {
+      const list: any = await jobsApi.skills();
+      setAvailableSkills(Array.isArray(list) ? list : []);
+    } catch {
+      setAvailableSkills([]);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,18 +64,48 @@ export default function JobManagement() {
     finally { setLoading(false); }
   }, [page, search, status]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    loadEmployers();
+    loadSkills();
+  }, [load]);
+
+  const handleCreateEmployer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmployer.company_name.trim()) return;
+    setCreatingEmployer(true);
+    try {
+      const created: any = await adminApi.createEmployer(newEmployer);
+      setEmployers((prev) => [created, ...prev]);
+      setForm((f: any) => ({
+        ...f,
+        employer_id: created.id,
+        company_name: created.company_name,
+        industry: created.industry || f.industry,
+      }));
+      setShowNewEmployer(false);
+      setNewEmployer({ company_name: '', industry: '', contact_person: '', contact_email: '' });
+      addNotification('Employer created successfully', 'success');
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to create employer', 'error');
+    } finally {
+      setCreatingEmployer(false);
+    }
+  };
 
   const openCreate = () => {
     setEditId(null);
     setForm({ ...EMPTY_FORM });
     setFormError('');
+    setShowNewEmployer(false);
+    setSkillInput('');
     setShowForm(true);
   };
 
   const openEdit = (job: any) => {
     setEditId(job.id);
     setForm({
+      employer_id: job.employer_id || '',
       company_name: job.company_name || '',
       position: job.position || '',
       description: job.description || '',
@@ -67,6 +121,8 @@ export default function JobManagement() {
       expires_at: job.expires_at ? job.expires_at.slice(0, 10) : '',
     });
     setFormError('');
+    setShowNewEmployer(false);
+    setSkillInput('');
     setShowForm(true);
   };
 
@@ -89,7 +145,7 @@ export default function JobManagement() {
   };
 
   const handleClose = async (id: string) => {
-    if (!window.confirm('Close this job posting? It will no longer appear on the alumni career hub.')) return;
+    if (!window.confirm('Close this job posting? It will no longer appear on the alumni job postings.')) return;
     try {
       await adminApi.jobClose(id);
       addNotification('Job posting closed', 'success');
@@ -216,7 +272,106 @@ export default function JobManagement() {
             <h2 className="text-sm font-bold text-gray-900 mb-4">{editId ? 'Edit Job Opportunity' : 'Post a Job Opportunity'}</h2>
             {formError && <div className="bg-red-50 text-red-700 px-3 py-2 rounded-lg mb-3 text-xs">{formError}</div>}
             <form onSubmit={handleSave} className="space-y-3">
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Company Name *</label><input type="text" value={form.company_name} onChange={setField('company_name')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
+              {/* Employer Selection */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-gray-700">Employer *</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewEmployer(!showNewEmployer)}
+                    className="text-[11px] font-medium text-orange-600 hover:text-orange-700"
+                  >
+                    {showNewEmployer ? 'Cancel New Employer' : '+ Add New Employer'}
+                  </button>
+                </div>
+
+                {showNewEmployer ? (
+                  <div className="p-3 bg-orange-50/70 border border-orange-200 rounded-lg space-y-2 mb-2">
+                    <p className="text-[11px] font-semibold text-orange-900">New Employer Information</p>
+                    <input
+                      type="text"
+                      placeholder="Company Name *"
+                      value={newEmployer.company_name}
+                      onChange={(e) => setNewEmployer((ne) => ({ ...ne, company_name: e.target.value }))}
+                      className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                      required
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Industry (e.g. Technology)"
+                        value={newEmployer.industry}
+                        onChange={(e) => setNewEmployer((ne) => ({ ...ne, industry: e.target.value }))}
+                        className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Contact Person"
+                        value={newEmployer.contact_person}
+                        onChange={(e) => setNewEmployer((ne) => ({ ...ne, contact_person: e.target.value }))}
+                        className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                      />
+                    </div>
+                    <input
+                      type="email"
+                      placeholder="Contact Email"
+                      value={newEmployer.contact_email}
+                      onChange={(e) => setNewEmployer((ne) => ({ ...ne, contact_email: e.target.value }))}
+                      className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                    />
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewEmployer(false)}
+                        className="px-2.5 py-1 text-xs text-gray-600 bg-white border border-gray-200 rounded hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreateEmployer}
+                        disabled={creatingEmployer || !newEmployer.company_name.trim()}
+                        className="px-2.5 py-1 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600 disabled:opacity-50"
+                      >
+                        {creatingEmployer ? 'Saving...' : 'Save Employer'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <select
+                      value={form.employer_id || ''}
+                      onChange={(e) => {
+                        const empId = e.target.value;
+                        const found = employers.find((emp) => emp.id === empId);
+                        setForm((f: any) => ({
+                          ...f,
+                          employer_id: empId,
+                          company_name: found ? found.company_name : f.company_name,
+                          industry: found?.industry || f.industry,
+                        }));
+                      }}
+                      className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full bg-white"
+                    >
+                      <option value="">Select an Existing Employer (or type below)</option>
+                      {employers.map((emp) => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.company_name} {emp.industry ? `(${emp.industry})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Company Name (auto-filled or custom) *"
+                      value={form.company_name}
+                      onChange={setField('company_name')}
+                      className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Position *</label><input type="text" value={form.position} onChange={setField('position')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Description *</label><textarea value={form.description} onChange={setField('description')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" rows={3} required /></div>
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Location *</label><input type="text" value={form.location} onChange={setField('location')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
@@ -240,22 +395,47 @@ export default function JobManagement() {
                     ))}
                     <input
                       type="text"
+                      value={skillInput}
+                      onChange={(e) => setSkillInput(e.target.value)}
                       placeholder={form.required_skills.length === 0 ? 'Type skill and press Enter...' : ''}
                       className="flex-1 min-w-[120px] outline-none text-xs p-0.5"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ',') {
                           e.preventDefault();
-                          const value = e.currentTarget.value.replace(/,/g, '').trim();
+                          const value = skillInput.replace(/,/g, '').trim();
                           if (value && !form.required_skills.includes(value)) {
                             setForm((f: any) => ({ ...f, required_skills: [...f.required_skills, value] }));
                           }
-                          e.currentTarget.value = '';
-                        } else if (e.key === 'Backspace' && !e.currentTarget.value && form.required_skills.length > 0) {
+                          setSkillInput('');
+                        } else if (e.key === 'Backspace' && !skillInput && form.required_skills.length > 0) {
                           setForm((f: any) => ({ ...f, required_skills: f.required_skills.slice(0, -1) }));
                         }
                       }}
                     />
                   </div>
+
+                  {/* Suggestions list */}
+                  {skillInput.trim() && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5 pt-1.5 border-t border-gray-100">
+                      <span className="text-[10px] text-gray-400 mr-1">Suggestions:</span>
+                      {availableSkills
+                        .filter((s) => s.toLowerCase().includes(skillInput.toLowerCase()) && !form.required_skills.includes(s))
+                        .slice(0, 6)
+                        .map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => {
+                              setForm((f: any) => ({ ...f, required_skills: [...f.required_skills, s] }));
+                              setSkillInput('');
+                            }}
+                            className="px-2 py-0.5 rounded text-[10px] bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 transition-colors"
+                          >
+                            + {s}
+                          </button>
+                        ))}
+                    </div>
+                  )}
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">Press Enter or comma to add. Backspace to remove last.</p>
               </div>

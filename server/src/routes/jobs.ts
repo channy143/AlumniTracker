@@ -55,6 +55,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       const poster = job.posted_by ? posterMap.get(job.posted_by) || null : null;
       return {
         id: job.id,
+        employer_id: job.employer_id || null,
         company_name: job.company_name,
         position: job.position,
         description: job.description,
@@ -63,6 +64,10 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
         job_type: job.job_type,
         salary_range: job.salary_range,
         is_alumni_exclusive: job.is_alumni_exclusive,
+        required_skills: job.required_skills || [],
+        experience_level: job.experience_level || 'entry',
+        is_remote: job.is_remote || false,
+        industry: job.industry || null,
         created_at: job.created_at,
         expires_at: job.expires_at,
         company_website: companyInfo?.website || null,
@@ -80,22 +85,81 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   }
 });
 
+router.get('/skills', authenticate, async (_req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from('skills')
+      .select('name');
+    if (error && (error.code === '42P01' || error.code === 'PGRST205')) return res.json([]);
+    if (error) throw new AppError(error.message, 500);
+    const uniqueSkills = Array.from(
+      new Set((data || []).map((s: any) => (s.name || '').trim()).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b));
+    res.json(uniqueSkills);
+  } catch (err) { next(err); }
+});
+
 router.get('/my-applications', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const db = createUserScopedClient(req.token!);
     const { data: applications, error } = await db
       .from('job_applications')
-      .select('id, job_id, status, applied_at, resume_url, cover_letter, job:job_postings(id, company_name, position, location, job_type, salary_range, is_alumni_exclusive, expires_at, is_remote)')
+      .select('id, job_id, status, applied_at, resume_url, cover_letter, match_percentage, matched_skills, missing_skills, screening_notes, is_screened, screened_at, job:job_postings(id, company_name, position, location, job_type, salary_range, is_alumni_exclusive, expires_at, is_remote, required_skills, experience_level)')
       .eq('user_id', req.user!.userId)
       .order('applied_at', { ascending: false });
 
     if (error && (error.code === '42P01' || error.code === 'PGRST205')) return res.json([]);
     if (error) throw new AppError(error.message, 500);
 
-    res.json(applications || []);
+    const appIds = (applications || []).map((a: any) => a.id);
+    const screeningMap = new Map<string, any>();
+    if (appIds.length > 0) {
+      const { data: screenings } = await supabase
+        .from('application_screening')
+        .select('*')
+        .in('application_id', appIds)
+        .order('screened_at', { ascending: false });
+      (screenings || []).forEach((s: any) => {
+        if (!screeningMap.has(s.application_id)) screeningMap.set(s.application_id, s);
+      });
+    }
+
+    const enriched = (applications || []).map((a: any) => ({
+      ...a,
+      screening: screeningMap.get(a.id) || null,
+    }));
+
+    res.json(enriched);
   } catch (err) {
     next(err);
   }
+});
+
+router.delete('/applications/:id', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: existing, error: findError } = await db
+      .from('job_applications')
+      .select('id, user_id, status')
+      .eq('id', req.params.id)
+      .eq('user_id', req.user!.userId)
+      .maybeSingle();
+
+    if (findError && (findError.code === '42P01' || findError.code === 'PGRST205')) {
+      throw new AppError('Job applications table not found', 404);
+    }
+    if (findError) throw new AppError(findError.message, 500);
+    if (!existing) throw new AppError('Application not found', 404);
+
+    const { error: deleteError } = await db
+      .from('job_applications')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('user_id', req.user!.userId);
+
+    if (deleteError) throw new AppError(deleteError.message, 500);
+    res.json({ message: 'Application withdrawn successfully' });
+  } catch (err) { next(err); }
 });
 
 router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) => {
@@ -132,6 +196,7 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
 
     res.json({
       id: job.id,
+      employer_id: job.employer_id || null,
       company_name: job.company_name,
       position: job.position,
       description: job.description,
@@ -140,6 +205,10 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       job_type: job.job_type,
       salary_range: job.salary_range,
       is_alumni_exclusive: job.is_alumni_exclusive,
+      required_skills: job.required_skills || [],
+      experience_level: job.experience_level || 'entry',
+      is_remote: job.is_remote || false,
+      industry: job.industry || null,
       created_at: job.created_at,
       expires_at: job.expires_at,
       company_website: companyInfo?.website || null,

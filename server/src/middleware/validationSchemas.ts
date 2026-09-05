@@ -221,8 +221,17 @@ export const referralRespondSchema = z.object({
 const httpsUrl = z.string().url('Must be a valid URL').max(500)
   .refine((u) => /^https:\/\//i.test(u), 'URL must be an https:// URL');
 
+export const createEmployerSchema = z.object({
+  company_name: z.string().min(1, 'Company name is required').max(255),
+  industry: z.string().max(100).optional().nullable(),
+  contact_person: z.string().max(255).optional().nullable(),
+  contact_email: z.string().email('Invalid email').max(255).optional().nullable(),
+}).strict();
+
 export const adminCreateJobSchema = z.object({
-  company_id: z.string().min(1, 'Company is required').max(64),
+  company_id: z.string().max(64).optional().nullable(),
+  employer_id: z.string().max(64).optional().nullable(),
+  company_name: z.string().max(200).optional().nullable(),
   position: z.string().min(1, 'Position is required').max(200),
   description: z.string().min(1, 'Description is required').max(50000),
   requirements: z.array(z.string().max(2000)).max(500).optional(),
@@ -240,7 +249,9 @@ export const adminCreateJobSchema = z.object({
 
 // Admin update schema: all fields optional but each validated
 export const adminUpdateJobSchema = z.object({
-  company_id: z.string().max(64).optional(),
+  company_id: z.string().max(64).optional().nullable(),
+  employer_id: z.string().max(64).optional().nullable(),
+  company_name: z.string().max(200).optional().nullable(),
   position: z.string().max(200).optional(),
   description: z.string().max(50000).optional(),
   requirements: z.array(z.string().max(2000)).max(500).optional(),
@@ -257,12 +268,17 @@ export const adminUpdateJobSchema = z.object({
 }).strict();
 
 export const applicationStatusSchema = z.object({
-  status: z.enum(['pending', 'reviewed', 'shortlisted', 'accepted', 'rejected']),
+  status: z.enum(['pending', 'under_review', 'shortlisted', 'rejected', 'hired', 'reviewed', 'accepted']),
 }).strict();
 
 export const screenApplicationSchema = z.object({
   matched_skills: z.array(z.string().max(100)).max(500),
   screening_notes: z.string().max(500).optional().nullable(),
+  status: z.enum(['pending', 'under_review', 'shortlisted', 'rejected', 'hired', 'reviewed', 'accepted']).optional(),
+  skills_match_score: z.number().min(0).max(100).optional(),
+  experience_match_score: z.number().min(0).max(100).optional(),
+  education_match_score: z.number().min(0).max(100).optional(),
+  overall_match_score: z.number().min(0).max(100).optional(),
 }).strict();
 
 // -----------------------------------------------------------------------------
@@ -303,3 +319,4 @@ export const adminEligibleCreateSchema = z.object({
   program: z.string().max(200).optional().nullable(),
   year_graduated: z.number().int().min(1900).max(2100).optional().nullable(),
 }).strict();
+

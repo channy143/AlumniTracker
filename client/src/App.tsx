@@ -21,6 +21,7 @@ import EventsPage from '@/pages/events/EventsPage';
 import AnnouncementsPage from '@/pages/announcements/AnnouncementsPage';
 import JobsPage from '@/pages/jobs/JobsPage';
 import SurveyPage from '@/pages/survey/SurveyPage';
+import EmployerDashboard from '@/pages/employer/EmployerDashboard';
 
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AlumniManagement from '@/pages/admin/AlumniManagement';
@@ -94,6 +95,7 @@ export default function App() {
         <Route path="links" element={<UsefulLinksPage />} />
         <Route path="announcements" element={<AnnouncementsPage />} />
         <Route path="jobs" element={<JobsPage />} />
+        <Route path="employer/dashboard" element={<EmployerDashboard />} />
         <Route path="events" element={<EventsPage />} />
         <Route path="surveys/:id" element={<SurveyPage />} />
         <Route path="support" element={<SupportPage />} />
@@ -123,6 +125,7 @@ export default function App() {
         <Route path="/admin/curriculum" element={<CurriculumInsights />} />
         <Route path="/admin/employers" element={<EmployerInsights />} />
         <Route path="/admin/employers/:name" element={<EmployerDetail />} />
+        <Route path="/admin/employer-dashboard" element={<EmployerDashboard />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
         <Route path="/admin/settings" element={<SystemSettings />} />
         <Route path="/admin/activity" element={<AdminActivity />} />

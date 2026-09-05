@@ -32,6 +32,13 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #9ca3af;
   }
+
+  button:focus:not(:focus-visible),
+  button:active {
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    box-shadow: none !important;
+  }
 }
 
 @layer utilities {
@@ -41,23 +48,29 @@
     scrollbar-color: transparent transparent;
     transition: scrollbar-color 0.2s;
   }
+
   .scrollbar-hover:hover {
     scrollbar-color: #d1d5db transparent;
   }
+
   .scrollbar-hover::-webkit-scrollbar {
     width: 4px;
     display: none;
   }
+
   .scrollbar-hover:hover::-webkit-scrollbar {
     display: block;
   }
+
   .scrollbar-hover::-webkit-scrollbar-thumb {
     background: transparent;
     border-radius: 3px;
   }
+
   .scrollbar-hover:hover::-webkit-scrollbar-thumb {
     background: #d1d5db;
   }
+
   .scrollbar-hover::-webkit-scrollbar-thumb:hover {
     background: #9ca3af;
   }
@@ -65,22 +78,15 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-ctu-blue text-white px-6 py-2.5 rounded-lg font-medium
-      hover:bg-blue-900 transition-colors duration-200
-      focus:outline-none focus:ring-2 focus:ring-ctu-blue focus:ring-offset-2
-      disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-ctu-blue text-white px-6 py-2.5 rounded-lg font-medium hover:bg-blue-900 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ctu-blue focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply border-2 border-ctu-blue text-ctu-blue px-6 py-2.5 rounded-lg font-medium
-      hover:bg-ctu-blue hover:text-white transition-colors duration-200
-      focus:outline-none focus:ring-2 focus:ring-ctu-blue focus:ring-offset-2;
+    @apply border-2 border-ctu-blue text-ctu-blue px-6 py-2.5 rounded-lg font-medium hover:bg-ctu-blue hover:text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ctu-blue focus:ring-offset-2;
   }
 
   .btn-gold {
-    @apply bg-ctu-gold text-white px-6 py-2.5 rounded-lg font-medium
-      hover:bg-yellow-600 transition-colors duration-200
-      focus:outline-none focus:ring-2 focus:ring-ctu-gold focus:ring-offset-2;
+    @apply bg-ctu-gold text-white px-6 py-2.5 rounded-lg font-medium hover:bg-yellow-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ctu-gold focus:ring-offset-2;
   }
 
   .card {
@@ -88,9 +94,7 @@
   }
 
   .input-field {
-    @apply w-full px-4 py-2.5 border border-gray-300 rounded-lg
-      focus:outline-none focus:ring-2 focus:ring-ctu-blue focus:border-transparent
-      placeholder:text-gray-400 transition-all duration-200;
+    @apply w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ctu-blue focus:border-transparent placeholder:text-gray-400 transition-all duration-200;
   }
 
   .section-title {
@@ -127,6 +131,61 @@
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-12px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes slowSwirl {
+  0% {
+    transform: translate(-10%, -10%) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translate(10%, 10%) rotate(180deg) scale(1.2);
+  }
+  100% {
+    transform: translate(-10%, -10%) rotate(360deg) scale(1);
+  }
+}
+
+@keyframes slowSwirlReverse {
+  0% {
+    transform: translate(10%, -5%) rotate(360deg) scale(1.15);
+  }
+  50% {
+    transform: translate(-10%, 5%) rotate(180deg) scale(0.9);
+  }
+  100% {
+    transform: translate(10%, -5%) rotate(0deg) scale(1.15);
+  }
+}
+
+.animate-slow-swirl {
+  animation: slowSwirl 20s ease-in-out infinite alternate;
+}
+
+.animate-slow-swirl-reverse {
+  animation: slowSwirlReverse 26s ease-in-out infinite alternate;
+}
+
+@keyframes slowWaveDrift {
+  0% {
+    transform: translate(-3%, -2%) rotate(0deg) scale(1.03);
+  }
+  50% {
+    transform: translate(3%, 3%) rotate(2.5deg) scale(1.08);
+  }
+  100% {
+    transform: translate(-3%, -2%) rotate(0deg) scale(1.03);
+  }
+}
+
+.animate-slow-wave {
+  animation: slowWaveDrift 20s ease-in-out infinite alternate;
 }

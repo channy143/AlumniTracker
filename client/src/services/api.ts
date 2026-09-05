@@ -50,7 +50,7 @@ export const api = {
     });
   },
   upload: <T>(endpoint: string, formData: FormData) => {
-  const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
+    const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
     return fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
       headers: {
@@ -176,6 +176,8 @@ export const jobsApi = {
   create: (data: any) => api.post<any>('/jobs', data),
   myApplications: () => api.get<any[]>('/jobs/my-applications'),
   myApplication: (id: string) => api.get<any>(`/jobs/${id}/my-application`),
+  withdraw: (id: string) => api.delete<{ message: string }>(`/jobs/applications/${id}`),
+  skills: () => api.get<string[]>('/jobs/skills'),
   apply: (jobId: string, data: { cover_letter?: string; resume?: File }) => {
     const formData = new FormData();
     if (data.cover_letter) formData.append('cover_letter', data.cover_letter);
@@ -236,11 +238,20 @@ export const adminApi = {
   jobUpdate: (id: string, data: any) => api.put<any>(`/admin/jobs/${id}`, data),
   jobDelete: (id: string) => api.delete(`/admin/jobs/${id}`),
   jobClose: (id: string) => api.put<any>(`/admin/jobs/${id}/close`, {}),
-  jobApplicants: (id: string) => api.get<any[]>(`/admin/jobs/${id}/applicants`),
+  jobApplicants: (id: string) => api.get<any>(`/admin/jobs/${id}/applicants`),
   jobUpdateApplicantStatus: (applicationId: string, status: string) => api.put<any>(`/admin/jobs/applications/${applicationId}/status`, { status }),
-  screenApplication: (applicationId: string, data: { matched_skills: string[]; screening_notes?: string }) =>
-    api.put<any>(`/admin/jobs/applications/${applicationId}/screen`, data),
+  screenApplication: (applicationId: string, data: {
+    matched_skills: string[];
+    screening_notes?: string;
+    status?: string;
+    skills_match_score?: number;
+    experience_match_score?: number;
+    education_match_score?: number;
+    overall_match_score?: number;
+  }) => api.put<any>(`/admin/jobs/applications/${applicationId}/screen`, data),
   exportApplicants: (jobId: string) => api.download(`/admin/jobs/${jobId}/applicants/export`),
+  employersList: () => api.get<any[]>('/admin/jobs/employers'),
+  createEmployer: (data: any) => api.post<any>('/admin/jobs/employers', data),
 
   surveyList: (params: Record<string, any> = {}) => api.get<any[]>(`/admin/surveys?${toQuery(params)}`),
   surveyCreate: (data: any) => api.post<any>('/admin/surveys', data),
@@ -271,7 +282,7 @@ export const adminApi = {
   reportSurvey: (id: string, format = 'json') => api.get<Blob>(`/admin/reports/survey/${id}?format=${format}`),
   reportCareerProgress: (format = 'json') => api.get<Blob>(`/admin/reports/career-progress?format=${format}`),
 
-employmentRate: (params: Record<string, any> = {}) => api.get<any>(`/admin/analytics/employment-rate?${toQuery(params)}`),
+  employmentRate: (params: Record<string, any> = {}) => api.get<any>(`/admin/analytics/employment-rate?${toQuery(params)}`),
   employmentByCourse: (params: Record<string, any> = {}) => api.get<any[]>(`/admin/analytics/employment-by-course?${toQuery(params)}`),
   employmentByCourseCsv: () => api.get<Blob>(`/admin/analytics/employment-by-course?format=csv`),
   employmentByBatch: () => api.get<any[]>('/admin/analytics/employment-by-batch'),
@@ -353,4 +364,10 @@ export const directoryApi = {
 
 export const publicApi = {
   stats: () => api.get<{ totalAlumni: number; employmentRate: number; mentorshipMatches: number; programsTracked: number }>('/public/stats'),
+};
+
+export const employerApi = {
+  dashboard: (employerId?: string) =>
+    api.get<any>(`/employer/dashboard${employerId ? `?employer_id=${encodeURIComponent(employerId)}` : ''}`),
+  downloadReport: (jobId: string) => api.download(`/employer/reports/${jobId}`),
 };

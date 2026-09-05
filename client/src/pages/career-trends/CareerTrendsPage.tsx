@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { BriefcaseIcon, BuildingOfficeIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { BriefcaseIcon, BuildingOfficeIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 import { careerTrendsApi } from '@/services/api';
+import { formatExperience } from '@/utils/formatExperience';
 import CareerLeaderboardNav, { type RankCard } from './CareerLeaderboardNav';
 import CareerCardInsightsPanel from './CareerCardInsightsPanel';
 
@@ -88,11 +89,10 @@ function FilterDropdown({ label, options, selected, onChange, formatLabel }: {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors whitespace-nowrap ${
-          selected
+        className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors whitespace-nowrap ${selected
             ? 'bg-orange-50 border-orange-300 text-orange-700 font-medium'
             : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-        }`}
+          }`}
       >
         {label}{selected && `: ${formatLabel ? formatLabel(selected) : selected}`}
         <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -109,11 +109,10 @@ function FilterDropdown({ label, options, selected, onChange, formatLabel }: {
             <button
               key={opt}
               onClick={() => { onChange(opt); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-xs rounded transition-colors ${
-                selected === opt
+              className={`w-full text-left px-3 py-1.5 text-xs rounded transition-colors ${selected === opt
                   ? 'bg-orange-50 text-orange-700 font-semibold'
                   : 'text-gray-700 hover:bg-gray-50'
-              }`}
+                }`}
             >
               {formatLabel ? formatLabel(opt) : opt}
               {selected === opt && <span className="float-right text-orange-500">&#10003;</span>}
@@ -128,43 +127,70 @@ function FilterDropdown({ label, options, selected, onChange, formatLabel }: {
 function CareerCard({ career }: { career: CareerTrend }) {
   const navigate = useNavigate();
   return (
-    <div className="bg-white border border-gray-200 rounded-lg">
-      <div className="py-3 px-4">
-        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-          <BriefcaseIcon className="w-4 h-4 text-orange-500" />
-          <span className="font-medium text-gray-700">Career Trend</span>
-          <span className="text-gray-400">&middot;</span>
-          <span>{formatNumber(career.alumniCount)} alumni</span>
+    <div className="bg-white border border-gray-200/90 hover:border-orange-300 rounded-xl p-4 transition-all duration-150 hover:shadow-xs group">
+      {/* Top Header Row */}
+      <div className="flex items-start justify-between gap-3 mb-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-orange-100/80 text-orange-600 flex items-center justify-center shrink-0">
+            <BriefcaseIcon className="w-4 h-4" />
+          </div>
+          <h3 className="text-base font-bold text-gray-900 group-hover:text-orange-600 transition-colors truncate">
+            {career.position}
+          </h3>
         </div>
 
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">{career.position}</h3>
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-100 shrink-0">
+          <UserGroupIcon className="w-3.5 h-3.5 text-orange-500" />
+          {formatNumber(career.alumniCount)} alumni
+        </span>
+      </div>
 
-        <div className="space-y-1 text-xs text-gray-600 mb-2">
-          {career.topEmployers.length > 0 && (
-            <div>
-              <span className="text-gray-500">Top Employers: </span>
-              {career.topEmployers.map((e) => e.name).join(', ')}
+      {/* Middle Grid of Structured Information */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs py-2.5 border-t border-b border-gray-100 mb-3">
+        {career.topEmployers.length > 0 && (
+          <div className="flex items-start gap-1.5 text-gray-600 min-w-0">
+            <BuildingOfficeIcon className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <span className="text-gray-400 text-[11px] block font-medium">Top Employers</span>
+              <span className="font-semibold text-gray-800 truncate block" title={career.topEmployers.map((e) => e.name).join(', ')}>
+                {career.topEmployers.map((e) => e.name).join(', ')}
+              </span>
             </div>
-          )}
-          {career.mostCommonCourse && (
-            <div className="whitespace-nowrap overflow-hidden text-ellipsis">
-              <span className="text-gray-500">Common Course: </span>
-              {career.mostCommonCourse}
-            </div>
-          )}
-          {career.averageExperienceYears > 0 && (
-            <div>
-              <span className="text-gray-500">Avg Experience: </span>
-              {career.averageExperienceYears} years
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
+        {career.mostCommonCourse && (
+          <div className="flex items-start gap-1.5 text-gray-600 min-w-0">
+            <AcademicCapIcon className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <span className="text-gray-400 text-[11px] block font-medium">Common Program</span>
+              <span className="font-semibold text-gray-800 truncate block" title={career.mostCommonCourse}>
+                {career.mostCommonCourse}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {career.averageExperienceYears > 0 && (
+          <div className="flex items-start gap-1.5 text-gray-600 min-w-0">
+            <ClockIcon className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <span className="text-gray-400 text-[11px] block font-medium">Average Experience</span>
+              <span className="font-semibold text-gray-800 truncate block">
+                {formatExperience(career.averageExperienceYears)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer Action */}
+      <div className="flex items-center justify-end">
         <button
           onClick={() => navigate(`/career-trends/${encodeURIComponent(career.position)}`)}
-          className="text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors flex items-center gap-1"
+          className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors flex items-center gap-1.5 py-1 px-2.5 rounded-lg hover:bg-orange-50/60"
         >
-          View Career Insights <ArrowRightIcon className="w-3 h-3" />
+          View Career Insights <ArrowRightIcon className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
@@ -195,7 +221,7 @@ export default function CareerTrendsPage() {
     let cancelled = false;
     careerTrendsApi.list()
       .then((res) => { if (!cancelled) setData(res); })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -243,11 +269,11 @@ export default function CareerTrendsPage() {
   const filteredCareers = (() => {
     let list = isSearching
       ? allCareers.filter((c) =>
-          matchQuery(c.position, query) ||
-          c.topEmployers.some((e) => matchQuery(e.name, query)) ||
-          (c.mostCommonCourse && matchQuery(c.mostCommonCourse, query)) ||
-          c.topSkills.some((s) => matchQuery(s.name, query))
-        )
+        matchQuery(c.position, query) ||
+        c.topEmployers.some((e) => matchQuery(e.name, query)) ||
+        (c.mostCommonCourse && matchQuery(c.mostCommonCourse, query)) ||
+        c.topSkills.some((s) => matchQuery(s.name, query))
+      )
       : [...allCareers];
 
     if (selectedPosition) list = list.filter((c) => c.position === selectedPosition);
@@ -290,7 +316,7 @@ export default function CareerTrendsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-4">
           <div className="h-5 w-32 bg-gray-200 animate-pulse rounded mb-1" />
           <div className="h-3 w-64 bg-gray-200 animate-pulse rounded" />
@@ -312,7 +338,7 @@ export default function CareerTrendsPage() {
               </div>
             ))}
           </div>
-          <aside className="hidden lg:block w-80 shrink-0 self-stretch">
+          <aside className="hidden lg:block w-96 xl:w-[410px] shrink-0 self-stretch">
             <div className="sticky top-16 bg-white border border-gray-200 rounded-xl overflow-hidden">
               <div className="grid grid-cols-2 gap-2 p-3">
                 {[1, 2, 3, 4].map((i) => (
@@ -339,7 +365,7 @@ export default function CareerTrendsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       <div className="mb-4">
         <h1 className="text-base font-bold text-gray-900">Career Trends</h1>
         <p className="text-xs text-gray-500">Employment insights and career trends based on alumni data.</p>
@@ -362,11 +388,10 @@ export default function CareerTrendsPage() {
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={() => { clearAllFilters(); }}
-            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-              !hasAnyFilter && sortBy === 'all'
+            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${!hasAnyFilter && sortBy === 'all'
                 ? 'bg-orange-500 text-white shadow-sm'
                 : 'text-gray-500 hover:bg-gray-100'
-            }`}
+              }`}
           >
             All Careers
           </button>
@@ -460,7 +485,7 @@ export default function CareerTrendsPage() {
           )}
         </div>
 
-        <aside className="hidden lg:block w-80 shrink-0 self-stretch">
+        <aside className="hidden lg:block w-96 xl:w-[410px] shrink-0 self-stretch">
           <div className="sticky top-16 h-[calc(100vh-4rem)]">
             <CareerLeaderboardNav
               data={data}

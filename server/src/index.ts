@@ -1,4 +1,10 @@
 import 'dotenv/config';
+import path from 'path';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), 'server/.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 // Validate JWT_SECRET before importing anything that uses it
 const jwtSecret = process.env.JWT_SECRET;

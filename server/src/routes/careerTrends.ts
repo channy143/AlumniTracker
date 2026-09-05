@@ -133,8 +133,12 @@ router.get('/', authenticate, async (req, res, next) => {
       if (e.start_date) {
         const end = e.end_date ? new Date(e.end_date) : new Date();
         const start = new Date(e.start_date);
-        const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-        if (months > 0) career.experienceMonths.push(months);
+        const diffMs = end.getTime() - start.getTime();
+        if (diffMs > 0) {
+          const days = diffMs / (1000 * 60 * 60 * 24);
+          const months = Math.max(days / 30.4375, 0.05);
+          career.experienceMonths.push(months);
+        }
       }
 
       // Track filter data per career
@@ -174,9 +178,9 @@ router.get('/', authenticate, async (req, res, next) => {
         const sortedCourses = Array.from(data.courses.entries()).sort((a, b) => b[1] - a[1]);
         const sortedSkills = Array.from(data.allSkills.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
         const avgMonths = data.experienceMonths.length > 0
-          ? Math.round(data.experienceMonths.reduce((a, b) => a + b, 0) / data.experienceMonths.length)
+          ? data.experienceMonths.reduce((a, b) => a + b, 0) / data.experienceMonths.length
           : 0;
-        const avgYears = Math.round((avgMonths / 12) * 10) / 10;
+        const avgYears = Math.round((avgMonths / 12) * 100) / 100;
         const alumniCount = data.alumni.size;
 
         return {
@@ -197,20 +201,34 @@ router.get('/', authenticate, async (req, res, next) => {
       .sort((a, b) => b.alumniCount - a.alumniCount);
 
     const employerMap = new Map<string, Set<string>>();
+    const employerIndustryMap = new Map<string, Map<string, number>>();
     currentJobs.forEach((j: any) => {
       if (!j.company_name || j.company_name === 'Unknown') return;
       if (!employerMap.has(j.company_name)) employerMap.set(j.company_name, new Set());
       employerMap.get(j.company_name)!.add(j.profile_id);
+
+      if (j.company_industry && j.company_industry !== 'Unknown') {
+        if (!employerIndustryMap.has(j.company_name)) employerIndustryMap.set(j.company_name, new Map());
+        const indMap = employerIndustryMap.get(j.company_name)!;
+        indMap.set(j.company_industry, (indMap.get(j.company_industry) || 0) + 1);
+      }
     });
     const topEmployers = Array.from(employerMap.entries())
-      .map(([name, alumni]) => ({ name, alumniCount: alumni.size }))
+      .map(([name, alumni]) => {
+        const indMap = employerIndustryMap.get(name);
+        const topInd = indMap ? Array.from(indMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] : null;
+        return { name, alumniCount: alumni.size, industry: topInd || null };
+      })
       .sort((a, b) => b.alumniCount - a.alumniCount);
 
     const industryMap = new Map<string, Set<string>>();
     currentJobs.forEach((j: any) => {
-      if (!j.company_industry || j.company_industry === 'Unknown') return;
-      if (!industryMap.has(j.company_industry)) industryMap.set(j.company_industry, new Set());
-      industryMap.get(j.company_industry)!.add(j.profile_id);
+      const p = profileMap.get(j.profile_id);
+      const raw = (j.company_industry && j.company_industry !== 'Unknown' ? j.company_industry : null) || (p?.industry && p.industry !== 'Unknown' ? p.industry : null);
+      const ind = raw ? raw.trim() : null;
+      if (!ind) return;
+      if (!industryMap.has(ind)) industryMap.set(ind, new Set());
+      industryMap.get(ind)!.add(j.profile_id);
     });
     const totalEmployedCount = currentJobs.length;
     const topIndustries = Array.from(industryMap.entries())
@@ -289,12 +307,16 @@ router.get('/', authenticate, async (req, res, next) => {
       if (e.start_date) {
         const end = e.end_date ? new Date(e.end_date) : new Date();
         const start = new Date(e.start_date);
-        const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-        if (months > 0) allExperienceMonths.push(months);
+        const diffMs = end.getTime() - start.getTime();
+        if (diffMs > 0) {
+          const days = diffMs / (1000 * 60 * 60 * 24);
+          const months = Math.max(days / 30.4375, 0.05);
+          allExperienceMonths.push(months);
+        }
       }
     });
     const avgOverallExperience = allExperienceMonths.length > 0
-      ? Math.round((allExperienceMonths.reduce((a, b) => a + b, 0) / allExperienceMonths.length / 12) * 10) / 10
+      ? Math.round((allExperienceMonths.reduce((a, b) => a + b, 0) / allExperienceMonths.length / 12) * 100) / 100
       : 0;
 
     const distinctBatches = [...new Set(educationFiltered.map((e: any) => e.year_graduated).filter(Boolean))].sort((a: any, b: any) => b - a);
@@ -387,25 +409,37 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       ...profileEmployment.filter((p: any) => !employedIds.has(p.profile_id)),
     ];
     const currentJobs = mergedEmployment;
+    const norm = (str: string) => str ? str.toLowerCase().replace(/\s*&\s*/g, ' and ').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim() : '';
 
     const matches = (e: any): boolean => {
       const p = profileMap.get(e.profile_id);
       switch (type) {
-        case 'employer':
-          return (e.company_name && e.company_name !== 'Unknown' && e.company_name === value);
-        case 'industry':
-          return (e.company_industry && e.company_industry !== 'Unknown' && e.company_industry === value);
+        case 'employer': {
+          const emp = (e.company_name && e.company_name !== 'Unknown' ? e.company_name : null) || (p?.company_name && p.company_name !== 'Unknown' ? p.company_name : null);
+          if (!emp) return false;
+          return emp.trim().toLowerCase() === value.trim().toLowerCase();
+        }
+        case 'industry': {
+          const empInd = (e.company_industry && e.company_industry !== 'Unknown' ? e.company_industry : null) || (p?.industry && p.industry !== 'Unknown' ? p.industry : null);
+          if (!empInd) return false;
+          if (empInd.trim().toLowerCase() === value.trim().toLowerCase()) return true;
+          return norm(empInd) === norm(value);
+        }
         case 'status': {
-          const status = (e.employment_status || p?.employment_status || '').toLowerCase().replace(/\s+/g, '-');
-          return status === value.toLowerCase().replace(/\s+/g, '-') || (e.employment_status || p?.employment_status) === value;
+          const status = (e.employment_status || p?.employment_status || '').toLowerCase().replace(/[\s-_]+/g, '');
+          const target = value.toLowerCase().replace(/[\s-_]+/g, '');
+          return status === target || status.includes(target) || target.includes(status);
         }
         case 'skill':
-          return (skillMap.get(e.profile_id) || []).includes(value);
+          return (skillMap.get(e.profile_id) || []).some((s: string) => s.toLowerCase() === value.toLowerCase());
         case 'batch':
-          return (eduMap.get(e.profile_id) || []).some((ed: any) => String(ed.year_graduated) === value.replace(/^batch\s*/i, ''));
+          return (eduMap.get(e.profile_id) || []).some((ed: any) => String(ed.year_graduated) === value.replace(/^batch\s*/i, '').trim());
         case 'position':
-        default:
-          return (e.position || p?.current_job_title) === value;
+        default: {
+          const pos = e.position || p?.current_job_title;
+          if (!pos) return false;
+          return pos.trim().toLowerCase() === value.trim().toLowerCase();
+        }
       }
     };
 
@@ -538,12 +572,16 @@ router.get('/:position', authenticate, async (req, res, next) => {
       if (j.start_date) {
         const end = j.end_date ? new Date(j.end_date) : new Date();
         const start = new Date(j.start_date);
-        const m = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-        if (m > 0) totalMonths.push(m);
+        const diffMs = end.getTime() - start.getTime();
+        if (diffMs > 0) {
+          const days = diffMs / (1000 * 60 * 60 * 24);
+          const m = Math.max(days / 30.4375, 0.05);
+          totalMonths.push(m);
+        }
       }
     });
     const avgYears = totalMonths.length > 0
-      ? Math.round((totalMonths.reduce((a, b) => a + b, 0) / totalMonths.length / 12) * 10) / 10
+      ? Math.round((totalMonths.reduce((a, b) => a + b, 0) / totalMonths.length / 12) * 100) / 100
       : 0;
 
     const industryMap = new Map<string, number>();

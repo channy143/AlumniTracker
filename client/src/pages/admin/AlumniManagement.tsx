@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
 import { generateYears } from '@/utils/helpers';
+import { formatExperienceFromDate } from '@/utils/formatExperience';
 
 export default function AlumniManagement() {
   const [data, setData] = useState<any[]>([]);
@@ -478,16 +479,9 @@ export default function AlumniManagement() {
                       { label: 'Company', value: (detailData.employment || []).find((e: any) => e.is_current)?.company_name },
                       { label: 'Employment Type', value: (detailData.employment || []).find((e: any) => e.is_current)?.job_type },
                       { label: 'Location', value: [detailData.profile?.city, detailData.profile?.province].filter(Boolean).join(', ') },
-                      { label: 'Years in Current Job', value: (() => {
+                      { label: 'Time in Current Job', value: (() => {
                         const cur = (detailData.employment || []).find((e: any) => e.is_current);
-                        if (!cur?.start_date) return '';
-                        const start = new Date(cur.start_date);
-                        const now = new Date();
-                        const months = (now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth();
-                        if (months < 1) return 'Less than a month';
-                        const yrs = Math.floor(months / 12);
-                        const m = months % 12;
-                        return yrs > 0 ? `${yrs} yr${yrs > 1 ? 's' : ''}${m > 0 ? ` ${m} mo${m > 1 ? 's' : ''}` : ''}` : `${months} mo${months > 1 ? 's' : ''}`;
+                        return cur?.start_date ? formatExperienceFromDate(cur.start_date) : '';
                       })() },
                     ].map((item: any) => (
                       item.value ? (

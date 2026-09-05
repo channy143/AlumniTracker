@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon, BriefcaseIcon, AcademicCapIcon, MapPinIcon, LinkIcon, StarIcon, CheckBadgeIcon, TrophyIcon, ClockIcon, BuildingOfficeIcon, ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { directoryApi } from '@/services/api';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
+import { formatExperienceFromDate } from '@/utils/formatExperience';
 import { SkeletonCard, SkeletonRow, SkeletonText } from '@/components/ui/Skeleton';
 
 function normalizeStatus(s?: string): string {
@@ -108,15 +109,7 @@ export default function DirectoryProfilePage() {
   const hasFeedback = profile.career_feedback;
 
   function calcYears(startDate: string): string {
-    if (!startDate) return '';
-    const start = new Date(startDate);
-    const now = new Date();
-    const months = (now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth();
-    if (months < 1) return 'Less than a month';
-    if (months < 12) return `${months} month${months > 1 ? 's' : ''}`;
-    const years = Math.floor(months / 12);
-    const rem = months % 12;
-    return rem > 0 ? `${years} year${years > 1 ? 's' : ''} ${rem} month${rem > 1 ? 's' : ''}` : `${years} year${years > 1 ? 's' : ''}`;
+    return formatExperienceFromDate(startDate);
   }
 
   const portfolioLinks = [
@@ -155,7 +148,7 @@ export default function DirectoryProfilePage() {
             )}
             {(profile.city || profile.province) && (
               <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                <MapPinIcon className="w-3 h-3" />
+                <MapPinIcon className="w-3.5 h-3.5" />
                 {[profile.city, profile.province].filter(Boolean).join(', ')}
               </p>
             )}
@@ -177,7 +170,7 @@ export default function DirectoryProfilePage() {
           <div>
             <InfoRow label="Employment Type" value={current?.job_type || ''} />
             <InfoRow label="Location" value={[profile.city, profile.province].filter(Boolean).join(', ')} />
-            <InfoRow label="Years in Current Job" value={current?.start_date ? calcYears(current.start_date) : ''} />
+            <InfoRow label="Time in Current Job" value={current?.start_date ? calcYears(current.start_date) : ''} />
           </div>
         </div>
       </div>

@@ -670,11 +670,15 @@ router.get('/career-statistics', async (req, res, next) => {
       const start = new Date(e.start_date);
       const end = e.end_date ? new Date(e.end_date) : new Date();
       if (isNaN(start.getTime())) return;
-      const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-      if (months >= 0) experienceMonths.push(months);
+      const diffMs = end.getTime() - start.getTime();
+      if (diffMs > 0) {
+        const days = diffMs / (1000 * 60 * 60 * 24);
+        const months = Math.max(days / 30.4375, 0.05);
+        experienceMonths.push(months);
+      }
     });
     const averageYearsExperience = experienceMonths.length > 0
-      ? Math.round((experienceMonths.reduce((a, b) => a + b, 0) / experienceMonths.length / 12) * 10) / 10
+      ? Math.round((experienceMonths.reduce((a, b) => a + b, 0) / experienceMonths.length / 12) * 100) / 100
       : 0;
 
     const activeSurveyCount = (surveys || []).filter((s: any) => s.status === 'published' && s.is_active === true).length;
