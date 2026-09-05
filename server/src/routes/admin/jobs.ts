@@ -230,7 +230,7 @@ router.put('/applications/:applicationId/screen', validate(screenApplicationSche
       });
     } catch {}
 
-    const { data: updated, fetchError } = await supabase
+    const { data: updated, error: fetchError } = await supabase
       .from('job_applications')
       .select('*')
       .eq('id', req.params.applicationId)
