@@ -238,11 +238,19 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     {showLogoutModal && (
       <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onClick={() => setShowLogoutModal(false)}>
         <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
-          <div className="flex justify-center -mb-2">
-            <BlobSpeech mood={blobMood} className="mb-0" />
-          </div>
-          <div className="flex justify-center relative -mt-1">
-            <JellyBlobMascot mood={blobMood} className="w-40 h-auto" />
+          {/* Fixed-height blob stage — blob + speech bubble animate with y-transforms;
+              isolating them in a non-flow container prevents them from pushing the
+              title / paragraph / buttons around during animation. */}
+          <div className="relative mx-auto" style={{ width: 160, height: 196 }}>
+            {/* Speech bubble sits above the blob; absolutely positioned so it never
+                participates in flow height changes during the y-spring animation. */}
+            <div className="absolute left-0 right-0 flex justify-center" style={{ top: 0 }}>
+              <BlobSpeech mood={blobMood} />
+            </div>
+            {/* Blob mascot anchored at the bottom of the stage */}
+            <div className="absolute left-0 right-0 flex justify-center" style={{ top: 56 }}>
+              <JellyBlobMascot mood={blobMood} className="w-40 h-auto" />
+            </div>
           </div>
           <h3 className="text-base font-bold text-gray-900 mb-1">See you soon!</h3>
           <p className="text-sm text-gray-500 mb-5">Are you sure you want to log out?</p>
