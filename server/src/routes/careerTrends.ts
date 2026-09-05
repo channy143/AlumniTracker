@@ -346,7 +346,7 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, start_date, end_date, is_current, salary_range, job_type'),
       supabase.from('education').select('profile_id, program, year_graduated, major'),
       supabase.from('skills').select('profile_id, name, category, proficiency_level'),
-      supabase.from('profiles').select('id, first_name, last_name, current_job_title, company_name, industry, employment_status, city, province'),
+      supabase.from('profiles').select('id, first_name, last_name, avatar_url, current_job_title, company_name, industry, employment_status, city, province'),
     ]);
 
     const employment = employmentRes.data || [];
@@ -422,6 +422,7 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       alumni.push({
         id: j.profile_id,
         name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown',
+        avatar_url: p.avatar_url || null,
         position: j.position || p.current_job_title,
         company: j.company_name || p.company_name,
         industry: j.company_industry || p.industry,

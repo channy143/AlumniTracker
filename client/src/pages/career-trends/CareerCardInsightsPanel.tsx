@@ -155,8 +155,12 @@ export default function CareerCardInsightsPanel({ card, onBack }: {
                       key={a.id}
                       className="flex items-start gap-3 text-xs py-2.5 px-1 border border-gray-100 rounded-lg hover:bg-orange-50/40 transition-colors"
                     >
-                      <div className={`w-9 h-9 rounded-full ${AVATAR_COLORS[idx % AVATAR_COLORS.length]} flex items-center justify-center text-xs font-bold shrink-0`}>
-                        {(a.name || '?').charAt(0).toUpperCase()}
+                      <div className={`w-9 h-9 rounded-full ${AVATAR_COLORS[idx % AVATAR_COLORS.length]} flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden`}>
+                        {a.avatar_url ? (
+                          <img src={a.avatar_url} alt={a.name || ''} className="w-full h-full object-cover" />
+                        ) : (
+                          (a.name || '?').charAt(0).toUpperCase()
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
