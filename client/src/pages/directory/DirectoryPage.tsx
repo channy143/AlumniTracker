@@ -4,6 +4,7 @@ import { BriefcaseIcon, AcademicCapIcon, CalendarDaysIcon, FunnelIcon, ChevronDo
 import { directoryApi } from '@/services/api';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
 import { SkeletonRow } from '@/components/ui/Skeleton';
+import { formatProgramLongName } from '@/utils/formatProgram';
 
 const statusColors: Record<string, string> = {
   'Employed': 'bg-emerald-100 text-emerald-700',
@@ -247,9 +248,9 @@ export default function DirectoryPage() {
                     </span>
                   )}
                   {edu?.program && (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1" title={formatProgramLongName(edu.program) || edu.program}>
                       <AcademicCapIcon className="w-3 h-3" />
-                      {edu.program}
+                      {formatProgramLongName(edu.program) || edu.program}
                     </span>
                   )}
                   {edu?.year_graduated && (

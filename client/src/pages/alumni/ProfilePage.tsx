@@ -10,6 +10,7 @@ import {
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { playTing } from '@/utils/helpers';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
+import { formatProgramLongName } from '@/utils/formatProgram';
 import { useUIStore } from '@/store/uiStore';
 
 const tabs = [
@@ -418,7 +419,7 @@ export default function ProfilePage() {
     : '?';
   const fullName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}` : '';
   const firstEdu = profile?.education?.[0];
-  const programInfo = firstEdu ? firstEdu.program || '' : '';
+  const programInfo = firstEdu ? (formatProgramLongName(firstEdu.program) || firstEdu.program || '') : '';
   const batchInfo = firstEdu?.year_graduated || '';
   const currentEmp = profile?.employment?.find((e: any) => e.is_current);
   const totalExpFormatted = (() => {
@@ -1017,7 +1018,7 @@ export default function ProfilePage() {
                   <AcademicCapIcon className="w-6 h-6 text-orange-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-semibold text-gray-900">{edu.program || edu.degree}</h3>
+                  <h3 className="text-base font-semibold text-gray-900">{formatProgramLongName(edu.program) || edu.program || edu.degree}</h3>
                   <p className="text-sm text-gray-500">CTU-Naga{edu.campus ? ` - ${edu.campus}` : ''}</p>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
                     {edu.year_graduated && (

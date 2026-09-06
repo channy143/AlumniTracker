@@ -21,6 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
+import { formatProgramLongName } from '@/utils/formatProgram';
 
 function MatchBar({ pct, label = 'Match Score' }: { pct: number | null | undefined; label?: string }) {
   if (pct === null || pct === undefined) return null;
@@ -320,7 +321,7 @@ export default function ApplicantScreeningModal({
           'Applicant Name': a.applicant_name || 'Applicant',
           'Email Address': a.applicant_email || '',
           'Batch Year': a.batch_year ? `Batch ${a.batch_year}` : '',
-          'Program / Degree': a.program || '',
+          'Program / Degree': a.program ? (formatProgramLongName(a.program) || a.program) : '',
           'Match Score': a.match_percentage != null ? `${a.match_percentage}%` : 'Not Evaluated',
           'Matched Skills': (a.matched_skills || []).join(', '),
           'Missing Skills': (a.missing_skills || []).join(', '),
@@ -736,12 +737,12 @@ export default function ApplicantScreeningModal({
                                     </div>
                                     <p className="text-[10px] text-gray-400 truncate">{app.applicant_email}</p>
                                     {(app.batch_year || app.program) && (
-                                      <p className="text-[10px] text-gray-500 truncate mt-0.5">
-                                        {app.batch_year ? `Batch ${app.batch_year}` : ''}
-                                        {app.batch_year && app.program ? ' · ' : ''}
-                                        {app.program || ''}
-                                      </p>
-                                    )}
+                                        <p className="text-[10px] text-gray-500 truncate mt-0.5">
+                                          {app.batch_year ? `Batch ${app.batch_year}` : ''}
+                                          {app.batch_year && app.program ? ' · ' : ''}
+                                          {formatProgramLongName(app.program) || app.program || ''}
+                                        </p>
+                                      )}
                                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                                       {score != null && (
                                         <span
@@ -830,12 +831,12 @@ export default function ApplicantScreeningModal({
                                   </div>
                                   <p className="text-[11px] text-gray-500 mt-0.5">{selected.applicant_email}</p>
                                   {(selected.batch_year || selected.program) && (
-                                    <p className="text-[11px] font-medium text-gray-600 mt-0.5">
-                                      {selected.batch_year ? `Batch ${selected.batch_year}` : ''}
-                                      {selected.batch_year && selected.program ? ' · ' : ''}
-                                      {selected.program || ''}
-                                    </p>
-                                  )}
+                                     <p className="text-[11px] font-medium text-gray-600 mt-0.5">
+                                       {selected.batch_year ? `Batch ${selected.batch_year}` : ''}
+                                       {selected.batch_year && selected.program ? ' · ' : ''}
+                                       {formatProgramLongName(selected.program) || selected.program || ''}
+                                     </p>
+                                   )}
                                   <p className="text-[10px] text-gray-400 mt-0.5">
                                     Applied on{' '}
                                     {new Date(selected.applied_at).toLocaleDateString('en-US', {

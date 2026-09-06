@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon, BriefcaseIcon, BuildingOfficeIcon, UserGroupIcon, CurrencyDollarIcon, MapPinIcon, AcademicCapIcon, ClockIcon, TagIcon } from '@heroicons/react/24/outline';
 import { careerTrendsApi } from '@/services/api';
+import { formatProgramLongName } from '@/utils/formatProgram';
 import type { RankCard } from './CareerLeaderboardNav';
 
 const KIND_META: Record<string, { label: string; type: string }> = {
@@ -237,10 +238,13 @@ export default function CareerCardInsightsPanel({
                           {/* Meta Information Section */}
                           <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-gray-500">
                             {(a.program || a.batch) && (
-                              <span className="flex items-center gap-1 text-[11px] text-gray-600">
+                              <span
+                                className="flex items-center gap-1 text-[11px] text-gray-600"
+                                title={`${formatProgramLongName(a.program) || a.program || ''}${a.batch ? ` (Batch ${a.batch})` : ''}`}
+                              >
                                 <AcademicCapIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                <span className="truncate max-w-[220px]">
-                                  {a.program}
+                                <span className="max-w-[340px] sm:max-w-none truncate sm:whitespace-normal font-medium">
+                                  {formatProgramLongName(a.program) || a.program}
                                   {a.batch ? ` (Batch ${a.batch})` : ''}
                                 </span>
                               </span>

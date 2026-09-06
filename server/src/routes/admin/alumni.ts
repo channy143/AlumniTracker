@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
+import { formatProgramLongName } from '../../utils/formatProgram';
 
 const router = Router();
 
@@ -112,7 +113,10 @@ router.get('/', async (req, res, next) => {
           supabase.from('employment').select('*').in('profile_id', profileIds).eq('is_current', true),
         ]);
 
-        const eduMap = new Map((education || []).map((e: any) => [e.profile_id, e]));
+        const eduMap = new Map((education || []).map((e: any) => [e.profile_id, {
+          ...e,
+          program: e.program ? formatProgramLongName(e.program) : e.program,
+        }]));
         const empMap = new Map((employment || []).map((e: any) => [e.profile_id, e]));
 
         result = result.map((u: any) => {

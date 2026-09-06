@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { sanitizeFilterInput } from '../utils/sanitizeFilterInput';
+import { formatProgramLongName } from '../utils/formatProgram';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/programs', authenticate, async (req: AuthenticatedRequest, res, nex
   try {
     const db = createUserScopedClient(req.token!);
     const { data: education } = await db.from('education').select('program');
-    const programs = [...new Set((education || []).map((e: any) => e.program).filter(Boolean))].sort();
+    const programs = [...new Set((education || []).map((e: any) => e.program ? formatProgramLongName(e.program) : null).filter(Boolean))].sort();
     res.json(programs);
   } catch (err) { next(err); }
 });
@@ -183,7 +184,12 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
         employmentMap.set(e.profile_id, e);
       });
       (education || []).forEach((e: any) => {
-        if (!educationMap.has(e.profile_id)) educationMap.set(e.profile_id, e);
+        if (!educationMap.has(e.profile_id)) {
+          educationMap.set(e.profile_id, {
+            ...e,
+            program: e.program ? formatProgramLongName(e.program) : e.program,
+          });
+        }
       });
     }
 

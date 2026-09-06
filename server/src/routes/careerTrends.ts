@@ -459,7 +459,7 @@ router.get('/', authenticate, async (req, res, next) => {
     const distinctBatches = [...new Set(educationFiltered.map((e: any) => e.year_graduated).filter(Boolean))].sort((a: any, b: any) => b - a);
     const distinctLocations = [...new Set(profilesFiltered.map((p: any) => [p.city, p.province].filter(Boolean).join(', ')).filter(Boolean))].sort();
     const distinctJobTypes = [...new Set(fullEmployment.map((e: any) => e.job_type).filter(Boolean))];
-    const programs = [...new Set(educationFiltered.map((e: any) => e.program).filter(Boolean))].sort();
+    const programs = [...new Set(educationFiltered.map((e: any) => e.program ? formatProgramLongName(e.program) : null).filter(Boolean))].sort();
 
     res.json({
       overview: {
@@ -632,7 +632,8 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       seen.add(j.profile_id);
       const edu = eduMap.get(j.profile_id) || [];
       const gradYear = edu.map((ed: any) => ed.year_graduated).filter(Boolean).sort().pop() || null;
-      const program = edu.map((ed: any) => ed.program).filter(Boolean)[0] || null;
+      const rawProgram = edu.map((ed: any) => ed.program).filter(Boolean)[0] || null;
+      const program = rawProgram ? formatProgramLongName(rawProgram) : null;
       alumni.push({
         id: j.profile_id,
         name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown',
@@ -957,7 +958,7 @@ router.get('/:position', authenticate, async (req, res, next) => {
           position: j.position,
           company: j.company_name,
           location: j.profile ? [j.profile.city, j.profile.province].filter(Boolean).join(', ') : null,
-          program: prog,
+          program: prog ? formatProgramLongName(prog) : null,
           batch: gradYear,
           employmentStatus: empStatus,
           avatar_url: j.profile?.avatar_url || null,

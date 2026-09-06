@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { UserGroupIcon, UserPlusIcon, CheckIcon, XMarkIcon, ChatBubbleLeftRightIcon, HandRaisedIcon } from '@heroicons/react/24/outline';
 import { connectionsApi, directoryApi, messagesApi, profileApi } from '@/services/api';
+import { formatProgramLongName } from '@/utils/formatProgram';
 
 const tabs = ['All', 'Pending', 'Accepted'];
 
@@ -173,7 +174,7 @@ export default function ConnectionsPage() {
                                 <span>{profile.current_employment.position} at {profile.current_employment.company_name}</span>
                               )}
                               {profile.education && (
-                                <span>{profile.education.program} ({profile.education.year_graduated})</span>
+                                <span>{formatProgramLongName(profile.education.program) || profile.education.program} ({profile.education.year_graduated})</span>
                               )}
                             </div>
                           </div>

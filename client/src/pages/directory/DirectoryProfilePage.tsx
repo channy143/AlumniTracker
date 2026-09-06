@@ -5,6 +5,7 @@ import { directoryApi } from '@/services/api';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
 import { SkeletonCard, SkeletonRow, SkeletonText } from '@/components/ui/Skeleton';
+import { formatProgramLongName } from '@/utils/formatProgram';
 
 function normalizeStatus(s?: string): string {
   if (!s) return '';
@@ -290,7 +291,7 @@ export default function DirectoryProfilePage() {
                       <AcademicCapIcon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-gray-900 leading-snug">{edu.program || edu.major}</p>
+                      <p className="text-xs font-bold text-gray-900 leading-snug">{formatProgramLongName(edu.program) || edu.program || edu.major}</p>
                       <p className="text-[11px] text-gray-500 truncate">CTU-Naga{edu.campus ? ` - ${edu.campus}` : ''}</p>
                       <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-1">
                         {edu.year_graduated && <span className="bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded font-medium">Class of {edu.year_graduated}</span>}

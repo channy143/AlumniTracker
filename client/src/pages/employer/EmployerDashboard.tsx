@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { employerApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
+import { formatProgramLongName } from '@/utils/formatProgram';
 import {
   BriefcaseIcon,
   UserGroupIcon,
@@ -193,7 +194,7 @@ export default function EmployerDashboard() {
                         <p className="text-[11px] font-medium text-gray-600 mt-0.5">
                           {c.batch_year ? `Batch ${c.batch_year}` : ''}
                           {c.batch_year && c.program ? ' · ' : ''}
-                          {c.program || ''}
+                          {formatProgramLongName(c.program) || c.program || ''}
                         </p>
                       )}
                       <p className="text-[10px] text-gray-400 mt-1">
