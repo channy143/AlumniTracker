@@ -4,7 +4,8 @@ import {
   CameraIcon, PencilIcon, BriefcaseIcon, MapPinIcon,
   AcademicCapIcon, CheckBadgeIcon, UserIcon, ClockIcon,
   BuildingOfficeIcon, ChartBarIcon, LinkIcon, CalendarDaysIcon,
-  TrophyIcon, ArrowTrendingUpIcon
+  TrophyIcon, ArrowTrendingUpIcon, UserCircleIcon, XMarkIcon,
+  LockClosedIcon
 } from '@heroicons/react/24/outline';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { playTing } from '@/utils/helpers';
@@ -115,10 +116,18 @@ export default function ProfilePage() {
       const data = await profileApi.get();
       setProfile(data);
       let currentJobType = '';
+      let currentSalary = data?.salary_range || '';
       try {
         const records = await employmentApi.list();
         const current = records.find((r: any) => r.is_current);
-        if (current) currentJobType = current.job_type || '';
+        if (current) {
+          currentJobType = current.job_type || '';
+          if (!currentSalary && current.salary_range) currentSalary = current.salary_range;
+          if (data && !data.company_name && current.company_name) data.company_name = current.company_name;
+          if (data && !data.current_job_title && current.position) data.current_job_title = current.position;
+          if (data && !data.industry && current.company_industry) data.industry = current.company_industry;
+          if (data && !data.employment_status && current.employment_status) data.employment_status = current.employment_status;
+        }
       } catch {}
       if (data) {
         setForm({
@@ -134,7 +143,7 @@ export default function ProfilePage() {
           current_job_title: data.current_job_title || '',
           company_name: data.company_name || '',
           industry: data.industry || '',
-          salary_range: data.salary_range || '',
+          salary_range: currentSalary,
           job_type: currentJobType,
         });
       }
@@ -169,63 +178,8 @@ export default function ProfilePage() {
       if (form.city !== undefined) payload.city = form.city;
       if (form.province !== undefined) payload.province = form.province;
       if (form.bio !== undefined) payload.bio = form.bio;
-      const careerFields: any = {};
-      const careerKeys = ['employment_status', 'current_job_title', 'company_name', 'industry', 'salary_range'];
-      let hasCareerChanges = false;
-      for (const key of careerKeys) {
-        if (form[key] !== profile?.[key]) {
-          careerFields[key] = form[key] || null;
-          hasCareerChanges = true;
-        }
-      }
+      // Note: Employment fields are verified & locked. They automatically update when hired for a job.
       const updated = await profileApi.update(payload);
-      let hasEmploymentChanges = hasCareerChanges;
-      if (!hasEmploymentChanges) {
-        try {
-          const records = await employmentApi.list();
-          const current = records.find((r: any) => r.is_current);
-          if (current && (form.job_type || 'full-time') !== (current.job_type || 'full-time') || (form.salary_range || null) !== (current.salary_range || null)) {
-            hasEmploymentChanges = true;
-          }
-        } catch {}
-      }
-      if (hasCareerChanges) {
-        await profileApi.updateCareer(careerFields);
-      }
-      if (hasEmploymentChanges) {
-        const mapStatus = (s: string) => {
-          const map: Record<string, string> = {
-            'Employed': 'employed',
-            'Self-employed': 'self-employed',
-            'Unemployed': 'unemployed',
-            'Seeking Opportunities': 'seeking',
-            'Retired': 'retired',
-          };
-          return map[s] || s?.toLowerCase().replace(/\s+/g, '-') || 'employed';
-        };
-        try {
-          const finalStatus = careerFields.employment_status || profile?.employment_status || 'Employed';
-          const records = await employmentApi.list();
-          const current = records.find((r: any) => r.is_current);
-          const empPayload = {
-            position: form.current_job_title || 'Not specified',
-            company_name: form.company_name || 'Not specified',
-            company_industry: form.industry || 'Not specified',
-            employment_status: mapStatus(finalStatus),
-            job_type: form.job_type || 'full-time',
-            salary_range: form.salary_range || null,
-            is_current: true,
-            start_date: current?.start_date || new Date().toISOString().split('T')[0],
-          };
-          if (current) {
-            await employmentApi.update(current.id, empPayload);
-          } else {
-            await employmentApi.create(empPayload);
-          }
-        } catch (e) {
-          console.warn('Failed to sync employment record:', e);
-        }
-      }
       await profileApi.batchSkills(editSkills.map((name: string) => ({ name })));
       const origEdu = profile?.education || [];
       const origIds = origEdu.map((e: any) => e.id);
@@ -547,27 +501,50 @@ export default function ProfilePage() {
   const renderEditModal = () => {
     if (!editing) return null;
     return (
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 pb-10">
-        <div className="fixed inset-0 bg-black/50" onClick={() => setEditing(false)} />
-        <div className="relative bg-white rounded-xl max-w-4xl w-full mx-4 max-h-[90vh] shadow-2xl flex flex-col">
+      <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setEditing(false)}>
+        <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
-          <div className="px-6 py-4 shrink-0 bg-orange-500 rounded-t-xl">
-            <h3 className="text-base font-bold text-white">Edit Profile</h3>
+          <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                <UserCircleIcon className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white leading-tight">Edit Alumni Profile</h2>
+                <p className="text-xs text-orange-100 mt-0.5">Manage personal information, career details, and account security</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setEditing(false)}
+              className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Body */}
-          <div className="flex flex-1 min-h-0">
+          <div className="flex flex-1 min-h-0 overflow-hidden">
             {/* Left Sidebar */}
-            <div className="w-52 shrink-0 border-r border-gray-200 p-4 space-y-1">
-              <button onClick={() => setEditSection('personal')} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-left transition-colors cursor-pointer ${
-                editSection === 'personal' ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-gray-600 hover:bg-gray-50 font-medium'
-              }`}>
+            <div className="w-56 shrink-0 border-r border-gray-100 bg-gray-50/50 p-4 space-y-1.5">
+              <button
+                onClick={() => setEditSection('personal')}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                  editSection === 'personal'
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
+                }`}
+              >
                 <UserIcon className="w-4 h-4" />
                 Personal Information
               </button>
-              <button onClick={() => setEditSection('security')} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-left transition-colors cursor-pointer ${
-                editSection === 'security' ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-gray-600 hover:bg-gray-50 font-medium'
-              }`}>
+              <button
+                onClick={() => setEditSection('security')}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                  editSection === 'security'
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
+                }`}
+              >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                 Security &amp; Password
               </button>
@@ -614,46 +591,87 @@ export default function ProfilePage() {
 
                   <div>
                     <SectionLine label="Employment" />
+                    <div className="mt-2.5 p-2.5 bg-amber-50/90 border border-amber-200/80 rounded-lg flex items-start gap-2 text-xs text-amber-900">
+                      <LockClosedIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-amber-950">Employment Details are Verified & Locked</span>
+                        <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                          These fields cannot be edited manually. They will automatically update when you are hired for a job through the portal.
+                        </p>
+                      </div>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Status</label>
-                        <select value={form.employment_status} onChange={(e) => setForm((f: any) => ({ ...f, employment_status: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400">
-                          <option value="">Select...</option>
-                          <option value="Employed">Employed</option>
-                          <option value="Self-employed">Self-employed</option>
-                          <option value="Unemployed">Unemployed</option>
-
-                          <option value="Seeking Opportunities">Seeking Opportunities</option>
-                          <option value="Retired">Retired</option>
-                        </select>
+                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                          <span>Employment Status</span>
+                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        </label>
+                        <input
+                          disabled
+                          readOnly
+                          value={form.employment_status || 'Unemployed'}
+                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Current Position</label>
-                        <input value={form.current_job_title} onChange={(e) => setForm((f: any) => ({ ...f, current_job_title: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                          <span>Current Position</span>
+                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        </label>
+                        <input
+                          disabled
+                          readOnly
+                          value={form.current_job_title || '—'}
+                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Company</label>
-                        <input value={form.company_name} onChange={(e) => setForm((f: any) => ({ ...f, company_name: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                          <span>Company</span>
+                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        </label>
+                        <input
+                          disabled
+                          readOnly
+                          value={form.company_name || '—'}
+                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Industry</label>
-                        <input value={form.industry} onChange={(e) => setForm((f: any) => ({ ...f, industry: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                          <span>Industry</span>
+                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        </label>
+                        <input
+                          disabled
+                          readOnly
+                          value={form.industry || '—'}
+                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Salary Range (₱)</label>
-                        <input value={form.salary_range} onChange={(e) => setForm((f: any) => ({ ...f, salary_range: e.target.value }))} placeholder="e.g. 30k-50k" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                          <span>Salary Range (₱)</span>
+                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        </label>
+                        <input
+                          disabled
+                          readOnly
+                          value={form.salary_range || '—'}
+                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Employment Type</label>
-                        <select value={form.job_type} onChange={(e) => setForm((f: any) => ({ ...f, job_type: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400">
-                          <option value="">Select...</option>
-                          <option value="full-time">Full-time</option>
-                          <option value="part-time">Part-time</option>
-                          <option value="contract">Contract</option>
-                          <option value="freelance">Freelance</option>
-                          <option value="self-employed">Self-employed</option>
-                          <option value="internship">Internship</option>
-                        </select>
+                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                          <span>Employment Type</span>
+                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        </label>
+                        <input
+                          disabled
+                          readOnly
+                          value={form.job_type ? (form.job_type.charAt(0).toUpperCase() + form.job_type.slice(1)) : '—'}
+                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
+                        />
                       </div>
                     </div>
                   </div>
@@ -722,11 +740,18 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 pt-2">
-                    <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer">
-                      {saving ? 'Saving...' : 'Save Changes'}
+                  <div className="flex items-center gap-2.5 pt-4 border-t border-gray-100">
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      {saving ? 'Saving...' : 'Save Profile Changes'}
                     </button>
-                    <button onClick={() => setEditing(false)} className="px-5 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                    <button
+                      onClick={() => setEditing(false)}
+                      className="px-4 py-2 bg-white border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -772,8 +797,12 @@ export default function ProfilePage() {
                         )}
                       </div>
                       <div className="pt-2">
-                        <button onClick={handleChangePassword} disabled={saving || !passwordForm.currentPassword || !passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmPassword} className="px-5 py-2 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer">
-                          {saving ? 'Changing...' : 'Change Password'}
+                        <button
+                          onClick={handleChangePassword}
+                          disabled={saving || !passwordForm.currentPassword || !passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmPassword}
+                          className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer"
+                        >
+                          {saving ? 'Updating Password...' : 'Update Password'}
                         </button>
                       </div>
                     </div>
@@ -791,23 +820,23 @@ export default function ProfilePage() {
                           <p className="text-sm font-medium text-green-700">MFA is enabled</p>
                           <p className="text-xs text-gray-500">A verification code will be required at sign-in.</p>
                         </div>
-                        <button onClick={handleDisableMfa} disabled={mfaLoading} className="px-4 py-2 border border-gray-300 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 cursor-pointer">
+                        <button onClick={handleDisableMfa} disabled={mfaLoading} className="px-4 py-2 border border-gray-200 bg-white text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs">
                           {mfaLoading ? 'Disabling...' : 'Disable MFA'}
                         </button>
                       </div>
                     ) : (
                       <div className="space-y-3 max-w-md">
                         <div className="flex items-center gap-2">
-                          <button onClick={handleSendMfaCode} disabled={mfaLoading} className="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 cursor-pointer">
+                          <button onClick={handleSendMfaCode} disabled={mfaLoading} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer">
                             {mfaLoading ? 'Sending...' : 'Send Verification Code'}
                           </button>
                         </div>
                         <div className="flex items-end gap-2">
                           <div className="flex-1">
                             <label className="block text-xs text-gray-500 mb-1">Verification Code</label>
-                            <input type="text" value={mfaOtp} onChange={(e) => setMfaOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} maxLength={6} placeholder="000000" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                            <input type="text" value={mfaOtp} onChange={(e) => setMfaOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} maxLength={6} placeholder="000000" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
                           </div>
-                          <button onClick={handleEnableMfa} disabled={mfaLoading || mfaOtp.length !== 6} className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer">
+                          <button onClick={handleEnableMfa} disabled={mfaLoading || mfaOtp.length !== 6} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer">
                             {mfaLoading ? 'Enabling...' : 'Enable MFA'}
                           </button>
                         </div>

@@ -3,6 +3,12 @@ import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
 import { generateYears } from '@/utils/helpers';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
+import {
+  UserIcon,
+  UserPlusIcon,
+  CheckBadgeIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 
 export default function AlumniManagement() {
   const [data, setData] = useState<any[]>([]);
@@ -396,7 +402,24 @@ export default function AlumniManagement() {
       )}
 
       {tab === 'eligible' && (
-        eligibleCards.length === 0 ? (
+        loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+              <div key={i} className="bg-white border border-gray-200 animate-pulse">
+                <div className="w-full h-44 bg-gray-200" />
+                <div className="p-[13px] space-y-2">
+                  <div className="h-3 bg-gray-200 rounded w-3/4" />
+                  <div className="h-2 bg-gray-200 rounded w-1/2" />
+                  <div className="h-2 bg-gray-200 rounded w-2/3" />
+                  <div className="h-2 bg-gray-200 rounded w-1/3" />
+                </div>
+                <div className="px-2.5 pb-2.5 flex gap-1">
+                  <div className="h-5 bg-gray-200 rounded w-12" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : eligibleCards.length === 0 ? (
           <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">
             {search.trim() ? 'No eligible alumni match your search' : 'No eligible alumni yet. Use "+ Eligible Alumni" to add records so they can verify and register.'}
           </div>
@@ -431,21 +454,35 @@ export default function AlumniManagement() {
       )}
 
       {showDetail && detailData && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDetail(false)}>
-          <div className="bg-white max-w-5xl w-full flex flex-col rounded-xl overflow-hidden" style={{ height: '80vh' }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setShowDetail(false)}>
+          <div className="bg-white max-w-5xl w-full flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150" style={{ height: '84vh' }} onClick={(e) => e.stopPropagation()}>
             {/* Header bar */}
-            <div className="flex items-center justify-between px-6 py-3 shrink-0 bg-orange-500 sticky top-0 z-10">
-              <h2 className="text-sm font-bold text-white">Alumni Details</h2>
+            <div className="flex items-center justify-between px-6 py-4 shrink-0 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white sticky top-0 z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                  <UserIcon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white leading-tight">
+                    {detailData.profile?.first_name} {detailData.profile?.last_name}
+                  </h2>
+                  <p className="text-xs text-orange-100 mt-0.5">
+                    {detailData.profile?.student_id ? `ID: ${detailData.profile.student_id} · ` : ''}Alumni Profile & Records
+                  </p>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 {!editingDetail ? (
-                  <button onClick={handleEditDetail} className="px-3 py-1 text-xs font-medium bg-white text-orange-600 hover:bg-orange-50 rounded-lg">Edit</button>
+                  <button onClick={handleEditDetail} className="px-3.5 py-1.5 text-xs font-semibold bg-white text-orange-700 hover:bg-orange-50 rounded-xl shadow-xs transition-colors cursor-pointer">Edit Profile</button>
                 ) : (
                   <>
-                    <button onClick={handleSaveDetail} disabled={savingDetail} className="px-3 py-1 text-xs font-medium bg-white text-orange-600 hover:bg-orange-50 disabled:opacity-50 rounded-lg">{savingDetail ? 'Saving...' : 'Save'}</button>
-                    <button onClick={() => setEditingDetail(false)} className="px-3 py-1 text-xs font-medium border border-white/30 text-white hover:bg-white/20 rounded-lg">Cancel</button>
+                    <button onClick={handleSaveDetail} disabled={savingDetail} className="px-3.5 py-1.5 text-xs font-semibold bg-white text-orange-700 hover:bg-orange-50 disabled:opacity-50 rounded-xl shadow-xs transition-colors cursor-pointer">{savingDetail ? 'Saving...' : 'Save Changes'}</button>
+                    <button onClick={() => setEditingDetail(false)} className="px-3.5 py-1.5 text-xs font-semibold border border-white/30 text-white hover:bg-white/20 rounded-xl transition-colors cursor-pointer">Cancel</button>
                   </>
                 )}
-                <button onClick={() => setShowDetail(false)} className="text-white/70 hover:text-white hover:bg-white/20 text-lg leading-none ml-1 p-1 rounded-lg transition-colors">&times;</button>
+                <button onClick={() => setShowDetail(false)} className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer ml-1">
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
               </div>
             </div>
 
@@ -658,24 +695,76 @@ export default function AlumniManagement() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-lg max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-sm font-bold text-gray-900 mb-4">Add Alumni</h2>
-            <form onSubmit={handleCreate} className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">First Name</label><input type="text" value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Last Name</label><input type="text" value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setShowForm(false)}>
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                  <UserPlusIcon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Add Alumni</h3>
+                  <p className="text-xs text-orange-100 mt-0.5">Register a new graduate account directly into the portal</p>
+                </div>
               </div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Email</label><input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-0.5">ID Number</label><input type="text" value={form.idNumber} onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" placeholder="e.g. CTU-2020-0001" /></div>
-              <div className="grid grid-cols-2 gap-2">
-                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Course</label><select value={form.program} onChange={(e) => setForm((f) => ({ ...f, program: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none"><option value="">Select</option><option value="BSIT">BSIT</option><option value="BIT">BIT</option><option value="BEEd">BEEd</option><option value="BSEd-Math">BSEd-Math</option><option value="BTLED-HE">BTLED-HE</option><option value="BTLED-ICT">BTLED-ICT</option></select></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Year Graduated</label><select value={form.yearGraduated} onChange={(e) => setForm((f) => ({ ...f, yearGraduated: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400"><option value="">Select</option>{batchYears.map((y) => <option key={y} value={y}>{y}</option>)}</select></div>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreate} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">First Name *</label>
+                    <input type="text" value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Last Name *</label>
+                    <input type="text" value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Email Address *</label>
+                  <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">ID Number</label>
+                  <input type="text" value={form.idNumber} onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" placeholder="e.g. CTU-2020-0001" />
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Program / Course</label>
+                    <select value={form.program} onChange={(e) => setForm((f) => ({ ...f, program: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
+                      <option value="">Select Course</option>
+                      <option value="BSIT">BSIT</option>
+                      <option value="BIT">BIT</option>
+                      <option value="BEEd">BEEd</option>
+                      <option value="BSEd-Math">BSEd-Math</option>
+                      <option value="BTLED-HE">BTLED-HE</option>
+                      <option value="BTLED-ICT">BTLED-ICT</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Year Graduated</label>
+                    <select value={form.yearGraduated} onChange={(e) => setForm((f) => ({ ...f, yearGraduated: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
+                      <option value="">Select Year</option>
+                      {batchYears.map((y) => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Password *</label>
+                  <input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
+                </div>
               </div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Password</label><input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
-              <div className="flex gap-2 justify-end pt-2">
-                <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">Create Alumni</button>
+              <div className="px-6 py-3.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2.5 shrink-0">
+                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer">Cancel</button>
+                <button type="submit" className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer flex items-center gap-1.5">Create Alumni</button>
               </div>
             </form>
           </div>
@@ -683,25 +772,73 @@ export default function AlumniManagement() {
       )}
 
       {showEligibleForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowEligibleForm(false)}>
-          <div className="bg-white rounded-lg max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-sm font-bold text-gray-900 mb-4">Add Eligible Alumni</h2>
-            <p className="text-xs text-gray-500 mb-4">Add this person to the eligible registry so they can verify their identity and register.</p>
-            <form onSubmit={handleCreateEligible} className="space-y-3">
-              <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Student ID *</label><input type="text" value={eligibleForm.student_id} onChange={(e) => setEligibleForm((f: any) => ({ ...f, student_id: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" placeholder="e.g. CTU-2020-0001" required /></div>
-              <div className="grid grid-cols-2 gap-2">
-                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">First Name *</label><input type="text" value={eligibleForm.first_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, first_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Last Name *</label><input type="text" value={eligibleForm.last_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, last_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setShowEligibleForm(false)}>
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                  <CheckBadgeIcon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Add Eligible Alumni</h3>
+                  <p className="text-xs text-orange-100 mt-0.5">Whitelist a graduate record for self-registration</p>
+                </div>
               </div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Birthdate *</label><input type="date" value={eligibleForm.birth_date} onChange={(e) => setEligibleForm((f: any) => ({ ...f, birth_date: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400" required /></div>
-              <div className="grid grid-cols-2 gap-2">
-                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Course</label><select value={eligibleForm.program} onChange={(e) => setEligibleForm((f: any) => ({ ...f, program: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400"><option value="">Select</option><option value="BSIT">BSIT</option><option value="BIT">BIT</option><option value="BEEd">BEEd</option><option value="BSEd-Math">BSEd-Math</option><option value="BTLED-HE">BTLED-HE</option><option value="BTLED-ICT">BTLED-ICT</option></select></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-0.5">Year Graduated</label><select value={eligibleForm.year_graduated} onChange={(e) => setEligibleForm((f: any) => ({ ...f, year_graduated: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400"><option value="">Select</option>{batchYears.map((y) => <option key={y} value={y}>{y}</option>)}</select></div>
+              <button
+                type="button"
+                onClick={() => setShowEligibleForm(false)}
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateEligible} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Student ID *</label>
+                  <input type="text" value={eligibleForm.student_id} onChange={(e) => setEligibleForm((f: any) => ({ ...f, student_id: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" placeholder="e.g. CTU-2020-0001" required />
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">First Name *</label>
+                    <input type="text" value={eligibleForm.first_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, first_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Last Name *</label>
+                    <input type="text" value={eligibleForm.last_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, last_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Birthdate *</label>
+                  <input type="date" value={eligibleForm.birth_date} onChange={(e) => setEligibleForm((f: any) => ({ ...f, birth_date: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Program / Course</label>
+                    <select value={eligibleForm.program} onChange={(e) => setEligibleForm((f: any) => ({ ...f, program: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
+                      <option value="">Select Course</option>
+                      <option value="BSIT">BSIT</option>
+                      <option value="BIT">BIT</option>
+                      <option value="BEEd">BEEd</option>
+                      <option value="BSEd-Math">BSEd-Math</option>
+                      <option value="BTLED-HE">BTLED-HE</option>
+                      <option value="BTLED-ICT">BTLED-ICT</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Year Graduated</label>
+                    <select value={eligibleForm.year_graduated} onChange={(e) => setEligibleForm((f: any) => ({ ...f, year_graduated: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
+                      <option value="">Select Year</option>
+                      {batchYears.map((y) => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {eligError && <p className="text-xs text-red-600 bg-red-50 p-2 rounded-lg border border-red-100">{eligError}</p>}
               </div>
-              {eligError && <p className="text-xs text-red-600">{eligError}</p>}
-              <div className="flex gap-2 justify-end pt-2">
-                <button type="button" onClick={() => setShowEligibleForm(false)} className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
-                <button type="submit" disabled={savingEligible} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">{savingEligible ? 'Saving...' : 'Add Record'}</button>
+              <div className="px-6 py-3.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2.5 shrink-0">
+                <button type="button" onClick={() => setShowEligibleForm(false)} className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer">Cancel</button>
+                <button type="submit" disabled={savingEligible} className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5">{savingEligible ? 'Saving...' : 'Add Record'}</button>
               </div>
             </form>
           </div>

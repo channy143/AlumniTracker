@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
-import { MegaphoneIcon } from '@heroicons/react/24/outline';
+import { MegaphoneIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const EMPTY_FORM = { title: '', content: '', image_url: '', document_url: '', is_pinned: false, send_to_all: true, linked_survey_id: '' };
 
@@ -154,7 +154,24 @@ export default function AnnouncementManagement() {
       </div>
 
       {loading ? (
-        <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="bg-white border border-gray-200 rounded-lg animate-pulse h-16" />)}</div>
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-lg p-3.5 animate-pulse flex items-start justify-between">
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-4 bg-gray-200 rounded w-1/3" />
+                  <div className="h-3 w-14 bg-gray-200 rounded-full" />
+                </div>
+                <div className="h-3 bg-gray-100 rounded w-3/4" />
+                <div className="h-2.5 bg-gray-100 rounded w-1/4" />
+              </div>
+              <div className="flex gap-1.5 ml-3 shrink-0">
+                <div className="h-6 w-12 bg-gray-100 rounded" />
+                <div className="h-6 w-12 bg-gray-100 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : data.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg text-center py-12">
           <MegaphoneIcon className="w-8 h-8 mx-auto text-gray-300 mb-2" />
@@ -211,32 +228,65 @@ export default function AnnouncementManagement() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-xl max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-sm font-bold text-gray-900 mb-4">{editId ? 'Edit Announcement' : 'Create Announcement'}</h2>
-            <form onSubmit={handleSave} className="space-y-3">
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Title *</label><input type="text" value={form.title} onChange={(e) => setForm((f: any) => ({ ...f, title: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Content *</label><textarea value={form.content} onChange={(e) => setForm((f: any) => ({ ...f, content: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" rows={5} required /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Image URL</label><input type="url" value={form.image_url} onChange={(e) => setForm((f: any) => ({ ...f, image_url: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" /></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Document URL</label><input type="url" value={form.document_url} onChange={(e) => setForm((f: any) => ({ ...f, document_url: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setShowForm(false)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                  <MegaphoneIcon className="w-5 h-5 text-white" />
+                </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Link to Survey <span className="text-gray-400 font-normal">(optional)</span></label>
-                  <select value={form.linked_survey_id} onChange={(e) => setForm((f: any) => ({ ...f, linked_survey_id: e.target.value }))} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full">
-                    <option value="">No survey linked</option>
-                    {availableSurveys.map((s: any) => <option key={s.id} value={s.id}>{s.title}</option>)}
-                  </select>
-                </div>
-                <div className="flex items-center gap-4 pt-5">
-                  <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.is_pinned} onChange={(e) => setForm((f: any) => ({ ...f, is_pinned: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500" /> Pin Announcement</label>
-                  <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.send_to_all} onChange={(e) => setForm((f: any) => ({ ...f, send_to_all: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500" /> Send to All</label>
+                  <h3 className="text-base font-bold text-white">{editId ? 'Edit Announcement' : 'Create Announcement'}</h3>
+                  <p className="text-xs text-orange-100 mt-0.5">Publish institution updates, tracer survey alerts, and news</p>
                 </div>
               </div>
-              <div className="flex gap-2 justify-end pt-1">
-                <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">{editId ? 'Update' : 'Create'}</button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Title *</label>
+                  <input type="text" value={form.title} onChange={(e) => setForm((f: any) => ({ ...f, title: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Content *</label>
+                  <textarea value={form.content} onChange={(e) => setForm((f: any) => ({ ...f, content: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" rows={5} required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Image URL</label>
+                    <input type="url" value={form.image_url} onChange={(e) => setForm((f: any) => ({ ...f, image_url: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Document URL</label>
+                    <input type="url" value={form.document_url} onChange={(e) => setForm((f: any) => ({ ...f, document_url: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Link to Survey <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <select value={form.linked_survey_id} onChange={(e) => setForm((f: any) => ({ ...f, linked_survey_id: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white w-full">
+                      <option value="">No survey linked</option>
+                      {availableSurveys.map((s: any) => <option key={s.id} value={s.id}>{s.title}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-4 pt-5">
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.is_pinned} onChange={(e) => setForm((f: any) => ({ ...f, is_pinned: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500 rounded" /> Pin Announcement</label>
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.send_to_all} onChange={(e) => setForm((f: any) => ({ ...f, send_to_all: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500 rounded" /> Send to All</label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-3.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2.5 shrink-0">
+                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer">Cancel</button>
+                <button type="submit" className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer flex items-center gap-1.5">{editId ? 'Update Announcement' : 'Publish Announcement'}</button>
               </div>
             </form>
           </div>

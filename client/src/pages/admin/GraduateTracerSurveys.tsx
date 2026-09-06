@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
 import { generateYears } from '@/utils/helpers';
+import { ClipboardDocumentCheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -313,15 +314,29 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white w-full max-w-[900px] max-h-[90vh] overflow-y-auto rounded-xl" onClick={(e) => e.stopPropagation()}>
-        <form onSubmit={handleSubmit}>
-          <div className="px-6 py-4 bg-orange-500 sticky top-0 z-10">
-            <h2 className="text-sm font-bold text-white">Create Graduate Tracer Survey</h2>
-            <p className="text-xs text-orange-100 mt-0.5">Create a new survey period for alumni.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/55 backdrop-blur-xs" onClick={onClose}>
+      <div className="bg-white w-full max-w-[900px] max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl border border-gray-100 flex flex-col animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                <ClipboardDocumentCheckIcon className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white leading-tight">Create Graduate Tracer Survey</h2>
+                <p className="text-xs text-orange-100 mt-0.5">Configure institutional tracer study cycle and target cohort</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="p-6">
+          <div className="p-6 overflow-y-auto flex-1 text-xs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Survey Information</p>
@@ -329,24 +344,24 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
                   <label className="block text-xs font-medium text-gray-700 mb-1">Survey Title *</label>
                   <input type="text" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
                     placeholder="e.g. Graduate Tracer Study 2026"
-                    className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" />
+                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
                   <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
                     placeholder="Brief description of this survey cycle."
-                    className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" rows={3} />
+                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" rows={3} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Survey Notes <span className="text-gray-400 font-normal">(Optional, only visible to administrators)</span></label>
                   <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
                     placeholder="Internal notes about this survey."
-                    className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" rows={2} />
+                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" rows={2} />
                 </div>
 
                 <div className="border-t border-gray-100 pt-4">
                   <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Standard Graduate Tracer Questionnaire</p>
-                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <div className="bg-gray-50 rounded-xl p-3 space-y-1">
                     {[
                       'Personal Information',
                       'Educational Background',
@@ -358,7 +373,7 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
                       'Graduate Feedback',
                     ].map((section) => (
                       <div key={section} className="flex items-center gap-2 text-xs">
-                        <span className="text-emerald-600">&#10003;</span>
+                        <span className="text-emerald-600 font-bold">&#10003;</span>
                         <span className="text-gray-700">{section}</span>
                       </div>
                     ))}
@@ -368,30 +383,24 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
               </div>
 
               <div className="space-y-4">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Survey Settings</p>
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Target Cohort & Schedule</p>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Academic Year *</label>
-                  <select required value={form.academic_year} onChange={(e) => setForm({ ...form, academic_year: e.target.value })}
-                    className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400">
-                    {years.map((y) => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Target Alumni</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Target Audience</label>
                   <select value={form.target_type} onChange={(e) => setForm({ ...form, target_type: e.target.value, target_value: '' })}
-                    className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400">
+                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
                     <option value="all">All Alumni</option>
-                    <option value="course">Specific Course</option>
-                    <option value="batch">Specific Batch</option>
+                    <option value="batch">Graduating Batch</option>
+                    <option value="course">Specific Course / Program</option>
                   </select>
                 </div>
+
                 {form.target_type === 'batch' && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Graduation Batch</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Batch Year</label>
                     <select value={form.target_value} onChange={(e) => setForm({ ...form, target_value: e.target.value })}
-                      className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400">
-                      <option value="">Select batch</option>
-                      {years.map((y) => <option key={y} value={y}>{y}</option>)}
+                      className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
+                      <option value="">Select year</option>
+                      {generateYears(2015, new Date().getFullYear()).map((y) => <option key={y} value={y}>{y}</option>)}
                     </select>
                   </div>
                 )}
@@ -399,7 +408,7 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Course</label>
                     <select value={form.target_value} onChange={(e) => setForm({ ...form, target_value: e.target.value })}
-                      className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400">
+                      className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
                       <option value="">Select course</option>
                       {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED-HE', 'BTLED-ICT'].map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
@@ -409,22 +418,22 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Opening Date</label>
                     <input type="date" value={form.opens_at} onChange={(e) => setForm({ ...form, opens_at: e.target.value })}
-                      className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" />
+                      className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Closing Date</label>
                     <input type="date" value={form.closes_at} onChange={(e) => setForm({ ...form, closes_at: e.target.value })}
-                      className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" />
+                      className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                  <div className="flex gap-3">
-                    <label className="flex items-center gap-1.5 text-xs text-gray-700">
+                  <div className="flex gap-4 pt-1">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
                       <input type="radio" name="status" value="draft" checked={form.status === 'draft'} onChange={(e) => setForm({ ...form, status: e.target.value })} className="accent-orange-500" />
                       Draft
                     </label>
-                    <label className="flex items-center gap-1.5 text-xs text-gray-700">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
                       <input type="radio" name="status" value="published" checked={form.status === 'published'} onChange={(e) => setForm({ ...form, status: e.target.value })} className="accent-orange-500" />
                       Published
                     </label>
@@ -432,18 +441,18 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
                 </div>
 
                 <div className="border-t border-gray-100 pt-4">
-                  <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                  <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-500">Questions</span>
-                      <span className="font-medium text-gray-900">{questionCount !== null ? questionCount : '—'}</span>
+                      <span className="font-semibold text-gray-900">{questionCount !== null ? questionCount : '—'}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-500">Target</span>
-                      <span className="font-medium text-gray-900">{form.target_type === 'batch' ? `Batch ${form.target_value || '—'}` : form.target_type === 'course' ? form.target_value || '—' : 'All Alumni'}</span>
+                      <span className="font-semibold text-gray-900">{form.target_type === 'batch' ? `Batch ${form.target_value || '—'}` : form.target_type === 'course' ? form.target_value || '—' : 'All Alumni'}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-500">Status</span>
-                      <span className="font-medium text-gray-900 capitalize">{form.status}</span>
+                      <span className="font-semibold text-gray-900 capitalize">{form.status}</span>
                     </div>
                   </div>
                 </div>
@@ -451,9 +460,9 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
             </div>
           </div>
 
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button type="submit" className="px-4 py-2 text-xs font-medium text-white bg-orange-500 rounded-lg hover:bg-orange-600">Create Survey</button>
+          <div className="px-6 py-3.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2.5 shrink-0">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer">Cancel</button>
+            <button type="submit" className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer flex items-center gap-1.5">Create Survey</button>
           </div>
         </form>
       </div>

@@ -151,26 +151,46 @@ router.get('/industry-distribution', async (_req, res, next) => {
 
 router.get('/top-employers', async (_req, res, next) => {
   try {
-    const { data: employment } = await supabase
-      .from('employment')
-      .select('company_name, company_industry, salary_range')
-      .eq('is_current', true)
-      .not('company_name', 'is', null);
+    const [{ data: employment }, { data: companies }, { data: employersTable }, { data: jobs }] = await Promise.all([
+      supabase
+        .from('employment')
+        .select('company_name, company_industry, salary_range')
+        .eq('is_current', true)
+        .not('company_name', 'is', null),
+      supabase.from('companies').select('name, industry'),
+      supabase.from('employers').select('company_name, industry'),
+      supabase.from('job_postings').select('company_name, industry'),
+    ]);
 
     const employers: Record<string, { count: number; industry: string; salaries: number[] }> = {};
     employment?.forEach((e: any) => {
-      if (!employers[e.company_name]) employers[e.company_name] = { count: 0, industry: e.company_industry || '', salaries: [] };
-      employers[e.company_name].count++;
+      const name = (e.company_name || '').trim();
+      if (!name || name === 'Unknown') return;
+      if (!employers[name]) employers[name] = { count: 0, industry: e.company_industry || '', salaries: [] };
+      employers[name].count++;
       if (e.salary_range) {
         const nums = e.salary_range.replace(/[^0-9\-]/g, '').split('-').map(Number).filter(Boolean);
-        if (nums.length > 0) employers[e.company_name].salaries.push(nums[0]);
+        if (nums.length > 0) employers[name].salaries.push(nums[0]);
       }
     });
+
+    const addIfMissing = (rawName: string | null | undefined, ind: string | null | undefined) => {
+      const name = (rawName || '').trim();
+      if (!name || name === 'Unknown') return;
+      const key = Object.keys(employers).find((k) => k.toLowerCase() === name.toLowerCase());
+      if (!key) {
+        employers[name] = { count: 0, industry: ind || '', salaries: [] };
+      }
+    };
+
+    (companies || []).forEach((c: any) => addIfMissing(c.name, c.industry));
+    (employersTable || []).forEach((emp: any) => addIfMissing(emp.company_name, emp.industry));
+    (jobs || []).forEach((j: any) => addIfMissing(j.company_name, j.industry));
 
     const data = Object.entries(employers).map(([company, stats]) => ({
       company, count: stats.count, industry: stats.industry,
       avgSalary: stats.salaries.length > 0 ? Math.round(stats.salaries.reduce((a, b) => a + b, 0) / stats.salaries.length) : null,
-    })).sort((a, b) => b.count - a.count).slice(0, 20);
+    })).sort((a, b) => b.count - a.count || a.company.localeCompare(b.company)).slice(0, 20);
 
     res.json(data);
   } catch (err) {

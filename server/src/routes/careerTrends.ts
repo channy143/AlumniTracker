@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
+import { formatProgramLongName } from '../utils/formatProgram';
 
 const router = Router();
 
@@ -8,7 +9,7 @@ router.get('/', authenticate, async (req, res, next) => {
   try {
     const course = req.query.course as string;
 
-    const [employmentRes, educationRes, skillsRes, profilesRes, usersRes, jobPostingsRes, jobApplicationsRes] = await Promise.all([
+    const [employmentRes, educationRes, skillsRes, profilesRes, usersRes, jobPostingsRes, jobApplicationsRes, companiesRes, employersTableRes] = await Promise.all([
       supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, start_date, end_date, is_current, salary_range, job_type').order('start_date', { ascending: false }),
       supabase.from('education').select('profile_id, program, year_graduated, major'),
       supabase.from('skills').select('profile_id, name, category, proficiency_level'),
@@ -16,6 +17,8 @@ router.get('/', authenticate, async (req, res, next) => {
       supabase.from('users').select('id, created_at').eq('role', 'alumni'),
       supabase.from('job_postings').select('id, position, company_name, industry, location, is_remote, salary_range, job_type, expires_at'),
       supabase.from('job_applications').select('id, job_id, user_id, status, applied_at').in('status', ['hired', 'accepted']),
+      supabase.from('companies').select('id, name, industry, is_active'),
+      supabase.from('employers').select('id, company_name, industry'),
     ]);
 
     const employment = employmentRes.data || [];
@@ -178,7 +181,10 @@ router.get('/', authenticate, async (req, res, next) => {
       }
       if (eduMap.has(e.profile_id)) {
         eduMap.get(e.profile_id)!.forEach((ed) => {
-          if (ed.program) career.courses.set(ed.program, (career.courses.get(ed.program) || 0) + 1);
+          if (ed.program) {
+            const longProgram = formatProgramLongName(ed.program);
+            career.courses.set(longProgram, (career.courses.get(longProgram) || 0) + 1);
+          }
         });
       }
       if (profileSkills.has(e.profile_id)) {
@@ -229,7 +235,26 @@ router.get('/', authenticate, async (req, res, next) => {
 
     const topCareers = Array.from(careerMap.entries())
       .map(([position, data]) => {
-        const sortedEmployers = Array.from(data.employers.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        const normPos = position.trim().toLowerCase();
+        const matchingActiveJobs = activeJobs.filter((j: any) => {
+          if (!j.position) return false;
+          const jp = j.position.trim().toLowerCase();
+          return jp === normPos || jp.includes(normPos) || normPos.includes(jp);
+        });
+        const hiredCount = hiredCareerCount.get(normPos) || 0;
+
+        // Ensure active job employers are also included in the career's top employers list even if 0 alumni hired yet
+        matchingActiveJobs.forEach((j: any) => {
+          if (j.company_name && j.company_name !== 'Unknown') {
+            const trimmedCompany = j.company_name.trim();
+            const exists = Array.from(data.employers.keys()).some((k) => k.toLowerCase() === trimmedCompany.toLowerCase());
+            if (!exists) {
+              data.employers.set(trimmedCompany, 0);
+            }
+          }
+        });
+
+        const sortedEmployers = Array.from(data.employers.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5);
         const sortedIndustries = Array.from(data.industries.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
         const sortedCourses = Array.from(data.courses.entries()).sort((a, b) => b[1] - a[1]);
         const sortedSkills = Array.from(data.allSkills.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -239,21 +264,13 @@ router.get('/', authenticate, async (req, res, next) => {
         const avgYears = Math.round((avgMonths / 12) * 100) / 100;
         const alumniCount = data.alumni.size;
 
-        const normPos = position.trim().toLowerCase();
-        const matchingActiveJobs = activeJobs.filter((j: any) => {
-          if (!j.position) return false;
-          const jp = j.position.trim().toLowerCase();
-          return jp === normPos || jp.includes(normPos) || normPos.includes(jp);
-        });
-        const hiredCount = hiredCareerCount.get(normPos) || 0;
-
         return {
           position,
           alumniCount,
           currentInCareer: currentJobs.filter((j: any) => j.position === position).length,
           topEmployers: sortedEmployers.map(([name, count]) => ({ name, count })),
           topIndustries: sortedIndustries.map(([name, count]) => ({ name, count })),
-          mostCommonCourse: sortedCourses.length > 0 ? sortedCourses[0][0] : null,
+          mostCommonCourse: sortedCourses.length > 0 ? formatProgramLongName(sortedCourses[0][0]) : null,
           topSkills: sortedSkills.map(([name, count]) => ({ name, count })),
           averageExperienceYears: avgYears,
           jobTypes: [...(careerJobTypes.get(position) || [])],
@@ -288,6 +305,30 @@ router.get('/', authenticate, async (req, res, next) => {
         indMap.set(j.company_industry, (indMap.get(j.company_industry) || 0) + 1);
       }
     });
+    // Ensure all registered employers, companies, and active job posters are represented even with 0 alumni
+    const allKnownCompanies: { name: string; industry?: string }[] = [];
+    (companiesRes.data || []).forEach((c: any) => {
+      if (c.name && c.name !== 'Unknown') allKnownCompanies.push({ name: c.name, industry: c.industry });
+    });
+    (employersTableRes.data || []).forEach((emp: any) => {
+      if (emp.company_name && emp.company_name !== 'Unknown') allKnownCompanies.push({ name: emp.company_name, industry: emp.industry });
+    });
+    allJobPostings.forEach((j: any) => {
+      if (j.company_name && j.company_name !== 'Unknown') allKnownCompanies.push({ name: j.company_name, industry: j.industry });
+    });
+
+    allKnownCompanies.forEach((c) => {
+      const trimmedName = c.name.trim();
+      const existingKey = Array.from(employerMap.keys()).find((k) => k.toLowerCase() === trimmedName.toLowerCase());
+      if (!existingKey) {
+        employerMap.set(trimmedName, new Set());
+        if (c.industry && c.industry !== 'Unknown') {
+          if (!employerIndustryMap.has(trimmedName)) employerIndustryMap.set(trimmedName, new Map());
+          employerIndustryMap.get(trimmedName)!.set(c.industry, 1);
+        }
+      }
+    });
+
     const topEmployers = Array.from(employerMap.entries())
       .map(([name, alumni]) => {
         const indMap = employerIndustryMap.get(name);
@@ -303,7 +344,7 @@ router.get('/', authenticate, async (req, res, next) => {
           hiredViaJobsCount: hiredCount,
         };
       })
-      .sort((a, b) => b.alumniCount - a.alumniCount);
+      .sort((a, b) => b.alumniCount - a.alumniCount || b.activeJobsCount - a.activeJobsCount || a.name.localeCompare(b.name));
 
     const industryMap = new Map<string, Set<string>>();
     currentJobs.forEach((j: any) => {
@@ -757,13 +798,33 @@ router.get('/:position', authenticate, async (req, res, next) => {
     current.forEach((j: any) => {
       if (j.company_name && j.company_name !== 'Unknown') employers.set(j.company_name, (employers.get(j.company_name) || 0) + 1);
     });
+
+    // Also include employers with active job openings for this role even if 0 alumni hired yet
+    const normCareerPos = position.trim().toLowerCase();
+    const matchingActiveJobsForPos = activeJobs.filter((j: any) => {
+      const jp = (j.position || '').trim().toLowerCase();
+      return jp === normCareerPos || jp.includes(normCareerPos) || normCareerPos.includes(jp);
+    });
+    matchingActiveJobsForPos.forEach((mj: any) => {
+      if (mj.company_name && mj.company_name !== 'Unknown') {
+        const trimmed = mj.company_name.trim();
+        const exists = Array.from(employers.keys()).some((k) => k.toLowerCase() === trimmed.toLowerCase());
+        if (!exists) {
+          employers.set(trimmed, 0);
+        }
+      }
+    });
+
     const topEmployers = Array.from(employers.entries())
       .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
     const courses = new Map<string, number>();
     (education || []).forEach((e: any) => {
-      if (e.program) courses.set(e.program, (courses.get(e.program) || 0) + 1);
+      if (e.program) {
+        const longProgram = formatProgramLongName(e.program);
+        courses.set(longProgram, (courses.get(longProgram) || 0) + 1);
+      }
     });
     const mostCommonCourse = Array.from(courses.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 

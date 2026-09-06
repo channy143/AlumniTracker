@@ -21,6 +21,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import ApplicantScreeningModal from '@/components/admin/ApplicantScreeningModal';
+import { SkeletonStatCard } from '@/components/ui/Skeleton';
 
 const EMPTY_FORM = {
   employer_id: '', company_name: '', position: '', description: '', location: '', job_type: 'full-time',
@@ -222,45 +223,51 @@ export default function JobManagement() {
 
       {/* Overview KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white border border-gray-200/80 rounded-xl p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 shrink-0">
-            <BriefcaseIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-gray-500">Total Postings</p>
-            <p className="text-lg font-bold text-gray-900 leading-tight">{total}</p>
-          </div>
-        </div>
+        {loading ? (
+          [1, 2, 3, 4].map((i) => <SkeletonStatCard key={i} className="p-3.5" />)
+        ) : (
+          <>
+            <div className="bg-white border border-gray-200/80 rounded-xl p-3.5 shadow-2xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+                <BriefcaseIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-gray-500">Total Postings</p>
+                <p className="text-lg font-bold text-gray-900 leading-tight">{total}</p>
+              </div>
+            </div>
 
-        <div className="bg-white border border-gray-200/80 rounded-xl p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-            <CheckCircleIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-gray-500">Active Listings</p>
-            <p className="text-lg font-bold text-emerald-700 leading-tight">{stats.activePostings}</p>
-          </div>
-        </div>
+            <div className="bg-white border border-gray-200/80 rounded-xl p-3.5 shadow-2xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <CheckCircleIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-gray-500">Active Listings</p>
+                <p className="text-lg font-bold text-emerald-700 leading-tight">{stats.activePostings}</p>
+              </div>
+            </div>
 
-        <div className="bg-white border border-gray-200/80 rounded-xl p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-            <UserGroupIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-gray-500">Total Candidates</p>
-            <p className="text-lg font-bold text-blue-700 leading-tight">{stats.totalApplicants}</p>
-          </div>
-        </div>
+            <div className="bg-white border border-gray-200/80 rounded-xl p-3.5 shadow-2xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                <UserGroupIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-gray-500">Total Candidates</p>
+                <p className="text-lg font-bold text-blue-700 leading-tight">{stats.totalApplicants}</p>
+              </div>
+            </div>
 
-        <div className="bg-white border border-gray-200/80 rounded-xl p-3.5 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
-            <BuildingOfficeIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-[11px] font-medium text-gray-500">Registered Employers</p>
-            <p className="text-lg font-bold text-purple-700 leading-tight">{stats.totalEmployers}</p>
-          </div>
-        </div>
+            <div className="bg-white border border-gray-200/80 rounded-xl p-3.5 shadow-2xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+                <BuildingOfficeIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-gray-500">Registered Employers</p>
+                <p className="text-lg font-bold text-purple-700 leading-tight">{stats.totalEmployers}</p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -560,11 +567,30 @@ export default function JobManagement() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-sm font-bold text-gray-900 mb-4">{editId ? 'Edit Job Opportunity' : 'Post a Job Opportunity'}</h2>
-            {formError && <div className="bg-red-50 text-red-700 px-3 py-2 rounded-lg mb-3 text-xs">{formError}</div>}
-            <form onSubmit={handleSave} className="space-y-3">
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setShowForm(false)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                  <BriefcaseIcon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">{editId ? 'Edit Job Opportunity' : 'Post Job Opportunity'}</h3>
+                  <p className="text-xs text-orange-100 mt-0.5">Publish new career opportunities and internships for alumni</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                {formError && <div className="bg-red-50 text-red-700 px-3 py-2 rounded-xl text-xs border border-red-100">{formError}</div>}
               {/* Employer Selection */}
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -605,77 +631,144 @@ export default function JobManagement() {
                         className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
                       />
                     </div>
-                    <input
-                      type="email"
-                      placeholder="Contact Email"
-                      value={newEmployer.contact_email}
-                      onChange={(e) => setNewEmployer((ne) => ({ ...ne, contact_email: e.target.value }))}
-                      className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
-                    />
-                    <div className="flex justify-end gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => setShowNewEmployer(false)}
-                        className="px-2.5 py-1 text-xs text-gray-600 bg-white border border-gray-200 rounded hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="email"
+                        placeholder="Contact Email"
+                        value={newEmployer.contact_email}
+                        onChange={(e) => setNewEmployer((ne) => ({ ...ne, contact_email: e.target.value }))}
+                        className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white flex-1 outline-none focus:border-orange-400"
+                      />
                       <button
                         type="button"
                         onClick={handleCreateEmployer}
-                        disabled={creatingEmployer || !newEmployer.company_name.trim()}
-                        className="px-2.5 py-1 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600 disabled:opacity-50"
+                        disabled={creatingEmployer || !newEmployer.company_name}
+                        className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-40"
                       >
-                        {creatingEmployer ? 'Saving...' : 'Save Employer'}
+                        {creatingEmployer ? 'Adding...' : 'Add'}
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-1.5">
-                    <select
-                      value={form.employer_id || ''}
-                      onChange={(e) => {
-                        const empId = e.target.value;
-                        const found = employers.find((emp) => emp.id === empId);
-                        setForm((f: any) => ({
-                          ...f,
-                          employer_id: empId,
-                          company_name: found ? found.company_name : f.company_name,
-                          industry: found?.industry || f.industry,
-                        }));
-                      }}
-                      className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full bg-white"
-                    >
-                      <option value="">Select an Existing Employer (or type below)</option>
-                      {employers.map((emp) => (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.company_name} {emp.industry ? `(${emp.industry})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      placeholder="Company Name (auto-filled or custom) *"
-                      value={form.company_name}
-                      onChange={setField('company_name')}
-                      className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"
-                      required
-                    />
-                  </div>
+                  <select
+                    value={form.employer_id}
+                    onChange={(e) => {
+                      const emp = employers.find((x) => x.id === e.target.value);
+                      setForm((f: any) => ({
+                        ...f,
+                        employer_id: e.target.value,
+                        company_name: emp?.company_name || f.company_name,
+                        industry: emp?.industry || f.industry,
+                      }));
+                    }}
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                    required
+                  >
+                    <option value="">Select an Employer</option>
+                    {employers.map((emp) => (
+                      <option key={emp.id} value={emp.id}>{emp.company_name}{emp.industry ? ` (${emp.industry})` : ''}</option>
+                    ))}
+                  </select>
                 )}
               </div>
 
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Position *</label><input type="text" value={form.position} onChange={setField('position')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Description *</label><textarea value={form.description} onChange={setField('description')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" rows={3} required /></div>
-              <div><label className="block text-xs font-medium text-gray-700 mb-1">Location *</label><input type="text" value={form.location} onChange={setField('location')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" required /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Job Type</label><select value={form.job_type} onChange={setField('job_type')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"><option value="full-time">Full-Time</option><option value="part-time">Part-Time</option><option value="contract">Contract</option><option value="freelance">Freelance</option><option value="internship">Internship</option></select></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Experience Level</label><select value={form.experience_level} onChange={setField('experience_level')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"><option value="entry">Entry</option><option value="junior">Junior</option><option value="mid">Mid-Level</option><option value="senior">Senior</option><option value="lead">Lead</option><option value="executive">Executive</option></select></div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">Position / Job Title *</label>
+                <input
+                  type="text"
+                  value={form.position}
+                  onChange={(e) => setForm((f: any) => ({ ...f, position: e.target.value }))}
+                  placeholder="e.g. Junior Web Developer"
+                  className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  required
+                />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Industry</label><input type="text" value={form.industry} onChange={setField('industry')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="e.g. Technology" /></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Salary Range</label><input type="text" value={form.salary_range} onChange={setField('salary_range')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="e.g. ₱20k-₱40k" /></div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Industry</label>
+                  <input
+                    type="text"
+                    value={form.industry}
+                    onChange={(e) => setForm((f: any) => ({ ...f, industry: e.target.value }))}
+                    placeholder="e.g. Information Technology"
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Location</label>
+                  <input
+                    type="text"
+                    value={form.location}
+                    onChange={(e) => setForm((f: any) => ({ ...f, location: e.target.value }))}
+                    placeholder="e.g. Cebu City, Philippines"
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  />
+                </div>
               </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Job Type</label>
+                  <select
+                    value={form.job_type}
+                    onChange={(e) => setForm((f: any) => ({ ...f, job_type: e.target.value }))}
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  >
+                    <option value="full-time">Full-time</option>
+                    <option value="part-time">Part-time</option>
+                    <option value="contract">Contract</option>
+                    <option value="internship">Internship</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Experience Level</label>
+                  <select
+                    value={form.experience_level}
+                    onChange={(e) => setForm((f: any) => ({ ...f, experience_level: e.target.value }))}
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  >
+                    <option value="entry">Entry Level</option>
+                    <option value="mid">Mid Level</option>
+                    <option value="senior">Senior Level</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Salary Range</label>
+                  <input
+                    type="text"
+                    value={form.salary_range}
+                    onChange={(e) => setForm((f: any) => ({ ...f, salary_range: e.target.value }))}
+                    placeholder="e.g. 25,000 - 35,000"
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Application Deadline *</label>
+                  <input
+                    type="date"
+                    value={form.expires_at ? form.expires_at.slice(0, 10) : ''}
+                    onChange={(e) => setForm((f: any) => ({ ...f, expires_at: e.target.value }))}
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">External Application URL</label>
+                  <input
+                    type="url"
+                    value={form.application_url}
+                    onChange={(e) => setForm((f: any) => ({ ...f, application_url: e.target.value }))}
+                    placeholder="https://company.com/apply or email"
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  />
+                </div>
+              </div>
+
+              {/* Skills Tag Input */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Required Skills</label>
                 <div className="border border-gray-200 rounded-lg px-2 py-1.5 focus-within:ring-1 focus-within:ring-orange-400 focus-within:border-orange-400">
@@ -732,17 +825,49 @@ export default function JobManagement() {
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">Press Enter or comma to add. Backspace to remove last.</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">External Application URL</label><input type="url" value={form.application_url} onChange={setField('application_url')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" placeholder="https://company.com/careers" /></div>
-                <div><label className="block text-xs font-medium text-gray-700 mb-1">Expiry Date</label><input type="date" value={form.expires_at} onChange={setField('expires_at')} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full" /></div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">Job Description</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm((f: any) => ({ ...f, description: e.target.value }))}
+                  placeholder="Describe the job role, responsibilities, culture..."
+                  className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  rows={3}
+                />
               </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">Qualifications & Requirements</label>
+                <textarea
+                  value={form.requirements}
+                  onChange={(e) => setForm((f: any) => ({ ...f, requirements: e.target.value }))}
+                  placeholder="Degrees, certifications, minimum years of experience..."
+                  className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  rows={2}
+                />
+              </div>
+
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={form.is_alumni_exclusive} onChange={toggleField('is_alumni_exclusive')} className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500" /><span className="text-xs text-gray-500">Alumni Exclusive</span></label>
                 <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={form.is_remote} onChange={toggleField('is_remote')} className="w-3.5 h-3.5 rounded border-gray-300 text-orange-500" /><span className="text-xs text-gray-500">Remote</span></label>
               </div>
-              <div className="flex gap-2 justify-end pt-1">
-                <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">{editId ? 'Update Job' : 'Post Job'}</button>
+              </div>
+
+              <div className="px-6 py-3.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  {editId ? 'Update Opportunity' : 'Post Opportunity'}
+                </button>
               </div>
             </form>
           </div>
@@ -754,6 +879,7 @@ export default function JobManagement() {
           onClose={() => setScreeningJob(null)}
           jobId={screeningJob.id}
           jobPosition={screeningJob.position}
+          jobCompany={screeningJob.company_name}
           requiredSkills={screeningJob.required_skills || []}
         />
       )}

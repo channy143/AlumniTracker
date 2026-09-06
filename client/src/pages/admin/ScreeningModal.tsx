@@ -68,14 +68,19 @@ export default function ScreeningModal({ jobId, jobPosition, jobCompany, onClose
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl max-w-2xl w-full flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-          <div>
-            <h2 className="text-sm font-bold text-gray-900">Screen Applicants</h2>
-            <p className="text-xs text-gray-500">{jobPosition} — {jobCompany}</p>
+    <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+              <UserGroupIcon className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white leading-tight">Screen Applicants</h2>
+              <p className="text-xs text-orange-100 mt-0.5">{jobPosition} — {jobCompany}</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer">
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>

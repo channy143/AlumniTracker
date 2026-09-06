@@ -166,7 +166,7 @@ export default function CareerLeaderboardNav({
       name: e.name,
       count: e.alumniCount,
       metric: `${e.alumniCount}`,
-      metricLabel: activeJobs > 0 ? `${e.alumniCount} alumni • ${activeJobs} open job${activeJobs > 1 ? 's' : ''}` : 'alumni',
+      metricLabel: activeJobs > 0 ? `${e.alumniCount} alumni • ${activeJobs} open job${activeJobs > 1 ? 's' : ''}` : `${e.alumniCount} alumni`,
       kind: 'employer' as const,
       industry: ind || 'General',
       percentage: pct,

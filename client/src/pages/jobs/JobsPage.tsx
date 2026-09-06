@@ -943,17 +943,17 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
 
   if (submittedApp) {
     return (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-        <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-xl transform transition-all" onClick={(e) => e.stopPropagation()}>
-          <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-xs">
+      <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={onClose}>
+        <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+          <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-xs">
             <CheckCircleIcon className="w-8 h-8" />
           </div>
-          <h3 className="text-base font-bold text-gray-900 mb-1">Application submitted</h3>
+          <h3 className="text-base font-bold text-gray-900 mb-1">Application Submitted!</h3>
           <span className="inline-block px-3 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-semibold mb-3">
-            Submitted
+            Candidate Referral Profile Active
           </span>
           <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-            Your application for <span className="font-semibold text-gray-800">{job.position}</span> at <span className="font-semibold text-gray-800">{job.company_name}</span> has been received.
+            Your application for <span className="font-semibold text-gray-800">{job.position}</span> at <span className="font-semibold text-gray-800">{job.company_name}</span> has been forwarded to university admin for referral screening.
           </p>
           <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3 overflow-hidden">
             <div
@@ -967,7 +967,7 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2.5 px-4 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+            className="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer shadow-xs"
           >
             Close Now
           </button>
@@ -977,73 +977,83 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl max-w-lg w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between px-6 py-4 bg-orange-500">
-          <div>
-            <h2 className="text-sm font-bold text-white">Apply for {job.position}</h2>
-            <p className="text-xs text-orange-100">{job.company_name}</p>
+    <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+              <BriefcaseIcon className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white leading-tight">Apply for {job.position}</h2>
+              <p className="text-xs text-orange-100 mt-0.5">{job.company_name} · Candidate Application</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"><XMarkIcon className="w-5 h-5" /></button>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
         </div>
-        <div className="p-6">
 
-        {error && <div className="bg-red-50 text-red-700 px-3 py-2 rounded-lg mb-3 text-xs">{error}</div>}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+            {error && <div className="bg-red-50 text-red-700 px-3 py-2 rounded-xl text-xs border border-red-100">{error}</div>}
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {profileResume ? (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
-              <p className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
-                <CheckCircleIcon className="w-4 h-4" /> Your profile resume will be used
-              </p>
-              <p className="text-[11px] text-emerald-600 mt-0.5">No need to upload again. Use the option below only if you want to attach a different resume for this application.</p>
+            {profileResume ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-3">
+                <p className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
+                  <CheckCircleIcon className="w-4 h-4" /> Your profile resume will be used
+                </p>
+                <p className="text-[11px] text-emerald-600 mt-0.5">No need to re-upload. Use the option below only if you want to attach a tailored resume for this opportunity.</p>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3">
+                <p className="text-xs text-amber-700 font-semibold">Upload a resume to apply</p>
+                <p className="text-[11px] text-amber-600 mt-0.5">You don't have a resume on your profile yet, so please attach your CV below.</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Resume (PDF or DOC/DOCX){!profileResume && <span className="text-red-500"> *</span>}</label>
+              <label className="flex items-center gap-2 border border-dashed border-gray-300 rounded-xl px-3.5 py-3 cursor-pointer hover:border-orange-400 hover:bg-orange-50/20 transition-all">
+                <PaperClipIcon className="w-4 h-4 text-gray-400" />
+                <span className="text-xs text-gray-600 truncate">
+                  {resume
+                    ? resume.name
+                    : profileResume
+                      ? 'Choose a file (optional — attaches a different resume)'
+                      : 'Choose a file (required)'}
+                </span>
+                <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={(e) => setResume(e.target.files?.[0] || null)} />
+              </label>
             </div>
-          ) : (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
-              <p className="text-xs text-amber-700 font-medium">Upload a resume to apply</p>
-              <p className="text-[11px] text-amber-600 mt-0.5">You don't have a resume on your profile yet, so please attach one below.</p>
-            </div>
-          )}
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Resume (PDF or DOC/DOCX){!profileResume && <span className="text-red-500"> *</span>}</label>
-            <label className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-3 cursor-pointer hover:border-orange-400">
-              <PaperClipIcon className="w-4 h-4 text-gray-400" />
-              <span className="text-xs text-gray-600 truncate">
-                {resume
-                  ? resume.name
-                  : profileResume
-                    ? 'Choose a file (optional — attaches a different resume)'
-                    : 'Choose a file (required)'}
-              </span>
-              <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={(e) => setResume(e.target.files?.[0] || null)} />
-            </label>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Cover Letter (optional)</label>
+              <textarea
+                value={coverLetter}
+                onChange={(e) => setCoverLetter(e.target.value)}
+                className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full"
+                rows={4}
+                placeholder="Briefly highlight your qualifications, skills, and why you are a great fit..."
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Cover Letter (optional)</label>
-            <textarea
-              value={coverLetter}
-              onChange={(e) => setCoverLetter(e.target.value)}
-              className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"
-              rows={4}
-              placeholder="Why are you a great fit for this role?"
-            />
-          </div>
-
-          <div className="flex items-center justify-between pt-1">
-            <a href={job.company_website || '#'} target="_blank" rel="noreferrer" className="text-xs text-gray-500 hover:underline flex items-center gap-1">
-              <GlobeAltIcon className="w-3.5 h-3.5" /> Learn more about {job.company_name}
+          <div className="px-6 py-3.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between gap-2.5 shrink-0">
+            <a href={job.company_website || '#'} target="_blank" rel="noreferrer" className="text-xs text-gray-500 hover:text-orange-600 flex items-center gap-1 transition-colors">
+              <GlobeAltIcon className="w-3.5 h-3.5" /> <span>Company Website</span>
             </a>
-            <div className="flex gap-2">
-              <button type="button" onClick={onClose} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
-              <button type="submit" disabled={submitting} className="px-3 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50">
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer">Cancel</button>
+              <button type="submit" disabled={submitting} className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5">
                 {submitting ? 'Submitting...' : 'Submit Application'}
               </button>
             </div>
           </div>
         </form>
-        </div>
       </div>
     </div>
   );

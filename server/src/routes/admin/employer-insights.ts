@@ -195,6 +195,26 @@ router.get('/statistics', async (req, res, next) => {
       if (profile?.province) acc.provinceCounts[profile.province] = (acc.provinceCounts[profile.province] || 0) + 1;
     });
 
+    // Ensure all companies from companies table are included even if they have 0 alumni
+    companies.forEach((c: any) => {
+      const name = String(c.name || '').replace(/\s+/g, ' ').trim();
+      if (!name) return;
+      const key = normalize(name);
+      if (!employers.has(key)) {
+        employers.set(key, {
+          name,
+          alumni: new Set<string>(),
+          employmentCount: 0,
+          hireYears: new Set<number>(),
+          firstHireDate: null,
+          lastHireDate: null,
+          industryCounts: c.industry ? { [c.industry]: 1 } : {},
+          cityCounts: {},
+          provinceCounts: {},
+        });
+      }
+    });
+
     const employerList = [...employers.values()];
     const currentYear = new Date().getFullYear();
 
@@ -220,7 +240,7 @@ router.get('/statistics', async (req, res, next) => {
         employmentCount: e.employmentCount,
         industry: topKey(e.industryCounts) || '',
       }))
-      .sort((a: any, b: any) => b.alumniCount - a.alumniCount || b.employmentCount - a.employmentCount)
+      .sort((a: any, b: any) => b.alumniCount - a.alumniCount || b.employmentCount - a.employmentCount || a.name.localeCompare(b.name))
       .slice(0, 12);
 
     const industryCount: Record<string, number> = {};

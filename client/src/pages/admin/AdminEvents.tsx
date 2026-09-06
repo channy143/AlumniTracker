@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
+import { CalendarDaysIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 export default function AdminEvents() {
   const [events, setEvents] = useState<any[]>([]);
@@ -110,7 +111,20 @@ export default function AdminEvents() {
       </div>
 
       <div className="space-y-2">
-        {filteredEvents.length === 0 ? (
+        {loading ? (
+          [1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gray-200" />
+                <div className="space-y-1.5">
+                  <div className="h-3.5 w-40 bg-gray-200 rounded" />
+                  <div className="h-2.5 w-24 bg-gray-200 rounded" />
+                </div>
+              </div>
+              <div className="h-4 w-16 bg-gray-200 rounded" />
+            </div>
+          ))
+        ) : filteredEvents.length === 0 ? (
           <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">No {filter} events for now.</div>
         ) : filteredEvents.slice(0, 10).map((e: any) => (
           <div key={e.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between">
@@ -134,25 +148,61 @@ export default function AdminEvents() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-lg p-4 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-sm font-bold text-gray-900 mb-3">{editId ? 'Edit Event' : 'New Event'}</h2>
-            <form onSubmit={handleSave} className="space-y-3">
-              <input required placeholder="Event name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" />
-              <textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" rows={3} />
-              <div className="grid grid-cols-2 gap-2">
-                <input type="date" required placeholder="Date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" />
-                <input type="time" placeholder="Time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })}
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/55 backdrop-blur-xs" onClick={() => setShowForm(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                  <CalendarDaysIcon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">{editId ? 'Edit Event' : 'Create New Event'}</h3>
+                  <p className="text-xs text-orange-100 mt-0.5">Schedule campus reunions, homecomings, and job fairs</p>
+                </div>
               </div>
-              <input placeholder="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
-                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" />
-              <div className="flex items-center gap-2 pt-2">
-                <button type="submit" className="px-4 py-2 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">{editId ? 'Update' : 'Create'}</button>
-                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-xs font-medium text-gray-600 hover:text-gray-800">Cancel</button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Event Name *</label>
+                  <input required placeholder="e.g. Annual Grand Alumni Homecoming 2026" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                  <textarea placeholder="Provide details about the event schedule, program, and attendees..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" rows={3} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Date *</label>
+                    <input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
+                      className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Time</label>
+                    <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })}
+                      className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Location / Venue</label>
+                  <input placeholder="e.g. CTU Main Campus Gymnasium or Zoom Link" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
+                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
+                </div>
+              </div>
+
+              <div className="px-6 py-3.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2.5 shrink-0">
+                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer">Cancel</button>
+                <button type="submit" className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer flex items-center gap-1.5">{editId ? 'Update Event' : 'Create Event'}</button>
               </div>
             </form>
           </div>

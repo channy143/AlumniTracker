@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BriefcaseIcon, BuildingOfficeIcon, AcademicCapIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, ChartBarIcon, UserGroupIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { careerTrendsApi } from '@/services/api';
+import { careerTrendsApi, jobsApi } from '@/services/api';
 import { formatExperience } from '@/utils/formatExperience';
+import { formatProgramLongName } from '@/utils/formatProgram';
 import { SkeletonCard, SkeletonText, SkeletonStatCard } from '@/components/ui/Skeleton';
+import { isJobMatch } from '@/utils/isJobMatch';
 
 const INDUSTRY_COLORS = ['#059669', '#2563eb', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#6b7280'];
 
@@ -13,6 +15,13 @@ export default function CareerInsightsPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [myApplications, setMyApplications] = useState<any[]>([]);
+
+  useEffect(() => {
+    jobsApi.myApplications()
+      .then((res) => setMyApplications(Array.isArray(res) ? res : []))
+      .catch(() => setMyApplications([]));
+  }, []);
 
   useEffect(() => {
     if (!position) return;
@@ -125,7 +134,7 @@ export default function CareerInsightsPage() {
           <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs">
             <AcademicCapIcon className="w-4 h-4 text-orange-500 shrink-0" />
             <span className="text-gray-500">Most Common Course:</span>
-            <span className="font-semibold text-gray-800">{data.mostCommonCourse}</span>
+            <span className="font-semibold text-gray-800">{formatProgramLongName(data.mostCommonCourse)}</span>
           </div>
         )}
       </div>
@@ -392,16 +401,34 @@ export default function CareerInsightsPage() {
                       </p>
                     </div>
 
-                    <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
-                      <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                    <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 shrink-0">
                         Hiring Now
                       </span>
-                      <button
-                        onClick={() => navigate(`/jobs?filter=${encodeURIComponent(job.position)}`)}
-                        className="px-3 py-1 text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors cursor-pointer"
-                      >
-                        Apply Now
-                      </button>
+                      {(() => {
+                        const isApplied = myApplications.some((app) => isJobMatch(app, job));
+                        if (isApplied) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/jobs?filter=${encodeURIComponent(job.position)}`)}
+                              className="px-2.5 py-1 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                            >
+                              <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Applied</span>
+                            </button>
+                          );
+                        }
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/jobs?filter=${encodeURIComponent(job.position)}`)}
+                            className="px-3 py-1 text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors cursor-pointer shadow-xs active:scale-95"
+                          >
+                            Apply Now
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                 ))}

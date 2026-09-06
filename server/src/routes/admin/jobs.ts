@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { validate } from '../../middleware/validate';
@@ -15,6 +16,7 @@ import {
 import { calculateMatchScore } from '../../utils/matchScoring';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 router.get('/', async (req, res, next) => {
   try {
@@ -268,21 +270,29 @@ router.get('/:id/applicants', async (req: AuthenticatedRequest, res, next) => {
         }
       );
 
-      const overall = screeningRecord?.overall_match_score != null
-        ? Number(screeningRecord.overall_match_score)
-        : (a.match_percentage != null && a.match_percentage > 0 ? a.match_percentage : scoreResult.overall_score);
-
       const skillsScore = screeningRecord?.skills_match_score != null
-        ? Number(screeningRecord.skills_match_score)
+        ? Math.min(100, Math.max(0, Number(screeningRecord.skills_match_score)))
         : scoreResult.skills_score;
 
       const experienceScore = screeningRecord?.experience_match_score != null
-        ? Number(screeningRecord.experience_match_score)
+        ? Math.min(100, Math.max(0, Number(screeningRecord.experience_match_score)))
         : scoreResult.experience_score;
 
       const educationScore = screeningRecord?.education_match_score != null
-        ? Number(screeningRecord.education_match_score)
+        ? Math.min(100, Math.max(0, Number(screeningRecord.education_match_score)))
         : scoreResult.education_score;
+
+      const calculatedOverall = Math.min(
+        100,
+        Math.max(
+          0,
+          Math.round(skillsScore * 0.50 + experienceScore * 0.30 + educationScore * 0.20)
+        )
+      );
+
+      const overall = screeningRecord?.overall_match_score != null
+        ? Math.min(100, Math.max(0, Number(screeningRecord.overall_match_score)))
+        : calculatedOverall;
 
       return {
         id: a.id,
@@ -296,9 +306,13 @@ router.get('/:id/applicants', async (req: AuthenticatedRequest, res, next) => {
         cover_letter: a.cover_letter,
         match_percentage: overall,
         skills_match_score: skillsScore,
+        skills_score: skillsScore,
         experience_match_score: experienceScore,
+        experience_score: experienceScore,
         education_match_score: educationScore,
+        education_score: educationScore,
         overall_match_score: overall,
+        overall_score: overall,
         skills_breakdown: scoreResult.skills_breakdown,
         matched_skills: a.matched_skills && a.matched_skills.length > 0
           ? a.matched_skills
@@ -469,19 +483,67 @@ router.put('/applications/:applicationId/screen', validate(screenApplicationSche
 
     const { data: job, error: jobError } = await supabase
       .from('job_postings')
-      .select('required_skills')
+      .select('required_skills, experience_level, position, industry')
       .eq('id', application.job_id)
       .maybeSingle();
     if (jobError) throw new AppError(jobError.message, 500);
 
     const requiredSkills: string[] = job?.required_skills || [];
-    const missingSkills = requiredSkills.filter((s) => !matched_skills.includes(s));
+    const validMatchedSkills: string[] = Array.from(new Set(
+      (matched_skills || []).filter((s: string) => requiredSkills.includes(s))
+    ));
+    const missingSkills = requiredSkills.filter((s) => !validMatchedSkills.includes(s));
+
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('id, user_id, education:education(*), employment:employment(*)')
+      .eq('user_id', application.user_id)
+      .maybeSingle();
+
+    const scoreResult = calculateMatchScore(
+      {
+        required_skills: requiredSkills,
+        experience_level: job?.experience_level || 'entry',
+        position: job?.position || '',
+        industry: job?.industry || '',
+      },
+      {
+        skills: validMatchedSkills,
+        employment: prof?.employment || [],
+        education: prof?.education || [],
+      }
+    );
+
+    const calculatedSkillsScore = requiredSkills.length > 0
+      ? Math.min(100, Math.max(0, Math.round((validMatchedSkills.length / requiredSkills.length) * 100)))
+      : 100;
+
+    const expScore = experience_match_score != null
+      ? Math.min(100, Math.max(0, experience_match_score))
+      : scoreResult.experience_score;
+
+    const eduScore = education_match_score != null
+      ? Math.min(100, Math.max(0, education_match_score))
+      : scoreResult.education_score;
+
+    const computedOverall = Math.min(
+      100,
+      Math.max(
+        0,
+        Math.round(calculatedSkillsScore * 0.5 + expScore * 0.3 + eduScore * 0.2)
+      )
+    );
+
     const finalOverall = overall_match_score != null
-      ? overall_match_score
-      : (requiredSkills.length > 0 ? Math.round((matched_skills.length / requiredSkills.length) * 100) : 0);
+      ? Math.min(100, Math.max(0, overall_match_score))
+      : computedOverall;
+
+    const finalSkillsScore = skills_match_score != null
+      ? Math.min(100, Math.max(0, skills_match_score))
+      : calculatedSkillsScore;
 
     const updatePayload: any = {
-      matched_skills,
+      matched_skills: validMatchedSkills,
       missing_skills: missingSkills,
       match_percentage: finalOverall,
       screening_notes: screening_notes || null,
@@ -492,10 +554,20 @@ router.put('/applications/:applicationId/screen', validate(screenApplicationSche
       updatePayload.status = status;
     }
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from('job_applications')
       .update(updatePayload)
       .eq('id', req.params.applicationId);
+
+    if (error && error.code === 'PGRST204' && updatePayload.screened_at) {
+      delete updatePayload.screened_at;
+      const retryResult = await supabase
+        .from('job_applications')
+        .update(updatePayload)
+        .eq('id', req.params.applicationId);
+      error = retryResult.error;
+    }
+
     if (error && (error.code === '42P01' || error.code === 'PGRST205')) {
       throw new AppError('Screening columns not available. Run the screening migration first.', 500);
     }
@@ -506,18 +578,37 @@ router.put('/applications/:applicationId/screen', validate(screenApplicationSche
     }
 
     try {
-      await supabase.from('application_screening').insert({
+      const { data: existingScreening } = await supabase
+        .from('application_screening')
+        .select('id')
+        .eq('application_id', req.params.applicationId)
+        .order('screened_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const screeningPayload = {
         application_id: req.params.applicationId,
-        skills_match_score: skills_match_score ?? finalOverall,
-        experience_match_score: experience_match_score ?? 0,
-        education_match_score: education_match_score ?? 0,
+        skills_match_score: finalSkillsScore,
+        experience_match_score: expScore,
+        education_match_score: eduScore,
         overall_match_score: finalOverall,
         screening_notes: screening_notes || null,
         screened_by: req.user?.userId || null,
         screened_at: new Date().toISOString(),
-      });
+      };
+
+      if (existingScreening) {
+        await supabase
+          .from('application_screening')
+          .update(screeningPayload)
+          .eq('id', existingScreening.id);
+      } else {
+        await supabase
+          .from('application_screening')
+          .insert(screeningPayload);
+      }
     } catch (scErr) {
-      console.warn('Could not insert application_screening record:', scErr);
+      console.warn('Could not upsert application_screening record:', scErr);
     }
 
     try {
@@ -542,29 +633,38 @@ router.put('/applications/:applicationId/screen', validate(screenApplicationSche
       .maybeSingle();
     if (fetchError) throw new AppError(fetchError.message, 500);
 
-    res.json(updated);
+    res.json({
+      ...updated,
+      matched_skills: validMatchedSkills,
+      missing_skills: missingSkills,
+      match_percentage: finalOverall,
+      overall_match_score: finalOverall,
+      skills_match_score: finalSkillsScore,
+      experience_match_score: expScore,
+      education_match_score: eduScore,
+    });
   } catch (err) { next(err); }
 });
 
 router.get('/:id/applicants/export', async (req: AuthenticatedRequest, res, next) => {
   try {
+    const { data: job, error: jobError } = await supabase
+      .from('job_postings')
+      .select('id, position, company_name, industry')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (jobError) throw new AppError(jobError.message, 500);
+    if (!job) throw new AppError('Job not found', 404);
+
     try {
       await supabase.from('audit_logs').insert({
         user_id: req.user?.userId || null,
         action: 'export',
         entity: 'job_application',
         entity_id: req.params.id,
-        details: { description: 'Admin exported screened applicants as CSV' },
+        details: { description: `Admin generated candidate referral report for ${job.position}` },
       });
     } catch { }
-
-    const { data: job, error: jobError } = await supabase
-      .from('job_postings')
-      .select('id, position, company_name')
-      .eq('id', req.params.id)
-      .maybeSingle();
-    if (jobError) throw new AppError(jobError.message, 500);
-    if (!job) throw new AppError('Job not found', 404);
 
     const { data: applications, error } = await supabase
       .from('job_applications')
@@ -577,24 +677,439 @@ router.get('/:id/applicants/export', async (req: AuthenticatedRequest, res, next
     }
     if (error) throw new AppError(error.message, 500);
 
-    const esc = (val: string) => `"${String(val || '').replace(/"/g, '""')}"`;
-    const headers = ['Name', 'Email', 'Match %', 'Matched Skills', 'Missing Skills', 'Notes', 'Status'];
-    const rows = (applications || []).map((a: any) => [
-      esc(a.applicant_name || ''),
-      esc(a.applicant_email || ''),
-      a.match_percentage != null ? `${a.match_percentage}%` : 'Not screened',
-      esc((a.matched_skills || []).join('; ')),
-      esc((a.missing_skills || []).join('; ')),
-      esc(a.screening_notes || ''),
-      esc(a.status || 'pending'),
-    ]);
-    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const userIds = (applications || []).map((a: any) => a.user_id).filter(Boolean);
+    const profileMap = new Map<string, any>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, user_id, first_name, last_name, email, phone, education:education(*)')
+        .in('user_id', userIds);
+      (profiles || []).forEach((p: any) => profileMap.set(p.user_id, p));
+    }
+
+    const esc = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+    const escHtml = (val: any) =>
+      String(val ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const format = String(req.query.format || 'csv').toLowerCase();
+
+    const appData = (applications || []).map((a: any) => {
+      const prof = profileMap.get(a.user_id);
+      const sortedEd = [...(prof?.education || [])].sort((x: any, y: any) => (y.year_graduated || 0) - (x.year_graduated || 0));
+      const batchYear = sortedEd[0]?.year_graduated ? String(sortedEd[0].year_graduated) : '';
+      const program = sortedEd[0]?.program || '';
+      const phone = prof?.phone || '';
+      const candidateName = a.applicant_name || (prof ? `${prof.first_name || ''} ${prof.last_name || ''}`.trim() : 'Applicant');
+      const email = a.applicant_email || prof?.email || '';
+      const matchScore = a.match_percentage != null ? `${a.match_percentage}%` : 'Not evaluated';
+      const matchedSkills = (a.matched_skills || []).join('; ');
+      const missingSkills = (a.missing_skills || []).join('; ');
+      const notes = a.screening_notes || '';
+      const resume = a.resume_url || '';
+      const appliedDate = a.applied_at ? new Date(a.applied_at).toLocaleDateString() : '';
+      const currentDecision = a.status && a.status !== 'pending' && a.status !== 'under_review' ? a.status : '';
+
+      return {
+        id: a.id,
+        name: candidateName,
+        email,
+        phone,
+        batchYear,
+        program,
+        matchScore,
+        matchedSkills,
+        missingSkills,
+        notes,
+        resume,
+        appliedDate,
+        decision: currentDecision,
+        remarks: a.company_feedback || '',
+      };
+    });
 
     const safeName = (job.position || 'job').replace(/[^a-zA-Z0-9]/g, '_');
+
+    if (format === 'excel' || format === 'xls') {
+      const html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #1e293b; }
+    .header-box { background-color: #f97316; color: #ffffff; padding: 12px 16px; margin-bottom: 12px; border-radius: 6px; }
+    .title { font-size: 16px; font-weight: bold; }
+    .subtitle { font-size: 12px; opacity: 0.9; margin-top: 4px; }
+    .notice { background-color: #fff7ed; border: 1px solid #fdba74; color: #9a3412; padding: 10px 14px; font-size: 11px; margin-bottom: 14px; border-radius: 4px; }
+    table { border-collapse: collapse; width: 100%; }
+    th { background-color: #1e3a8a; color: #ffffff; border: 1px solid #0f172a; padding: 7px 10px; font-size: 11px; text-align: left; }
+    td { border: 1px solid #cbd5e1; padding: 6px 10px; font-size: 11px; }
+    .decision-th { background-color: #047857; color: #ffffff; }
+    .decision-td { background-color: #ecfdf5; font-weight: bold; color: #065f46; }
+  </style>
+</head>
+<body>
+  <div class="header-box">
+    <div class="title">Candidate Referral Report — ${escHtml(job.position)}</div>
+    <div class="subtitle">Company: ${escHtml(job.company_name || 'Employer Partner')} · Generated: ${new Date().toLocaleDateString()}</div>
+  </div>
+  <div class="notice">
+    <strong>Instructions for Employer:</strong> The university has screened and verified candidate qualifications. Please review the applicants below, indicate your hiring outcome in the <strong>"Company Hiring Decision"</strong> column (e.g. <em>Hired, Shortlisted, Rejected, Interview</em>), and return this spreadsheet to the University Alumni Placement Office.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Applicant Name</th>
+        <th>Email Address</th>
+        <th>Contact Number</th>
+        <th>Batch Year</th>
+        <th>Degree / Program</th>
+        <th>Match Score</th>
+        <th>Matched Skills</th>
+        <th>Skill Gaps</th>
+        <th>University Screening Notes</th>
+        <th>Resume Link</th>
+        <th>Applied Date</th>
+        <th class="decision-th">Company Hiring Decision (Hired / Shortlisted / Rejected / Interview)</th>
+        <th class="decision-th">Company Remarks</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${appData
+        .map(
+          (d) => `<tr>
+        <td>${escHtml(d.name)}</td>
+        <td>${escHtml(d.email)}</td>
+        <td>${escHtml(d.phone)}</td>
+        <td>${escHtml(d.batchYear)}</td>
+        <td>${escHtml(d.program)}</td>
+        <td>${escHtml(d.matchScore)}</td>
+        <td>${escHtml(d.matchedSkills)}</td>
+        <td>${escHtml(d.missingSkills)}</td>
+        <td>${escHtml(d.notes)}</td>
+        <td>${d.resume ? `<a href="${escHtml(d.resume)}">View Resume</a>` : 'N/A'}</td>
+        <td>${escHtml(d.appliedDate)}</td>
+        <td class="decision-td">${escHtml(d.decision)}</td>
+        <td>${escHtml(d.remarks)}</td>
+      </tr>`
+        )
+        .join('')}
+    </tbody>
+  </table>
+</body>
+</html>`;
+      res.setHeader('Content-Type', 'application/vnd.ms-excel; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="candidates-${safeName}.xls"`);
+      return res.send(html);
+    }
+
+    // Default: CSV format with UTF-8 BOM
+    const headers = [
+      'Applicant Name',
+      'Email Address',
+      'Contact Number',
+      'Batch Year',
+      'Degree / Program',
+      'Match Score',
+      'Matched Skills',
+      'Skill Gaps',
+      'University Screening Notes',
+      'Resume Link',
+      'Applied Date',
+      'Company Hiring Decision (Hired / Shortlisted / Rejected / Interview)',
+      'Company Remarks',
+    ];
+    const rows = appData.map((d) => [
+      esc(d.name),
+      esc(d.email),
+      esc(d.phone),
+      esc(d.batchYear),
+      esc(d.program),
+      esc(d.matchScore),
+      esc(d.matchedSkills),
+      esc(d.missingSkills),
+      esc(d.notes),
+      esc(d.resume),
+      esc(d.appliedDate),
+      esc(d.decision),
+      esc(d.remarks),
+    ]);
+    const csvContent = '\ufeff' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="screening-${safeName}.csv"`);
-    res.send(csv);
-  } catch (err) { next(err); }
+    res.setHeader('Content-Disposition', `attachment; filename="candidates-${safeName}.csv"`);
+    res.send(csvContent);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Import company hiring decisions from spreadsheet / JSON
+router.post('/:id/import-company-decisions', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { decisions } = req.body;
+    if (!Array.isArray(decisions) || decisions.length === 0) {
+      throw new AppError('No decision records provided in payload', 400);
+    }
+
+    const { data: job, error: jobError } = await supabase
+      .from('job_postings')
+      .select('id, position, company_name')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (jobError) throw new AppError(jobError.message, 500);
+    if (!job) throw new AppError('Job not found', 404);
+
+    const { data: applications, error: appError } = await supabase
+      .from('job_applications')
+      .select('id, user_id, applicant_email, applicant_name, status, screening_notes')
+      .eq('job_id', req.params.id);
+    if (appError) throw new AppError(appError.message, 500);
+
+    const appByEmail = new Map<string, any>();
+    const appByName = new Map<string, any>();
+    const appById = new Map<string, any>();
+
+    (applications || []).forEach((a: any) => {
+      if (a.id) appById.set(String(a.id).trim().toLowerCase(), a);
+      if (a.applicant_email) appByEmail.set(String(a.applicant_email).trim().toLowerCase(), a);
+      if (a.applicant_name) appByName.set(String(a.applicant_name).trim().toLowerCase(), a);
+    });
+
+    let updatedCount = 0;
+    let hiredCount = 0;
+    let shortlistedCount = 0;
+    let rejectedCount = 0;
+    const details: any[] = [];
+
+    const normalizeStatus = (rawStatus: string): string => {
+      const s = String(rawStatus || '')
+        .toLowerCase()
+        .trim();
+      if (s.includes('hire') || s.includes('accept') || s.includes('passed') || s.includes('employed') || s === 'hired')
+        return 'hired';
+      if (
+        s.includes('shortlist') ||
+        s.includes('interview') ||
+        s.includes('review') ||
+        s.includes('qualif') ||
+        s === 'shortlisted'
+      )
+        return 'shortlisted';
+      if (
+        s.includes('reject') ||
+        s.includes('not select') ||
+        s.includes('declined') ||
+        s.includes('failed') ||
+        s.includes('denied') ||
+        s === 'rejected'
+      )
+        return 'rejected';
+      if (s.includes('pending') || s.includes('hold') || s.includes('waiting')) return 'pending';
+      return 'under_review';
+    };
+
+    for (const d of decisions) {
+      const email = String(d.email || d.applicant_email || d['Email Address'] || d['email'] || '').trim().toLowerCase();
+      const name = String(d.name || d.applicant_name || d['Applicant Name'] || d['name'] || '').trim().toLowerCase();
+      const appId = String(d.id || d.application_id || d.applicant_id || '').trim().toLowerCase();
+      const rawStatus =
+        d.status ||
+        d.decision ||
+        d.company_decision ||
+        d['Company Hiring Decision (Hired / Shortlisted / Rejected / Interview)'] ||
+        d['Company Hiring Decision'] ||
+        d['Company Decision'] ||
+        d['Decision'] ||
+        '';
+
+      if (!rawStatus) continue;
+
+      const app = (appId ? appById.get(appId) : null) || (email ? appByEmail.get(email) : null) || (name ? appByName.get(name) : null);
+      if (!app) {
+        details.push({
+          identifier: email || name || appId || 'Unknown applicant',
+          success: false,
+          reason: 'Applicant was not found among applicants for this job.',
+        });
+        continue;
+      }
+
+      const nextStatus = normalizeStatus(rawStatus);
+      const remarks =
+        d.remarks ||
+        d.company_notes ||
+        d.notes ||
+        d['Company Remarks'] ||
+        d['Company Remarks / Notes'] ||
+        d['Remarks'] ||
+        '';
+
+      const updateData: any = {
+        status: nextStatus,
+      };
+
+      if (remarks) {
+        const timestamp = new Date().toLocaleDateString();
+        const noteAddition = `[Company Decision - ${timestamp}]: ${remarks}`;
+        updateData.screening_notes = app.screening_notes
+          ? `${app.screening_notes}\n${noteAddition}`
+          : noteAddition;
+      }
+
+      const { error: updateErr } = await supabase.from('job_applications').update(updateData).eq('id', app.id);
+
+      if (updateErr) {
+        details.push({
+          identifier: app.applicant_name || app.applicant_email,
+          success: false,
+          reason: updateErr.message,
+        });
+        continue;
+      }
+
+      updatedCount++;
+      if (nextStatus === 'hired') hiredCount++;
+      else if (nextStatus === 'shortlisted') shortlistedCount++;
+      else if (nextStatus === 'rejected') rejectedCount++;
+
+      if (nextStatus === 'hired') {
+        try {
+          await syncHiredApplicationToEmployment(app.id);
+        } catch (syncErr) {
+          console.warn('Could not sync hired applicant to employment:', syncErr);
+        }
+      }
+
+      details.push({
+        identifier: app.applicant_name || app.applicant_email,
+        success: true,
+        previousStatus: app.status,
+        newStatus: nextStatus,
+      });
+    }
+
+    try {
+      await supabase.from('audit_logs').insert({
+        user_id: req.user?.userId || null,
+        action: 'IMPORT_COMPANY_DECISIONS',
+        entity: 'job_application',
+        entity_id: req.params.id,
+        details: {
+          job_id: req.params.id,
+          job_title: job.position,
+          total_processed: decisions.length,
+          updated_count: updatedCount,
+          hired_count: hiredCount,
+          shortlisted_count: shortlistedCount,
+          rejected_count: rejectedCount,
+        },
+      });
+    } catch { }
+
+    res.json({
+      message: `Processed company decisions: ${updatedCount} applicant(s) updated (${hiredCount} hired, ${shortlistedCount} shortlisted, ${rejectedCount} rejected).`,
+      totalProcessed: decisions.length,
+      updatedCount,
+      hiredCount,
+      shortlistedCount,
+      rejectedCount,
+      details,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Upload and attach company evaluation file
+router.post('/:id/company-files', upload.single('file'), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const file = req.file;
+    if (!file) throw new AppError('No file uploaded', 400);
+
+    const fileRecord = {
+      id: 'cf_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      job_id: req.params.id,
+      file_name: file.originalname,
+      mime_type: file.mimetype,
+      file_size: file.size,
+      data_url: `data:${file.mimetype};base64,${file.buffer.toString('base64')}`,
+      uploaded_by: req.user?.userId || null,
+      uploaded_at: new Date().toISOString(),
+    };
+
+    try {
+      await supabase.from('audit_logs').insert({
+        user_id: req.user?.userId || null,
+        action: 'UPLOAD_COMPANY_FILE',
+        entity: 'job_posting',
+        entity_id: req.params.id,
+        details: fileRecord,
+      });
+    } catch (auditErr) {
+      console.warn('Audit log insert error for company file:', auditErr);
+    }
+
+    res.json({
+      message: `File "${file.originalname}" successfully uploaded.`,
+      file: {
+        id: fileRecord.id,
+        file_name: fileRecord.file_name,
+        file_size: fileRecord.file_size,
+        mime_type: fileRecord.mime_type,
+        data_url: fileRecord.data_url,
+        uploaded_at: fileRecord.uploaded_at,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Retrieve company evaluation files for a job posting
+router.get('/:id/company-files', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { data: logs, error } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('entity', 'job_posting')
+      .eq('entity_id', req.params.id)
+      .eq('action', 'UPLOAD_COMPANY_FILE')
+      .order('created_at', { ascending: false });
+
+    if (error) throw new AppError(error.message, 500);
+
+    const files = (logs || []).map((l: any) => l.details).filter(Boolean);
+    res.json(files);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete a company evaluation file
+router.delete('/:id/company-files/:fileId', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id: jobId, fileId } = req.params;
+    const { data: logs, error } = await supabase
+      .from('audit_logs')
+      .select('id, details')
+      .eq('entity', 'job_posting')
+      .eq('entity_id', jobId)
+      .eq('action', 'UPLOAD_COMPANY_FILE');
+
+    if (error) throw new AppError(error.message, 500);
+
+    const match = (logs || []).find((l: any) => l.details?.id === fileId);
+    if (match) {
+      await supabase.from('audit_logs').delete().eq('id', match.id);
+    }
+
+    res.json({ message: 'Company file removed.' });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.put('/:id', validate(adminUpdateJobSchema), async (req, res, next) => {

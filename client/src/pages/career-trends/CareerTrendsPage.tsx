@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BriefcaseIcon, BuildingOfficeIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon, AcademicCapIcon, SparklesIcon } from '@heroicons/react/24/outline';
-import { careerTrendsApi } from '@/services/api';
+import { careerTrendsApi, jobsApi } from '@/services/api';
 import { formatExperience } from '@/utils/formatExperience';
+import { formatProgramLongName } from '@/utils/formatProgram';
 import CareerLeaderboardNav, { type RankCard } from './CareerLeaderboardNav';
 import CareerCardInsightsPanel from './CareerCardInsightsPanel';
+import ActiveJobOpeningsNavCard from './ActiveJobOpeningsNavCard';
 
 const JOB_TYPE_LABELS: Record<string, string> = {
   'full-time': 'Full-time',
@@ -177,8 +179,8 @@ function CareerCard({ career }: { career: CareerTrend }) {
             <AcademicCapIcon className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
             <div className="min-w-0">
               <span className="text-gray-400 text-[11px] block font-medium">Common Program</span>
-              <span className="font-semibold text-gray-800 truncate block" title={career.mostCommonCourse}>
-                {career.mostCommonCourse}
+              <span className="font-semibold text-gray-800 truncate block" title={formatProgramLongName(career.mostCommonCourse)}>
+                {formatProgramLongName(career.mostCommonCourse)}
               </span>
             </div>
           </div>
@@ -281,6 +283,33 @@ export default function CareerTrendsPage() {
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<string>('all');
   const [selectedCard, setSelectedCard] = useState<RankCard | null>(null);
+  const [myApplications, setMyApplications] = useState<any[]>([]);
+  const [activeJobsNav, setActiveJobsNav] = useState<{ cardName: string; kindLabel?: string; jobs: any[] } | null>(null);
+
+  useEffect(() => {
+    jobsApi.myApplications()
+      .then((res) => setMyApplications(Array.isArray(res) ? res : []))
+      .catch(() => setMyApplications([]));
+  }, []);
+
+  const handleSelectCard = (card: RankCard | null) => {
+    setSelectedCard(card);
+    if (!card) {
+      setActiveJobsNav(null);
+    }
+  };
+
+  const handleToggleActiveJobs = (jobs: any[]) => {
+    if (activeJobsNav && activeJobsNav.cardName === selectedCard?.name) {
+      setActiveJobsNav(null);
+    } else if (selectedCard) {
+      setActiveJobsNav({
+        cardName: selectedCard.name,
+        kindLabel: selectedCard.metricLabel || selectedCard.kind,
+        jobs,
+      });
+    }
+  };
 
   const careerNames = [...new Set(allCareers.map((c) => c.position))];
   const careerIndustryNames = [...new Set(allCareers.flatMap((c) => c.topIndustries?.map((ind) => ind.name) || []))];
@@ -312,7 +341,7 @@ export default function CareerTrendsPage() {
       ? allCareers.filter((c) =>
         matchQuery(c.position, query) ||
         c.topEmployers.some((e) => matchQuery(e.name, query)) ||
-        (c.mostCommonCourse && matchQuery(c.mostCommonCourse, query)) ||
+        (c.mostCommonCourse && (matchQuery(c.mostCommonCourse, query) || matchQuery(formatProgramLongName(c.mostCommonCourse), query))) ||
         c.topSkills.some((s) => matchQuery(s.name, query))
       )
       : [...allCareers];
@@ -517,7 +546,9 @@ export default function CareerTrendsPage() {
           {selectedCard ? (
             <CareerCardInsightsPanel
               card={selectedCard}
-              onBack={() => setSelectedCard(null)}
+              onBack={() => handleSelectCard(null)}
+              onToggleActiveJobs={handleToggleActiveJobs}
+              isActiveJobsNavOpen={!!activeJobsNav && activeJobsNav.cardName === selectedCard.name}
             />
           ) : (
             filteredCareers.length > 0 && filteredCareers.map((career) => (
@@ -528,11 +559,21 @@ export default function CareerTrendsPage() {
 
         <aside className="hidden lg:block w-96 xl:w-[410px] shrink-0 self-stretch">
           <div className="sticky top-16 h-[calc(100vh-4rem)]">
-            <CareerLeaderboardNav
-              data={data}
-              selectedCard={selectedCard}
-              onCardSelect={setSelectedCard}
-            />
+            {activeJobsNav ? (
+              <ActiveJobOpeningsNavCard
+                cardName={activeJobsNav.cardName}
+                kindLabel={activeJobsNav.kindLabel}
+                jobs={activeJobsNav.jobs}
+                myApplications={myApplications}
+                onClose={() => setActiveJobsNav(null)}
+              />
+            ) : (
+              <CareerLeaderboardNav
+                data={data}
+                selectedCard={selectedCard}
+                onCardSelect={handleSelectCard}
+              />
+            )}
           </div>
         </aside>
       </div>

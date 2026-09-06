@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { communityApi, eventsApi } from '@/services/api';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ChatBubbleLeftRightIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 
 export default function CommunityPage() {
@@ -192,22 +192,64 @@ export default function CommunityPage() {
       </div>
 
       {showPostModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowPostModal(false)}>
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-semibold text-ctu-charcoal mb-4">Create Post</h2>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setShowPostModal(false)}>
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                  <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white leading-tight">Create Community Post</h2>
+                  <p className="text-xs text-orange-100 mt-0.5">Share updates, insights, or questions with alumni</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPostModal(false)}
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Title</label>
-                <input value={postForm.title} onChange={(e) => setPostForm({ ...postForm, title: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ctu-blue/20 focus:border-ctu-blue outline-none" />
+                <label className="block text-xs font-medium text-gray-700 mb-1">Post Title</label>
+                <input
+                  value={postForm.title}
+                  onChange={(e) => setPostForm({ ...postForm, title: e.target.value })}
+                  placeholder="Give your post a concise title..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all placeholder:text-gray-400"
+                />
               </div>
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Content</label>
-                <textarea value={postForm.content} onChange={(e) => setPostForm({ ...postForm, content: e.target.value })} rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ctu-blue/20 focus:border-ctu-blue outline-none" />
+                <label className="block text-xs font-medium text-gray-700 mb-1">Content</label>
+                <textarea
+                  value={postForm.content}
+                  onChange={(e) => setPostForm({ ...postForm, content: e.target.value })}
+                  rows={5}
+                  placeholder="Write your message, questions, or ideas here..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all placeholder:text-gray-400"
+                />
               </div>
-              <div className="flex gap-3 justify-end pt-2">
-                <button onClick={() => setShowPostModal(false)} className="btn-secondary">Cancel</button>
-                <button onClick={handleCreatePost} disabled={saving} className="btn-primary">{saving ? 'Posting...' : 'Post'}</button>
-              </div>
+            </div>
+
+            <div className="px-6 py-3.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowPostModal(false)}
+                className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreatePost}
+                disabled={saving || !postForm.title.trim() || !postForm.content.trim()}
+                className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {saving ? 'Posting...' : 'Post Update'}
+              </button>
             </div>
           </div>
         </div>

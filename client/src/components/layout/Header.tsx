@@ -334,8 +334,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       </header>
 
       {showLogoutModal && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onClick={() => setShowLogoutModal(false)}>
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-[100] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setShowLogoutModal(false)}>
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center -mb-2">
               <BlobSpeech mood={blobMood} className="mb-0" />
             </div>
@@ -343,23 +343,25 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               <JellyBlobMascot mood={blobMood} className="w-40 h-auto" />
             </div>
             <h3 className="text-base font-bold text-gray-900 mb-1">See you soon!</h3>
-            <p className="text-sm text-gray-500 mb-5">Are you sure you want to log out?</p>
-            <div className="flex gap-3">
+            <p className="text-xs text-gray-500 mb-5">Are you sure you want to log out of your account?</p>
+            <div className="flex gap-2.5">
               <button
+                type="button"
                 onMouseEnter={() => setBlobMood('happy')}
                 onMouseLeave={() => setBlobMood('neutral')}
                 onClick={() => setShowLogoutModal(false)}
-                className="flex-1 px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="flex-1 px-4 py-2.5 text-xs font-semibold bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer"
               >
-                Stay
+                Stay Logged In
               </button>
               <button
+                type="button"
                 onMouseEnter={() => setBlobMood('sad')}
                 onMouseLeave={() => setBlobMood('neutral')}
                 onClick={handleLogout}
-                className="flex-1 px-4 py-2 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                className="flex-1 px-4 py-2.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer"
               >
-                Log out
+                Yes, Sign Out
               </button>
             </div>
           </div>

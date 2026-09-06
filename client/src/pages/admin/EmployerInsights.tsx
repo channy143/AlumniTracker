@@ -121,7 +121,7 @@ function FilterField({ label, children }: { label: string; children: ReactNode }
 
 function EmployerBarList({ items }: { items: any[] }) {
   if (items.length === 0) return <p className="text-xs text-gray-400 text-center py-8">No employer data available.</p>;
-  const max = Math.max(...items.map((i) => i.alumniCount));
+  const max = Math.max(...items.map((i) => i.alumniCount), 1);
   return (
     <div className="space-y-2 max-h-72 overflow-y-auto overflow-x-hidden pr-1">
       {items.map((e, i) => (
@@ -138,7 +138,7 @@ function EmployerBarList({ items }: { items: any[] }) {
               <span className="text-[10px] text-gray-500 shrink-0">{e.alumniCount} alumni</span>
             </div>
             <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-              <div className="bg-orange-500 rounded-full h-1.5 transition-all" style={{ width: `${Math.max((e.alumniCount / max) * 100, 4)}%` }} />
+              <div className="bg-orange-500 rounded-full h-1.5 transition-all" style={{ width: `${e.alumniCount > 0 ? Math.max((e.alumniCount / max) * 100, 4) : 0}%` }} />
             </div>
           </div>
           <ArrowRightIcon className="w-3.5 h-3.5 text-gray-300 group-hover:text-orange-500 shrink-0" />
@@ -246,16 +246,24 @@ function EmployerDirectoryModal({ open, onClose, directory, filteredDirectory, d
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col">
-        <div className="flex items-center justify-between gap-3 px-5 py-4 shrink-0 bg-orange-500 rounded-t-lg">
-          <div>
-            <h2 className="text-sm font-bold text-white">Employer Directory</h2>
-            <p className="text-[11px] text-orange-100">{directory.length} companies</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/55 backdrop-blur-xs" onClick={onClose}>
+      <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 shrink-0 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+              <BuildingOfficeIcon className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white leading-tight">Employer Directory</h2>
+              <p className="text-xs text-orange-100 mt-0.5">{directory.length} hiring institutions & partners</p>
+            </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/20 border border-white/30 flex items-center justify-center text-white hover:bg-white/30 shrink-0 transition-colors" aria-label="Close directory">
-            <XMarkIcon className="w-4 h-4" />
+          <button
+            onClick={onClose}
+            className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+            aria-label="Close directory"
+          >
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
         <div className="px-5 py-4 shrink-0">

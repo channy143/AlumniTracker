@@ -251,7 +251,15 @@ export const adminApi = {
     education_match_score?: number;
     overall_match_score?: number;
   }) => api.put<any>(`/admin/jobs/applications/${applicationId}/screen`, data),
-  exportApplicants: (jobId: string) => api.download(`/admin/jobs/${jobId}/applicants/export`),
+  exportApplicants: (jobId: string, format = 'csv') => api.download(`/admin/jobs/${jobId}/applicants/export?format=${format}`),
+  importCompanyDecisions: (jobId: string, payload: { decisions: any[] }) =>
+    api.post<any>(`/admin/jobs/${jobId}/import-company-decisions`, payload),
+  uploadCompanyFile: (jobId: string, formData: FormData) =>
+    api.upload<any>(`/admin/jobs/${jobId}/company-files`, formData),
+  getCompanyFiles: (jobId: string) =>
+    api.get<any[]>(`/admin/jobs/${jobId}/company-files`),
+  deleteCompanyFile: (jobId: string, fileId: string) =>
+    api.delete<any>(`/admin/jobs/${jobId}/company-files/${fileId}`),
   employersList: () => api.get<any[]>('/admin/jobs/employers'),
   createEmployer: (data: any) => api.post<any>('/admin/jobs/employers', data),
 

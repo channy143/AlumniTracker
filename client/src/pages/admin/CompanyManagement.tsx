@@ -26,6 +26,7 @@ import {
   HandThumbUpIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolid } from '@heroicons/react/24/solid';
+import { SkeletonStatCard } from '@/components/ui/Skeleton';
 
 const INDUSTRIES = [
   'Technology / IT',
@@ -389,77 +390,83 @@ export default function CompanyManagement() {
 
       {/* KPI Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="bg-white border border-gray-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-2">
-            <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0">
-              <BuildingOffice2Icon className="w-5 h-5 text-orange-600" />
+        {loading ? (
+          [1, 2, 3, 4].map((i) => <SkeletonStatCard key={i} />)
+        ) : (
+          <>
+            <div className="bg-white border border-gray-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-2">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0">
+                  <BuildingOffice2Icon className="w-5 h-5 text-orange-600" />
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200/60">
+                  Active MOA
+                </span>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold tracking-tight text-orange-600 leading-none">{stats.partners}</p>
+                <p className="text-xs font-semibold text-gray-600 mt-1.5">Partner Companies</p>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-gray-100 text-[11px] text-gray-400">
+                {stats.total > 0 ? `${Math.round((stats.partners / stats.total) * 100)}% of registered organizations` : 'Official partnerships'}
+              </div>
             </div>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200/60">
-              Active MOA
-            </span>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl font-bold tracking-tight text-orange-600 leading-none">{stats.partners}</p>
-            <p className="text-xs font-semibold text-gray-600 mt-1.5">Partner Companies</p>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-gray-100 text-[11px] text-gray-400">
-            {stats.total > 0 ? `${Math.round((stats.partners / stats.total) * 100)}% of registered organizations` : 'Official partnerships'}
-          </div>
-        </div>
 
-        <div className="bg-white border border-gray-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-2">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
-              <BuildingOfficeIcon className="w-5 h-5 text-indigo-600" />
+            <div className="bg-white border border-gray-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-2">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+                  <BuildingOfficeIcon className="w-5 h-5 text-indigo-600" />
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                  Directory
+                </span>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold tracking-tight text-indigo-600 leading-none">{stats.total}</p>
+                <p className="text-xs font-semibold text-gray-600 mt-1.5">Total Organizations</p>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-gray-100 text-[11px] text-gray-400">
+                {stats.total - stats.partners} regular employers
+              </div>
             </div>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-              Directory
-            </span>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl font-bold tracking-tight text-indigo-600 leading-none">{stats.total}</p>
-            <p className="text-xs font-semibold text-gray-600 mt-1.5">Total Organizations</p>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-gray-100 text-[11px] text-gray-400">
-            {stats.total - stats.partners} regular employers
-          </div>
-        </div>
 
-        <div className="bg-white border border-gray-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-2">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-              <CheckBadgeIcon className="w-5 h-5 text-emerald-600" />
+            <div className="bg-white border border-gray-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-2">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                  <CheckBadgeIcon className="w-5 h-5 text-emerald-600" />
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                  Legitimacy
+                </span>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold tracking-tight text-emerald-600 leading-none">{stats.verified}</p>
+                <p className="text-xs font-semibold text-gray-600 mt-1.5">Verified Employers</p>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-gray-100 text-[11px] text-gray-400">
+                Validated by administration
+              </div>
             </div>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-              Legitimacy
-            </span>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl font-bold tracking-tight text-emerald-600 leading-none">{stats.verified}</p>
-            <p className="text-xs font-semibold text-gray-600 mt-1.5">Verified Employers</p>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-gray-100 text-[11px] text-gray-400">
-            Validated by administration
-          </div>
-        </div>
 
-        <div className="bg-white border border-gray-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-2">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-              <UserGroupIcon className="w-5 h-5 text-blue-600" />
+            <div className="bg-white border border-gray-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-2">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+                  <UserGroupIcon className="w-5 h-5 text-blue-600" />
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
+                  Employment
+                </span>
+              </div>
+              <div className="mt-3">
+                <p className="text-2xl font-bold tracking-tight text-blue-600 leading-none">{stats.alumniAtPartners}</p>
+                <p className="text-xs font-semibold text-gray-600 mt-1.5">Alumni at Partners</p>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-gray-100 text-[11px] text-gray-400">
+                Hired through partner networks
+              </div>
             </div>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
-              Employment
-            </span>
-          </div>
-          <div className="mt-3">
-            <p className="text-2xl font-bold tracking-tight text-blue-600 leading-none">{stats.alumniAtPartners}</p>
-            <p className="text-xs font-semibold text-gray-600 mt-1.5">Alumni at Partners</p>
-          </div>
-          <div className="mt-3 pt-2.5 border-t border-gray-100 text-[11px] text-gray-400">
-            Hired through partner networks
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Filter & Options Bar */}
@@ -582,21 +589,39 @@ export default function CompanyManagement() {
 
       {/* Content View */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 animate-pulse">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-gray-100" />
-                <div className="space-y-1.5 flex-1">
-                  <div className="h-4 bg-gray-100 rounded w-2/3" />
-                  <div className="h-3 bg-gray-100 rounded w-1/3" />
+        viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-gray-100" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-4 bg-gray-100 rounded w-2/3" />
+                    <div className="h-3 bg-gray-100 rounded w-1/3" />
+                  </div>
                 </div>
+                <div className="h-12 bg-gray-100 rounded" />
+                <div className="h-8 bg-gray-100 rounded" />
               </div>
-              <div className="h-12 bg-gray-100 rounded" />
-              <div className="h-8 bg-gray-100 rounded" />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
+            <div className="p-4 space-y-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="flex items-center gap-4 py-2 border-b border-gray-100 last:border-0 animate-pulse">
+                  <div className="w-9 h-9 rounded-lg bg-gray-100 shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3.5 bg-gray-100 rounded w-1/3" />
+                    <div className="h-2.5 bg-gray-100 rounded w-1/4" />
+                  </div>
+                  <div className="h-5 w-16 bg-gray-100 rounded-full shrink-0" />
+                  <div className="h-4 w-20 bg-gray-100 rounded shrink-0" />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )
       ) : filteredCompanies.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center space-y-3 shadow-2xs">
           <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto border border-orange-100">
@@ -892,33 +917,34 @@ export default function CompanyManagement() {
 
       {/* Add / Edit Company Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-xl animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/55 backdrop-blur-xs" onClick={() => setModalOpen(false)}>
+          <div className="bg-white border border-gray-100 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
-                  <BuildingOffice2Icon className="w-4 h-4" />
+            <div className="px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                  <BuildingOffice2Icon className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900">
+                  <h3 className="text-base font-bold text-white">
                     {editingCompany ? 'Edit Partner Company' : 'Add Partner Company'}
                   </h3>
-                  <p className="text-[11px] text-gray-500">
-                    Configure institutional details, industry, and partnership agreement.
+                  <p className="text-xs text-orange-100 mt-0.5">
+                    Configure institutional details, industry, and partnership agreement
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
               >
-                <XMarkIcon className="w-4 h-4" />
+                <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSave} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto text-xs">
+            <form onSubmit={handleSave} className="p-6 space-y-4 overflow-y-auto text-xs flex-1">
               {/* Company Name */}
               <div>
                 <label className="block text-[11px] font-semibold text-gray-700 mb-1 uppercase tracking-wider">
@@ -1084,18 +1110,18 @@ export default function CompanyManagement() {
               </div>
 
               {/* Modal Buttons */}
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
+              <div className="px-6 py-3.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2.5 shrink-0 -mx-6 -mb-6 mt-4">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-xl transition-colors shadow-xs cursor-pointer disabled:opacity-60"
+                  className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-60 flex items-center gap-1.5"
                 >
                   {saving ? 'Saving...' : editingCompany ? 'Save Changes' : 'Create Partner Company'}
                 </button>
