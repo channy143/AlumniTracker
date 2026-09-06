@@ -65,7 +65,7 @@ function SummaryStats({ overview }: { overview: any }) {
     { label: 'Top Career', value: overview.topCareer || '—', icon: <ChartBarIcon className="w-3.5 h-3.5 text-orange-600" /> },
     { label: 'Top Industry', value: overview.topIndustry || '—', icon: <ChartBarIcon className="w-3.5 h-3.5 text-orange-600" /> },
     { label: 'Emp. Rate', value: `${overview.employmentRate ?? 0}%`, icon: <UserGroupIcon className="w-3.5 h-3.5 text-orange-600" /> },
-    { label: 'Avg Exp.', value: formatExperience(overview.averageExperienceYears, { compact: true }), icon: <ClockIcon className="w-3.5 h-3.5 text-orange-600" /> },
+    { label: 'Avg Exp.', value: formatExperience(overview.averageExperienceYears), icon: <ClockIcon className="w-3.5 h-3.5 text-orange-600" /> },
   ];
   return (
     <div className="grid grid-cols-2 gap-2 px-3 pt-3 pb-1">
@@ -126,7 +126,7 @@ export default function CareerLeaderboardNav({
     }
     hoverTimerRef.current = setTimeout(() => {
       setHoveredCard(cardKey);
-    }, 2000);
+    }, 1000);
   };
 
   const handleMouseLeave = () => {
@@ -186,7 +186,7 @@ export default function CareerLeaderboardNav({
   const maxCareerCount = Math.max(...topCareers.map((c) => c.alumniCount || 0), 1);
   const careerCards: RankCard[] = topCareers.slice(0, 8).map((c, i) => {
     const topEmp = c.topEmployers?.[0]?.name || null;
-    const exp = c.averageExperienceYears != null ? formatExperience(c.averageExperienceYears, { compact: true }) : null;
+    const exp = c.averageExperienceYears != null ? formatExperience(c.averageExperienceYears) : null;
     const topInd = c.topIndustries?.[0]?.name || null;
     const pct = Math.round((c.alumniCount / maxCareerCount) * 100);
     const sharePct = totalEmployed > 0 ? Math.round((c.alumniCount / totalEmployed) * 100) : 0;

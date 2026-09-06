@@ -56,6 +56,8 @@ export default function CareerInsightsPage() {
     );
   }
 
+  const hasActiveJobs = Boolean(data.activeJobs && data.activeJobs.length > 0);
+
   return (
     <div className="max-w-7xl mx-auto pb-8">
       <button
@@ -88,7 +90,7 @@ export default function CareerInsightsPage() {
             <p className="text-[10px] text-gray-500">Currently Employed</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-            <p className="text-sm font-bold text-gray-900">{formatExperience(data.averageExperienceYears, { compact: true })}</p>
+            <p className="text-sm font-bold text-gray-900">{formatExperience(data.averageExperienceYears)}</p>
             <p className="text-[10px] text-gray-500">Avg Experience</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-2.5 text-center">
@@ -102,7 +104,7 @@ export default function CareerInsightsPage() {
         </div>
       </div>
 
-      {/* Overview + Course + Hiring Connection */}
+      {/* Overview + Course + Hiring Connection (Full Width) */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <SparklesIcon className="w-4 h-4 text-orange-500" />
@@ -128,273 +130,286 @@ export default function CareerInsightsPage() {
         )}
       </div>
 
-      {/* Active Job Openings Section */}
-      {data.activeJobs && data.activeJobs.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-              <BriefcaseIcon className="w-4 h-4 text-emerald-600" />
-              Active Job Openings in this Field ({data.activeJobs.length})
-            </h3>
-            <button
-              onClick={() => navigate(`/jobs?filter=${encodeURIComponent(position || '')}`)}
-              className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors flex items-center gap-1 cursor-pointer"
-            >
-              Browse in Job Postings &rarr;
-            </button>
-          </div>
+      {/* Main Content Layout: Left Insights Column + Conditional Right Nav (placed under Career Overview) */}
+      <div className="flex flex-col lg:flex-row gap-4 items-stretch">
+        <div className="flex-1 min-w-0 w-full space-y-4">
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {data.activeJobs.map((job: any) => (
-              <div
-                key={job.id}
-                className="bg-gray-50/70 border border-gray-200/80 rounded-xl p-3.5 flex flex-col justify-between hover:border-orange-300 hover:bg-white transition-all shadow-2xs"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <h4 className="text-sm font-bold text-gray-900 line-clamp-1">{job.position}</h4>
-                    {job.is_remote && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 shrink-0">
-                        Remote
-                      </span>
+          {/* Where They Work: Top Employers & Alumni */}
+          {(data.topEmployers?.length > 0 || data.recentAlumni?.length > 0) && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Where They Work</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                {/* Top Employers */}
+                {data.topEmployers?.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                      <BuildingOfficeIcon className="w-4 h-4 text-orange-500" />
+                      Top Employers
+                    </h4>
+                    <div className="space-y-1.5 flex-1">
+                      {data.topEmployers.map((emp: any, i: number) => (
+                        <div key={emp.name} className="flex items-center justify-between text-xs py-2 px-2.5 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-colors">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="w-5 h-5 rounded bg-orange-100 flex items-center justify-center text-[9px] font-bold text-orange-600 shrink-0">{i + 1}</span>
+                            <span className="text-gray-700 font-medium truncate">{emp.name}</span>
+                          </div>
+                          <span className="text-gray-400 shrink-0 text-[11px] font-medium">{emp.count} alumni</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Alumni Working as [Position] */}
+                {data.recentAlumni?.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                      <UserGroupIcon className="w-4 h-4 text-orange-500" />
+                      Alumni Working as {position}
+                    </h4>
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 flex-1">
+                      {data.recentAlumni.slice(0, 10).map((alumni: any) => (
+                        <div key={alumni.id} className="flex items-center justify-between gap-3 text-xs p-2 rounded-lg hover:bg-gray-50 border border-gray-50 transition-colors">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-[10px] font-bold text-orange-600 shrink-0">
+                              {alumni.name?.charAt(0) || 'A'}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-gray-800 truncate">{alumni.name}</p>
+                              <p className="text-[11px] text-gray-500 truncate">
+                                {alumni.position || position}
+                                {alumni.company && <span> at {alumni.company}</span>}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0 text-xs leading-tight flex flex-col items-end gap-1">
+                            <div className="flex items-center gap-1 flex-wrap justify-end">
+                              {alumni.hiredViaJob && (
+                                <span className="inline-block text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/80">
+                                  Hired via Portal
+                                </span>
+                              )}
+                              {alumni.employmentStatus && (
+                                <span className="inline-block text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                                  {alumni.employmentStatus}
+                                </span>
+                              )}
+                            </div>
+                            {alumni.batch && <p className="text-[11px] text-gray-400 mt-0.5">Batch {alumni.batch}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Skills & Industry: Skills Distribution & Industry Distribution */}
+          {(data.topSkills?.length > 0 || data.industryDistribution?.length > 0) && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Skills & Industry</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                {/* Skills Distribution */}
+                {data.topSkills?.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                      <AcademicCapIcon className="w-4 h-4 text-orange-500" />
+                      Skills Distribution
+                    </h4>
+                    <div className="space-y-2.5 flex-1">
+                      {data.topSkills.slice(0, 6).map((skill: any) => (
+                        <div key={skill.name}>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-gray-700 font-medium">{skill.name}</span>
+                            <span className="text-gray-500">{skill.percentage}%</span>
+                          </div>
+                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-orange-500" style={{ width: `${Math.min(skill.percentage, 100)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Industry Distribution */}
+                {data.industryDistribution?.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                      <ChartBarIcon className="w-4 h-4 text-orange-500" />
+                      Industry Distribution
+                    </h4>
+                    <div className="space-y-2.5 flex-1">
+                      {data.industryDistribution.map((ind: any, i: number) => (
+                        <div key={ind.name}>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: INDUSTRY_COLORS[i % INDUSTRY_COLORS.length] }} />
+                              <span className="text-gray-700 font-medium">{ind.name}</span>
+                            </div>
+                            <span className="text-gray-500">{ind.percentage}%</span>
+                          </div>
+                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${Math.min(ind.percentage, 100)}%`, backgroundColor: INDUSTRY_COLORS[i % INDUSTRY_COLORS.length] }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Career Paths & Growth: Career Paths & Employment Growth */}
+          {(data.suggestedSkills?.length > 0 || data.relatedCareers?.length > 0 || data.employmentTimeline?.length > 0) && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Career Paths & Growth</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                {/* Career Paths (Suggested Skills + Related Careers) */}
+                {(data.suggestedSkills?.length > 0 || data.relatedCareers?.length > 0) && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4 flex flex-col">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <SparklesIcon className="w-4 h-4 text-orange-500" />
+                      Career Paths
+                    </h4>
+
+                    {data.suggestedSkills?.length > 0 && (
+                      <div>
+                        <h5 className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                          <CheckCircleIcon className="w-3.5 h-3.5 text-orange-500" />
+                          Suggested Skills
+                        </h5>
+                        <p className="text-[11px] text-gray-500 mb-2.5">
+                          If you want to become a {position}, the most common skills among alumni are:
+                        </p>
+                        <div className="space-y-1.5">
+                          {data.suggestedSkills.map((skill: any) => (
+                            <div key={skill.name} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-gray-50">
+                              <div className="flex items-center gap-2">
+                                <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                <span className="text-gray-700 font-medium">{skill.name}</span>
+                              </div>
+                              <span className="text-gray-400">{skill.percentage}% of alumni</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {data.relatedCareers?.length > 0 && (
+                      <div className="pt-3 border-t border-gray-100">
+                        <h5 className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                          <BriefcaseIcon className="w-3.5 h-3.5 text-orange-500" />
+                          Related Careers
+                        </h5>
+                        <p className="text-[11px] text-gray-500 mb-2">
+                          Alumni who work as {position} also pursue these roles:
+                        </p>
+                        <div className="space-y-1">
+                          {data.relatedCareers.map((rc: any) => (
+                            <button
+                              key={rc.name}
+                              onClick={() => navigate(`/career-trends/${encodeURIComponent(rc.name)}`)}
+                              className="flex items-center justify-between w-full text-xs px-2 py-1.5 rounded hover:bg-orange-50 transition-colors text-left"
+                            >
+                              <span className="text-orange-700 font-medium">{rc.name}</span>
+                              <span className="text-gray-400">{rc.count} alumni</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <p className="text-xs text-gray-600 font-medium truncate">{job.company_name}</p>
-                  <p className="text-[11px] text-gray-400 mt-1 truncate">
-                    {[job.location, job.salary_range ? `₱${job.salary_range}` : null, job.job_type].filter(Boolean).join(' • ')}
-                  </p>
-                </div>
+                )}
 
-                <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
-                  <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                    Hiring Now
-                  </span>
-                  <button
-                    onClick={() => navigate(`/jobs?filter=${encodeURIComponent(job.position)}`)}
-                    className="px-3 py-1 text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors cursor-pointer"
+                {/* Employment Growth */}
+                {data.employmentTimeline?.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                      <ClockIcon className="w-4 h-4 text-orange-500" />
+                      Employment Growth
+                    </h4>
+                    <div className="h-48 flex-1 min-h-[180px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={data.employmentTimeline}>
+                          <XAxis dataKey="year" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <Tooltip formatter={(value: number) => [Math.round(value), 'Alumni']} />
+                          <Line type="monotone" dataKey="count" stroke="#f97316" strokeWidth={2} dot={{ r: 3, fill: '#f97316' }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Nav: Active Job Openings (only appears when there's a job on this specific field) */}
+        {hasActiveJobs && (
+          <aside className="w-full lg:w-80 xl:w-96 shrink-0 flex flex-col">
+            <div className="hidden lg:block text-xs font-semibold uppercase tracking-wider mb-2 invisible select-none" aria-hidden="true">
+              &nbsp;
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs flex-1 flex flex-col min-h-0">
+              <div className="flex items-center justify-between gap-2 pb-3 border-b border-gray-100 mb-3 shrink-0">
+                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-1.5 min-w-0 truncate">
+                  <BriefcaseIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="truncate">Openings in this Field ({data.activeJobs.length})</span>
+                </h3>
+                <button
+                  onClick={() => navigate(`/jobs?filter=${encodeURIComponent(position || '')}`)}
+                  className="text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                >
+                  Browse &rarr;
+                </button>
+              </div>
+
+              <div className="space-y-3 overflow-y-auto pr-0.5 scrollbar-hover flex-1 min-h-0">
+                {data.activeJobs.map((job: any) => (
+                  <div
+                    key={job.id}
+                    className="bg-gray-50/70 border border-gray-200/80 rounded-xl p-3.5 flex flex-col justify-between hover:border-orange-300 hover:bg-white transition-all shadow-2xs group shrink-0"
                   >
-                    Apply Now
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Where They Work: Top Employers & Alumni */}
-      {(data.topEmployers?.length > 0 || data.recentAlumni?.length > 0) && (
-        <div className="mb-4">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Where They Work</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-            {/* Top Employers */}
-            {data.topEmployers?.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <BuildingOfficeIcon className="w-4 h-4 text-orange-500" />
-                  Top Employers
-                </h4>
-                <div className="space-y-1.5 flex-1">
-                  {data.topEmployers.map((emp: any, i: number) => (
-                    <div key={emp.name} className="flex items-center justify-between text-xs py-2 px-2.5 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-colors">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="w-5 h-5 rounded bg-orange-100 flex items-center justify-center text-[9px] font-bold text-orange-600 shrink-0">{i + 1}</span>
-                        <span className="text-gray-700 font-medium truncate">{emp.name}</span>
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors line-clamp-1">
+                          {job.position}
+                        </h4>
+                        {job.is_remote && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 shrink-0">
+                            Remote
+                          </span>
+                        )}
                       </div>
-                      <span className="text-gray-400 shrink-0 text-[11px] font-medium">{emp.count} alumni</span>
+                      <p className="text-xs text-gray-600 font-medium truncate">{job.company_name}</p>
+                      <p className="text-[11px] text-gray-400 mt-1 truncate">
+                        {[job.location, job.salary_range ? `₱${job.salary_range}` : null, job.job_type].filter(Boolean).join(' • ')}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* Alumni Working as [Position] (Moved right beside Top Employers) */}
-            {data.recentAlumni?.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <UserGroupIcon className="w-4 h-4 text-orange-500" />
-                  Alumni Working as {position}
-                </h4>
-                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 flex-1">
-                  {data.recentAlumni.slice(0, 10).map((alumni: any) => (
-                    <div key={alumni.id} className="flex items-center justify-between gap-3 text-xs p-2 rounded-lg hover:bg-gray-50 border border-gray-50 transition-colors">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-[10px] font-bold text-orange-600 shrink-0">
-                          {alumni.name?.charAt(0) || 'A'}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-gray-800 truncate">{alumni.name}</p>
-                          <p className="text-[11px] text-gray-500 truncate">
-                            {alumni.position || position}
-                            {alumni.company && <span> at {alumni.company}</span>}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0 text-xs leading-tight flex flex-col items-end gap-1">
-                        <div className="flex items-center gap-1 flex-wrap justify-end">
-                          {alumni.hiredViaJob && (
-                            <span className="inline-block text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/80">
-                              Hired via Portal
-                            </span>
-                          )}
-                          {alumni.employmentStatus && (
-                            <span className="inline-block text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                              {alumni.employmentStatus}
-                            </span>
-                          )}
-                        </div>
-                        {alumni.batch && <p className="text-[11px] text-gray-400 mt-0.5">Batch {alumni.batch}</p>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Skills & Industry: Skills Distribution & Industry Distribution */}
-      {(data.topSkills?.length > 0 || data.industryDistribution?.length > 0) && (
-        <div className="mb-4">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Skills & Industry</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-            {/* Skills Distribution */}
-            {data.topSkills?.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <AcademicCapIcon className="w-4 h-4 text-orange-500" />
-                  Skills Distribution
-                </h4>
-                <div className="space-y-2.5 flex-1">
-                  {data.topSkills.slice(0, 6).map((skill: any) => (
-                    <div key={skill.name}>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-gray-700 font-medium">{skill.name}</span>
-                        <span className="text-gray-500">{skill.percentage}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-orange-500" style={{ width: `${Math.min(skill.percentage, 100)}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Industry Distribution (Moved right beside Skills Distribution) */}
-            {data.industryDistribution?.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <ChartBarIcon className="w-4 h-4 text-orange-500" />
-                  Industry Distribution
-                </h4>
-                <div className="space-y-2.5 flex-1">
-                  {data.industryDistribution.map((ind: any, i: number) => (
-                    <div key={ind.name}>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: INDUSTRY_COLORS[i % INDUSTRY_COLORS.length] }} />
-                          <span className="text-gray-700 font-medium">{ind.name}</span>
-                        </div>
-                        <span className="text-gray-500">{ind.percentage}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(ind.percentage, 100)}%`, backgroundColor: INDUSTRY_COLORS[i % INDUSTRY_COLORS.length] }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Career Paths & Growth: Career Paths & Employment Growth */}
-      {(data.suggestedSkills?.length > 0 || data.relatedCareers?.length > 0 || data.employmentTimeline?.length > 0) && (
-        <div className="mb-4">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Career Paths & Growth</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-            {/* Career Paths (Suggested Skills + Related Careers) */}
-            {(data.suggestedSkills?.length > 0 || data.relatedCareers?.length > 0) && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4 flex flex-col">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                  <SparklesIcon className="w-4 h-4 text-orange-500" />
-                  Career Paths
-                </h4>
-
-                {data.suggestedSkills?.length > 0 && (
-                  <div>
-                    <h5 className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                      <CheckCircleIcon className="w-3.5 h-3.5 text-orange-500" />
-                      Suggested Skills
-                    </h5>
-                    <p className="text-[11px] text-gray-500 mb-2.5">
-                      If you want to become a {position}, the most common skills among alumni are:
-                    </p>
-                    <div className="space-y-1.5">
-                      {data.suggestedSkills.map((skill: any) => (
-                        <div key={skill.name} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-gray-50">
-                          <div className="flex items-center gap-2">
-                            <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            <span className="text-gray-700 font-medium">{skill.name}</span>
-                          </div>
-                          <span className="text-gray-400">{skill.percentage}% of alumni</span>
-                        </div>
-                      ))}
+                    <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+                      <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                        Hiring Now
+                      </span>
+                      <button
+                        onClick={() => navigate(`/jobs?filter=${encodeURIComponent(job.position)}`)}
+                        className="px-3 py-1 text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors cursor-pointer"
+                      >
+                        Apply Now
+                      </button>
                     </div>
                   </div>
-                )}
-
-                {data.relatedCareers?.length > 0 && (
-                  <div className="pt-3 border-t border-gray-100">
-                    <h5 className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                      <BriefcaseIcon className="w-3.5 h-3.5 text-orange-500" />
-                      Related Careers
-                    </h5>
-                    <p className="text-[11px] text-gray-500 mb-2">
-                      Alumni who work as {position} also pursue these roles:
-                    </p>
-                    <div className="space-y-1">
-                      {data.relatedCareers.map((rc: any) => (
-                        <button
-                          key={rc.name}
-                          onClick={() => navigate(`/career-trends/${encodeURIComponent(rc.name)}`)}
-                          className="flex items-center justify-between w-full text-xs px-2 py-1.5 rounded hover:bg-orange-50 transition-colors text-left"
-                        >
-                          <span className="text-orange-700 font-medium">{rc.name}</span>
-                          <span className="text-gray-400">{rc.count} alumni</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
-            )}
-
-            {/* Employment Growth */}
-            {data.employmentTimeline?.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <ClockIcon className="w-4 h-4 text-orange-500" />
-                  Employment Growth
-                </h4>
-                <div className="h-48 flex-1 min-h-[180px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data.employmentTimeline}>
-                      <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                      <Tooltip formatter={(value: number) => [Math.round(value), 'Alumni']} />
-                      <Line type="monotone" dataKey="count" stroke="#f97316" strokeWidth={2} dot={{ r: 3, fill: '#f97316' }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+            </div>
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

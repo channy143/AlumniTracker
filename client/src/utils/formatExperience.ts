@@ -32,14 +32,14 @@ export function formatExperience(
   // 1. Day period: less than 30 days
   if (totalDays < 30) {
     const days = Math.max(1, totalDays);
-    return compact ? `${days}d` : `${days} day${days === 1 ? '' : 's'}`;
+    return `${days} day${days === 1 ? '' : 's'}`;
   }
 
   // 2. Month period: less than 1 year (or < 365 days)
   const totalMonths = Math.round(yrs * 12);
   if (totalMonths < 12) {
     const months = Math.max(1, totalMonths);
-    return compact ? `${months} mo${months === 1 ? '' : 's'}` : `${months} month${months === 1 ? '' : 's'}`;
+    return `${months} month${months === 1 ? '' : 's'}`;
   }
 
   // 3. Year period: 1 year or more
@@ -48,12 +48,10 @@ export function formatExperience(
 
   if (remMonths === 0 || remMonths === 12) {
     const finalYears = remMonths === 12 ? wholeYears + 1 : wholeYears;
-    return compact ? `${finalYears} yr${finalYears === 1 ? '' : 's'}` : `${finalYears} year${finalYears === 1 ? '' : 's'}`;
+    return `${finalYears} year${finalYears === 1 ? '' : 's'}`;
   }
 
-  return compact
-    ? `${wholeYears} yr${wholeYears === 1 ? '' : 's'} ${remMonths} mo${remMonths === 1 ? '' : 's'}`
-    : `${wholeYears} year${wholeYears === 1 ? '' : 's'} ${remMonths} month${remMonths === 1 ? '' : 's'}`;
+  return `${wholeYears} year${wholeYears === 1 ? '' : 's'} ${remMonths} month${remMonths === 1 ? '' : 's'}`;
 }
 
 /**
@@ -72,15 +70,14 @@ export function formatExperienceFromDate(
   if (Number.isNaN(end.getTime())) return '—';
 
   const diffMs = end.getTime() - start.getTime();
-  if (diffMs <= 0) return options?.compact ? '1d' : '1 day';
+  if (diffMs <= 0) return '1 day';
 
   const totalDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const compact = options?.compact ?? false;
 
   // 1. Day period: less than 30 days
   if (totalDays < 30) {
     const days = Math.max(1, totalDays);
-    return compact ? `${days}d` : `${days} day${days === 1 ? '' : 's'}`;
+    return `${days} day${days === 1 ? '' : 's'}`;
   }
 
   // 2. Month period: less than 12 months
@@ -91,11 +88,11 @@ export function formatExperienceFromDate(
 
   if (months < 1) {
     const days = Math.max(1, totalDays);
-    return compact ? `${days}d` : `${days} day${days === 1 ? '' : 's'}`;
+    return `${days} day${days === 1 ? '' : 's'}`;
   }
 
   if (months < 12) {
-    return compact ? `${months} mo${months === 1 ? '' : 's'}` : `${months} month${months === 1 ? '' : 's'}`;
+    return `${months} month${months === 1 ? '' : 's'}`;
   }
 
   // 3. Year period: 1 year or more
@@ -103,10 +100,8 @@ export function formatExperienceFromDate(
   const remMonths = months % 12;
 
   if (remMonths === 0) {
-    return compact ? `${years} yr${years === 1 ? '' : 's'}` : `${years} year${years === 1 ? '' : 's'}`;
+    return `${years} year${years === 1 ? '' : 's'}`;
   }
 
-  return compact
-    ? `${years} yr${years === 1 ? '' : 's'} ${remMonths} mo${remMonths === 1 ? '' : 's'}`
-    : `${years} year${years === 1 ? '' : 's'} ${remMonths} month${remMonths === 1 ? '' : 's'}`;
+  return `${years} year${years === 1 ? '' : 's'} ${remMonths} month${remMonths === 1 ? '' : 's'}`;
 }
