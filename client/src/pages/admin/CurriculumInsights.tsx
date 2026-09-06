@@ -44,10 +44,14 @@ const GROWTH_STYLES: Record<string, { label: string; cls: string; icon: any }> =
 
 function formatMonths(m: number | null | undefined) {
   if (m === null || m === undefined || Number.isNaN(m)) return '—';
-  if (m < 12) return `${m} mo`;
-  const y = Math.floor(m / 12);
-  const r = m % 12;
-  return r > 0 ? `${y}y ${r}m` : `${y}y`;
+  const val = Math.round(Number(m));
+  if (val < 0) return '—';
+  if (val === 0) return '< 1 month';
+  if (val === 1) return '1 month';
+  if (val < 12) return `${val} months`;
+  const y = Math.floor(val / 12);
+  const r = val % 12;
+  return r > 0 ? `${y} year${y === 1 ? '' : 's'} ${r} month${r === 1 ? '' : 's'}` : `${y} year${y === 1 ? '' : 's'}`;
 }
 
 function escapeHtml(s: string) {

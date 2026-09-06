@@ -25,6 +25,7 @@ import EmployerDashboard from '@/pages/employer/EmployerDashboard';
 
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AlumniManagement from '@/pages/admin/AlumniManagement';
+import CompanyManagement from '@/pages/admin/CompanyManagement';
 import JobManagement from '@/pages/admin/JobManagement';
 import GraduateTracerSurveys from '@/pages/admin/GraduateTracerSurveys';
 import AnnouncementManagement from '@/pages/admin/AnnouncementManagement';
@@ -117,6 +118,7 @@ export default function App() {
       >
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/alumni" element={<AlumniManagement />} />
+        <Route path="/admin/companies" element={<CompanyManagement />} />
         <Route path="/admin/jobs" element={<JobManagement />} />
         <Route path="/admin/surveys" element={<GraduateTracerSurveys />} />
         <Route path="/admin/announcements" element={<AnnouncementManagement />} />

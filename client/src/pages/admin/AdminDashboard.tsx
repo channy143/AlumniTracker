@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { adminApi, activitiesApi } from '@/services/api';
 import { Link } from 'react-router-dom';
+import { formatMonths } from '@/utils/formatExperience';
 import { SkeletonCard, SkeletonStatCard } from '@/components/ui/Skeleton';
 import {
   BriefcaseIcon,
@@ -313,14 +314,102 @@ export default function AdminDashboard() {
   }, []);
 
   const kpis = [
-    { label: 'Total Alumni', value: stats?.totalAlumni != null ? stats.totalAlumni.toLocaleString() : '—', icon: UserGroupIcon, color: 'text-orange-600', bg: 'bg-orange-50', href: '/admin/alumni' },
-    { label: 'Employment Rate', value: stats?.employedPercentage != null ? `${stats.employedPercentage}%` : '—', icon: BriefcaseIcon, color: 'text-emerald-600', bg: 'bg-emerald-50', href: '/admin/analytics' },
-    { label: 'Survey Completion Rate', value: stats?.tracerSurveyCompletionRate != null ? `${stats.tracerSurveyCompletionRate}%` : '—', icon: DocumentTextIcon, color: 'text-purple-600', bg: 'bg-purple-50', href: '/admin/surveys' },
-    { label: 'Average Salary', value: stats?.averageSalary ? `₱${Number(stats.averageSalary).toLocaleString()}` : '—', icon: CurrencyDollarIcon, color: 'text-green-600', bg: 'bg-green-50', href: '/admin/analytics' },
-    { label: 'Time to Employment', value: stats?.averageTimeToEmployment != null ? `${stats.averageTimeToEmployment} mo` : '—', icon: ClockIcon, color: 'text-blue-600', bg: 'bg-blue-50', href: '/admin/analytics' },
-    { label: 'Open Tracer Surveys', value: stats?.activeSurveyCount != null ? stats.activeSurveyCount.toLocaleString() : '—', icon: ClipboardDocumentListIcon, color: 'text-amber-600', bg: 'bg-amber-50', href: '/admin/surveys' },
-    { label: 'Alumni Registered This Year', value: stats?.registeredThisYear != null ? stats.registeredThisYear.toLocaleString() : '—', icon: UserPlusIcon, color: 'text-cyan-600', bg: 'bg-cyan-50', href: '/admin/alumni' },
-    { label: 'Partner Companies', value: stats?.partnerCompanies != null ? stats.partnerCompanies.toLocaleString() : '—', icon: BuildingOfficeIcon, color: 'text-indigo-600', bg: 'bg-indigo-50', href: '/admin/companies' },
+    {
+      label: 'Total Alumni',
+      value: stats?.totalAlumni != null ? stats.totalAlumni.toLocaleString() : '—',
+      icon: UserGroupIcon,
+      color: 'text-orange-600',
+      bg: 'bg-orange-50',
+      border: 'border-orange-100',
+      badge: 'Total',
+      badgeBg: 'bg-orange-50 text-orange-700 border border-orange-200/60',
+      subtitle: stats?.verifiedAlumni != null ? `${stats.verifiedAlumni} verified alumni` : 'Alumni database',
+      href: '/admin/alumni',
+    },
+    {
+      label: 'Employment Rate',
+      value: stats?.employedPercentage != null ? `${stats.employedPercentage}%` : '—',
+      icon: BriefcaseIcon,
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50',
+      border: 'border-emerald-100',
+      badge: 'Active',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
+      subtitle: stats?.employedCount != null ? `${stats.employedCount} employed alumni` : 'Current employment',
+      href: '/admin/analytics',
+    },
+    {
+      label: 'Survey Completion Rate',
+      value: stats?.tracerSurveyCompletionRate != null ? `${stats.tracerSurveyCompletionRate}%` : '—',
+      icon: DocumentTextIcon,
+      color: 'text-purple-600',
+      bg: 'bg-purple-50',
+      border: 'border-purple-100',
+      badge: 'Tracer',
+      badgeBg: 'bg-purple-50 text-purple-700 border border-purple-200/60',
+      subtitle: stats?.surveyResponsesCount != null && stats?.surveyTargetCount ? `${stats.surveyResponsesCount} of ${stats.surveyTargetCount} responded` : 'Tracer study responses',
+      href: '/admin/surveys',
+    },
+    {
+      label: 'Average Salary',
+      value: stats?.averageSalary ? `₱${Number(stats.averageSalary).toLocaleString()}` : '—',
+      icon: CurrencyDollarIcon,
+      color: 'text-green-600',
+      bg: 'bg-green-50',
+      border: 'border-green-100',
+      badge: 'Monthly',
+      badgeBg: 'bg-green-50 text-green-700 border border-green-200/60',
+      subtitle: stats?.alumniWithSalary ? `From ${stats.alumniWithSalary} reported salaries` : 'Monthly base salary',
+      href: '/admin/analytics',
+    },
+    {
+      label: 'Time to Employment',
+      value: formatMonths(stats?.averageTimeToEmployment),
+      icon: ClockIcon,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50',
+      border: 'border-blue-100',
+      badge: 'Post-Grad',
+      badgeBg: 'bg-blue-50 text-blue-700 border border-blue-200/60',
+      subtitle: 'From graduation to 1st job',
+      href: '/admin/analytics',
+    },
+    {
+      label: 'Open Tracer Surveys',
+      value: stats?.activeSurveyCount != null ? stats.activeSurveyCount.toLocaleString() : '—',
+      icon: ClipboardDocumentListIcon,
+      color: 'text-amber-600',
+      bg: 'bg-amber-50',
+      border: 'border-amber-100',
+      badge: stats?.activeSurveyCount > 0 ? 'Collecting' : 'Idle',
+      badgeBg: stats?.activeSurveyCount > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200/60' : 'bg-gray-50 text-gray-500 border border-gray-200/60',
+      subtitle: stats?.activeSurveyCount > 0 ? 'Currently collecting responses' : 'No active surveys',
+      href: '/admin/surveys',
+    },
+    {
+      label: 'Alumni Registered This Year',
+      value: stats?.registeredThisYear != null ? stats.registeredThisYear.toLocaleString() : '—',
+      icon: UserPlusIcon,
+      color: 'text-cyan-600',
+      bg: 'bg-cyan-50',
+      border: 'border-cyan-100',
+      badge: `${new Date().getFullYear()} YTD`,
+      badgeBg: 'bg-cyan-50 text-cyan-700 border border-cyan-200/60',
+      subtitle: 'New alumni registrations',
+      href: '/admin/alumni',
+    },
+    {
+      label: 'Partner Companies',
+      value: stats?.partnerCompanies != null ? stats.partnerCompanies.toLocaleString() : '—',
+      icon: BuildingOfficeIcon,
+      color: 'text-indigo-600',
+      bg: 'bg-indigo-50',
+      border: 'border-indigo-100',
+      badge: 'Industry',
+      badgeBg: 'bg-indigo-50 text-indigo-700 border border-indigo-200/60',
+      subtitle: stats?.partnerCompanies != null ? `${stats.partnerCompanies} partner companies` : 'Corporate network',
+      href: '/admin/companies',
+    },
   ];
 
   const statusData = aggregateEmploymentStatus(charts?.statusDistribution || []);
@@ -332,8 +421,6 @@ export default function AdminDashboard() {
     ? Math.round((activeSurvey.responseCount / activeSurvey.targetCount) * 100)
     : 0;
 
-  const statsLoaded = !loading && Object.keys(stats).length > 0;
-
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-5">
@@ -342,19 +429,41 @@ export default function AdminDashboard() {
       </div>
 
       {/* KPI Cards - Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
         {loading ? (
           [1, 2, 3, 4, 5, 6, 7, 8].map((i) => <SkeletonStatCard key={i} />)
         ) : kpis.map((stat) => (
-          <Link key={stat.label} to={stat.href} className="bg-white border border-gray-200 rounded-lg px-4 py-3 hover:shadow-sm transition-shadow">
-            <div className="flex items-start justify-between gap-2">
-              <div className={`w-10 h-10 rounded-lg ${stat.bg} flex items-center justify-center shrink-0`}>
-                <stat.icon className={`w-5 h-5 ${stat.color}`} />
+          <Link
+            key={stat.label}
+            to={stat.href}
+            className="group relative bg-white border border-gray-200/90 rounded-xl p-4 shadow-2xs hover:shadow-md hover:border-orange-300 transition-all duration-200 flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <div className={`w-10 h-10 rounded-xl ${stat.bg} ${stat.border} flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-2xs`}>
+                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${stat.badgeBg}`}>
+                    {stat.badge}
+                  </span>
+                  <ArrowRightIcon className="w-3.5 h-3.5 text-gray-300 group-hover:text-orange-500 group-hover:translate-x-0.5 transition-all" />
+                </div>
               </div>
-              {statsLoaded && <span className="text-[10px] text-gray-400 mt-0.5">Live data</span>}
+
+              <div className="mt-3">
+                <p className={`text-2xl font-bold tracking-tight ${stat.color} leading-none`}>
+                  {stat.value}
+                </p>
+                <p className="text-xs font-semibold text-gray-600 mt-1.5 line-clamp-1">
+                  {stat.label}
+                </p>
+              </div>
             </div>
-            <p className={`text-lg font-bold ${stat.color} mt-2`}>{stat.value}</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">{stat.label}</p>
+
+            <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400">
+              <span className="truncate">{stat.subtitle}</span>
+            </div>
           </Link>
         ))}
       </div>

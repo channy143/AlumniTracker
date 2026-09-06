@@ -1051,11 +1051,11 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
 
 export default function JobsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const urlFilter = searchParams.get('filter') || searchParams.get('search') || searchParams.get('company') || searchParams.get('industry') || '';
+  const urlFilter = searchParams.get('q') || searchParams.get('filter') || searchParams.get('search') || searchParams.get('company') || searchParams.get('industry') || '';
   const [queryFilter, setQueryFilter] = useState(urlFilter);
 
   useEffect(() => {
-    if (urlFilter) setQueryFilter(urlFilter);
+    setQueryFilter(urlFilter);
   }, [urlFilter]);
 
   const [loading, setLoading] = useState(true);
@@ -1324,19 +1324,20 @@ export default function JobsPage() {
         </div>
       )}
 
-      {/* Active Filter from Career Trends */}
+      {/* Active Filter from Search or Career Trends */}
       {queryFilter && activeTab === 'opportunities' && !selectedJob && (
         <div className="flex items-center justify-between gap-2 mb-3 bg-orange-50 border border-orange-200 rounded-lg px-3.5 py-2">
           <div className="flex items-center gap-2 min-w-0">
             <BriefcaseIcon className="w-4 h-4 text-orange-600 shrink-0" />
             <span className="text-xs text-orange-800">
-              Showing opportunities matching <strong>"{queryFilter}"</strong> from Career Trends ({filteredJobs.length} found)
+              Showing opportunities matching <strong>"{queryFilter}"</strong> ({filteredJobs.length} found)
             </span>
           </div>
           <button
             onClick={() => {
               setQueryFilter('');
               const next = new URLSearchParams(searchParams);
+              next.delete('q');
               next.delete('filter');
               next.delete('search');
               next.delete('company');

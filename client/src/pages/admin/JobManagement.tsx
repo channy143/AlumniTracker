@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { adminApi, jobsApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
 import {
@@ -17,6 +18,7 @@ import {
   MagnifyingGlassIcon,
   TagIcon,
   PlusIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import ApplicantScreeningModal from '@/components/admin/ApplicantScreeningModal';
 
@@ -31,11 +33,12 @@ function daysLeft(expiresAt: string): number {
 }
 
 export default function JobManagement() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get('q') || '';
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -96,6 +99,10 @@ export default function JobManagement() {
     loadEmployers();
     loadSkills();
   }, [load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const handleCreateEmployer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,19 +263,27 @@ export default function JobManagement() {
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
+      {/* Filter Bar */}
       <div className="bg-white border border-gray-200/90 rounded-xl p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 flex-1">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Search by position, company, or skills..."
-              className="text-xs border border-gray-200 rounded-lg pl-9 pr-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full"
-            />
-          </div>
+          {search && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-800 font-medium shrink-0">
+              <MagnifyingGlassIcon className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+              <span>Search: <strong>"{search}"</strong></span>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = new URLSearchParams(searchParams);
+                  next.delete('q');
+                  setSearchParams(next, { replace: true });
+                }}
+                className="ml-0.5 text-orange-600 hover:text-orange-900 p-0.5 rounded cursor-pointer transition-colors"
+                title="Clear search"
+              >
+                <XMarkIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           <select
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
@@ -280,8 +295,16 @@ export default function JobManagement() {
           </select>
           {(search || status) && (
             <button
-              onClick={() => { setSearch(''); setStatus(''); setPage(1); }}
-              className="text-xs text-orange-600 hover:text-orange-700 font-medium px-2 py-1"
+              onClick={() => {
+                setStatus('');
+                setPage(1);
+                if (search) {
+                  const next = new URLSearchParams(searchParams);
+                  next.delete('q');
+                  setSearchParams(next, { replace: true });
+                }
+              }}
+              className="text-xs text-orange-600 hover:text-orange-700 font-medium px-2 py-1 cursor-pointer transition-colors"
             >
               Reset Filters
             </button>

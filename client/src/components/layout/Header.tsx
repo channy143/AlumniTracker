@@ -3,17 +3,40 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { getInitials, playTing } from '@/utils/helpers';
 import { profileApi, notificationsApi } from '@/services/api';
-import { Bars3Icon, BellIcon, MagnifyingGlassIcon, UserIcon, ArrowRightOnRectangleIcon, AcademicCapIcon, BriefcaseIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
+import {
+  Bars3Icon,
+  BellIcon,
+  MagnifyingGlassIcon,
+  UserIcon,
+  ArrowRightOnRectangleIcon,
+  AcademicCapIcon,
+  BriefcaseIcon,
+  ClipboardDocumentCheckIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import { JellyBlobMascot, BlobSpeech } from '@/components/ui/feral-blob/JellyBlobMascot';
 import '@/styles/blob.css';
 
-const SEARCH_PAGES = ['/career-trends', '/announcements', '/events', '/directory', '/connections'];
+const SEARCH_PAGES = [
+  '/admin/companies',
+  '/admin/jobs',
+  '/jobs',
+  '/career-trends',
+  '/announcements',
+  '/events',
+  '/directory',
+  '/connections',
+];
 
 const SEARCH_PLACEHOLDERS: Record<string, string> = {
+  '/admin/companies': 'Search partner companies...',
+  '/admin/jobs': 'Search job postings...',
+  '/jobs': 'Search jobs by title, company, skill...',
   '/career-trends': 'Search career trends...',
   '/announcements': 'Search announcements...',
   '/events': 'Search events...',
   '/directory': 'Search alumni by name, headline...',
+  '/connections': 'Search connections...',
 };
 
 export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
@@ -32,7 +55,78 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const currentSearchPage = SEARCH_PAGES.find((p) => location.pathname.startsWith(p)) || null;
-  const placeholder = currentSearchPage ? SEARCH_PLACEHOLDERS[currentSearchPage] || 'Search...' : 'Search alumni, jobs, companies...';
+  const placeholder = currentSearchPage
+    ? SEARCH_PLACEHOLDERS[currentSearchPage] || 'Search...'
+    : 'Search alumni, jobs, companies...';
+
+  const queryFromUrl = new URLSearchParams(location.search).get('q') || '';
+
+  // Synchronize searchValue whenever the route or query param changes
+  useEffect(() => {
+    if (currentSearchPage) {
+      setSearchValue(queryFromUrl);
+    } else {
+      setSearchValue('');
+    }
+  }, [location.pathname, queryFromUrl, currentSearchPage]);
+
+  // Live debounced search when user is actively typing on a searchable page
+  useEffect(() => {
+    if (!currentSearchPage) return;
+    const timer = setTimeout(() => {
+      const currentParams = new URLSearchParams(location.search);
+      const currentQ = currentParams.get('q') || '';
+      const trimmed = searchValue.trim();
+      if (currentQ !== trimmed) {
+        if (trimmed) {
+          currentParams.set('q', trimmed);
+        } else {
+          currentParams.delete('q');
+        }
+        if (currentParams.has('page')) {
+          currentParams.set('page', '1');
+        }
+        const searchStr = currentParams.toString() ? `?${currentParams.toString()}` : '';
+        navigate(`${location.pathname}${searchStr}`, { replace: true });
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchValue, currentSearchPage, location.pathname, location.search, navigate]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = searchValue.trim();
+    if (currentSearchPage) {
+      const currentParams = new URLSearchParams(location.search);
+      if (trimmed) {
+        currentParams.set('q', trimmed);
+      } else {
+        currentParams.delete('q');
+      }
+      if (currentParams.has('page')) {
+        currentParams.set('page', '1');
+      }
+      const searchStr = currentParams.toString() ? `?${currentParams.toString()}` : '';
+      navigate(`${location.pathname}${searchStr}`, { replace: true });
+    } else {
+      if (!trimmed) return;
+      const defaultTarget = user?.role === 'admin' ? '/admin/companies' : '/connections';
+      navigate(`${defaultTarget}?q=${encodeURIComponent(trimmed)}`);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchValue('');
+    if (currentSearchPage) {
+      const currentParams = new URLSearchParams(location.search);
+      currentParams.delete('q');
+      if (currentParams.has('page')) {
+        currentParams.set('page', '1');
+      }
+      const searchStr = currentParams.toString() ? `?${currentParams.toString()}` : '';
+      navigate(`${location.pathname}${searchStr}`, { replace: true });
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -121,21 +215,25 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
           <div className="flex justify-center">
             <div className="w-full max-w-xl">
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                if (!searchValue.trim()) return;
-                const target = currentSearchPage || '/connections';
-                navigate(`${target}?q=${encodeURIComponent(searchValue.trim())}`);
-                setSearchValue('');
-              }} className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <form onSubmit={handleSearchSubmit} className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <input
                   type="text"
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                   placeholder={placeholder}
-                  className="w-full h-9 pl-9 pr-4 bg-gray-50 border border-gray-200 rounded-full text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all"
+                  className="w-full h-9 pl-9 pr-8 bg-gray-50 border border-gray-200 rounded-full text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all"
                 />
+                {searchValue && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 cursor-pointer transition-colors"
+                    title="Clear search"
+                  >
+                    <XMarkIcon className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </form>
             </div>
           </div>

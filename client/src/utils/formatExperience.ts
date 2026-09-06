@@ -105,3 +105,29 @@ export function formatExperienceFromDate(
 
   return `${years} year${years === 1 ? '' : 's'} ${remMonths} month${remMonths === 1 ? '' : 's'}`;
 }
+
+/**
+ * Formats a duration given in months into full words (e.g. "1 month", "2 months", "1 year", "1 year 2 months").
+ */
+export function formatMonths(
+  months: number | string | null | undefined
+): string {
+  if (months == null || months === '' || Number.isNaN(Number(months))) {
+    return '—';
+  }
+
+  const m = Math.round(Number(months));
+  if (m < 0) return '—';
+  if (m === 0) return '< 1 month';
+  if (m === 1) return '1 month';
+  if (m < 12) return `${m} months`;
+
+  const years = Math.floor(m / 12);
+  const remMonths = m % 12;
+
+  if (remMonths === 0) {
+    return `${years} year${years === 1 ? '' : 's'}`;
+  }
+
+  return `${years} year${years === 1 ? '' : 's'} ${remMonths} month${remMonths === 1 ? '' : 's'}`;
+}

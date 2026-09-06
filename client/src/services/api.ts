@@ -230,7 +230,9 @@ export const adminApi = {
   companyList: (params: Record<string, any> = {}) => api.get<any>(`/admin/companies?${toQuery(params)}`),
   companyCreate: (data: any) => api.post<any>('/admin/companies', data),
   companyUpdate: (id: string, data: any) => api.put<any>(`/admin/companies/${id}`, data),
+  companyTogglePartnership: (id: string, partnership_status: 'partner' | 'non-partner') => api.put<any>(`/admin/companies/${id}/partnership`, { partnership_status }),
   companyVerify: (id: string) => api.put<any>(`/admin/companies/${id}/verify`, {}),
+  companySyncEmployers: () => api.post<any>('/admin/companies/sync-employers', {}),
   companyDelete: (id: string) => api.delete(`/admin/companies/${id}`),
 
   jobCreate: (data: any) => api.post<any>('/admin/jobs', data),
