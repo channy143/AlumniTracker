@@ -7,6 +7,7 @@ import { validate } from '../middleware/validate';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { sendOtpEmail } from '../services/email';
+import { logAudit } from '../services/auditLogger';
 import {
   createOtp,
   verifyOtp,
@@ -215,8 +216,20 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
 
     const token = signAccessToken(user.id, user.email, user.role);
 
+    logAudit(req, {
+      action: 'AUTH_REGISTER',
+      entity: 'user',
+      entityId: user.id,
+      actorId: user.id,
+      actorName: user.email,
+      actorRole: user.role,
+      severity: 'info',
+      status: 'success',
+      details: { email: user.email, program, yearGraduated },
+    });
+
     res.status(201).json({
-      user: { id: user.id, email: user.email, role: user.role },
+      user: { id: user.id, email: user.email, role: user.role, survey_completed: false },
       token,
     });
   } catch (err) {
@@ -232,7 +245,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
 
     const user = await supabase
       .from('users')
-      .select('id, email, password_hash, role, mfa_enabled')
+      .select('id, email, password_hash, role, mfa_enabled, survey_completed')
       .eq('email', email)
       .single();
 
@@ -241,6 +254,14 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     // generic message. This check MUST run before password validation so a
     // correct password cannot bypass an active cooldown.
     if (getCoolDownMs(identifier, ip) > 0) {
+      logAudit(req, {
+        action: 'AUTH_LOGIN_BLOCKED',
+        entity: 'auth',
+        actorName: email,
+        severity: 'critical',
+        status: 'failure',
+        details: { email, reason: 'Active cooldown / rate limit in place' },
+      });
       return res.status(429).json({ message: 'Too many unsuccessful attempts. Please try again later.' });
     }
 
@@ -251,6 +272,14 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
 
     if (!exists || !passwordOk) {
       const attempts = recordFailedAttempt(identifier, ip);
+      logAudit(req, {
+        action: 'AUTH_LOGIN_FAILED',
+        entity: 'auth',
+        actorName: email,
+        severity: attempts >= 5 ? 'critical' : 'warning',
+        status: 'failure',
+        details: { email, attempts, reason: 'Invalid credentials or non-existent account' },
+      });
       // After recording, either the count reached the threshold or a lock was
       // just applied in this request -> block with 429.
       if (attempts >= 5 || getCoolDownMs(identifier, ip) > 0) {
@@ -283,8 +312,21 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     }
 
     const token = signAccessToken(record.id, record.email, record.role);
+
+    logAudit(req, {
+      action: 'AUTH_LOGIN_SUCCESS',
+      entity: 'user',
+      entityId: record.id,
+      actorId: record.id,
+      actorName: record.email,
+      actorRole: record.role,
+      severity: 'info',
+      status: 'success',
+      details: { email: record.email, role: record.role },
+    });
+
     return res.json({
-      user: { id: record.id, email: record.email, role: record.role },
+      user: { id: record.id, email: record.email, role: record.role, survey_completed: !!record.survey_completed },
       token,
     });
   } catch (err) {
@@ -329,15 +371,28 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
 
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, password_hash, role')
+      .select('id, email, password_hash, role, survey_completed')
       .eq('email', email)
       .single();
     if (error || !user) throw new AppError('Invalid email or password.', 401);
 
     await supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
     const token = signAccessToken(user.id, user.email, user.role);
+
+    logAudit(req, {
+      action: 'AUTH_MFA_LOGIN_SUCCESS',
+      entity: 'user',
+      entityId: user.id,
+      actorId: user.id,
+      actorName: user.email,
+      actorRole: user.role,
+      severity: 'info',
+      status: 'success',
+      details: { email: user.email, role: user.role, mfaVerified: true },
+    });
+
     res.json({
-      user: { id: user.id, email: user.email, role: user.role },
+      user: { id: user.id, email: user.email, role: user.role, survey_completed: !!user.survey_completed },
       token,
     });
   } catch (err) {
@@ -500,6 +555,17 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
 
     if (updateError) throw new AppError(updateError.message, 500);
 
+    logAudit(req, {
+      action: 'AUTH_PASSWORD_CHANGED',
+      entity: 'user',
+      entityId: req.user?.userId,
+      actorId: req.user?.userId,
+      actorRole: req.user?.role,
+      severity: 'warning',
+      status: 'success',
+      details: { message: 'User changed password' },
+    });
+
     res.json({ message: 'Password changed successfully' });
   } catch (err) { next(err); }
 });
@@ -645,7 +711,7 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res, next) => 
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, email, role, is_verified, last_login, created_at, mfa_enabled')
+      .select('id, email, role, is_verified, last_login, created_at, mfa_enabled, survey_completed')
       .eq('id', req.user!.userId)
       .single();
 
@@ -663,7 +729,7 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res, next) => 
       lastName = profile.last_name || '';
     }
 
-    res.json({ user: { ...user, first_name: firstName, last_name: lastName } });
+    res.json({ user: { ...user, first_name: firstName, last_name: lastName, survey_completed: !!user.survey_completed } });
   } catch (err) {
     next(err);
   }

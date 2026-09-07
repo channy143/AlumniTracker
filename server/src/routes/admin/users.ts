@@ -4,6 +4,7 @@ import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { validate } from '../../middleware/validate';
 import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
+import { logAudit } from '../../services/auditLogger';
 import {
   adminCreateUserSchema,
   adminUpdateUserSchema,
@@ -79,6 +80,15 @@ router.post('/', validate(adminCreateUserSchema), async (req, res, next) => {
       user_id: user.id, first_name: firstName, last_name: lastName, email,
     });
 
+    logAudit(req, {
+      action: 'USER_CREATED',
+      entity: 'user',
+      entityId: user.id,
+      severity: 'info',
+      status: 'success',
+      details: { email, role: userRole || 'staff', firstName, lastName },
+    });
+
     res.status(201).json(user);
   } catch (err) {
     next(err);
@@ -113,6 +123,16 @@ router.put('/:id/disable', async (req, res, next) => {
     const { error } = await supabase.from('users').update({ is_active: false }).eq('id', req.params.id);
     if (error && error.code === '42703') return res.json({ message: 'Account status column not available on this database' });
     if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: 'USER_DISABLED',
+      entity: 'user',
+      entityId: req.params.id,
+      severity: 'warning',
+      status: 'success',
+      details: { targetUserId: req.params.id },
+    });
+
     res.json({ message: 'Account disabled' });
   } catch (err) {
     next(err);
@@ -124,6 +144,16 @@ router.put('/:id/enable', async (req, res, next) => {
     const { error } = await supabase.from('users').update({ is_active: true }).eq('id', req.params.id);
     if (error && error.code === '42703') return res.json({ message: 'Account status column not available on this database' });
     if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: 'USER_ENABLED',
+      entity: 'user',
+      entityId: req.params.id,
+      severity: 'info',
+      status: 'success',
+      details: { targetUserId: req.params.id },
+    });
+
     res.json({ message: 'Account enabled' });
   } catch (err) {
     next(err);
@@ -135,6 +165,16 @@ router.put('/:id/role', validate(adminRoleSchema), async (req, res, next) => {
     const { role } = req.body;
     const { error } = await supabase.from('users').update({ role }).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: 'USER_ROLE_CHANGED',
+      entity: 'user',
+      entityId: req.params.id,
+      severity: 'critical',
+      status: 'success',
+      details: { targetUserId: req.params.id, newRole: role },
+    });
+
     res.json({ message: `Role updated to ${role}` });
   } catch (err) {
     next(err);
@@ -147,6 +187,16 @@ router.post('/:id/reset-password', validate(adminResetPasswordSchema), async (re
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     const { error } = await supabase.from('users').update({ password_hash: hashedPassword }).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: 'USER_PASSWORD_RESET_BY_ADMIN',
+      entity: 'user',
+      entityId: req.params.id,
+      severity: 'critical',
+      status: 'success',
+      details: { targetUserId: req.params.id, note: 'Admin forcibly reset user password' },
+    });
+
     res.json({ message: 'Password reset successfully' });
   } catch (err) {
     next(err);

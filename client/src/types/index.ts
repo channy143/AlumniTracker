@@ -8,6 +8,7 @@ export interface Profile {
   phone?: string;
   birth_date?: string;
   gender?: string;
+  civil_status?: string;
   address?: string;
   city?: string;
   province?: string;
@@ -227,4 +228,5 @@ export interface User {
   created_at: string;
   first_name?: string;
   last_name?: string;
+  survey_completed?: boolean;
 }

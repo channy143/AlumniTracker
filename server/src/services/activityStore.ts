@@ -1,11 +1,14 @@
 import { supabase } from './supabase';
+import { logAudit } from './auditLogger';
 
 interface Activity {
-  id: number;
+  id: string | number;
   user: string;
   action: string;
   target: string;
   created_at: string;
+  severity?: string;
+  status?: string;
 }
 
 const memoryStore: Activity[] = [];
@@ -21,10 +24,38 @@ export async function addActivity(userName: string, action: string, target: stri
   } catch {
     // DB not available, in-memory fallback works
   }
+
+  // Also record into secure audit_logs table
+  await logAudit(null, {
+    action: action.toUpperCase().replace(/\s+/g, '_'),
+    entity: 'activity',
+    actorName: userName,
+    details: { actionDescription: `${userName} ${action} ${target}`, target },
+    severity: 'info',
+    status: 'success',
+  });
 }
 
 export async function getRecentActivities(limit = 10) {
   try {
+    const { data: auditData } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (auditData && auditData.length > 0) {
+      return auditData.map((a: any) => ({
+        id: a.id,
+        user: a.actor_name || a.details?.new?.email || a.details?.email || 'System User',
+        action: a.action,
+        target: a.entity ? `${a.entity}${a.entity_id ? ` #${a.entity_id.slice(0, 8)}` : ''}` : (a.details?.target || ''),
+        created_at: a.created_at,
+        severity: a.severity || 'info',
+        status: a.status || 'success',
+      }));
+    }
+
     const { data } = await supabase
       .from('activity_log')
       .select('*')

@@ -68,7 +68,7 @@ export const api = {
 };
 
 export interface LoginResponse {
-  user?: { id: string; email: string; role: 'admin' | 'staff' | 'alumni' };
+  user?: { id: string; email: string; role: 'admin' | 'staff' | 'alumni'; survey_completed?: boolean };
   token?: string;
   requiresMfa?: boolean;
   mfaToken?: string;
@@ -192,6 +192,9 @@ export const surveyApi = {
   getActive: () => api.get<any>('/surveys/active'),
   submit: (surveyId: string, responses: any) =>
     api.post<any>(`/surveys/${surveyId}/respond`, { responses }),
+  getOnboarding: () => api.get<any>('/surveys/onboarding'),
+  submitOnboarding: (data: { consent: any; responses: any }) =>
+    api.post<any>('/surveys/onboarding', data),
 };
 
 export const notificationsApi = {
@@ -318,6 +321,8 @@ export const adminApi = {
   settingsUpdate: (data: any) => api.put<any>('/admin/settings', data),
 
   auditLogs: (params: Record<string, any> = {}) => api.get<any>(`/admin/audit-logs?${toQuery(params)}`),
+  auditLogStats: () => api.get<any>('/admin/audit-logs/stats'),
+  exportAuditLogsUrl: (params: Record<string, any> = {}) => `/api/admin/audit-logs/export?${toQuery(params)}`,
 
   careerOverview: () => api.get<any>('/admin/analytics/career-overview'),
   careerProgression: () => api.get<any>('/admin/analytics/career-progression'),

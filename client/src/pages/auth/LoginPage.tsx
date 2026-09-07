@@ -44,14 +44,22 @@ export default function LoginPage() {
         return;
       }
       setToken(res.token!, rememberMe);
-      setUser({
+      const loggedUser = {
         id: res.user!.id,
         email: res.user!.email,
         role: res.user!.role,
         is_verified: false,
+        survey_completed: res.user!.survey_completed,
         created_at: '',
-      });
-      navigate(res.user!.role === 'admin' ? '/admin' : '/');
+      };
+      setUser(loggedUser as any);
+      if (res.user!.role === 'admin') {
+        navigate('/admin');
+      } else if (res.user!.survey_completed === false) {
+        navigate('/survey/onboarding');
+      } else {
+        navigate('/');
+      }
     } catch (err: any) {
       setError(err.message || 'Invalid email or password.');
     } finally {
@@ -83,14 +91,22 @@ export default function LoginPage() {
     try {
       const res = await authApi.mfaVerify(email, otp, mfaToken);
       setToken(res.token!, rememberMe);
-      setUser({
+      const loggedUser = {
         id: res.user!.id,
         email: res.user!.email,
         role: res.user!.role,
         is_verified: false,
+        survey_completed: res.user!.survey_completed,
         created_at: '',
-      });
-      navigate(res.user!.role === 'admin' ? '/admin' : '/');
+      };
+      setUser(loggedUser as any);
+      if (res.user!.role === 'admin') {
+        navigate('/admin');
+      } else if (res.user!.survey_completed === false) {
+        navigate('/survey/onboarding');
+      } else {
+        navigate('/');
+      }
     } catch (err: any) {
       setError(err.message || 'Invalid verification code.');
     } finally {

@@ -2,7 +2,16 @@ import { useState, useEffect, useRef } from 'react';
 import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
 import { generateYears } from '@/utils/helpers';
-import { ClipboardDocumentCheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import {
+  ClipboardDocumentCheckIcon,
+  XMarkIcon,
+  CheckCircleIcon,
+  ShieldCheckIcon,
+  StarIcon,
+  EyeIcon,
+  AcademicCapIcon,
+  UserGroupIcon,
+} from '@heroicons/react/24/outline';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -511,13 +520,203 @@ function SurveyOverview({ survey }: { survey: any }) {
   );
 }
 
+function ResponseDetailModal({ response, onClose }: { response: any; onClose: () => void }) {
+  const profile = response.user?.profile;
+  const data = response.responses || {};
+  const consent = data.consent || {};
+  const fullName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Alumnus';
+  const email = response.user?.email || data.email || '—';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs" onClick={onClose}>
+      <div
+        className="bg-white w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl border border-gray-100 flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 bg-gradient-to-r from-orange-500 to-amber-600 text-white flex items-center justify-between shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-white/20 font-medium">Survey Response</span>
+              <span className="text-[11px] text-orange-100">
+                Submitted {response.submitted_at ? new Date(response.submitted_at).toLocaleString() : '—'}
+              </span>
+            </div>
+            <h2 className="text-base font-bold text-white mt-1">{fullName}</h2>
+            <p className="text-xs text-orange-100">{email} {data.phone ? `• ${data.phone}` : ''}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4 text-xs">
+          {/* Section 1: User Consent (Data Privacy Act) */}
+          <div className="bg-orange-50/50 border border-orange-200 rounded-xl p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-orange-950 flex items-center gap-1.5">
+                <ShieldCheckIcon className="w-4 h-4 text-orange-600" />
+                Data Privacy Act (RA 10173) Consent
+              </span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                {consent.agreed ? 'Consent Accepted' : 'Pending'}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] text-gray-600 pt-1">
+              <div className="flex items-center gap-1.5">
+                <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Collect, process & retain data</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Congratulatory banners inclusion</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Activities & promotional discounts</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Job opportunities referrals</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Personal & Contact Details */}
+          <div className="border border-gray-200 rounded-xl p-3.5 space-y-2">
+            <h3 className="font-bold text-gray-900 uppercase tracking-wider text-[11px]">Personal & Contact Details</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+              <div><span className="text-gray-400 block text-[10px]">Student ID</span><span className="font-medium text-gray-800">{data.studentId || profile?.id_number || '—'}</span></div>
+              <div><span className="text-gray-400 block text-[10px]">Gender</span><span className="font-medium text-gray-800">{data.gender || '—'}</span></div>
+              <div><span className="text-gray-400 block text-[10px]">Civil Status</span><span className="font-medium text-gray-800">{data.civilStatus || '—'}</span></div>
+              <div><span className="text-gray-400 block text-[10px]">City / Municipality</span><span className="font-medium text-gray-800">{data.city || '—'}</span></div>
+              <div><span className="text-gray-400 block text-[10px]">Province</span><span className="font-medium text-gray-800">{data.province || 'Cebu'}</span></div>
+              <div><span className="text-gray-400 block text-[10px]">Living Location</span><span className="font-medium text-gray-800">{data.currentResidenceLocation || '—'}</span></div>
+            </div>
+            {data.address && (
+              <div className="pt-1.5 border-t border-gray-100">
+                <span className="text-gray-400 block text-[10px]">Street / Barangay Address</span>
+                <span className="font-medium text-gray-800">{data.address}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Educational Background & Licensure */}
+          <div className="border border-gray-200 rounded-xl p-3.5 space-y-2">
+            <h3 className="font-bold text-gray-900 uppercase tracking-wider text-[11px]">Degree & Licensure</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+              <div className="sm:col-span-2"><span className="text-gray-400 block text-[10px]">Degree / Program</span><span className="font-semibold text-gray-900">{data.program || '—'}</span></div>
+              <div><span className="text-gray-400 block text-[10px]">Graduation Year</span><span className="font-medium text-gray-800">{data.yearGraduated || '—'}</span></div>
+              <div><span className="text-gray-400 block text-[10px]">Honors</span><span className="font-medium text-gray-800">{data.honors || 'None'}</span></div>
+              <div><span className="text-gray-400 block text-[10px]">Licensure Status</span><span className="font-medium text-gray-800">{data.licensureStatus || 'N/A'}</span></div>
+              <div><span className="text-gray-400 block text-[10px]">License Exam Title</span><span className="font-medium text-gray-800">{data.licensureExamName || '—'}</span></div>
+            </div>
+            {Array.isArray(data.reasonsForEnrolling) && data.reasonsForEnrolling.length > 0 && (
+              <div className="pt-2 border-t border-gray-100">
+                <span className="text-gray-400 block text-[10px] mb-1">Primary reasons for choosing CTU:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {data.reasonsForEnrolling.map((r: string) => (
+                    <span key={r} className="px-2 py-0.5 rounded-md bg-orange-50 text-orange-800 text-[10px] border border-orange-200/60 font-medium">
+                      {r}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Section 4: Skills & Lifelong Learning */}
+          <div className="border border-gray-200 rounded-xl p-3.5 space-y-2">
+            <h3 className="font-bold text-gray-900 uppercase tracking-wider text-[11px]">Skills & Further Studies</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div><span className="text-gray-400 block text-[10px]">Post-Graduate Studies</span><span className="font-medium text-gray-800">{data.furtherStudies || 'No plans at this time'}</span></div>
+              <div><span className="text-gray-400 block text-[10px]">Certifications</span><span className="font-medium text-gray-800">{data.postGradCertifications || '—'}</span></div>
+            </div>
+            {Array.isArray(data.competenciesDeveloped) && data.competenciesDeveloped.length > 0 && (
+              <div className="pt-2 border-t border-gray-100">
+                <span className="text-gray-400 block text-[10px] mb-1">Core competencies developed at CTU:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {data.competenciesDeveloped.map((c: string) => (
+                    <span key={c} className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 text-[10px] border border-blue-200/60 font-medium">
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Section 5: Institutional Feedback & Ratings */}
+          <div className="border border-gray-200 rounded-xl p-3.5 space-y-2.5">
+            <h3 className="font-bold text-gray-900 uppercase tracking-wider text-[11px]">Institutional Feedback & Evaluation</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className="bg-gray-50 p-2 rounded-lg text-center">
+                <span className="text-[10px] text-gray-400 block">Curriculum Relevance</span>
+                <span className="font-bold text-orange-600 text-xs mt-0.5 block">{data.curriculumRelevance || '—'}</span>
+              </div>
+              <div className="bg-gray-50 p-2 rounded-lg text-center">
+                <span className="text-[10px] text-gray-400 block">Faculty Evaluation</span>
+                <span className="font-bold text-gray-900 text-xs mt-0.5 block">{data.facultyRating ? `${data.facultyRating} / 5` : '—'}</span>
+              </div>
+              <div className="bg-gray-50 p-2 rounded-lg text-center">
+                <span className="text-[10px] text-gray-400 block">Laboratories & Facilities</span>
+                <span className="font-bold text-gray-900 text-xs mt-0.5 block">{data.facilitiesRating ? `${data.facilitiesRating} / 5` : '—'}</span>
+              </div>
+              <div className="bg-gray-50 p-2 rounded-lg text-center">
+                <span className="text-[10px] text-gray-400 block">Student Guidance</span>
+                <span className="font-bold text-gray-900 text-xs mt-0.5 block">{data.studentServicesRating ? `${data.studentServicesRating} / 5` : '—'}</span>
+              </div>
+            </div>
+
+            {Array.isArray(data.engagementPreferences) && data.engagementPreferences.length > 0 && (
+              <div className="pt-1.5 border-t border-gray-100">
+                <span className="text-gray-400 block text-[10px] mb-1">Engagement Preferences with CTU-Naga:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {data.engagementPreferences.map((p: string) => (
+                    <span key={p} className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 text-[10px] border border-purple-200/60 font-medium">
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {data.suggestions && (
+              <div className="pt-1.5 border-t border-gray-100 bg-gray-50/70 p-2.5 rounded-lg">
+                <span className="text-gray-500 font-semibold block text-[10px]">Suggestions / Feedback:</span>
+                <p className="text-gray-800 italic mt-0.5 leading-relaxed">{data.suggestions}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-gray-100 flex justify-end shrink-0 bg-gray-50">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-100 cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SurveyResponses({ survey }: { survey: any }) {
   const [responses, setResponses] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedResponse, setSelectedResponse] = useState<any>(null);
   const limit = 15;
+
+  const isOnboarding = survey.id === '00000000-0000-0000-0000-000000000001' || survey.title?.includes('Registration');
 
   useEffect(() => {
     setLoading(true);
@@ -533,7 +732,7 @@ function SurveyResponses({ survey }: { survey: any }) {
     <div>
       <div className="flex items-center gap-2 mb-3">
         <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Search by name or email..." className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-64" />
+          placeholder="Search by name, email, or course..." className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-64" />
         <button onClick={() => { const a = document.createElement('a'); a.href = `/admin/surveys/${survey.id}/responses/export`; a.click(); }} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 ml-auto">Export CSV</button>
       </div>
 
@@ -548,22 +747,54 @@ function SurveyResponses({ survey }: { survey: any }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-left">
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Course</th>
-                <th className="px-3 py-2 font-medium">Employment Status</th>
+                <th className="px-3 py-2 font-medium">Name & Email</th>
+                <th className="px-3 py-2 font-medium">Degree / Course</th>
+                <th className="px-3 py-2 font-medium">{isOnboarding ? 'Licensure & Honors' : 'Employment Status'}</th>
+                <th className="px-3 py-2 font-medium">{isOnboarding ? 'Residence' : 'Industry'}</th>
                 <th className="px-3 py-2 font-medium">Submitted</th>
+                <th className="px-3 py-2 font-medium text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {responses.map((r: any) => {
                 const profile = r.user?.profile;
                 const data = r.responses || {};
+                const fullName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : (data.firstName ? `${data.firstName} ${data.lastName || ''}`.trim() : r.user?.email || '—');
                 return (
                   <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="px-3 py-2 font-medium text-gray-900">{profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : r.user?.email || '—'}</td>
-                    <td className="px-3 py-2 text-gray-600">{data.program || '—'}</td>
-                    <td className="px-3 py-2">{data.employment_status || '—'}</td>
-                    <td className="px-3 py-2 text-gray-500">{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : '—'}</td>
+                    <td className="px-3 py-2 text-gray-900">
+                      <p className="font-semibold text-gray-900">{fullName}</p>
+                      <p className="text-[10px] text-gray-400">{r.user?.email || data.email || '—'}</p>
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      <span>{data.program || '—'}</span>
+                      {data.yearGraduated && <span className="text-[10px] text-gray-400 block">Class of {data.yearGraduated}</span>}
+                    </td>
+                    <td className="px-3 py-2">
+                      {isOnboarding ? (
+                        <div>
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${data.licensureStatus === 'Passed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-50 text-gray-600'}`}>
+                            {data.licensureStatus || 'N/A'}
+                          </span>
+                          {data.honors && data.honors !== 'None' && <span className="text-[10px] text-orange-600 block mt-0.5">{data.honors}</span>}
+                        </div>
+                      ) : (
+                        <span className="text-gray-700">{data.employment_status || '—'}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {isOnboarding ? (data.currentResidenceLocation || data.city || '—') : (data.industry || '—')}
+                    </td>
+                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : '—'}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedResponse(r)}
+                        className="px-2.5 py-1 text-xs font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg transition-colors cursor-pointer"
+                      >
+                        View Details
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -580,6 +811,10 @@ function SurveyResponses({ survey }: { survey: any }) {
           )}
         </div>
       )}
+
+      {selectedResponse && (
+        <ResponseDetailModal response={selectedResponse} onClose={() => setSelectedResponse(null)} />
+      )}
     </div>
   );
 }
@@ -595,6 +830,160 @@ function SurveyAnalytics({ surveyId }: { surveyId: string }) {
   if (loading) return <div className="bg-white border border-gray-200 p-6 text-center text-xs text-gray-400">Loading analytics...</div>;
   if (!data || data.total === 0) return <div className="bg-white border border-gray-200 p-6 text-center text-xs text-gray-400">No data to analyze yet.</div>;
 
+  // Onboarding Survey Visual Analytics
+  if (data.isOnboarding || (data.ratings && data.competenciesDeveloped)) {
+    const totalPassed = data.licensureStatus?.find((x: any) => x.label === 'Passed')?.count || 0;
+    const licensureRate = data.total > 0 ? Math.round((totalPassed / data.total) * 100) : 0;
+    const relVeryOrExtremely = (data.curriculumRelevance?.find((x: any) => x.label === 'Extremely Relevant')?.count || 0) +
+      (data.curriculumRelevance?.find((x: any) => x.label === 'Very Relevant')?.count || 0);
+    const relevanceRate = data.total > 0 ? Math.round((relVeryOrExtremely / data.total) * 100) : 0;
+
+    return (
+      <div className="space-y-3">
+        {/* KPI Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="bg-white border border-gray-200 rounded-lg p-3">
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider block">Total Respondents</span>
+            <p className="text-xl font-bold text-gray-900 mt-1">{data.total}</p>
+            <span className="text-[10px] text-gray-400">Verified Alumni</span>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-3">
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider block">Curriculum Relevance</span>
+            <p className="text-xl font-bold text-orange-600 mt-1">{relevanceRate}%</p>
+            <span className="text-[10px] text-gray-400">Extremely / Very Relevant</span>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-3">
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider block">PRC/CSC Licensure</span>
+            <p className="text-xl font-bold text-emerald-600 mt-1">{licensureRate}%</p>
+            <span className="text-[10px] text-gray-400">Licensed / Eligible</span>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-3">
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider block">Data Privacy (DPA)</span>
+            <p className="text-xl font-bold text-blue-600 mt-1">{data.dpaCompliance?.rate ?? 100}%</p>
+            <span className="text-[10px] text-gray-400">Compliance Rate</span>
+          </div>
+        </div>
+
+        {/* Institutional Ratings */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 className="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-3">Institutional Evaluation (1 to 5 Stars)</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { title: 'Faculty Evaluation', stats: data.ratings?.faculty, color: '#f97316' },
+              { title: 'Laboratories & Facilities', stats: data.ratings?.facilities, color: '#3b82f6' },
+              { title: 'Student Guidance & Services', stats: data.ratings?.studentServices, color: '#10b981' },
+            ].map((ratingItem) => (
+              <div key={ratingItem.title} className="bg-gray-50 border border-gray-100 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-gray-800">{ratingItem.title}</span>
+                  <span className="text-xs font-bold text-orange-600 bg-white px-2 py-0.5 rounded border border-gray-200">
+                    {ratingItem.stats?.average ? `${ratingItem.stats.average} / 5` : '—'}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {(ratingItem.stats?.distribution || []).map((dist: any) => (
+                    <div key={dist.label} className="text-[11px]">
+                      <div className="flex justify-between text-gray-600 mb-0.5">
+                        <span>{dist.label}</span>
+                        <span>{dist.count} ({dist.percentage}%)</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${dist.percentage}%`, backgroundColor: ratingItem.color }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Competencies & Enrollment Reasons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <h3 className="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-3">Core Competencies Acquired from CTU</h3>
+            <div className="space-y-2">
+              {(data.competenciesDeveloped || []).map((c: any) => {
+                const max = Math.max(...data.competenciesDeveloped.map((x: any) => x.count), 1);
+                return (
+                  <div key={c.label}>
+                    <div className="flex justify-between text-xs mb-0.5">
+                      <span className="text-gray-700 truncate pr-2">{c.label}</span>
+                      <span className="text-gray-500 font-medium shrink-0">{c.count} alumni</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-orange-500 rounded-full" style={{ width: `${(c.count / max) * 100}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <h3 className="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-3">Primary Reasons for Enrolling at CTU</h3>
+            <div className="space-y-2">
+              {(data.reasonsForEnrolling || []).map((r: any) => {
+                const max = Math.max(...data.reasonsForEnrolling.map((x: any) => x.count), 1);
+                return (
+                  <div key={r.label}>
+                    <div className="flex justify-between text-xs mb-0.5">
+                      <span className="text-gray-700 truncate pr-2">{r.label}</span>
+                      <span className="text-gray-500 font-medium shrink-0">{r.count} alumni</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(r.count / max) * 100}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Licensure, Engagement & Residence */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <h3 className="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-3">Professional Licensure</h3>
+            <div className="space-y-2">
+              {(data.licensureStatus || []).map((l: any) => (
+                <div key={l.label} className="flex justify-between text-xs py-1 border-b border-gray-50 last:border-0">
+                  <span className="text-gray-700">{l.label}</span>
+                  <span className="font-bold text-gray-900">{l.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <h3 className="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-3">Engagement Preferences</h3>
+            <div className="space-y-2">
+              {(data.engagementPreferences || []).map((e: any) => (
+                <div key={e.label} className="flex justify-between text-xs py-1 border-b border-gray-50 last:border-0">
+                  <span className="text-gray-700 truncate pr-1">{e.label}</span>
+                  <span className="font-bold text-gray-900 shrink-0">{e.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <h3 className="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-3">Current Living Location</h3>
+            <div className="space-y-2">
+              {(data.residenceDistribution || []).map((loc: any) => (
+                <div key={loc.label} className="flex justify-between text-xs py-1 border-b border-gray-50 last:border-0">
+                  <span className="text-gray-700 truncate pr-1">{loc.label}</span>
+                  <span className="font-bold text-gray-900 shrink-0">{loc.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Standard tracer survey sections
   const sections = [
     { label: 'Employment Status', data: data.employmentStatus, color: '#f97316' },
     { label: 'Industry Distribution', data: data.industryDistribution, color: '#3b82f6' },

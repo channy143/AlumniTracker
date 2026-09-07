@@ -176,7 +176,7 @@ export default function RegisterPage() {
       });
       setToken(res.token);
       setUser(res.user);
-      navigate('/');
+      navigate('/survey/onboarding');
     } catch (err: any) {
       setError(err.message || 'Verification failed');
     } finally {

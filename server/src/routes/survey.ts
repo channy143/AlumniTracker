@@ -112,6 +112,148 @@ router.get('/active', authenticate, async (req: AuthenticatedRequest, res, next)
   } catch (err) { next(err); }
 });
 
+const ONBOARDING_SURVEY_ID = '00000000-0000-0000-0000-000000000001';
+
+router.get('/onboarding', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { data: userRec } = await supabase
+      .from('users')
+      .select('survey_completed')
+      .eq('id', req.user!.userId)
+      .single();
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*, education(*)')
+      .eq('user_id', req.user!.userId)
+      .single();
+
+    const { data: existingResponse } = await supabase
+      .from('survey_responses')
+      .select('id, responses, submitted_at')
+      .eq('survey_id', ONBOARDING_SURVEY_ID)
+      .eq('user_id', req.user!.userId)
+      .maybeSingle();
+
+    const isCompleted = !!(userRec?.survey_completed || existingResponse);
+
+    res.json({
+      surveyId: ONBOARDING_SURVEY_ID,
+      title: 'CTU-Naga Graduate Tracer & Alumni Registration Survey',
+      completed: isCompleted,
+      existingResponse: existingResponse?.responses || null,
+      profile: {
+        firstName: profile?.first_name || '',
+        lastName: profile?.last_name || '',
+        middleName: profile?.middle_name || '',
+        email: profile?.email || req.user!.email,
+        phone: profile?.phone || '',
+        studentId: profile?.id_number || '',
+        gender: profile?.gender || '',
+        civilStatus: profile?.civil_status || '',
+        address: profile?.address || '',
+        city: profile?.city || '',
+        province: profile?.province || '',
+        country: profile?.country || 'Philippines',
+        program: profile?.education?.[0]?.program || '',
+        yearGraduated: profile?.education?.[0]?.year_graduated || '',
+        honors: profile?.education?.[0]?.honors || '',
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { consent, responses } = req.body;
+
+    if (!consent || !consent.agreed) {
+      throw new AppError('You must accept the Data Privacy Consent to complete your alumni registration', 400);
+    }
+
+    const { data: existing } = await supabase
+      .from('survey_responses')
+      .select('id')
+      .eq('survey_id', ONBOARDING_SURVEY_ID)
+      .eq('user_id', req.user!.userId)
+      .maybeSingle();
+
+    const fullPayload = {
+      consent,
+      ...responses,
+      submitted_at: new Date().toISOString(),
+    };
+
+    if (existing) {
+      await supabase
+        .from('survey_responses')
+        .update({ responses: fullPayload, submitted_at: new Date().toISOString() })
+        .eq('id', existing.id);
+    } else {
+      const { error: insErr } = await supabase
+        .from('survey_responses')
+        .insert({
+          survey_id: ONBOARDING_SURVEY_ID,
+          user_id: req.user!.userId,
+          responses: fullPayload,
+          submitted_at: new Date().toISOString(),
+        });
+      if (insErr) {
+        console.error('[Survey Onboarding] Insert error:', insErr);
+        throw new AppError('Failed to record survey response', 500);
+      }
+    }
+
+    // Mark survey_completed = true on users table
+    await supabase
+      .from('users')
+      .update({ survey_completed: true })
+      .eq('id', req.user!.userId);
+
+    // Sync relevant profile information if provided
+    const profileUpdates: Record<string, any> = {};
+    if (responses?.phone) profileUpdates.phone = responses.phone;
+    if (responses?.gender) profileUpdates.gender = responses.gender;
+    if (responses?.civilStatus) profileUpdates.civil_status = responses.civilStatus;
+    if (responses?.address) profileUpdates.address = responses.address;
+    if (responses?.city) profileUpdates.city = responses.city;
+    if (responses?.province) profileUpdates.province = responses.province;
+    if (responses?.middleName) profileUpdates.middle_name = responses.middleName;
+
+    if (Object.keys(profileUpdates).length > 0) {
+      profileUpdates.updated_at = new Date().toISOString();
+      await supabase
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('user_id', req.user!.userId);
+    }
+
+    // Sync honors to education if provided
+    if (responses?.honors) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', req.user!.userId)
+        .single();
+      if (profile) {
+        await supabase
+          .from('education')
+          .update({ honors: responses.honors })
+          .eq('profile_id', profile.id);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Onboarding survey and consent successfully recorded.',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     await closeExpiredSurveys();

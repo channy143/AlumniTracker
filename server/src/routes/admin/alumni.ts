@@ -4,6 +4,7 @@ import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
 import { formatProgramLongName } from '../../utils/formatProgram';
+import { logAudit } from '../../services/auditLogger';
 
 const router = Router();
 
@@ -184,10 +185,27 @@ router.get('/export', async (req, res, next) => {
       }));
       const headers = Object.keys(rows[0] || {}).join(',');
       const csv = rows.map((r: any) => Object.values(r).map((v: any) => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+
+      logAudit(req, {
+        action: 'ALUMNI_DATA_EXPORTED',
+        entity: 'alumni',
+        severity: 'warning',
+        status: 'success',
+        details: { count: rows.length, format: 'csv' },
+      });
+
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename=alumni-export.csv');
       return res.send(`${headers}\n${csv}`);
     }
+
+    logAudit(req, {
+      action: 'ALUMNI_DATA_EXPORTED',
+      entity: 'alumni',
+      severity: 'warning',
+      status: 'success',
+      details: { count: users.length, format: 'json' },
+    });
 
     res.json(users);
   } catch (err) {
@@ -312,6 +330,16 @@ router.put('/:id/archive', async (req, res, next) => {
     const { error } = await supabase.from('users').update({ is_archived: true, is_active: false }).eq('id', req.params.id);
     if (error && error.code === '42703') return res.json({ message: 'Archive column not available on this database' });
     if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: 'ALUMNI_ARCHIVED',
+      entity: 'alumni',
+      entityId: req.params.id,
+      severity: 'warning',
+      status: 'success',
+      details: { targetAlumniId: req.params.id },
+    });
+
     res.json({ message: 'Alumni archived' });
   } catch (err) {
     next(err);
@@ -323,16 +351,36 @@ router.put('/:id/restore', async (req, res, next) => {
     const { error } = await supabase.from('users').update({ is_archived: false, is_active: true }).eq('id', req.params.id);
     if (error && error.code === '42703') return res.json({ message: 'Restore column not available on this database' });
     if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: 'ALUMNI_RESTORED',
+      entity: 'alumni',
+      entityId: req.params.id,
+      severity: 'info',
+      status: 'success',
+      details: { targetAlumniId: req.params.id },
+    });
+
     res.json({ message: 'Alumni restored' });
   } catch (err) {
     next(err);
   }
 });
 
-router.put('/:id/verify', async (_req, res, next) => {
+router.put('/:id/verify', async (req, res, next) => {
   try {
-    const { error } = await supabase.from('users').update({ is_verified: true }).eq('id', _req.params.id);
+    const { error } = await supabase.from('users').update({ is_verified: true }).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: 'ALUMNI_VERIFIED',
+      entity: 'alumni',
+      entityId: req.params.id,
+      severity: 'info',
+      status: 'success',
+      details: { targetAlumniId: req.params.id },
+    });
+
     res.json({ message: 'Alumni verified' });
   } catch (err) {
     next(err);

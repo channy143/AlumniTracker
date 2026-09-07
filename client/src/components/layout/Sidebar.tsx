@@ -20,6 +20,7 @@ import {
   AcademicCapIcon,
   ClockIcon,
   BriefcaseIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 
 type NavItem = { name: string; href: string; icon: any; end?: boolean };
@@ -34,8 +35,9 @@ const mainNav: NavItem[] = [
 const resourcesNav: NavItem[] = [
   { name: 'Announcements', href: '/announcements', icon: MegaphoneIcon },
   { name: 'Events', href: '/events', icon: CalendarDaysIcon },
-  { name: 'Useful Links', href: '/links', icon: LinkIcon },
-  { name: 'Support', href: '/support', icon: QuestionMarkCircleIcon },
+  { name: 'Graduate Tracer Survey', href: '/tracer-survey', icon: DocumentTextIcon },
+  { name: 'CTU Official Links', href: '/cefi-links', icon: LinkIcon },
+  { name: 'Help & FAQ', href: '/help', icon: QuestionMarkCircleIcon },
 ];
 
 const adminNav: NavItem[] = [
@@ -50,7 +52,7 @@ const adminNav: NavItem[] = [
   { name: 'Curriculum Insights', href: '/admin/curriculum', icon: AcademicCapIcon },
   { name: 'Employer Insights', href: '/admin/employers', icon: BuildingOfficeIcon },
   { name: 'Reports & Exports', href: '/admin/reports', icon: ChartBarIcon },
-  { name: 'Activity Log', href: '/admin/activity', icon: ClockIcon },
+  { name: 'Audit & Activity Log', href: '/admin/activity', icon: ShieldCheckIcon },
 ];
 
 export default function Sidebar({

@@ -14,6 +14,7 @@ import {
   createEmployerSchema,
 } from '../../middleware/validationSchemas';
 import { calculateMatchScore } from '../../utils/matchScoring';
+import { logAudit } from '../../services/auditLogger';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -194,11 +195,14 @@ router.post('/', validate(adminCreateJobSchema), async (req, res, next) => {
 router.get('/:id/applicants', async (req: AuthenticatedRequest, res, next) => {
   try {
     try {
-      await supabase.from('audit_logs').insert({
-        user_id: req.user?.userId || null,
-        action: 'view',
+      await logAudit(req, {
+        action: 'VIEW_JOB_APPLICANTS',
         entity: 'job_application',
-        entity_id: req.params.id,
+        entityId: req.params.id,
+        actorRole: 'admin',
+        actorName: 'Administrator',
+        severity: 'info',
+        status: 'success',
         details: { description: 'Admin viewed job applicants (PII)' },
       });
     } catch {}
@@ -612,11 +616,14 @@ router.put('/applications/:applicationId/screen', validate(screenApplicationSche
     }
 
     try {
-      await supabase.from('audit_logs').insert({
-        user_id: req.user?.userId || null,
+      await logAudit(req, {
         action: 'SCREEN_APPLICANT',
         entity: 'job_application',
-        entity_id: req.params.applicationId,
+        entityId: req.params.applicationId,
+        actorRole: 'admin',
+        actorName: 'Administrator',
+        severity: 'info',
+        status: 'success',
         details: {
           matched_skills,
           missing_skills: missingSkills,
@@ -657,11 +664,14 @@ router.get('/:id/applicants/export', async (req: AuthenticatedRequest, res, next
     if (!job) throw new AppError('Job not found', 404);
 
     try {
-      await supabase.from('audit_logs').insert({
-        user_id: req.user?.userId || null,
-        action: 'export',
+      await logAudit(req, {
+        action: 'EXPORT_JOB_APPLICANTS',
         entity: 'job_application',
-        entity_id: req.params.id,
+        entityId: req.params.id,
+        actorRole: 'admin',
+        actorName: 'Administrator',
+        severity: 'warning',
+        status: 'success',
         details: { description: `Admin generated candidate referral report for ${job.position}` },
       });
     } catch { }
@@ -992,11 +1002,14 @@ router.post('/:id/import-company-decisions', async (req: AuthenticatedRequest, r
     }
 
     try {
-      await supabase.from('audit_logs').insert({
-        user_id: req.user?.userId || null,
+      await logAudit(req, {
         action: 'IMPORT_COMPANY_DECISIONS',
         entity: 'job_application',
-        entity_id: req.params.id,
+        entityId: req.params.id,
+        actorRole: 'admin',
+        actorName: 'Administrator',
+        severity: 'info',
+        status: 'success',
         details: {
           job_id: req.params.id,
           job_title: job.position,
@@ -1041,11 +1054,14 @@ router.post('/:id/company-files', upload.single('file'), async (req: Authenticat
     };
 
     try {
-      await supabase.from('audit_logs').insert({
-        user_id: req.user?.userId || null,
+      await logAudit(req, {
         action: 'UPLOAD_COMPANY_FILE',
         entity: 'job_posting',
-        entity_id: req.params.id,
+        entityId: req.params.id,
+        actorRole: 'admin',
+        actorName: 'Administrator',
+        severity: 'info',
+        status: 'success',
         details: fileRecord,
       });
     } catch (auditErr) {

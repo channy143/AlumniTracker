@@ -21,6 +21,7 @@ import EventsPage from '@/pages/events/EventsPage';
 import AnnouncementsPage from '@/pages/announcements/AnnouncementsPage';
 import JobsPage from '@/pages/jobs/JobsPage';
 import SurveyPage from '@/pages/survey/SurveyPage';
+import AlumniOnboardingSurveyPage from '@/pages/survey/AlumniOnboardingSurveyPage';
 import EmployerDashboard from '@/pages/employer/EmployerDashboard';
 
 import AdminDashboard from '@/pages/admin/AdminDashboard';
@@ -49,6 +50,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   if (!user) return <Navigate to="/auth/login" replace />;
   if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  if (user.role === 'alumni' && user.survey_completed === false) {
+    return <Navigate to="/survey/onboarding" replace />;
+  }
+  return <>{children}</>;
+}
+
+function OnboardingRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuthStore();
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-ctu-blue" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/auth/login" replace />;
+  if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  if (user.survey_completed) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -77,6 +96,9 @@ function IndexRoute() {
   }
   if (!user) return <LandingPage />;
   if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  if (user.role === 'alumni' && user.survey_completed === false) {
+    return <Navigate to="/survey/onboarding" replace />;
+  }
   return <MainLayout />;
 }
 
@@ -108,6 +130,15 @@ export default function App() {
         <Route path="register" element={<RegisterPage />} />
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
       </Route>
+
+      <Route
+        path="/survey/onboarding"
+        element={
+          <OnboardingRoute>
+            <AlumniOnboardingSurveyPage />
+          </OnboardingRoute>
+        }
+      />
 
       <Route
         element={

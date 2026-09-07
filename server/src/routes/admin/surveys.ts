@@ -32,6 +32,63 @@ const STANDARD_QUESTIONS = [
   { id: 'suggestions', section: 'graduate_feedback', label: 'Suggestions for curriculum improvement', type: 'text' },
 ];
 
+export const ONBOARDING_SURVEY_ID = '00000000-0000-0000-0000-000000000001';
+
+export const ONBOARDING_QUESTIONS = [
+  { id: 'consent_section', section: 'User Consent (RA 10173 Data Privacy)', type: 'section' },
+  { id: 'agreed', section: 'consent_section', label: 'Data Privacy Consent Acceptance', type: 'choice', required: true },
+  { id: 'collectProcess', section: 'consent_section', label: 'Collect & Process Information Authorization', type: 'choice', required: true },
+  { id: 'storeRetain', section: 'consent_section', label: 'Store & Retain Information Authorization', type: 'choice', required: true },
+  { id: 'congratulatoryBanners', section: 'consent_section', label: 'Congratulatory Banners Authorization', type: 'choice', required: true },
+  { id: 'promotionalDiscounts', section: 'consent_section', label: 'Alumni Activities & Promotional Discounts Authorization', type: 'choice', required: true },
+  { id: 'jobOpportunities', section: 'consent_section', label: 'Employment Opportunities Referral Authorization', type: 'choice', required: true },
+
+  { id: 'personal_section', section: 'Personal & Contact Details', type: 'section' },
+  { id: 'firstName', section: 'personal_section', label: 'First Name', type: 'text', required: true },
+  { id: 'lastName', section: 'personal_section', label: 'Last Name', type: 'text', required: true },
+  { id: 'middleName', section: 'personal_section', label: 'Middle Name', type: 'text' },
+  { id: 'studentId', section: 'personal_section', label: 'Student / Alumni ID', type: 'text' },
+  { id: 'email', section: 'personal_section', label: 'Email Address', type: 'text', required: true },
+  { id: 'phone', section: 'personal_section', label: 'Contact / Mobile Number', type: 'text', required: true },
+  { id: 'gender', section: 'personal_section', label: 'Gender', type: 'choice' },
+  { id: 'civilStatus', section: 'personal_section', label: 'Civil Status', type: 'choice' },
+  { id: 'city', section: 'personal_section', label: 'City / Municipality', type: 'text', required: true },
+  { id: 'province', section: 'personal_section', label: 'Province', type: 'text' },
+  { id: 'address', section: 'personal_section', label: 'Street / Barangay Address', type: 'text' },
+  { id: 'currentResidenceLocation', section: 'personal_section', label: 'Current Living Location', type: 'choice' },
+
+  { id: 'academic_section', section: 'Educational Background & Licensure', type: 'section' },
+  { id: 'program', section: 'academic_section', label: 'Degree / Program Graduated at CTU', type: 'text', required: true },
+  { id: 'yearGraduated', section: 'academic_section', label: 'Graduation Year', type: 'text', required: true },
+  { id: 'honors', section: 'academic_section', label: 'Academic Honors', type: 'choice' },
+  { id: 'licensureStatus', section: 'academic_section', label: 'Professional Licensure / Board Exam Status', type: 'choice' },
+  { id: 'licensureExamName', section: 'academic_section', label: 'Exam / License Title', type: 'text' },
+  { id: 'reasonsForEnrolling', section: 'academic_section', label: 'Primary Reasons for Enrolling at CTU', type: 'multi-choice' },
+
+  { id: 'skills_section', section: 'Skills & Lifelong Learning', type: 'section' },
+  { id: 'furtherStudies', section: 'skills_section', label: 'Post-Graduate / Further Studies Status', type: 'choice' },
+  { id: 'postGradCertifications', section: 'skills_section', label: 'Post-Grad Certifications & Seminars', type: 'text' },
+  { id: 'competenciesDeveloped', section: 'skills_section', label: 'Core Competencies Acquired from CTU', type: 'multi-choice' },
+
+  { id: 'feedback_section', section: 'Graduate Feedback & Institutional Evaluation', type: 'section' },
+  { id: 'curriculumRelevance', section: 'feedback_section', label: 'Curriculum Relevance to Professional Readiness', type: 'choice' },
+  { id: 'facultyRating', section: 'feedback_section', label: 'Faculty Evaluation Rating (1-5)', type: 'choice' },
+  { id: 'facilitiesRating', section: 'feedback_section', label: 'Laboratories & Facilities Rating (1-5)', type: 'choice' },
+  { id: 'studentServicesRating', section: 'feedback_section', label: 'Student Guidance & Services Rating (1-5)', type: 'choice' },
+  { id: 'engagementPreferences', section: 'feedback_section', label: 'Ways to Stay Engaged with CTU-Naga', type: 'multi-choice' },
+  { id: 'suggestions', section: 'feedback_section', label: 'Suggestions for Curriculum / Institutional Improvement', type: 'text' },
+];
+
+export function getQuestionsForSurvey(survey: any) {
+  if (survey.id === ONBOARDING_SURVEY_ID) {
+    return ONBOARDING_QUESTIONS;
+  }
+  if (Array.isArray(survey.questions) && survey.questions.length > 0) {
+    return survey.questions;
+  }
+  return STANDARD_QUESTIONS;
+}
+
 const router = Router();
 
 async function getTargetCount(survey: any): Promise<number> {
@@ -114,7 +171,8 @@ router.get('/', async (req, res, next) => {
         .select('*', { count: 'exact', head: true })
         .eq('survey_id', survey.id);
       const [responseCount, targetCount] = await Promise.all([count || 0, getTargetCount(survey)]);
-      return { ...survey, questions: STANDARD_QUESTIONS, responseCount, targetCount };
+      const questions = getQuestionsForSurvey(survey);
+      return { ...survey, questions, responseCount, targetCount };
     }));
 
     res.json(surveysWithCounts);
@@ -185,7 +243,8 @@ router.get('/:id', async (req, res, next) => {
 
     const targetCount = await getTargetCount(survey);
 
-    res.json({ ...survey, questions: STANDARD_QUESTIONS, responseCount: responseCount || 0, targetCount });
+    const questions = getQuestionsForSurvey(survey);
+    res.json({ ...survey, questions, responseCount: responseCount || 0, targetCount });
   } catch (err) {
     next(err);
   }
@@ -345,18 +404,32 @@ router.get('/:id/responses', async (req, res, next) => {
     if (userIds.length > 0) {
       const [{ data: users }, { data: profiles }] = await Promise.all([
         supabase.from('users').select('id, email').in('id', userIds),
-        supabase.from('profiles').select('user_id, first_name, last_name').in('user_id', userIds),
+        supabase.from('profiles').select('user_id, first_name, last_name, id_number').in('user_id', userIds),
       ]);
       const userMap = new Map((users || []).map((u: any) => [u.id, u]));
       const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
 
-      result = result.map((r: any) => ({
-        ...r,
-        user: {
-          ...(userMap.get(r.user_id) || { id: r.user_id, email: null }),
-          profile: profileMap.get(r.user_id) || null,
-        },
-      }));
+      result = result.map((r: any) => {
+        const u = userMap.get(r.user_id) || { id: r.user_id, email: null };
+        const p = profileMap.get(r.user_id) || null;
+        const resp = r.responses || {};
+        const firstName = p?.first_name || resp.firstName || '';
+        const lastName = p?.last_name || resp.lastName || '';
+        const email = u.email || resp.email || null;
+        return {
+          ...r,
+          user: {
+            ...u,
+            email,
+            profile: {
+              first_name: firstName,
+              last_name: lastName,
+              id_number: p?.id_number || resp.studentId || '',
+              ...(p || {}),
+            },
+          },
+        };
+      });
     }
 
     if (search) {
@@ -364,7 +437,8 @@ router.get('/:id/responses', async (req, res, next) => {
       result = result.filter((r: any) =>
         r.user?.email?.toLowerCase().includes(s) ||
         r.user?.profile?.first_name?.toLowerCase().includes(s) ||
-        r.user?.profile?.last_name?.toLowerCase().includes(s)
+        r.user?.profile?.last_name?.toLowerCase().includes(s) ||
+        r.responses?.program?.toLowerCase().includes(s)
       );
     }
 
@@ -381,7 +455,9 @@ router.get('/:id/responses/export', async (req, res, next) => {
       .select('*')
       .eq('survey_id', req.params.id);
 
-    const { data: survey } = await supabase.from('surveys').select('title').eq('id', req.params.id).single();
+    const { data: survey } = await supabase.from('surveys').select('*').eq('id', req.params.id).single();
+    const isOnboarding = req.params.id === ONBOARDING_SURVEY_ID || (survey && survey.title?.includes('Registration'));
+    const questions = survey ? getQuestionsForSurvey(survey) : STANDARD_QUESTIONS;
 
     let result = responses || [];
     const userIds = result.map((r: any) => r.user_id).filter(Boolean);
@@ -400,14 +476,59 @@ router.get('/:id/responses/export', async (req, res, next) => {
     }
 
     const csvRows = (result || []).map((r: any) => {
+      const p = r.user?.profile;
+      const resp = r.responses || {};
+      const name = p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : `${resp.firstName || ''} ${resp.lastName || ''}`.trim();
+      const email = r.user?.email || resp.email || '';
+
+      if (isOnboarding) {
+        const consent = resp.consent || {};
+        return {
+          'Name': name,
+          'Email': email,
+          'Phone': resp.phone || '',
+          'Student ID': resp.studentId || '',
+          'Gender': resp.gender || '',
+          'Civil Status': resp.civilStatus || '',
+          'City / Municipality': resp.city || '',
+          'Province': resp.province || '',
+          'Address': resp.address || '',
+          'Current Residence Location': resp.currentResidenceLocation || '',
+          'Degree Program': resp.program || '',
+          'Graduation Year': resp.yearGraduated ? String(resp.yearGraduated) : '',
+          'Academic Honors': resp.honors || '',
+          'Licensure Status': resp.licensureStatus || '',
+          'Licensure Exam Name': resp.licensureExamName || '',
+          'Reasons for Enrolling at CTU': Array.isArray(resp.reasonsForEnrolling) ? resp.reasonsForEnrolling.join('; ') : '',
+          'Post-Grad / Further Studies': resp.furtherStudies || '',
+          'Certifications': resp.postGradCertifications || '',
+          'Core Competencies Acquired': Array.isArray(resp.competenciesDeveloped) ? resp.competenciesDeveloped.join('; ') : '',
+          'Curriculum Relevance': resp.curriculumRelevance || '',
+          'Faculty Evaluation Rating': resp.facultyRating ? `${resp.facultyRating} / 5` : '',
+          'Facilities Rating': resp.facilitiesRating ? `${resp.facilitiesRating} / 5` : '',
+          'Student Services Rating': resp.studentServicesRating ? `${resp.studentServicesRating} / 5` : '',
+          'Engagement Preferences': Array.isArray(resp.engagementPreferences) ? resp.engagementPreferences.join('; ') : '',
+          'Suggestions': resp.suggestions || '',
+          'DPA Consent Agreed': consent.agreed ? 'Yes' : 'No',
+          'Auth - Collect & Process': consent.collectProcess ? 'Yes' : 'No',
+          'Auth - Store & Retain': consent.storeRetain ? 'Yes' : 'No',
+          'Auth - Congratulatory Banners': consent.congratulatoryBanners ? 'Yes' : 'No',
+          'Auth - Promotional Discounts': consent.promotionalDiscounts ? 'Yes' : 'No',
+          'Auth - Job Opportunities': consent.jobOpportunities ? 'Yes' : 'No',
+          'Submitted At': r.submitted_at || resp.submitted_at || '',
+        };
+      }
+
       const row: Record<string, string> = {
-        'Name': r.user?.profile ? `${r.user.profile.first_name || ''} ${r.user.profile.last_name || ''}`.trim() : '',
-        'Email': r.user?.email || '',
+        'Name': name,
+        'Email': email,
       };
-      (STANDARD_QUESTIONS || []).forEach((q: any) => {
+      (questions || []).forEach((q: any) => {
         if (q.type === 'section') return;
-        row[q.label || q.id] = r.responses?.[q.id] || '';
+        const val = resp[q.id];
+        row[q.label || q.id] = Array.isArray(val) ? val.join('; ') : String(val ?? '');
       });
+      row['Submitted At'] = r.submitted_at || '';
       return row;
     });
 
@@ -431,14 +552,48 @@ router.get('/:id/analytics', async (req, res, next) => {
       .eq('survey_id', req.params.id);
 
     if (!responses || responses.length === 0) {
-      return res.json({ total: 0, employmentStatus: [], industryDistribution: [], workAlignment: [], satisfaction: [], curriculumRelevance: [] });
+      return res.json({
+        total: 0,
+        isOnboarding: req.params.id === ONBOARDING_SURVEY_ID,
+        employmentStatus: [],
+        industryDistribution: [],
+        workAlignment: [],
+        satisfaction: [],
+        curriculumRelevance: [],
+        ratings: {
+          faculty: { average: 0, distribution: [] },
+          facilities: { average: 0, distribution: [] },
+          studentServices: { average: 0, distribution: [] },
+        },
+        reasonsForEnrolling: [],
+        competenciesDeveloped: [],
+        licensureStatus: [],
+        furtherStudies: [],
+        engagementPreferences: [],
+        residenceDistribution: [],
+      });
     }
+
+    const isOnboarding = req.params.id === ONBOARDING_SURVEY_ID || responses.some((r: any) => r.responses?.reasonsForEnrolling || r.responses?.competenciesDeveloped || r.responses?.facultyRating);
 
     const employmentStatus: Record<string, number> = {};
     const industryDistribution: Record<string, number> = {};
     const workAlignment: Record<string, number> = {};
     const satisfaction: Record<string, number> = {};
     const curriculumRelevance: Record<string, number> = {};
+
+    const reasonsForEnrolling: Record<string, number> = {};
+    const competenciesDeveloped: Record<string, number> = {};
+    const licensureStatus: Record<string, number> = {};
+    const furtherStudies: Record<string, number> = {};
+    const engagementPreferences: Record<string, number> = {};
+    const residenceDistribution: Record<string, number> = {};
+    const civilStatusDistribution: Record<string, number> = {};
+
+    const facultyScores: number[] = [];
+    const facilitiesScores: number[] = [];
+    const servicesScores: number[] = [];
+    let dpaConsentAgreed = 0;
 
     responses.forEach((r: any) => {
       const data = r.responses || {};
@@ -450,19 +605,103 @@ router.get('/:id/analytics', async (req, res, next) => {
       if (alignment) workAlignment[alignment] = (workAlignment[alignment] || 0) + 1;
       const sat = data.satisfaction_rating;
       if (sat) satisfaction[sat] = (satisfaction[sat] || 0) + 1;
-      const relevance = data.curriculum_relevance;
+
+      const relevance = data.curriculum_relevance || data.curriculumRelevance;
       if (relevance) curriculumRelevance[relevance] = (curriculumRelevance[relevance] || 0) + 1;
+
+      if (Array.isArray(data.reasonsForEnrolling)) {
+        data.reasonsForEnrolling.forEach((reason: string) => {
+          if (reason) reasonsForEnrolling[reason] = (reasonsForEnrolling[reason] || 0) + 1;
+        });
+      }
+
+      if (Array.isArray(data.competenciesDeveloped)) {
+        data.competenciesDeveloped.forEach((comp: string) => {
+          if (comp) competenciesDeveloped[comp] = (competenciesDeveloped[comp] || 0) + 1;
+        });
+      }
+
+      if (Array.isArray(data.engagementPreferences)) {
+        data.engagementPreferences.forEach((item: string) => {
+          if (item) engagementPreferences[item] = (engagementPreferences[item] || 0) + 1;
+        });
+      }
+
+      if (data.licensureStatus) {
+        licensureStatus[data.licensureStatus] = (licensureStatus[data.licensureStatus] || 0) + 1;
+      }
+
+      if (data.furtherStudies) {
+        furtherStudies[data.furtherStudies] = (furtherStudies[data.furtherStudies] || 0) + 1;
+      }
+
+      if (data.currentResidenceLocation) {
+        residenceDistribution[data.currentResidenceLocation] = (residenceDistribution[data.currentResidenceLocation] || 0) + 1;
+      }
+
+      if (data.civilStatus) {
+        civilStatusDistribution[data.civilStatus] = (civilStatusDistribution[data.civilStatus] || 0) + 1;
+      }
+
+      if (data.facultyRating) {
+        const score = Number(data.facultyRating);
+        if (!isNaN(score)) facultyScores.push(score);
+      }
+      if (data.facilitiesRating) {
+        const score = Number(data.facilitiesRating);
+        if (!isNaN(score)) facilitiesScores.push(score);
+      }
+      if (data.studentServicesRating) {
+        const score = Number(data.studentServicesRating);
+        if (!isNaN(score)) servicesScores.push(score);
+      }
+
+      if (data.consent?.agreed) {
+        dpaConsentAgreed++;
+      }
     });
 
-    const toArray = (map: Record<string, number>) => Object.entries(map).map(([label, count]) => ({ label, count }));
+    const toArray = (map: Record<string, number>) =>
+      Object.entries(map).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+
+    const calcRatingStats = (scores: number[]) => {
+      if (scores.length === 0) return { average: 0, distribution: [] };
+      const avg = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
+      const countMap: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+      scores.forEach((s) => { countMap[s] = (countMap[s] || 0) + 1; });
+      const distribution = [5, 4, 3, 2, 1].map((rating) => ({
+        label: `${rating} Star${rating > 1 ? 's' : ''}`,
+        count: countMap[rating] || 0,
+        percentage: Math.round(((countMap[rating] || 0) / scores.length) * 100),
+      }));
+      return { average: avg, distribution };
+    };
 
     res.json({
       total: responses.length,
+      isOnboarding,
       employmentStatus: toArray(employmentStatus),
       industryDistribution: toArray(industryDistribution),
       workAlignment: toArray(workAlignment),
       satisfaction: toArray(satisfaction),
       curriculumRelevance: toArray(curriculumRelevance),
+      ratings: {
+        faculty: calcRatingStats(facultyScores),
+        facilities: calcRatingStats(facilitiesScores),
+        studentServices: calcRatingStats(servicesScores),
+      },
+      reasonsForEnrolling: toArray(reasonsForEnrolling),
+      competenciesDeveloped: toArray(competenciesDeveloped),
+      licensureStatus: toArray(licensureStatus),
+      furtherStudies: toArray(furtherStudies),
+      engagementPreferences: toArray(engagementPreferences),
+      residenceDistribution: toArray(residenceDistribution),
+      civilStatusDistribution: toArray(civilStatusDistribution),
+      dpaCompliance: {
+        total: responses.length,
+        agreed: dpaConsentAgreed,
+        rate: responses.length > 0 ? Math.round((dpaConsentAgreed / responses.length) * 100) : 100,
+      },
     });
   } catch (err) {
     next(err);

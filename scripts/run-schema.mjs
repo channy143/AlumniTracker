@@ -85,6 +85,7 @@ async function main() {
     { path: './supabase/migration_rls_hardening_skills.sql', label: 'RLS skills policies migration' },
     { path: './supabase/migration_alumni_eligible.sql', label: 'Alumni eligibility registry migration' },
     { path: './supabase/migrations/20260906000000_job_system_upgrade.sql', label: 'Job system upgrade migration' },
+    { path: './supabase/migration_alumni_onboarding_survey.sql', label: 'Alumni onboarding survey migration' },
   ];
 
   for (const f of files) {

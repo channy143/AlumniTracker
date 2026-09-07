@@ -446,7 +446,7 @@ router.get('/career-statistics', async (req, res, next) => {
     const dateFrom = req.query.date_from as string;
     const dateTo = req.query.date_to as string;
 
-    const { data: users } = await supabase.from('users').select('id').eq('role', 'alumni');
+    const { data: users } = await supabase.from('users').select('id, survey_completed').eq('role', 'alumni');
     const alumniUsers = users || [];
     const alumniUserIds = alumniUsers.map((u: any) => u.id);
 
@@ -474,7 +474,7 @@ router.get('/career-statistics', async (req, res, next) => {
     const { data: surveys } = await supabase.from('surveys').select('id, academic_year, status, is_active');
     const { data: surveyResponses } = await supabase
       .from('survey_responses')
-      .select('survey_id, user_id');
+      .select('survey_id, user_id, responses, submitted_at');
 
     const profileByUser = new Map(profiles.map((p: any) => [p.user_id, p.id]));
     const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
@@ -489,7 +489,10 @@ router.get('/career-statistics', async (req, res, next) => {
       empByProfile.get(e.profile_id)!.push(e);
     });
 
-    const respondentUserIds = new Set((surveyResponses || []).map((r: any) => r.user_id));
+    const respondentUserIds = new Set([
+      ...(surveyResponses || []).map((r: any) => r.user_id),
+      ...alumniUsers.filter((u: any) => u.survey_completed).map((u: any) => u.id),
+    ]);
     const academicYears = [...new Set((surveys || []).map((s: any) => s.academic_year).filter(Boolean))].sort();
     const academicYearUserIds = new Set<string>();
     if (academicYear) {
@@ -703,9 +706,10 @@ router.get('/career-statistics', async (req, res, next) => {
 
     const activeSurveyCount = (surveys || []).filter((s: any) => s.status === 'published' && s.is_active === true).length;
     const activeSurveyIds = new Set((surveys || []).filter((s: any) => s.status === 'published' && s.is_active === true).map((s: any) => s.id));
-    const activeRespondentUserIds = new Set(
-      (surveyResponses || []).filter((r: any) => activeSurveyIds.has(r.survey_id)).map((r: any) => r.user_id)
-    );
+    const activeRespondentUserIds = new Set([
+      ...(surveyResponses || []).filter((r: any) => activeSurveyIds.has(r.survey_id)).map((r: any) => r.user_id),
+      ...alumniUsers.filter((u: any) => u.survey_completed).map((u: any) => u.id),
+    ]);
     const surveyTarget = Math.max(alumniUsers.length, 1);
     const tracerSurveyResponseRate = activeRespondentUserIds.size > 0
       ? Math.round((activeRespondentUserIds.size / surveyTarget) * 100)
@@ -773,6 +777,100 @@ router.get('/career-statistics', async (req, res, next) => {
       employment.map((e: any) => String(e.company_industry || '').trim()).concat(profiles.map((p: any) => String(p.industry || '').trim()))
     )].filter(Boolean).sort();
 
+    // Aggregate CTU Onboarding / Registration Tracer Survey insights
+    const onboardingResponses = (surveyResponses || []).filter((r: any) =>
+      r.survey_id === '00000000-0000-0000-0000-000000000001' ||
+      r.responses?.reasonsForEnrolling ||
+      r.responses?.competenciesDeveloped ||
+      r.responses?.facultyRating
+    );
+
+    const obRelevanceCounts: Record<string, number> = {};
+    const obCompetencies: Record<string, number> = {};
+    const obReasons: Record<string, number> = {};
+    const obLicensure: Record<string, number> = {};
+    const obFurtherStudies: Record<string, number> = {};
+    const obEngagement: Record<string, number> = {};
+    const obFacultyScores: number[] = [];
+    const obFacilitiesScores: number[] = [];
+    const obServicesScores: number[] = [];
+
+    onboardingResponses.forEach((r: any) => {
+      const data = r.responses || {};
+      const rel = data.curriculumRelevance || data.curriculum_relevance;
+      if (rel) obRelevanceCounts[rel] = (obRelevanceCounts[rel] || 0) + 1;
+
+      if (Array.isArray(data.competenciesDeveloped)) {
+        data.competenciesDeveloped.forEach((c: string) => {
+          if (c) obCompetencies[c] = (obCompetencies[c] || 0) + 1;
+        });
+      }
+
+      if (Array.isArray(data.reasonsForEnrolling)) {
+        data.reasonsForEnrolling.forEach((res: string) => {
+          if (res) obReasons[res] = (obReasons[res] || 0) + 1;
+        });
+      }
+
+      if (data.licensureStatus) {
+        obLicensure[data.licensureStatus] = (obLicensure[data.licensureStatus] || 0) + 1;
+      }
+
+      if (data.furtherStudies) {
+        obFurtherStudies[data.furtherStudies] = (obFurtherStudies[data.furtherStudies] || 0) + 1;
+      }
+
+      if (Array.isArray(data.engagementPreferences)) {
+        data.engagementPreferences.forEach((pref: string) => {
+          if (pref) obEngagement[pref] = (obEngagement[pref] || 0) + 1;
+        });
+      }
+
+      if (data.facultyRating) {
+        const s = Number(data.facultyRating);
+        if (!isNaN(s)) obFacultyScores.push(s);
+      }
+      if (data.facilitiesRating) {
+        const s = Number(data.facilitiesRating);
+        if (!isNaN(s)) obFacilitiesScores.push(s);
+      }
+      if (data.studentServicesRating) {
+        const s = Number(data.studentServicesRating);
+        if (!isNaN(s)) obServicesScores.push(s);
+      }
+    });
+
+    const toSortedArray = (rec: Record<string, number>) =>
+      Object.entries(rec).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+
+    const avgOf = (arr: number[]) => arr.length > 0 ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
+
+    const totalPassedLicensure = obLicensure['Passed'] || 0;
+    const totalLicensureAnswered = Object.values(obLicensure).reduce((a, b) => a + b, 0);
+    const licensurePassingRate = totalLicensureAnswered > 0 ? Math.round((totalPassedLicensure / totalLicensureAnswered) * 100) : 0;
+
+    const extremelyOrVeryRelevance = (obRelevanceCounts['Extremely Relevant'] || 0) + (obRelevanceCounts['Very Relevant'] || 0);
+    const totalRelevanceAnswered = Object.values(obRelevanceCounts).reduce((a, b) => a + b, 0);
+    const curriculumRelevanceRate = totalRelevanceAnswered > 0 ? Math.round((extremelyOrVeryRelevance / totalRelevanceAnswered) * 100) : 0;
+
+    const onboardingSurveyAnalytics = {
+      totalResponses: onboardingResponses.length,
+      curriculumRelevanceRate,
+      licensurePassingRate,
+      curriculumRelevance: toSortedArray(obRelevanceCounts),
+      competencies: toSortedArray(obCompetencies),
+      enrollmentReasons: toSortedArray(obReasons),
+      licensureDistribution: toSortedArray(obLicensure),
+      furtherStudies: toSortedArray(obFurtherStudies),
+      engagementPreferences: toSortedArray(obEngagement),
+      ratings: {
+        faculty: avgOf(obFacultyScores),
+        facilities: avgOf(obFacilitiesScores),
+        studentServices: avgOf(obServicesScores),
+        overallAverage: avgOf([...obFacultyScores, ...obFacilitiesScores, ...obServicesScores]),
+      },
+    };
+
     res.json({
       overview: {
         totalAlumni,
@@ -803,6 +901,7 @@ router.get('/career-statistics', async (req, res, next) => {
         withoutSurveyList: withoutSurvey.map((p: any) => ({ id: p.id, name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown' })),
       },
       recentlyUpdated,
+      onboardingSurvey: onboardingSurveyAnalytics,
       filters: {
         academicYears,
         batches: [...new Set(education.map((e: any) => e.year_graduated).filter(Boolean))].sort((a: any, b: any) => b - a),

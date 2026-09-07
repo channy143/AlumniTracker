@@ -22,6 +22,7 @@ import {
   ClockIcon,
   UserPlusIcon,
   ArrowRightIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 import { FireIcon as FireSolid, StarIcon as StarSolid } from '@heroicons/react/24/solid';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -527,23 +528,30 @@ export default function AdminDashboard() {
             )}
           </SummaryCard>
 
-          <SummaryCard title="Recent Activity" icon={ClockIcon} footer={{ label: 'View All Activity', to: '/admin/activity' }}>
+          <SummaryCard title="Recent Activity & Audit Trail" icon={ShieldCheckIcon} footer={{ label: 'View Full Audit Trail', to: '/admin/activity' }}>
             {activities.length > 0 ? (
               <div className="space-y-2.5">
-                {activities.slice(0, 5).map((a: any, i: number) => (
-                  <div key={a.id ?? i} className="flex items-start gap-2 text-xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0 mt-1.5" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-gray-700 leading-snug truncate">
-                        {[a.user, a.action, a.target].filter(Boolean).join(' ')}
-                      </p>
-                      <p className="text-gray-400 text-[11px] mt-0.5">{timeAgo(a.created_at)}</p>
+                {activities.slice(0, 5).map((a: any, i: number) => {
+                  const isWarning = a.severity === 'warning' || a.severity === 'critical';
+                  return (
+                    <div key={a.id ?? i} className="flex items-start gap-2 text-xs">
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${
+                          isWarning ? 'bg-amber-500 animate-pulse' : 'bg-orange-500'
+                        }`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-gray-800 font-medium leading-snug truncate">
+                          {a.user} · <span className="font-normal text-gray-600">{a.action}</span>
+                        </p>
+                        <p className="text-gray-400 text-[10px] mt-0.5">{timeAgo(a.created_at)}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
-              <p className="text-xs text-gray-400 text-center py-6">No recent activity.</p>
+              <p className="text-xs text-gray-400 text-center py-6">No recent audit activity.</p>
             )}
           </SummaryCard>
 

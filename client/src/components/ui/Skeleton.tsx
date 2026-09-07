@@ -80,3 +80,70 @@ export function SkeletonActivityItem({ className = '' }: { className?: string })
     </div>
   </div>;
 }
+
+export function SkeletonAuditKpi({ className = '' }: { className?: string }) {
+  return (
+    <div className={`bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs animate-pulse ${className}`}>
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className="w-4 h-4 rounded bg-gray-200" />
+        <div className="h-3 w-28 bg-gray-200 rounded" />
+      </div>
+      <div className="h-7 w-20 bg-gray-200 rounded mb-1.5" />
+      <div className="h-2.5 w-32 bg-gray-100 rounded" />
+    </div>
+  );
+}
+
+export function SkeletonAuditTableRow({ className = '' }: { className?: string }) {
+  return (
+    <tr className={`animate-pulse ${className}`}>
+      {/* Timestamp */}
+      <td className="px-4 py-3.5 whitespace-nowrap">
+        <div className="h-3.5 w-16 bg-gray-200 rounded mb-1.5" />
+        <div className="h-2.5 w-24 bg-gray-100 rounded" />
+      </td>
+
+      {/* Severity & Status */}
+      <td className="px-3 py-3.5 whitespace-nowrap">
+        <div className="flex items-center gap-1.5">
+          <div className="h-4 w-16 bg-gray-200 rounded-full" />
+          <div className="h-4 w-8 bg-gray-100 rounded" />
+        </div>
+      </td>
+
+      {/* Event Action */}
+      <td className="px-3 py-3.5">
+        <div className="h-3.5 w-28 bg-gray-200 rounded mb-1" />
+        <div className="h-2.5 w-40 bg-gray-100 rounded" />
+      </td>
+
+      {/* Actor */}
+      <td className="px-3 py-3.5">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full bg-gray-200 shrink-0" />
+          <div className="space-y-1">
+            <div className="h-3 w-24 bg-gray-200 rounded" />
+            <div className="h-2.5 w-12 bg-gray-100 rounded" />
+          </div>
+        </div>
+      </td>
+
+      {/* Entity */}
+      <td className="px-3 py-3.5 whitespace-nowrap">
+        <div className="h-3.5 w-16 bg-gray-200 rounded mb-1" />
+        <div className="h-2.5 w-20 bg-gray-100 rounded" />
+      </td>
+
+      {/* Origin IP */}
+      <td className="px-3 py-3.5 whitespace-nowrap">
+        <div className="h-5 w-20 bg-gray-100 rounded border border-gray-100" />
+      </td>
+
+      {/* Actions */}
+      <td className="px-4 py-3.5 text-right whitespace-nowrap">
+        <div className="inline-block h-6 w-16 bg-gray-100 rounded-md" />
+      </td>
+    </tr>
+  );
+}
+

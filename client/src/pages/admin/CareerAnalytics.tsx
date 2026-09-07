@@ -16,6 +16,10 @@ import {
   ClipboardDocumentCheckIcon,
   ArrowRightIcon,
   ArrowDownTrayIcon,
+  SparklesIcon,
+  AcademicCapIcon,
+  StarIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 
 const ORANGE = '#f97316';
@@ -67,13 +71,28 @@ function download(filename: string, content: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-function Card({ title, children, footer }: { title: string; children: ReactNode; footer?: { label: string; to: string } }) {
+function Card({
+  title,
+  children,
+  footer,
+  action,
+  className = '',
+}: {
+  title: string;
+  children: ReactNode;
+  footer?: { label: string; to: string };
+  action?: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
-      <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{title}</h2>
+    <div className={`bg-white border border-gray-200 rounded-xl p-4 flex flex-col shadow-xs ${className}`}>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h2 className="text-xs font-bold text-gray-700 uppercase tracking-wider">{title}</h2>
+        {action}
+      </div>
       <div className="flex-1">{children}</div>
       {footer && (
-        <Link to={footer.to} className="mt-3 text-xs font-medium text-orange-600 hover:text-orange-700 inline-flex items-center gap-1 shrink-0">
+        <Link to={footer.to} className="mt-3 text-xs font-semibold text-orange-600 hover:text-orange-700 inline-flex items-center gap-1 shrink-0">
           {footer.label} <ArrowRightIcon className="w-3 h-3" />
         </Link>
       )}
@@ -249,6 +268,7 @@ export default function CareerAnalytics() {
   const provinces = data?.geographicDistribution?.provinces || [];
   const missingInfo = data?.missingInfo || { withoutEmployment: 0, withoutSurvey: 0, withoutEmploymentList: [], withoutSurveyList: [] };
   const recentlyUpdated = data?.recentlyUpdated || [];
+  const onboardingSurvey = data?.onboardingSurvey || null;
 
   const buildReport = () => [
     {
@@ -272,6 +292,30 @@ export default function CareerAnalytics() {
     { title: 'Geographic Distribution - Cities', headers: ['City', 'Count'], rows: cities.map((c: any) => ({ City: c.name, Count: c.count })) },
     { title: 'Geographic Distribution - Provinces', headers: ['Province', 'Count'], rows: provinces.map((c: any) => ({ Province: c.name, Count: c.count })) },
     { title: 'Recently Updated Employment Records', headers: ['Name', 'Position', 'Company', 'Updated'], rows: recentlyUpdated.map((r: any) => ({ Name: r.name, Position: r.position || '', Company: r.company || '', Updated: r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '' })) },
+    ...(onboardingSurvey && onboardingSurvey.totalResponses > 0 ? [
+      {
+        title: 'CTU Graduate Tracer Survey Metrics',
+        headers: ['Metric', 'Value'],
+        rows: [
+          { Metric: 'Total Survey Responses', Value: onboardingSurvey.totalResponses },
+          { Metric: 'Curriculum Relevance Rate', Value: `${onboardingSurvey.curriculumRelevanceRate}%` },
+          { Metric: 'Licensure Exam Passing Rate', Value: `${onboardingSurvey.licensurePassingRate}%` },
+          { Metric: 'Faculty Rating', Value: onboardingSurvey.ratings?.faculty ? `${onboardingSurvey.ratings.faculty} / 5` : 'N/A' },
+          { Metric: 'Facilities Rating', Value: onboardingSurvey.ratings?.facilities ? `${onboardingSurvey.ratings.facilities} / 5` : 'N/A' },
+          { Metric: 'Student Services Rating', Value: onboardingSurvey.ratings?.studentServices ? `${onboardingSurvey.ratings.studentServices} / 5` : 'N/A' },
+        ],
+      },
+      {
+        title: 'Top Developed Competencies',
+        headers: ['Competency', 'Count'],
+        rows: (onboardingSurvey.competencies || []).map((c: any) => ({ Competency: c.name, Count: c.count })),
+      },
+      {
+        title: 'Top Enrollment Reasons',
+        headers: ['Reason', 'Count'],
+        rows: (onboardingSurvey.enrollmentReasons || []).map((r: any) => ({ Reason: r.name, Count: r.count })),
+      },
+    ] : []),
   ];
 
   const handleExportCSV = () => {
@@ -392,11 +436,16 @@ export default function CareerAnalytics() {
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
             {[1, 2, 3, 4, 5, 6].map((i) => <KpiSkeleton key={i} />)}
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
-          </div>
-          <div className="grid grid-cols-1 gap-3">
-            {[1, 2].map((i) => <SkeletonCard key={i} />)}
+          <div className="lg:flex lg:gap-3 lg:items-start mt-3">
+            <div className="flex-1 min-w-0 space-y-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
+              </div>
+              <SkeletonCard />
+            </div>
+            <aside className="lg:w-80 xl:w-88 shrink-0 space-y-3 mt-3 lg:mt-0">
+              {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+            </aside>
           </div>
         </>
       ) : !data ? (
@@ -493,10 +542,10 @@ export default function CareerAnalytics() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 mt-3">
-            <Card title="Employment Trend">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <Card title="Employment Rate Trend by Batch">
               {employmentTrend.length > 0 ? (
-                <div className="h-56">
+                <div className="h-52">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={employmentTrend}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -510,9 +559,9 @@ export default function CareerAnalytics() {
               ) : <p className="text-xs text-gray-400 text-center py-8">No employment trend data available.</p>}
             </Card>
 
-            <Card title="Employment Timeline">
+            <Card title="Graduates Employed Timeline">
               {employmentTimeline.length > 0 ? (
-                <div className="h-56">
+                <div className="h-52">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={employmentTimeline}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -526,17 +575,219 @@ export default function CareerAnalytics() {
               ) : <p className="text-xs text-gray-400 text-center py-8">No employment timeline data available.</p>}
             </Card>
           </div>
+
+          {/* CTU Graduate Tracer & Registration Survey Section */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <SparklesIcon className="w-4 h-4 text-orange-500" />
+                  CTU Graduate Tracer Survey Outcomes
+                </h3>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Direct survey feedback from CTU alumni registrations
+                </p>
+              </div>
+              <Link
+                to="/admin/surveys"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-md transition-colors"
+              >
+                Survey Management
+                <ArrowRightIcon className="w-3.5 h-3.5" />
+              </Link>
             </div>
 
-            <aside className="lg:w-80 shrink-0 space-y-3 mt-3 lg:mt-0">
+            {onboardingSurvey && onboardingSurvey.totalResponses > 0 ? (
+              <div className="space-y-3">
+                {/* 4 Metric Badges */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="bg-orange-50/70 border border-orange-100 rounded-lg p-2.5">
+                    <div className="flex items-center gap-1 text-orange-600 mb-1">
+                      <CheckCircleIcon className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-semibold">Survey Responses</span>
+                    </div>
+                    <p className="text-lg font-bold text-gray-900">{onboardingSurvey.totalResponses}</p>
+                    <p className="text-[10px] text-gray-400">Alumni registered</p>
+                  </div>
+
+                  <div className="bg-blue-50/70 border border-blue-100 rounded-lg p-2.5">
+                    <div className="flex items-center gap-1 text-blue-600 mb-1">
+                      <SparklesIcon className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-semibold">Curriculum Relevance</span>
+                    </div>
+                    <p className="text-lg font-bold text-gray-900">{onboardingSurvey.curriculumRelevanceRate}%</p>
+                    <p className="text-[10px] text-gray-400">High career alignment</p>
+                  </div>
+
+                  <div className="bg-emerald-50/70 border border-emerald-100 rounded-lg p-2.5">
+                    <div className="flex items-center gap-1 text-emerald-600 mb-1">
+                      <AcademicCapIcon className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-semibold">Licensure Passing</span>
+                    </div>
+                    <p className="text-lg font-bold text-gray-900">{onboardingSurvey.licensurePassingRate}%</p>
+                    <p className="text-[10px] text-gray-400">Board exam passers</p>
+                  </div>
+
+                  <div className="bg-purple-50/70 border border-purple-100 rounded-lg p-2.5">
+                    <div className="flex items-center gap-1 text-purple-600 mb-1">
+                      <StarIcon className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-semibold">Campus Quality</span>
+                    </div>
+                    <p className="text-lg font-bold text-gray-900">
+                      {onboardingSurvey.ratings?.overallAverage ? `${onboardingSurvey.ratings.overallAverage} / 5` : '—'}
+                    </p>
+                    <p className="text-[10px] text-gray-400">Average touchpoint score</p>
+                  </div>
+                </div>
+
+                {/* 2 Side-by-side Progress Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div className="border border-gray-100 rounded-lg p-3 bg-gray-50/50">
+                    <h4 className="text-xs font-semibold text-gray-800 mb-2 flex items-center gap-1.5">
+                      <SparklesIcon className="w-3.5 h-3.5 text-orange-500" />
+                      Top Competencies Developed at CTU
+                    </h4>
+                    {onboardingSurvey.competencies && onboardingSurvey.competencies.length > 0 ? (
+                      <div className="space-y-2">
+                        {onboardingSurvey.competencies.slice(0, 5).map((c: any) => {
+                          const pct = Math.round((c.count / onboardingSurvey.totalResponses) * 100);
+                          return (
+                            <div key={c.name}>
+                              <div className="flex justify-between text-[11px] mb-0.5">
+                                <span className="text-gray-700 truncate max-w-[190px]">{c.name}</span>
+                                <span className="text-gray-500 font-medium">{c.count} ({pct}%)</span>
+                              </div>
+                              <div className="w-full bg-gray-200/80 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-orange-500 h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 py-4 text-center">No competency data yet</p>
+                    )}
+                  </div>
+
+                  <div className="border border-gray-100 rounded-lg p-3 bg-gray-50/50">
+                    <h4 className="text-xs font-semibold text-gray-800 mb-2 flex items-center gap-1.5">
+                      <AcademicCapIcon className="w-3.5 h-3.5 text-blue-500" />
+                      Primary Reasons for Enrolling at CTU
+                    </h4>
+                    {onboardingSurvey.enrollmentReasons && onboardingSurvey.enrollmentReasons.length > 0 ? (
+                      <div className="space-y-2">
+                        {onboardingSurvey.enrollmentReasons.slice(0, 5).map((r: any) => {
+                          const pct = Math.round((r.count / onboardingSurvey.totalResponses) * 100);
+                          return (
+                            <div key={r.name}>
+                              <div className="flex justify-between text-[11px] mb-0.5">
+                                <span className="text-gray-700 truncate max-w-[190px]">{r.name}</span>
+                                <span className="text-gray-500 font-medium">{r.count} ({pct}%)</span>
+                              </div>
+                              <div className="w-full bg-gray-200/80 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 py-4 text-center">No enrollment reason data yet</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-xs text-gray-400 mb-2">No CTU Graduate Tracer & Registration survey responses recorded yet.</p>
+                <Link
+                  to="/admin/surveys"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700"
+                >
+                  View Surveys in Tracer Management &rarr;
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <aside className="lg:w-80 xl:w-88 shrink-0 space-y-3 mt-3 lg:mt-0">
           {loading ? (
             <>
+              <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
             </>
           ) : data ? (
             <>
+              {/* Institutional Ratings Card (CTU Tracer Survey) */}
+              <Card
+                title="Institutional Ratings"
+                footer={{ label: 'View Survey Analytics', to: '/admin/surveys' }}
+              >
+                {onboardingSurvey && onboardingSurvey.totalResponses > 0 ? (
+                  <div className="space-y-3">
+                    {/* Overall score banner */}
+                    <div className="bg-gradient-to-br from-orange-50 to-amber-50/50 rounded-lg p-3 border border-orange-100 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Overall Satisfaction</p>
+                        <div className="flex items-baseline gap-1 mt-0.5">
+                          <span className="text-2xl font-black text-gray-900">
+                            {onboardingSurvey.ratings?.overallAverage ? onboardingSurvey.ratings.overallAverage : '—'}
+                          </span>
+                          <span className="text-xs text-gray-400 font-semibold">/ 5.0</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => {
+                          const avg = onboardingSurvey.ratings?.overallAverage || 0;
+                          return (
+                            <StarIcon
+                              key={star}
+                              className={`w-4 h-4 ${
+                                star <= Math.round(avg)
+                                  ? 'text-amber-400 fill-amber-400'
+                                  : 'text-gray-200 fill-gray-200'
+                              }`}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Individual Area Ratings */}
+                    <div className="space-y-2 pt-0.5">
+                      {[
+                        { label: 'Faculty Instruction', score: onboardingSurvey.ratings?.faculty },
+                        { label: 'Campus Facilities & Labs', score: onboardingSurvey.ratings?.facilities },
+                        { label: 'Student Support Services', score: onboardingSurvey.ratings?.studentServices },
+                      ].map((item) => (
+                        <div key={item.label} className="bg-gray-50/80 rounded-lg p-2 border border-gray-100">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="font-medium text-gray-700">{item.label}</span>
+                            <span className="font-bold text-gray-900">
+                              {item.score ? `${item.score} / 5` : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200/80 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-amber-400 h-full rounded-full transition-all"
+                              style={{ width: `${item.score ? (item.score / 5) * 100 : 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <StarIcon className="w-7 h-7 text-gray-300 mx-auto mb-1.5" />
+                    <p className="text-xs text-gray-400">No institutional rating data yet.</p>
+                  </div>
+                )}
+              </Card>
+
               <Card title="Geographic Distribution">
                 {cities.length === 0 && provinces.length === 0 ? (
                   <p className="text-xs text-gray-400 text-center py-8">No geographic data available.</p>
@@ -548,53 +799,65 @@ export default function CareerAnalytics() {
                 )}
               </Card>
 
-              <Card title="Missing Employment Information" footer={{ label: 'View Alumni', to: '/admin/alumni' }}>
+              <Card title="Records & Tracer Compliance" footer={{ label: 'Manage Alumni Records', to: '/admin/alumni' }}>
                 <div className="space-y-3">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <p className="text-xs font-medium text-gray-700">Without Employment Records</p>
-                      <span className="text-xs font-bold text-gray-900">{missingInfo.withoutEmployment}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        missingInfo.withoutEmployment > 0 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+                      }`}>
+                        {missingInfo.withoutEmployment}
+                      </span>
                     </div>
                     {missingInfo.withoutEmployment > 0 ? (
-                      <div className="max-h-32 overflow-y-auto space-y-1">
+                      <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
                         {missingInfo.withoutEmploymentList.map((a: any) => (
-                          <div key={a.id} className="flex items-center gap-2 text-xs py-1 px-2 rounded hover:bg-gray-50">
-                            <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[10px] text-gray-500 shrink-0">{a.name.charAt(0)}</div>
+                          <div key={a.id} className="flex items-center gap-2 text-xs py-1 px-2 rounded-md hover:bg-gray-50 transition-colors">
+                            <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-semibold text-gray-500 shrink-0">
+                              {a.name.charAt(0)}
+                            </div>
                             <span className="text-gray-600 truncate">{a.name}</span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-gray-400">All filtered alumni have employment records.</p>
+                      <p className="text-[11px] text-gray-400">All filtered alumni have employment records.</p>
                     )}
                   </div>
-                  <div>
+                  <div className="pt-2 border-t border-gray-100">
                     <div className="flex items-center justify-between mb-1.5">
                       <p className="text-xs font-medium text-gray-700">Without Completed Tracer Survey</p>
-                      <span className="text-xs font-bold text-gray-900">{missingInfo.withoutSurvey}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        missingInfo.withoutSurvey > 0 ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'
+                      }`}>
+                        {missingInfo.withoutSurvey}
+                      </span>
                     </div>
                     {missingInfo.withoutSurvey > 0 ? (
-                      <div className="max-h-32 overflow-y-auto space-y-1">
+                      <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
                         {missingInfo.withoutSurveyList.map((a: any) => (
-                          <div key={a.id} className="flex items-center gap-2 text-xs py-1 px-2 rounded hover:bg-gray-50">
-                            <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[10px] text-gray-500 shrink-0">{a.name.charAt(0)}</div>
+                          <div key={a.id} className="flex items-center gap-2 text-xs py-1 px-2 rounded-md hover:bg-gray-50 transition-colors">
+                            <div className="w-5 h-5 rounded-full bg-orange-50 flex items-center justify-center text-[10px] font-semibold text-orange-600 shrink-0">
+                              {a.name.charAt(0)}
+                            </div>
                             <span className="text-gray-600 truncate">{a.name}</span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-gray-400">All filtered alumni have completed tracer surveys.</p>
+                      <p className="text-[11px] text-gray-400">All filtered alumni have completed tracer surveys.</p>
                     )}
                   </div>
                 </div>
               </Card>
 
-              <Card title="Recently Updated Employment Records" footer={{ label: 'View All', to: '/admin/alumni' }}>
+              <Card title="Recent Career Updates" footer={{ label: 'View All Alumni', to: '/admin/alumni' }}>
                 {recentlyUpdated.length > 0 ? (
                   <div className="space-y-1">
                     {recentlyUpdated.map((r: any) => (
-                      <div key={r.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
-                        <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-xs font-bold text-orange-600 shrink-0">
+                      <div key={r.id} className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="w-7 h-7 rounded-full bg-orange-50 flex items-center justify-center text-xs font-bold text-orange-600 shrink-0">
                           {r.name.charAt(0)}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -608,7 +871,7 @@ export default function CareerAnalytics() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-400 text-center py-8">No recently updated employment records.</p>
+                  <p className="text-xs text-gray-400 text-center py-6">No recently updated employment records.</p>
                 )}
               </Card>
             </>
