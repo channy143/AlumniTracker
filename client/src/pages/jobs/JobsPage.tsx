@@ -921,10 +921,28 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
     return () => clearInterval(timer);
   }, [submittedApp, onClose]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`"${file.name}" is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum allowed file size is 10MB.`);
+        setResume(null);
+        e.target.value = '';
+        return;
+      }
+      setError('');
+    }
+    setResume(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resume && !profileResume) {
       setError('You need a resume to apply. Attach one below or add it to your profile.');
+      return;
+    }
+    if (resume && resume.size > 10 * 1024 * 1024) {
+      setError(`Resume file is too large (${(resume.size / (1024 * 1024)).toFixed(1)}MB). Maximum allowed size is 10MB.`);
       return;
     }
     setSubmitting(true);
@@ -935,7 +953,12 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
       onApplied(app, job);
       setSubmittedApp(app);
     } catch (err: any) {
-      setError(err.message || 'Failed to submit application. Please try again.');
+      const msg = String(err?.message || '');
+      if (msg.includes('413') || msg.toLowerCase().includes('too large') || msg.toLowerCase().includes('payload')) {
+        setError('The attached resume file is too large (maximum size is 10MB). Please choose a compressed or smaller file and try again.');
+      } else {
+        setError(msg || 'Failed to submit application. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1016,18 +1039,29 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
             )}
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Resume (PDF or DOC/DOCX){!profileResume && <span className="text-red-500"> *</span>}</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-gray-700">
+                  Resume (PDF or DOC/DOCX){!profileResume && <span className="text-red-500"> *</span>}
+                </label>
+                <span className="text-[10px] text-gray-400">Max 10MB</span>
+              </div>
               <label className="flex items-center gap-2 border border-dashed border-gray-300 rounded-xl px-3.5 py-3 cursor-pointer hover:border-orange-400 hover:bg-orange-50/20 transition-all">
-                <PaperClipIcon className="w-4 h-4 text-gray-400" />
+                <PaperClipIcon className="w-4 h-4 text-gray-400 shrink-0" />
                 <span className="text-xs text-gray-600 truncate">
                   {resume
-                    ? resume.name
+                    ? `${resume.name} (${(resume.size / (1024 * 1024)).toFixed(1)} MB)`
                     : profileResume
-                      ? 'Choose a file (optional — attaches a different resume)'
-                      : 'Choose a file (required)'}
+                      ? 'Choose a file (optional — attaches a different resume, max 10MB)'
+                      : 'Choose a file (required, max 10MB)'}
                 </span>
-                <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={(e) => setResume(e.target.files?.[0] || null)} />
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
               </label>
+              <p className="text-[10px] text-gray-400 mt-1">Accepted formats: PDF, DOC, DOCX up to 10MB.</p>
             </div>
 
             <div>

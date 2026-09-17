@@ -23,10 +23,11 @@ async function getProfileByUserId(db: any, userId: string) {
 router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const db = createUserScopedClient(req.token!);
+    const nowIso = new Date().toISOString();
     const { data: jobs, error } = await db
       .from('job_postings')
       .select('*')
-      .gte('expires_at', new Date().toISOString())
+      .or(`expires_at.is.null,expires_at.gte.${nowIso}`)
       .order('created_at', { ascending: false });
 
     if (error) throw new AppError(error.message, 500);
@@ -252,7 +253,7 @@ router.post('/:id/apply', authenticate, upload.single('resume'), validate(applyJ
       .eq('id', jobId)
       .single();
     if (jobError) throw new AppError('Job not found', 404);
-    if (new Date(job.expires_at) < new Date()) throw new AppError('This job posting has expired', 400);
+    if (job.expires_at && new Date(job.expires_at) < new Date()) throw new AppError('This job posting has expired', 400);
 
     const profile = await getProfileByUserId(db, req.user!.userId);
 

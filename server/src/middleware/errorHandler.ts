@@ -25,6 +25,25 @@ export function errorHandler(
     });
   }
 
+  // Handle Multer upload errors
+  if ((err as any).name === 'MulterError') {
+    if ((err as any).code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        message: 'The uploaded file is too large. Maximum allowed file size is 10MB.',
+      });
+    }
+    return res.status(400).json({
+      message: `File upload error: ${err.message}`,
+    });
+  }
+
+  // Handle raw-body / body-parser PayloadTooLargeError
+  if ((err as any).status === 413 || (err as any).statusCode === 413 || (err as any).type === 'entity.too.large') {
+    return res.status(413).json({
+      message: 'The uploaded file or request body is too large (413). Please choose a file under 10MB.',
+    });
+  }
+
   console.error('Unhandled error:', err.message || err);
   if (err.stack) console.error(err.stack);
 

@@ -89,8 +89,11 @@ export const api = {
       body: formData,
     }).then(async (res) => {
       if (!res.ok) {
+        if (res.status === 413) {
+          throw new Error('The uploaded file is too large (413). Please choose a file under 10MB.');
+        }
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Upload failed');
+        throw new Error(err.message || (res.status === 413 ? 'File too large (max 10MB)' : 'Upload failed'));
       }
       return res.json() as T;
     });
