@@ -4,6 +4,18 @@ import { z } from 'zod';
 // Auth
 // -----------------------------------------------------------------------------
 
+export const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~])/;
+
+export const strongPasswordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters long')
+  .max(128, 'Password must be under 128 characters')
+  .regex(
+    strongPasswordRegex,
+    'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+  );
+
+
 export const sendOtpSchema = z.object({
   email: z.string().email('Valid email is required').max(255),
   turnstileToken: z.string().min(1, 'Security check is required').max(2048),
@@ -18,7 +30,7 @@ export const registerSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   email: z.string().email('Valid email is required').max(255),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(128),
+  password: strongPasswordSchema,
   program: z.string().min(1, 'Program is required').max(200),
   yearGraduated: z.string().min(1).max(10),
   idNumber: z.string().max(50).optional().or(z.literal('')),
@@ -31,7 +43,7 @@ export const registerV2Schema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   email: z.string().email('Valid email is required').max(255),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(128),
+  password: strongPasswordSchema,
   program: z.string().min(1, 'Program is required').max(200),
   yearGraduated: z.string().min(1).max(10),
   otp: z.string().min(6).max(6),
@@ -45,12 +57,15 @@ export const verifyAlumniSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email('Valid email is required').max(255),
   password: z.string().min(1, 'Password is required').max(128),
+  deviceId: z.string().max(128).optional(),
+  deviceToken: z.string().max(2048).optional(),
 }).strict();
 
 export const mfaVerifySchema = z.object({
   email: z.string().email('Valid email is required').max(255),
   otp: z.string().min(6).max(6),
   mfaToken: z.string().min(1).max(4096),
+  deviceId: z.string().max(128).optional(),
 }).strict();
 
 export const mfaEnableSchema = z.object({
@@ -66,12 +81,12 @@ export const mfaSendCodeSchema = z.object({
 export const resetPasswordSchema = z.object({
   email: z.string().email('Valid email is required').max(255),
   otp: z.string().min(6).max(6),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(128),
+  password: strongPasswordSchema,
 }).strict();
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required').max(128),
-  newPassword: z.string().min(6, 'New password must be at least 6 characters').max(128),
+  newPassword: strongPasswordSchema,
 }).strict();
 
 export const verifyEmailSchema = z.object({
@@ -100,6 +115,7 @@ export const updateProfileSchema = z.object({
   linkedin_url: z.string().url().max(500).optional().nullable(),
   github_url: z.string().url().max(500).optional().nullable(),
   portfolio_url: z.string().url().max(500).optional().nullable(),
+  privacy_settings: z.record(z.any()).optional().nullable(),
 }).strict();
 
 export const updateCareerSchema = z.object({
@@ -287,7 +303,7 @@ export const screenApplicationSchema = z.object({
 
 export const adminCreateUserSchema = z.object({
   email: z.string().email('Valid email is required').max(255),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(128),
+  password: strongPasswordSchema,
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   role: z.enum(['admin', 'staff', 'alumni']).optional(),
@@ -304,7 +320,7 @@ export const adminRoleSchema = z.object({
 }).strict();
 
 export const adminResetPasswordSchema = z.object({
-  newPassword: z.string().min(6, 'Password must be at least 6 characters').max(128),
+  newPassword: strongPasswordSchema,
 }).strict();
 
 // -----------------------------------------------------------------------------

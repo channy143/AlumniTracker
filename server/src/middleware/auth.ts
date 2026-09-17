@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthenticatedRequest, AuthPayload } from '../types';
+import { isTokenRevoked } from '../services/revokedTokenService';
 
 export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -11,7 +12,7 @@ export function getJwtSecret(): string {
 
 const MAX_ADMIN_TOKEN_AGE_SECONDS = 2 * 60 * 60; // 2 hours
 
-export function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -23,6 +24,12 @@ export function authenticate(req: AuthenticatedRequest, res: Response, next: Nex
   try {
     const secret = getJwtSecret();
     const decoded = jwt.verify(token, secret) as AuthPayload;
+
+    // Check if token has been revoked / logged out (Rule 6)
+    const revoked = await isTokenRevoked(token);
+    if (revoked) {
+      return res.status(401).json({ message: 'Session has been logged out. Please log in again.' });
+    }
 
     // Pending MFA challenge tokens cannot access authenticated routes
     if ((decoded as any).mfa === 'pending') {

@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeftIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, CheckIcon, KeyIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { authApi } from '@/services/api';
+import { isPasswordStrong, checkPasswordCriteria } from '@/utils/validation';
 
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState<'email' | 'otp' | 'password'>('email');
@@ -10,6 +11,8 @@ export default function ForgotPasswordPage() {
   const [otp, setOtp] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState('');
@@ -85,7 +88,10 @@ export default function ForgotPasswordPage() {
     setError('');
 
     if (!password) { setError('Please enter a new password'); return; }
-    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    if (!isPasswordStrong(password)) {
+      setError('Password must meet strong password requirements: at least 8 characters, uppercase, lowercase, number, and special character');
+      return;
+    }
     if (password !== confirmPassword) { setError('Passwords do not match'); return; }
 
     setLoading(true);
@@ -168,13 +174,50 @@ export default function ForgotPasswordPage() {
             {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">{error}</div>}
 
             <form onSubmit={handleReset} className="space-y-4">
-              <div>
+              <div className="group">
                 <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">New Password</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-field" required autoFocus />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-field pr-11"
+                    required
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-ctu-blue p-1 rounded-lg hover:bg-gray-100/70 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
-              <div>
+              <div className="group">
                 <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">Confirm Password</label>
-                <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="input-field" required />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="input-field pr-11"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-ctu-blue p-1 rounded-lg hover:bg-gray-100/70 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
               <button type="submit" disabled={loading} className="btn-primary w-full">
                 {loading ? 'Resetting...' : 'Reset Password'}

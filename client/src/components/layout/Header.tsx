@@ -13,8 +13,13 @@ import {
   BriefcaseIcon,
   ClipboardDocumentCheckIcon,
   XMarkIcon,
+  ShieldCheckIcon,
+  ShieldExclamationIcon,
 } from '@heroicons/react/24/outline';
 import { JellyBlobMascot, BlobSpeech } from '@/components/ui/feral-blob/JellyBlobMascot';
+import { SecurityPolicyModal } from '@/components/security/SecurityPolicyModal';
+import { ReportSuspiciousActivityModal } from '@/components/security/ReportSuspiciousActivityModal';
+import { useIdleTimer } from '@/hooks/useIdleTimer';
 import '@/styles/blob.css';
 
 const SEARCH_PAGES = [
@@ -46,6 +51,10 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [logoutAllDevices, setLogoutAllDevices] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [blobMood, setBlobMood] = useState<'neutral' | 'happy' | 'sad'>('neutral');
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -53,6 +62,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  const { isWarningActive, secondsRemaining, resetActivity } = useIdleTimer();
 
   const currentSearchPage = SEARCH_PAGES.find((p) => location.pathname.startsWith(p)) || null;
   const placeholder = currentSearchPage
@@ -192,9 +203,15 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     return AcademicCapIcon;
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/auth/login');
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout(logoutAllDevices);
+    } finally {
+      setLoggingOut(false);
+      setShowLogoutModal(false);
+      navigate('/auth/login');
+    }
   };
 
   return (
@@ -310,21 +327,35 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-100 rounded-xl shadow-xl py-1.5 z-50 animate-in fade-in duration-150">
                   <button
                     onClick={() => { setDropdownOpen(false); navigate('/profile'); }}
-                    className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-left"
                   >
-                    <UserIcon className="w-4 h-4 text-gray-400" />
-                    My Profile
+                    <UserIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span>My Profile</span>
                   </button>
-                  <div className="border-t border-gray-100 my-1" />
                   <button
-                    onClick={() => { setDropdownOpen(false); setShowLogoutModal(true); }}
-                    className="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    onClick={() => { setDropdownOpen(false); setShowPolicyModal(true); }}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-left"
                   >
-                    <ArrowRightOnRectangleIcon className="w-4 h-4" />
-                    Logout
+                    <ShieldCheckIcon className="w-4 h-4 text-orange-500 shrink-0" />
+                    <span>Security &amp; Policy</span>
+                  </button>
+                  <button
+                    onClick={() => { setDropdownOpen(false); setShowReportModal(true); }}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-left"
+                  >
+                    <ShieldExclamationIcon className="w-4 h-4 text-red-500 shrink-0" />
+                    <span>Report Suspicious Activity</span>
+                  </button>
+                  <div className="border-t border-gray-100 my-1.5" />
+                  <button
+                    onClick={() => { setDropdownOpen(false); setLogoutAllDevices(false); setShowLogoutModal(true); }}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors whitespace-nowrap text-left"
+                  >
+                    <ArrowRightOnRectangleIcon className="w-4 h-4 shrink-0" />
+                    <span>Logout</span>
                   </button>
                 </div>
               )}
@@ -332,6 +363,41 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           </div>
         </div>
       </header>
+
+      {/* Inactivity Timeout Warning Modal */}
+      {isWarningActive && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[200] flex items-center justify-center p-3 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center shadow-2xl border border-orange-200">
+            <div className="w-12 h-12 mx-auto rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mb-3">
+              <ShieldExclamationIcon className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-gray-900 mb-1">Inactivity Security Alert</h3>
+            <p className="text-xs text-gray-600 mb-3">
+              Under our <strong>Secure Logout Policy</strong>, sessions on shared or idle computers are automatically terminated to prevent unauthorized access.
+            </p>
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4">
+              <span className="text-xs text-orange-950 font-medium">Session ending in</span>
+              <p className="text-2xl font-black text-orange-600 font-mono mt-0.5">{secondsRemaining}s</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={resetActivity}
+                className="flex-1 px-4 py-2.5 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors shadow-2xs cursor-pointer"
+              >
+                I'm Still Working (Stay Logged In)
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="px-4 py-2.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Log Out Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-[100] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setShowLogoutModal(false)}>
@@ -342,31 +408,59 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             <div className="flex justify-center relative -mt-1">
               <JellyBlobMascot mood={blobMood} className="w-40 h-auto" />
             </div>
-            <h3 className="text-base font-bold text-gray-900 mb-1">See you soon!</h3>
-            <p className="text-xs text-gray-500 mb-5">Are you sure you want to log out of your account?</p>
+            <h3 className="text-base font-bold text-gray-900 mb-1">Secure Logout</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Protect your account by ending your session, especially on shared computers.
+            </p>
+
+            {/* Rule 6 Shared Computer Checkbox */}
+            <div className="mb-4 text-left p-2.5 rounded-xl border border-gray-200 bg-gray-50 flex items-start gap-2.5">
+              <input
+                id="logoutAllDevices"
+                type="checkbox"
+                checked={logoutAllDevices}
+                onChange={(e) => setLogoutAllDevices(e.target.checked)}
+                className="mt-0.5 rounded text-orange-600 focus:ring-orange-500 border-gray-300"
+              />
+              <label htmlFor="logoutAllDevices" className="text-xs text-gray-700 cursor-pointer">
+                <span className="font-semibold text-gray-900 block">Log out of all devices</span>
+                <span className="text-[11px] text-gray-500">
+                  Revokes all active sessions &amp; trusted devices (Recommended on public computers).
+                </span>
+              </label>
+            </div>
+
             <div className="flex gap-2.5">
               <button
                 type="button"
+                disabled={loggingOut}
                 onMouseEnter={() => setBlobMood('happy')}
                 onMouseLeave={() => setBlobMood('neutral')}
                 onClick={() => setShowLogoutModal(false)}
-                className="flex-1 px-4 py-2.5 text-xs font-semibold bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs font-semibold bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
               >
                 Stay Logged In
               </button>
               <button
                 type="button"
+                disabled={loggingOut}
                 onMouseEnter={() => setBlobMood('sad')}
                 onMouseLeave={() => setBlobMood('neutral')}
                 onClick={handleLogout}
-                className="flex-1 px-4 py-2.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer"
+                className="flex-1 px-4 py-2.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-xs hover:shadow transition-all cursor-pointer disabled:opacity-50"
               >
-                Yes, Sign Out
+                {loggingOut ? 'Signing Out...' : 'Yes, Sign Out'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Security Policy Modal */}
+      <SecurityPolicyModal isOpen={showPolicyModal} onClose={() => setShowPolicyModal(false)} />
+
+      {/* Report Suspicious Activity Modal */}
+      <ReportSuspiciousActivityModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} />
     </>
   );
 }

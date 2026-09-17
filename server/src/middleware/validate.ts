@@ -11,8 +11,13 @@ export function validate(schema: ZodSchema) {
         message: e.message,
       }));
 
+      const isLogin = req.path === '/login' || req.originalUrl?.includes('/auth/login');
+      const message = isLogin
+        ? 'Wrong username and password, try again.'
+        : (errors[0]?.message || 'Please check the required fields.');
+
       return res.status(400).json({
-        message: 'Validation failed',
+        message,
         errors,
       });
     }

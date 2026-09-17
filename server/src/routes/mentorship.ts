@@ -65,6 +65,27 @@ router.post('/apply', authenticate, validate(mentorshipApplySchema), async (req:
 router.put('/:id', authenticate, validate(mentorshipUpdateSchema), async (req: AuthenticatedRequest, res, next) => {
   try {
     const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db
+      .from('profiles')
+      .select('id')
+      .eq('user_id', req.user!.userId)
+      .single();
+
+    if (!profile) throw new AppError('Profile not found', 404);
+
+    const { data: existing, error: findError } = await db
+      .from('mentorships')
+      .select('id, mentor_id, mentee_id')
+      .eq('id', req.params.id)
+      .maybeSingle();
+
+    if (findError) throw new AppError(findError.message, 500);
+    if (!existing) throw new AppError('Mentorship not found', 404);
+
+    if (existing.mentor_id !== profile.id && existing.mentee_id !== profile.id && req.user!.role !== 'admin') {
+      throw new AppError('Unauthorized: Users may only access and manage information allowed by their account role.', 403);
+    }
+
     const { data: mentorship, error } = await db
       .from('mentorships')
       .update({ status: req.body.status })

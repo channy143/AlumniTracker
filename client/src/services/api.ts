@@ -1,5 +1,19 @@
 const API_BASE = '/api';
 
+export class ApiError extends Error {
+  status: number;
+  cooldownSeconds?: number;
+  remainingAttempts?: number;
+
+  constructor(message: string, status: number, cooldownSeconds?: number, remainingAttempts?: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.cooldownSeconds = cooldownSeconds;
+    this.remainingAttempts = remainingAttempts;
+  }
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -21,7 +35,21 @@ async function request<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || `API Error: ${response.statusText}`);
+    let cooldown = error.cooldownSeconds;
+    if (!cooldown && response.headers.get('Retry-After')) {
+      const parsed = parseInt(response.headers.get('Retry-After')!, 10);
+      if (!isNaN(parsed)) cooldown = parsed;
+    }
+    if (!cooldown && error.message) {
+      const match = String(error.message).match(/(?:in|wait)\s+(\d+)\s*(?:s|seconds?)/i);
+      if (match) cooldown = parseInt(match[1], 10);
+    }
+    throw new ApiError(
+      error.message || `API Error: ${response.statusText}`,
+      response.status,
+      cooldown,
+      error.remainingAttempts
+    );
   }
 
   return response.json();
@@ -33,6 +61,8 @@ export const api = {
     request<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }),
   put: <T>(endpoint: string, data: unknown) =>
     request<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
+  patch: <T>(endpoint: string, data: unknown) =>
+    request<T>(endpoint, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: <T>(endpoint: string) => request<T>(endpoint, { method: 'DELETE' }),
   download: (endpoint: string) => {
     const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
@@ -72,6 +102,7 @@ export interface LoginResponse {
   token?: string;
   requiresMfa?: boolean;
   mfaToken?: string;
+  trustedDevice?: boolean;
 }
 
 export interface VerifyAlumniResponse {
@@ -86,10 +117,10 @@ export interface VerifyAlumniResponse {
 }
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post<LoginResponse>('/auth/login', { email, password }),
-  mfaVerify: (email: string, otp: string, mfaToken: string) =>
-    api.post<{ user: any; token: string }>('/auth/mfa-verify', { email, otp, mfaToken }),
+  login: (email: string, password: string, deviceId?: string, deviceToken?: string) =>
+    api.post<LoginResponse>('/auth/login', { email, password, deviceId, deviceToken }),
+  mfaVerify: (email: string, otp: string, mfaToken: string, deviceId?: string) =>
+    api.post<{ user: any; token: string; trustedDeviceToken?: string }>('/auth/mfa-verify', { email, otp, mfaToken, deviceId }),
   verifyAlumni: (studentId: string, birthDate: string) =>
     api.post<VerifyAlumniResponse>('/auth/verify-alumni', { studentId, birthDate }),
   register: (data: any) =>
@@ -109,6 +140,12 @@ export const authApi = {
     api.post<{ message: string }>('/auth/enable-mfa', { email, otp }),
   disableMfa: () =>
     api.post<{ message: string }>('/auth/disable-mfa', {}),
+  revokeTrustedDevices: () =>
+    api.post<{ message: string }>('/auth/revoke-devices', {}),
+  logout: (allDevices?: boolean) =>
+    api.post<{ success: boolean; message: string }>('/auth/logout', { allDevices }),
+  reportIncident: (data: { incidentType: string; description: string; severity?: string }) =>
+    api.post<{ success: boolean; message: string; incidentId: string }>('/auth/report-incident', data),
 };
 
 export const profileApi = {
@@ -294,6 +331,13 @@ export const adminApi = {
   reportEmployer: (format = 'json') => api.get<Blob>(`/admin/reports/employer?format=${format}`),
   reportSurvey: (id: string, format = 'json') => api.get<Blob>(`/admin/reports/survey/${id}?format=${format}`),
   reportCareerProgress: (format = 'json') => api.get<Blob>(`/admin/reports/career-progress?format=${format}`),
+  exportHistory: () => api.get<any[]>('/admin/reports/export-history'),
+  securityIncidents: (params?: { status?: string; severity?: string }) => {
+    const qs = new URLSearchParams(params as any).toString();
+    return api.get<any[]>(`/admin/security-incidents${qs ? `?${qs}` : ''}`);
+  },
+  updateSecurityIncident: (id: string, updates: { status?: string; adminNotes?: string; severity?: string }) =>
+    api.patch<any>(`/admin/security-incidents/${id}`, updates),
 
   employmentRate: (params: Record<string, any> = {}) => api.get<any>(`/admin/analytics/employment-rate?${toQuery(params)}`),
   employmentByCourse: (params: Record<string, any> = {}) => api.get<any[]>(`/admin/analytics/employment-by-course?${toQuery(params)}`),

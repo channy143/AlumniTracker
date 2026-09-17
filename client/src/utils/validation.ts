@@ -10,6 +10,40 @@ export const verifyAlumniSchema = z.object({
   birthDate: z.string().min(1, 'Birthdate is required'),
 });
 
+export const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~])/;
+
+export const strongPasswordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters long')
+  .max(128, 'Password must be under 128 characters')
+  .regex(
+    strongPasswordRegex,
+    'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+  );
+
+export interface PasswordCriteria {
+  minLength: boolean;
+  hasUpper: boolean;
+  hasLower: boolean;
+  hasNumber: boolean;
+  hasSpecial: boolean;
+}
+
+export function checkPasswordCriteria(password: string): PasswordCriteria {
+  return {
+    minLength: (password || '').length >= 8,
+    hasUpper: /[A-Z]/.test(password || ''),
+    hasLower: /[a-z]/.test(password || ''),
+    hasNumber: /\d/.test(password || ''),
+    hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password || ''),
+  };
+}
+
+export function isPasswordStrong(password: string): boolean {
+  const c = checkPasswordCriteria(password);
+  return c.minLength && c.hasUpper && c.hasLower && c.hasNumber && c.hasSpecial;
+}
+
 export const registerSchema = z
   .object({
     studentId: z.string().min(3, 'Student ID is required'),
@@ -17,7 +51,7 @@ export const registerSchema = z
     firstName: z.string().min(2, 'First name is required'),
     lastName: z.string().min(2, 'Last name is required'),
     email: z.string().email('Invalid email address'),
-    password: z.string().min(6, 'Password must be at least 6 characters'),
+    password: strongPasswordSchema,
     confirmPassword: z.string(),
     program: z.string().min(1, 'Program is required'),
     yearGraduated: z.string().min(4, 'Graduation year is required'),

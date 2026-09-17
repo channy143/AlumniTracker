@@ -18,20 +18,20 @@ export default function AuthLayout() {
   if (user) return <Navigate to="/" replace />;
 
   return (
-    <div className="min-h-screen flex overflow-hidden bg-white">
+    <div className="h-screen h-[100dvh] max-h-screen flex overflow-hidden bg-white">
       {/* Left: Brand panel — collapses when registering, hidden on mobile */}
       <motion.div
         initial={false}
         animate={{ width: isRegister ? '0%' : '50%', opacity: isRegister ? 0 : 1 }}
         transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-        className="hidden lg:block overflow-hidden shrink-0 min-w-0"
+        className="hidden lg:block overflow-hidden shrink-0 min-w-0 h-full"
       >
         <div
-          className="w-[50vw] min-h-screen relative bg-cover bg-center bg-no-repeat"
+          className="w-[50vw] h-full relative bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: 'url("/image/ChatGPT Image May 27, 2026, 04_38_30 AM.png")' }}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
-          <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-12">
+          <div className="relative z-10 h-full flex flex-col items-center justify-center p-12">
             <div className="max-w-md w-full">
               <h1 className="text-5xl md:text-6xl font-bold text-white font-display leading-[1.05] tracking-tight">
                 CTU-Naga<br />
@@ -50,26 +50,26 @@ export default function AuthLayout() {
         </div>
       </motion.div>
 
-      {/* Center: Form panel — full width on mobile, shifts left on desktop when brand collapses */}
-      <div className="flex-1 min-h-screen flex items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-md">
+      {/* Center: Form panel — scrollable independently when content overflows */}
+      <div className="flex-1 h-full max-h-screen overflow-y-auto flex justify-center p-4 sm:p-8">
+        <div className="w-full max-w-md my-auto py-6">
           <Outlet />
         </div>
       </div>
 
-      {/* Right: New panel — slides in when registering, hidden on mobile */}
+      {/* Right: Picture panel — fixed to screen, slides in when registering, hidden on mobile */}
       <motion.div
         initial={false}
         animate={{ width: isRegister ? '50%' : '0%', opacity: isRegister ? 1 : 0 }}
         transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-        className="hidden lg:block overflow-hidden shrink-0 min-w-0"
+        className="hidden lg:block overflow-hidden shrink-0 min-w-0 h-full"
       >
         <div
-          className="w-[50vw] min-h-screen relative bg-cover bg-center bg-no-repeat"
+          className="w-[50vw] h-full relative bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: 'url("/image/download.avif")' }}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
-          <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-12">
+          <div className="relative z-10 h-full flex flex-col items-center justify-center p-12">
             <div className="max-w-md w-full text-right">
             <h2 className="text-5xl md:text-6xl font-bold text-white font-display leading-[1.05] tracking-tight">
               Join the<br />

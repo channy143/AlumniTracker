@@ -17,6 +17,9 @@ import usersRouter from './users';
 import settingsRouter from './settings';
 import auditLogsRouter from './audit-logs';
 import eligibleAlumniRouter from './eligibleAlumni';
+import securityIncidentsRouter from './security-incidents';
+import { logAudit } from '../../services/auditLogger';
+import { AuthenticatedRequest } from '../../types';
 
 function groupBy<T extends Record<string, any>>(arr: T[], key: string): Record<string, T[]> {
   return (arr || []).reduce((acc: Record<string, T[]>, item: T) => {
@@ -46,8 +49,9 @@ router.use('/users', usersRouter);
 router.use('/settings', settingsRouter);
 router.use('/audit-logs', auditLogsRouter);
 router.use('/eligible-alumni', eligibleAlumniRouter);
+router.use('/security-incidents', securityIncidentsRouter);
 
-router.get('/export', async (_req, res, next) => {
+router.get('/export', async (req: AuthenticatedRequest, res, next) => {
   try {
     const { data: profilesData } = await supabase.from('profiles').select('*');
     const profileIds = (profilesData || []).map((p: any) => p.id).filter(Boolean);
@@ -69,6 +73,29 @@ router.get('/export', async (_req, res, next) => {
       education: eduByProfile[p.id] || [],
       employment: empByProfile[p.id] || [],
     }));
+
+    if (req.user?.userId) {
+      await supabase.from('report_exports').insert({
+        user_id: req.user.userId,
+        report_name: 'Full Alumni System Export',
+        report_type: 'full_alumni_export',
+        format: 'json',
+        record_count: result.length,
+        ip_address: req.ip || 'unknown',
+        user_agent: req.headers['user-agent'] as string,
+      });
+
+      await logAudit(req, {
+        actorId: req.user.userId,
+        actorName: req.user.email,
+        actorRole: 'admin',
+        action: 'REPORT_EXPORTED',
+        entity: 'reports',
+        details: { reportName: 'Full Alumni System Export', recordCount: result.length },
+        severity: 'info',
+        status: 'success',
+      });
+    }
 
     res.json(result);
   } catch (err) {

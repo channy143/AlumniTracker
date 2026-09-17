@@ -379,6 +379,15 @@ export default function AdminActivity() {
   const [page, setPage] = useState(1);
   const limit = 25;
 
+  // Security Incidents State (Rule 6)
+  const [incidents, setIncidents] = useState<any[]>([]);
+  const [loadingIncidents, setLoadingIncidents] = useState(false);
+  const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
+  const [incidentStatusFilter, setIncidentStatusFilter] = useState('all');
+  const [resolvingNotes, setResolvingNotes] = useState('');
+  const [resolvingStatus, setResolvingStatus] = useState('resolved');
+  const [updatingIncident, setUpdatingIncident] = useState(false);
+
   const queryIdRef = useRef(0);
 
   // Debounced search - only triggers when search actually changes, not on initial mount
@@ -440,8 +449,48 @@ export default function AdminActivity() {
     }
   };
 
+  const loadIncidents = async () => {
+    setLoadingIncidents(true);
+    try {
+      const data = await adminApi.securityIncidents({
+        status: incidentStatusFilter !== 'all' ? incidentStatusFilter : undefined,
+      });
+      setIncidents(data || []);
+    } catch (err) {
+      console.error('Failed to load incidents:', err);
+    } finally {
+      setLoadingIncidents(false);
+    }
+  };
+
   useEffect(() => {
-    loadData();
+    if (category === 'incidents') {
+      loadIncidents();
+    }
+  }, [category, incidentStatusFilter]);
+
+  const handleUpdateIncident = async () => {
+    if (!selectedIncident) return;
+    setUpdatingIncident(true);
+    try {
+      const updated = await adminApi.updateSecurityIncident(selectedIncident.id, {
+        status: resolvingStatus,
+        adminNotes: resolvingNotes,
+      });
+      setIncidents((prev) => prev.map((inc) => (inc.id === updated.id ? { ...inc, ...updated } : inc)));
+      setSelectedIncident(null);
+      loadIncidents();
+    } catch (err) {
+      console.error('Failed to update incident:', err);
+    } finally {
+      setUpdatingIncident(false);
+    }
+  };
+
+  useEffect(() => {
+    if (category !== 'incidents') {
+      loadData();
+    }
   }, [page, category, severity, status, datePreset, debouncedSearch]);
 
   const handleExportCsv = () => {
@@ -469,6 +518,7 @@ export default function AdminActivity() {
   const categories = [
     { id: 'all', label: 'All Events' },
     { id: 'auth', label: 'Auth & Security' },
+    { id: 'incidents', label: 'Reported Incidents (Rule 6)' },
     { id: 'admin', label: 'Admin Actions' },
     { id: 'alumni', label: 'Alumni & Profile' },
     { id: 'survey', label: 'Surveys & Tracer' },
@@ -662,154 +712,381 @@ export default function AdminActivity() {
         </div>
       </div>
 
-      {/* Audit Log Table */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden relative">
-        {refreshing && (
-          <div className="h-0.5 w-full bg-orange-100 overflow-hidden">
-            <div className="h-full bg-orange-500 animate-pulse w-full" />
-          </div>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-gray-50/75 border-b border-gray-100 text-gray-500 uppercase text-[10px] tracking-wider font-semibold">
-              <tr>
-                <th className="px-4 py-3">Timestamp</th>
-                <th className="px-3 py-3">Severity & Status</th>
-                <th className="px-3 py-3">Event Action</th>
-                <th className="px-3 py-3">Actor</th>
-                <th className="px-3 py-3">Entity</th>
-                <th className="px-3 py-3">Origin IP</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <SkeletonAuditTableRow key={i} />
-                ))
-              ) : logs.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-16 px-4">
-                    <ShieldCheckIcon className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                    <p className="text-xs font-semibold text-gray-700">No matching audit logs found</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Try adjusting your filters, search term, or date range.</p>
-                  </td>
-                </tr>
-              ) : (
-                logs.map((log) => (
-                  <tr
-                    key={log.id}
-                    onClick={() => setSelectedLog(log)}
-                    className="hover:bg-gray-50/70 transition-colors cursor-pointer group"
-                  >
-                    {/* Timestamp */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="font-semibold text-gray-900">{timeAgo(log.created_at)}</p>
-                      <p className="text-[10px] text-gray-400">{formatFullDate(log.created_at)}</p>
-                    </td>
-
-                    {/* Severity & Status */}
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <SeverityBadge severity={log.severity} />
-                        <StatusBadge status={log.status} />
-                      </div>
-                    </td>
-
-                    {/* Action */}
-                    <td className="px-3 py-3">
-                      <p className="font-medium text-gray-800">{formatActionLabel(log.action)}</p>
-                      <span className="font-mono text-[10px] text-gray-400">{log.action}</span>
-                    </td>
-
-                    {/* Actor */}
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-2">
-                        <ActorAvatar
-                          name={log.actor_name}
-                          email={log.actor_email}
-                          role={log.actor_role}
-                          avatarUrl={log.actor_avatar}
-                          size="sm"
-                        />
-                        <div className="min-w-0">
-                          <p className="font-medium text-gray-900 truncate max-w-[140px]">
-                            {log.actor_name || log.actor_email || 'System'}
-                          </p>
-                          <RoleBadge role={log.actor_role} />
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Entity */}
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <span className="font-semibold text-gray-700">{log.entity || '—'}</span>
-                      {log.entity_id && (
-                        <span className="block font-mono text-[10px] text-gray-400 truncate max-w-[120px]">
-                          #{log.entity_id.slice(0, 8)}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Origin IP */}
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <span className="font-mono text-[11px] bg-gray-50 border border-gray-100 px-1.5 py-0.5 rounded text-gray-600">
-                        {log.ip_address || '127.0.0.1'}
-                      </span>
-                    </td>
-
-                    {/* Inspect button */}
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedLog(log);
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-md transition-colors"
-                      >
-                        <EyeIcon className="w-3.5 h-3.5" />
-                        Inspect
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Footer */}
-        {!loading && logs.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50 text-xs">
-            <span className="text-gray-500">
-              Showing <strong className="text-gray-900">{(page - 1) * limit + 1}</strong> to{' '}
-              <strong className="text-gray-900">{Math.min(page * limit, totalCount)}</strong> of{' '}
-              <strong className="text-gray-900">{totalCount.toLocaleString()}</strong> events
-            </span>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-md bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      {/* Audit Log or Security Incidents Table */}
+      {category === 'incidents' ? (
+        <div className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 bg-red-50/20">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <ShieldExclamationIcon className="w-4 h-4 text-red-500" />
+                Reported Security Incidents (Rule 6)
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Investigate user-reported suspicious logins, credential leaks, and unauthorized access attempts.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={incidentStatusFilter}
+                onChange={(e) => setIncidentStatusFilter(e.target.value)}
+                className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
               >
-                Previous
-              </button>
-              <span className="px-2 text-xs text-gray-500">
-                Page {page} of {totalPages}
-              </span>
+                <option value="all">All Incidents</option>
+                <option value="open">Open</option>
+                <option value="investigating">Investigating</option>
+                <option value="resolved">Resolved</option>
+                <option value="dismissed">Dismissed</option>
+              </select>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-md bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                onClick={loadIncidents}
+                disabled={loadingIncidents}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
               >
-                Next
+                <ArrowPathIcon className={`w-3.5 h-3.5 ${loadingIncidents ? 'animate-spin text-orange-500' : ''}`} />
+                Refresh
               </button>
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-50/75 border-b border-gray-100 text-gray-500 uppercase text-[10px] tracking-wider font-semibold">
+                <tr>
+                  <th className="px-4 py-3">Reported At</th>
+                  <th className="px-3 py-3">Type</th>
+                  <th className="px-3 py-3">Severity</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Reporter</th>
+                  <th className="px-3 py-3">Description</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loadingIncidents ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-12 text-gray-400">
+                      Loading security incidents...
+                    </td>
+                  </tr>
+                ) : incidents.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-12 text-gray-400">
+                      <ShieldCheckIcon className="w-8 h-8 text-emerald-400 mx-auto mb-1.5" />
+                      <p className="font-semibold text-gray-700">No security incidents reported</p>
+                      <p className="text-[11px] text-gray-400">All alumni accounts currently secure.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  incidents.map((inc) => (
+                    <tr
+                      key={inc.id}
+                      onClick={() => {
+                        setSelectedIncident(inc);
+                        setResolvingStatus(inc.status || 'resolved');
+                        setResolvingNotes(inc.admin_notes || '');
+                      }}
+                      className="hover:bg-gray-50/70 transition-colors cursor-pointer"
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-900 font-medium">
+                        {timeAgo(inc.created_at)}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap font-semibold text-gray-800">
+                        {inc.incident_type?.replace(/_/g, ' ')}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                            inc.severity === 'critical'
+                              ? 'bg-red-100 text-red-700'
+                              : inc.severity === 'high'
+                              ? 'bg-orange-100 text-orange-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}
+                        >
+                          {inc.severity}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                            inc.status === 'resolved'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : inc.status === 'investigating'
+                              ? 'bg-blue-100 text-blue-700'
+                              : inc.status === 'dismissed'
+                              ? 'bg-gray-100 text-gray-600'
+                              : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {inc.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-gray-600">
+                        {inc.reporter ? `${inc.reporter.first_name || ''} ${inc.reporter.last_name || ''} (${inc.reporter.email || ''})` : 'User'}
+                      </td>
+                      <td className="px-3 py-3 max-w-xs truncate text-gray-500">
+                        {inc.description}
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedIncident(inc);
+                            setResolvingStatus(inc.status || 'resolved');
+                            setResolvingNotes(inc.admin_notes || '');
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-md transition-colors"
+                        >
+                          Manage
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden relative">
+          {refreshing && (
+            <div className="h-0.5 w-full bg-orange-100 overflow-hidden">
+              <div className="h-full bg-orange-500 animate-pulse w-full" />
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-50/75 border-b border-gray-100 text-gray-500 uppercase text-[10px] tracking-wider font-semibold">
+                <tr>
+                  <th className="px-4 py-3">Timestamp</th>
+                  <th className="px-3 py-3">Severity & Status</th>
+                  <th className="px-3 py-3">Event Action</th>
+                  <th className="px-3 py-3">Actor</th>
+                  <th className="px-3 py-3">Entity</th>
+                  <th className="px-3 py-3">Origin IP</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <SkeletonAuditTableRow key={i} />
+                  ))
+                ) : logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-16 px-4">
+                      <ShieldCheckIcon className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-gray-700">No matching audit logs found</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Try adjusting your filters, search term, or date range.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  logs.map((log) => (
+                    <tr
+                      key={log.id}
+                      onClick={() => setSelectedLog(log)}
+                      className="hover:bg-gray-50/70 transition-colors cursor-pointer group"
+                    >
+                      {/* Timestamp */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <p className="font-semibold text-gray-900">{timeAgo(log.created_at)}</p>
+                        <p className="text-[10px] text-gray-400">{formatFullDate(log.created_at)}</p>
+                      </td>
+
+                      {/* Severity & Status */}
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <SeverityBadge severity={log.severity} />
+                          <StatusBadge status={log.status} />
+                        </div>
+                      </td>
+
+                      {/* Action */}
+                      <td className="px-3 py-3">
+                        <p className="font-medium text-gray-800">{formatActionLabel(log.action)}</p>
+                        <span className="font-mono text-[10px] text-gray-400">{log.action}</span>
+                      </td>
+
+                      {/* Actor */}
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2">
+                          <ActorAvatar
+                            name={log.actor_name}
+                            email={log.actor_email}
+                            role={log.actor_role}
+                            avatarUrl={log.actor_avatar}
+                            size="sm"
+                          />
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900 truncate max-w-[140px]">
+                              {log.actor_name || log.actor_email || 'System'}
+                            </p>
+                            <RoleBadge role={log.actor_role} />
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Entity */}
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span className="font-semibold text-gray-700">{log.entity || '—'}</span>
+                        {log.entity_id && (
+                          <span className="block font-mono text-[10px] text-gray-400 truncate max-w-[120px]">
+                            #{log.entity_id.slice(0, 8)}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Origin IP */}
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span className="font-mono text-[11px] bg-gray-50 border border-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+                          {log.ip_address || '127.0.0.1'}
+                        </span>
+                      </td>
+
+                      {/* Inspect button */}
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedLog(log);
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-md transition-colors"
+                        >
+                          <EyeIcon className="w-3.5 h-3.5" />
+                          Inspect
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Footer */}
+          {!loading && logs.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50 text-xs">
+              <span className="text-gray-500">
+                Showing <strong className="text-gray-900">{(page - 1) * limit + 1}</strong> to{' '}
+                <strong className="text-gray-900">{Math.min(page * limit, totalCount)}</strong> of{' '}
+                <strong className="text-gray-900">{totalCount.toLocaleString()}</strong> events
+              </span>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-md bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="px-2 text-xs text-gray-500">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-md bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Incident Resolution Modal (Rule 6) */}
+      {selectedIncident && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <ShieldExclamationIcon className="w-5 h-5 text-red-600" />
+                Security Incident Resolution
+              </h3>
+              <button
+                onClick={() => setSelectedIncident(null)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-xl">
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase">Incident Type</span>
+                  <span className="font-semibold text-gray-900">{selectedIncident.incident_type?.replace(/_/g, ' ')}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase">Reported By</span>
+                  <span className="font-semibold text-gray-900">
+                    {selectedIncident.reporter ? `${selectedIncident.reporter.email}` : 'Authenticated User'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase">Origin IP</span>
+                  <span className="font-mono text-gray-700">{selectedIncident.ip_address || 'unknown'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase">Reported At</span>
+                  <span className="text-gray-700">{new Date(selectedIncident.created_at).toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-gray-500 font-semibold block mb-1">Incident Report:</span>
+                <p className="p-3 bg-red-50/30 border border-red-100 rounded-xl text-gray-800 text-xs leading-relaxed">
+                  {selectedIncident.description}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-gray-700 font-semibold block mb-1">Status:</label>
+                <select
+                  value={resolvingStatus}
+                  onChange={(e) => setResolvingStatus(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-white text-xs"
+                >
+                  <option value="open">Open</option>
+                  <option value="investigating">Investigating</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="dismissed">Dismissed</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-gray-700 font-semibold block mb-1">Admin Investigation &amp; Resolution Notes:</label>
+                <textarea
+                  value={resolvingNotes}
+                  onChange={(e) => setResolvingNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Record action taken (e.g. forced password reset, session revoked, or false alarm)..."
+                  className="w-full border border-gray-200 rounded-xl p-3 bg-white text-xs focus:ring-2 focus:ring-orange-500/20"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+              <button
+                onClick={() => setSelectedIncident(null)}
+                className="px-3.5 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-xl"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleUpdateIncident}
+                disabled={updatingIncident}
+                className="px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-2xs cursor-pointer disabled:opacity-50"
+              >
+                {updatingIncident ? 'Saving...' : 'Save Resolution'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detailed Inspection Modal */}
       {selectedLog && <AuditDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />}

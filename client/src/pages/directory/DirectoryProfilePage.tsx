@@ -223,42 +223,51 @@ export default function DirectoryProfilePage() {
             <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs lg:flex-1 flex flex-col">
               <SectionTitle icon={BuildingOfficeIcon} title="Employment History" />
               <div className="overflow-x-auto mt-2 flex-1">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-gray-100 text-gray-400 uppercase tracking-wider text-[10px]">
-                      <th className="text-left py-2.5 pr-3 font-semibold">Industry</th>
-                      <th className="text-left py-2.5 pr-3 font-semibold">Company</th>
-                      <th className="text-left py-2.5 pr-3 font-semibold">Position</th>
-                      <th className="text-left py-2.5 pr-3 font-semibold">Type</th>
-                      <th className="text-left py-2.5 pr-3 font-semibold">Salary</th>
-                      <th className="text-left py-2.5 pr-3 font-semibold">Started</th>
-                      <th className="text-left py-2.5 font-semibold">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {profile.employment.map((emp: any, i: number) => (
-                      <tr key={i} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="py-2.5 pr-3 text-gray-600">{emp.company_industry || '—'}</td>
-                        <td className="py-2.5 pr-3 font-semibold text-gray-800">{emp.company_name}</td>
-                        <td className="py-2.5 pr-3 font-medium text-gray-700">{emp.position}</td>
-                        <td className="py-2.5 pr-3 text-gray-600">
-                          <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase">
-                            {emp.job_type || '—'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 pr-3 text-gray-500 font-medium">{emp.salary_range ? `₱${emp.salary_range}` : '—'}</td>
-                        <td className="py-2.5 pr-3 text-gray-500">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}</td>
-                        <td className="py-2.5">
-                          {emp.is_current ? (
-                            <span className="text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full text-[10px] font-semibold">Current</span>
-                          ) : (
-                            <span className="text-gray-400 text-[10px]">Past</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {(() => {
+                  const showSalaryColumn = profile.employment.some((e: any) => Boolean(e.salary_range));
+                  return (
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-gray-400 uppercase tracking-wider text-[10px]">
+                          <th className="text-left py-2.5 pr-3 font-semibold">Industry</th>
+                          <th className="text-left py-2.5 pr-3 font-semibold">Company</th>
+                          <th className="text-left py-2.5 pr-3 font-semibold">Position</th>
+                          <th className="text-left py-2.5 pr-3 font-semibold">Type</th>
+                          {showSalaryColumn && <th className="text-left py-2.5 pr-3 font-semibold">Salary</th>}
+                          <th className="text-left py-2.5 pr-3 font-semibold">Started</th>
+                          <th className="text-left py-2.5 font-semibold">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {profile.employment.map((emp: any, i: number) => (
+                          <tr key={i} className="hover:bg-gray-50/70 transition-colors">
+                            <td className="py-2.5 pr-3 text-gray-600">{emp.company_industry || '—'}</td>
+                            <td className="py-2.5 pr-3 font-semibold text-gray-800">{emp.company_name}</td>
+                            <td className="py-2.5 pr-3 font-medium text-gray-700">{emp.position}</td>
+                            <td className="py-2.5 pr-3 text-gray-600">
+                              <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase">
+                                {emp.job_type || '—'}
+                              </span>
+                            </td>
+                            {showSalaryColumn && (
+                              <td className="py-2.5 pr-3 text-gray-500 font-medium">
+                                {emp.salary_range ? `₱${emp.salary_range}` : '—'}
+                              </td>
+                            )}
+                            <td className="py-2.5 pr-3 text-gray-500">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}</td>
+                            <td className="py-2.5">
+                              {emp.is_current ? (
+                                <span className="text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full text-[10px] font-semibold">Current</span>
+                              ) : (
+                                <span className="text-gray-400 text-[10px]">Past</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
               </div>
             </div>
           )}

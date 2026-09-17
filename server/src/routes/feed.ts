@@ -195,11 +195,15 @@ router.delete('/comments/:id', authenticate, async (req: AuthenticatedRequest, r
   try {
     const { data: comment, error: findError } = await supabase
       .from('feed_post_comments')
-      .select('id, post_id')
+      .select('id, post_id, user_id')
       .eq('id', req.params.id)
       .single();
 
     if (findError || !comment) throw new AppError('Comment not found', 404);
+
+    if (comment.user_id !== req.user!.userId && req.user!.role !== 'admin') {
+      throw new AppError('Unauthorized: Users may only manage their own comments and information.', 403);
+    }
 
     const { error } = await supabase
       .from('feed_post_comments')
@@ -207,6 +211,18 @@ router.delete('/comments/:id', authenticate, async (req: AuthenticatedRequest, r
       .eq('id', req.params.id);
 
     if (error) throw new AppError(error.message, 500);
+
+    // Decrement comment count on the post
+    if (comment.post_id) {
+      const { data: curr } = await supabase
+        .from('feed_posts')
+        .select('comment_count')
+        .eq('id', comment.post_id)
+        .single();
+      await supabase.from('feed_posts')
+        .update({ comment_count: Math.max(0, (curr?.comment_count || 1) - 1) })
+        .eq('id', comment.post_id);
+    }
 
     res.json({ message: 'Comment deleted' });
   } catch (err) { next(err); }

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { User } from '@/types';
+import { authApi } from '@/services/api';
 
 const STORAGE_KEY = 'access_token';
 
@@ -20,7 +21,7 @@ interface AuthState {
   setUser: (user: User & { role: 'admin' | 'staff' | 'alumni' }) => void;
   setToken: (token: string, persist?: boolean) => void;
   setLoading: (loading: boolean) => void;
-  logout: () => void;
+  logout: (allDevices?: boolean) => Promise<void>;
   syncToken: () => boolean;
 }
 
@@ -34,9 +35,18 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ token });
   },
   setLoading: (loading) => set({ loading }),
-  logout: () => {
-    removeStoredToken();
-    set({ user: null, token: null });
+  logout: async (allDevices = false) => {
+    try {
+      const token = getStoredToken();
+      if (token) {
+        await authApi.logout(allDevices);
+      }
+    } catch (err) {
+      console.warn('[authStore] Backend logout notification failed (local session cleared):', err);
+    } finally {
+      removeStoredToken();
+      set({ user: null, token: null });
+    }
   },
   syncToken: () => {
     const stored = getStoredToken();

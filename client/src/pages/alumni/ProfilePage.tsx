@@ -5,19 +5,22 @@ import {
   AcademicCapIcon, CheckBadgeIcon, UserIcon, ClockIcon,
   BuildingOfficeIcon, ChartBarIcon, LinkIcon, CalendarDaysIcon,
   TrophyIcon, ArrowTrendingUpIcon, UserCircleIcon, XMarkIcon,
-  LockClosedIcon
+  LockClosedIcon, ShieldCheckIcon, ShieldExclamationIcon, InformationCircleIcon
 } from '@heroicons/react/24/outline';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { playTing } from '@/utils/helpers';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
 import { formatProgramLongName } from '@/utils/formatProgram';
 import { useUIStore } from '@/store/uiStore';
+import { clearTrustedDeviceToken } from '@/utils/device';
+import { isPasswordStrong, checkPasswordCriteria } from '@/utils/validation';
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: UserIcon },
   { id: 'career', label: 'Career', icon: ArrowTrendingUpIcon },
   { id: 'education', label: 'Education', icon: AcademicCapIcon },
   { id: 'history', label: 'History', icon: ClockIcon },
+  { id: 'privacy', label: 'Privacy & Policies', icon: ShieldCheckIcon },
 ];
 
 function calcYears(startDate: string): number {
@@ -86,7 +89,7 @@ export default function ProfilePage() {
   const [showAchievementForm, setShowAchievementForm] = useState(false);
   const [certForm, setCertForm] = useState<any>({ name: '', issuer: '', issue_date: '', expiry_date: '', credential_url: '' });
   const [achievementForm, setAchievementForm] = useState<any>({ title: '', description: '', category: 'other', date_achieved: '' });
-  const [editSection, setEditSection] = useState<'personal' | 'security'>('personal');
+  const [editSection, setEditSection] = useState<'personal' | 'security' | 'privacy'>('personal');
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaOtp, setMfaOtp] = useState('');
@@ -131,6 +134,16 @@ export default function ProfilePage() {
         }
       } catch {}
       if (data) {
+        const defaultPrivacy = {
+          show_email: false,
+          show_phone: false,
+          show_address: false,
+          show_employment: true,
+        };
+        const parsedPrivacy = (typeof data.privacy_settings === 'string'
+          ? JSON.parse(data.privacy_settings)
+          : data.privacy_settings) || defaultPrivacy;
+
         setForm({
           first_name: data.first_name || '',
           last_name: data.last_name || '',
@@ -146,6 +159,7 @@ export default function ProfilePage() {
           industry: data.industry || '',
           salary_range: currentSalary,
           job_type: currentJobType,
+          privacy_settings: parsedPrivacy,
         });
       }
       setError('');
@@ -179,6 +193,7 @@ export default function ProfilePage() {
       if (form.city !== undefined) payload.city = form.city;
       if (form.province !== undefined) payload.province = form.province;
       if (form.bio !== undefined) payload.bio = form.bio;
+      if (form.privacy_settings !== undefined) payload.privacy_settings = form.privacy_settings;
       // Note: Employment fields are verified & locked. They automatically update when hired for a job.
       const updated = await profileApi.update(payload);
       await profileApi.batchSkills(editSkills.map((name: string) => ({ name })));
@@ -215,8 +230,8 @@ export default function ProfilePage() {
       setError('Passwords do not match');
       return;
     }
-    if (passwordForm.newPassword.length < 6) {
-      setError('New password must be at least 6 characters');
+    if (!isPasswordStrong(passwordForm.newPassword)) {
+      setError('New password must meet strong password requirements: at least 8 characters, uppercase, lowercase, number, and special character');
       return;
     }
     try {
@@ -225,8 +240,25 @@ export default function ProfilePage() {
       await authApi.changePassword(passwordForm.currentPassword, passwordForm.newPassword);
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setEditSection('personal');
+      useUIStore.getState().addNotification('Password updated successfully', 'success');
     } catch (err: any) {
       setError(err.message || 'Failed to change password');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSavePrivacySettings = async (newPrivacy: any) => {
+    try {
+      setSaving(true);
+      setError('');
+      await profileApi.update({ privacy_settings: newPrivacy });
+      setProfile((prev: any) => ({ ...prev, privacy_settings: newPrivacy }));
+      setForm((prev: any) => ({ ...prev, privacy_settings: newPrivacy }));
+      useUIStore.getState().addNotification('Privacy settings saved successfully', 'success');
+      playTing();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update privacy settings');
     } finally {
       setSaving(false);
     }
@@ -285,9 +317,24 @@ export default function ProfilePage() {
     setMfaLoading(true);
     try {
       await authApi.disableMfa();
+      clearTrustedDeviceToken(profile?.email || '');
       setMfaEnabled(false);
     } catch (err: any) {
       setError(err.message || 'Failed to disable MFA');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleRevokeDevices = async () => {
+    setError('');
+    setMfaLoading(true);
+    try {
+      await authApi.revokeTrustedDevices();
+      clearTrustedDeviceToken(profile?.email || '');
+      setError('All recognized devices have been cleared. MFA will be required on your next login.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to revoke devices');
     } finally {
       setMfaLoading(false);
     }
@@ -549,6 +596,17 @@ export default function ProfilePage() {
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                 Security &amp; Password
               </button>
+              <button
+                onClick={() => setEditSection('privacy')}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                  editSection === 'privacy'
+                    ? 'bg-orange-600 text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
+                }`}
+              >
+                <ShieldCheckIcon className="w-4 h-4" />
+                Privacy &amp; Data Protection
+              </button>
             </div>
 
             {/* Form Content */}
@@ -757,7 +815,7 @@ export default function ProfilePage() {
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : editSection === 'security' ? (
                 <div className="space-y-6">
                   {/* Change Password */}
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
@@ -813,17 +871,30 @@ export default function ProfilePage() {
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
                     <SectionLine label="Two-Factor Authentication (MFA)" />
                     <p className="text-xs text-gray-500 mb-3 max-w-md">
-                      Adding MFA requires a one-time verification code to be entered on every sign-in after your password.
+                      Adding MFA protects your account by requiring a verification code when signing in from an unrecognized device.
                     </p>
                     {mfaEnabled ? (
-                      <div className="flex items-center justify-between max-w-md">
-                        <div>
-                          <p className="text-sm font-medium text-green-700">MFA is enabled</p>
-                          <p className="text-xs text-gray-500">A verification code will be required at sign-in.</p>
+                      <div className="space-y-3 max-w-md">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-green-700">MFA is enabled</p>
+                            <p className="text-xs text-gray-500">Recognized devices sign in directly. A code is only required on new devices.</p>
+                          </div>
+                          <button onClick={handleDisableMfa} disabled={mfaLoading} className="px-4 py-2 border border-gray-200 bg-white text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs">
+                            {mfaLoading ? 'Disabling...' : 'Disable MFA'}
+                          </button>
                         </div>
-                        <button onClick={handleDisableMfa} disabled={mfaLoading} className="px-4 py-2 border border-gray-200 bg-white text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs">
-                          {mfaLoading ? 'Disabling...' : 'Disable MFA'}
-                        </button>
+                        <div className="pt-2 border-t border-gray-200/60 flex items-center justify-between">
+                          <p className="text-xs text-gray-500">Need to reset remembered devices?</p>
+                          <button
+                            type="button"
+                            onClick={handleRevokeDevices}
+                            disabled={mfaLoading}
+                            className="text-xs text-orange-600 hover:text-orange-700 font-medium hover:underline disabled:opacity-50 cursor-pointer"
+                          >
+                            Revoke recognized devices
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="space-y-3 max-w-md">
@@ -843,6 +914,124 @@ export default function ProfilePage() {
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Privacy Settings in Modal */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                    <SectionLine label="Directory Visibility Preferences" />
+                    <p className="text-xs text-gray-500 mb-4">
+                      Control which information is visible to other registered alumni in the alumni directory.
+                    </p>
+                    <div className="space-y-3.5 divide-y divide-gray-200/70">
+                      <div className="flex items-center justify-between pt-1">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-800">Show Email Address</p>
+                          <p className="text-[11px] text-gray-500">Allow peer alumni in the directory to view your email</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setForm((prev: any) => ({
+                            ...prev,
+                            privacy_settings: {
+                              ...(prev.privacy_settings || {}),
+                              show_email: !prev.privacy_settings?.show_email,
+                            },
+                          }))}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                            form.privacy_settings?.show_email ? 'bg-orange-600' : 'bg-gray-200'
+                          }`}
+                        >
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            form.privacy_settings?.show_email ? 'translate-x-4' : 'translate-x-0'
+                          }`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-800">Show Phone Number</p>
+                          <p className="text-[11px] text-gray-500">Allow peer alumni in the directory to view your phone number</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setForm((prev: any) => ({
+                            ...prev,
+                            privacy_settings: {
+                              ...(prev.privacy_settings || {}),
+                              show_phone: !prev.privacy_settings?.show_phone,
+                            },
+                          }))}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                            form.privacy_settings?.show_phone ? 'bg-orange-600' : 'bg-gray-200'
+                          }`}
+                        >
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            form.privacy_settings?.show_phone ? 'translate-x-4' : 'translate-x-0'
+                          }`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-800">Show Home Address</p>
+                          <p className="text-[11px] text-gray-500">Allow peer alumni in the directory to view your street address</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setForm((prev: any) => ({
+                            ...prev,
+                            privacy_settings: {
+                              ...(prev.privacy_settings || {}),
+                              show_address: !prev.privacy_settings?.show_address,
+                            },
+                          }))}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                            form.privacy_settings?.show_address ? 'bg-orange-600' : 'bg-gray-200'
+                          }`}
+                        >
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            form.privacy_settings?.show_address ? 'translate-x-4' : 'translate-x-0'
+                          }`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-800">Show Employment History</p>
+                          <p className="text-[11px] text-gray-500">Display company and job titles (salary is always redacted)</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setForm((prev: any) => ({
+                            ...prev,
+                            privacy_settings: {
+                              ...(prev.privacy_settings || {}),
+                              show_employment: !prev.privacy_settings?.show_employment,
+                            },
+                          }))}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                            form.privacy_settings?.show_employment !== false ? 'bg-orange-600' : 'bg-gray-200'
+                          }`}
+                        >
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            form.privacy_settings?.show_employment !== false ? 'translate-x-4' : 'translate-x-0'
+                          }`} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 pt-3 border-t border-gray-200 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        {saving ? 'Saving...' : 'Save Privacy Changes'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1116,12 +1305,217 @@ export default function ProfilePage() {
     </div>
   );
 
+  const renderPrivacy = () => {
+    const defaultPrivacy = {
+      show_email: false,
+      show_phone: false,
+      show_address: false,
+      show_employment: true,
+    };
+    const currentPrivacy = (typeof profile?.privacy_settings === 'string'
+      ? JSON.parse(profile.privacy_settings)
+      : profile?.privacy_settings) || defaultPrivacy;
+
+    const privacyForm = form.privacy_settings || currentPrivacy;
+
+    const updatePrivacyKey = (key: string, value: boolean) => {
+      const updated = { ...privacyForm, [key]: value };
+      setForm((prev: any) => ({ ...prev, privacy_settings: updated }));
+    };
+
+    return (
+      <div className="max-w-3xl space-y-6">
+        {/* Rule 2 & Rule 3 Protection Banner */}
+        <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 rounded-2xl p-6 text-white shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+              <ShieldCheckIcon className="w-7 h-7" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold">Authorized Access &amp; Information Protection</h2>
+                <span className="bg-white/20 text-white text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full backdrop-blur-xs">
+                  Active Protection
+                </span>
+              </div>
+              <p className="text-xs text-orange-100 mt-1 leading-relaxed">
+                Your alumni records are protected by strict role-based access control and confidentiality policies.
+                Only authorized actions allowed by your account role may be performed.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Authorized Access Card */}
+        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
+          <div className="flex items-center justify-between mb-3">
+            <SectionLine label="Authorized Access" />
+            <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              Role Enforced
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+            Users may only access information allowed by their account role. Unsecured alumni records are strictly prevented from exposure to unauthorized individuals.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="flex items-center gap-2 mb-1.5 text-xs font-semibold text-gray-800">
+                <UserIcon className="w-4 h-4 text-orange-500" />
+                Alumni Self-Management
+              </div>
+              <p className="text-[11px] text-gray-500 leading-normal">
+                Alumni should only manage their own profile and information. Cross-account access attempts are strictly blocked and audited.
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="flex items-center gap-2 mb-1.5 text-xs font-semibold text-gray-800">
+                <ShieldCheckIcon className="w-4 h-4 text-blue-500" />
+                Administrative Responsibilities
+              </div>
+              <p className="text-[11px] text-gray-500 leading-normal">
+                Administrators may access and manage alumni records according to their administrative responsibilities and institutional duties.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Protection of Alumni Information Card */}
+        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
+          <div className="flex items-center justify-between mb-3">
+            <SectionLine label="Protection of Alumni Information" />
+            <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+              Centralized &amp; Secure
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+            Personal and career information is centralized and handled responsibly across the 6 core pillars:
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {[
+              { label: 'Personal Information', desc: 'Name, birthdate, gender, civil status & verified identity.' },
+              { label: 'Contact Information', desc: 'Email address, phone number & residential address.' },
+              { label: 'Educational Background', desc: 'Degree program, graduation year, campus & honors.' },
+              { label: 'Employment Information', desc: 'Current job, employer, work status & industry.' },
+              { label: 'Career History', desc: 'Past employment timeline (salary data strictly redacted).' },
+              { label: 'Survey & Tracer Responses', desc: 'Graduate tracer responses & curriculum feedback.' },
+            ].map((item, i) => (
+              <div key={i} className="p-3 bg-gray-50/60 rounded-xl border border-gray-100 flex flex-col justify-between">
+                <span className="text-xs font-semibold text-gray-800">{item.label}</span>
+                <span className="text-[11px] text-gray-500 mt-1 leading-snug">{item.desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Directory Privacy Settings */}
+        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <SectionLine label="Directory Visibility Preferences" />
+          </div>
+          <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+            Choose what other registered alumni can view on your public directory profile. Note that sensitive details (salary range and student ID) are always strictly protected and never displayed to other alumni.
+          </p>
+
+          <div className="space-y-3.5 divide-y divide-gray-100">
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Show Email Address</p>
+                <p className="text-[11px] text-gray-500">Allow peer alumni in the directory to see your email address</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => updatePrivacyKey('show_email', !privacyForm.show_email)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                  privacyForm.show_email ? 'bg-orange-600' : 'bg-gray-200'
+                }`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                  privacyForm.show_email ? 'translate-x-4' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between pt-3">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Show Phone Number</p>
+                <p className="text-[11px] text-gray-500">Allow peer alumni in the directory to see your phone number</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => updatePrivacyKey('show_phone', !privacyForm.show_phone)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                  privacyForm.show_phone ? 'bg-orange-600' : 'bg-gray-200'
+                }`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                  privacyForm.show_phone ? 'translate-x-4' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between pt-3">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Show Home Address</p>
+                <p className="text-[11px] text-gray-500">Allow peer alumni in the directory to see your street address</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => updatePrivacyKey('show_address', !privacyForm.show_address)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                  privacyForm.show_address ? 'bg-orange-600' : 'bg-gray-200'
+                }`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                  privacyForm.show_address ? 'translate-x-4' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between pt-3">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Show Employment History</p>
+                <p className="text-[11px] text-gray-500">Display your company and job titles (compensation and salary are always redacted)</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => updatePrivacyKey('show_employment', !privacyForm.show_employment)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                  privacyForm.show_employment !== false ? 'bg-orange-600' : 'bg-gray-200'
+                }`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                  privacyForm.show_employment !== false ? 'translate-x-4' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
+            <span className="text-[11px] text-gray-400">Updates apply immediately across all directory queries</span>
+            <button
+              type="button"
+              onClick={() => handleSavePrivacySettings(privacyForm)}
+              disabled={saving}
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer"
+            >
+              {saving ? 'Saving...' : 'Save Privacy Preferences'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview': return renderOverview();
       case 'career': return renderCareer();
       case 'education': return renderEducation();
       case 'history': return renderHistory();
+      case 'privacy': return renderPrivacy();
       default: return null;
     }
   };

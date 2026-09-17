@@ -250,6 +250,20 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       return new Date(b.start_date || 0).getTime() - new Date(a.start_date || 0).getTime();
     });
 
+    const isOwnerOrAdmin = profile.user_id === req.user!.userId || req.user!.role === 'admin';
+
+    // Rule 3 – Protection of Alumni Information: Redact sensitive salary information for peer views
+    // and respect the alumnus's privacy preference for employment history.
+    let sanitizedEmployment: any[] = [];
+    if (isOwnerOrAdmin || privacy.show_employment !== false) {
+      sanitizedEmployment = (employment || []).map((emp: any) => {
+        if (isOwnerOrAdmin) return emp;
+        // Sensitive financial/career compensation details must not be exposed to other alumni
+        const { salary_range: _omitted, ...safeEmp } = emp;
+        return safeEmp;
+      });
+    }
+
     const result: any = {
       id: profile.id,
       user_id: profile.user_id,
@@ -275,15 +289,19 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       education: profile.education || [],
       skills: profile.skills || [],
       certifications: profile.certifications || [],
-      employment,
+      employment: sanitizedEmployment,
       achievements: achievementsRes.data || [],
       career_feedback: feedbackRes.data || null,
     };
 
-    if (privacy.show_email) result.email = profile.email;
-    if (privacy.show_phone) result.phone = profile.phone;
-    if (privacy.show_address) {
+    // Contact information protection: only expose if user opted in or requester is owner/admin
+    if (isOwnerOrAdmin || privacy.show_email) result.email = profile.email;
+    if (isOwnerOrAdmin || privacy.show_phone) result.phone = profile.phone;
+    if (isOwnerOrAdmin || privacy.show_address) {
       result.address = profile.address;
+    }
+    if (isOwnerOrAdmin) {
+      result.privacy_settings = privacy;
     }
 
     const { data: currentProfile } = await db

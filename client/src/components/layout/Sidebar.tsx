@@ -36,8 +36,8 @@ const resourcesNav: NavItem[] = [
   { name: 'Announcements', href: '/announcements', icon: MegaphoneIcon },
   { name: 'Events', href: '/events', icon: CalendarDaysIcon },
   { name: 'Graduate Tracer Survey', href: '/tracer-survey', icon: DocumentTextIcon },
-  { name: 'CTU Official Links', href: '/cefi-links', icon: LinkIcon },
-  { name: 'Help & FAQ', href: '/help', icon: QuestionMarkCircleIcon },
+  { name: 'CTU Official Links', href: '/links', icon: LinkIcon },
+  { name: 'Help & FAQ', href: '/support', icon: QuestionMarkCircleIcon },
 ];
 
 const adminNav: NavItem[] = [

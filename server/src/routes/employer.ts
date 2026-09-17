@@ -1,15 +1,16 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase';
 import { AppError } from '../middleware/errorHandler';
+import { authenticate, authorize } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
 
 const router = Router();
 
 /**
  * GET /api/employer/dashboard
- * Read-only metrics & shortlisted candidates for employers.
+ * Metrics & shortlisted candidates for administrative management.
  */
-router.get('/dashboard', async (req: AuthenticatedRequest, res, next) => {
+router.get('/dashboard', authenticate, authorize('admin', 'staff'), async (req: AuthenticatedRequest, res, next) => {
   try {
     const employerId = (req.query.employer_id as string) || '';
 
@@ -117,7 +118,7 @@ router.get('/dashboard', async (req: AuthenticatedRequest, res, next) => {
  * GET /api/employer/reports/:jobId
  * Download Screening Report for shortlisted applicants.
  */
-router.get('/reports/:jobId', async (req: AuthenticatedRequest, res, next) => {
+router.get('/reports/:jobId', authenticate, authorize('admin', 'staff'), async (req: AuthenticatedRequest, res, next) => {
   try {
     const jobId = req.params.jobId;
 

@@ -185,6 +185,12 @@ router.get('/export', async (req, res, next) => {
       }));
       const headers = Object.keys(rows[0] || {}).join(',');
       const csv = rows.map((r: any) => Object.values(r).map((v: any) => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const dpaNotice = 
+        '# -----------------------------------------------------------------------------\n' +
+        '# CONFIDENTIALITY & DATA PRIVACY NOTICE (RULE 5 & REPUBLIC ACT NO. 10173)\n' +
+        '# CTU-Naga Alumni Connect — Exported Alumni Personal Data\n' +
+        '# Unauthorized disclosure, copying, or distribution is strictly prohibited.\n' +
+        '# -----------------------------------------------------------------------------\n';
 
       logAudit(req, {
         action: 'ALUMNI_DATA_EXPORTED',
@@ -194,9 +200,21 @@ router.get('/export', async (req, res, next) => {
         details: { count: rows.length, format: 'csv' },
       });
 
+      if ((req as any).user?.userId) {
+        await supabase.from('report_exports').insert({
+          user_id: (req as any).user.userId,
+          report_name: 'Alumni Directory Export',
+          report_type: 'alumni_export',
+          format: 'csv',
+          record_count: rows.length,
+          ip_address: req.ip || 'unknown',
+          user_agent: req.headers['user-agent'] as string,
+        });
+      }
+
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename=alumni-export.csv');
-      return res.send(`${headers}\n${csv}`);
+      return res.send(`${dpaNotice}${headers}\n${csv}`);
     }
 
     logAudit(req, {
@@ -206,6 +224,18 @@ router.get('/export', async (req, res, next) => {
       status: 'success',
       details: { count: users.length, format: 'json' },
     });
+
+    if ((req as any).user?.userId) {
+      await supabase.from('report_exports').insert({
+        user_id: (req as any).user.userId,
+        report_name: 'Alumni Directory Export',
+        report_type: 'alumni_export',
+        format: 'json',
+        record_count: users.length,
+        ip_address: req.ip || 'unknown',
+        user_agent: req.headers['user-agent'] as string,
+      });
+    }
 
     res.json(users);
   } catch (err) {

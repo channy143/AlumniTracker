@@ -21,6 +21,7 @@ import EventsPage from '@/pages/events/EventsPage';
 import AnnouncementsPage from '@/pages/announcements/AnnouncementsPage';
 import JobsPage from '@/pages/jobs/JobsPage';
 import SurveyPage from '@/pages/survey/SurveyPage';
+import TracerSurveyPage from '@/pages/survey/TracerSurveyPage';
 import AlumniOnboardingSurveyPage from '@/pages/survey/AlumniOnboardingSurveyPage';
 import EmployerDashboard from '@/pages/employer/EmployerDashboard';
 
@@ -116,12 +117,16 @@ export default function App() {
         <Route path="directory" element={<DirectoryPage />} />
         <Route path="directory/:id" element={<DirectoryProfilePage />} />
         <Route path="links" element={<UsefulLinksPage />} />
+        <Route path="cefi-links" element={<Navigate to="/links" replace />} />
         <Route path="announcements" element={<AnnouncementsPage />} />
         <Route path="jobs" element={<JobsPage />} />
         <Route path="employer/dashboard" element={<EmployerDashboard />} />
         <Route path="events" element={<EventsPage />} />
+        <Route path="tracer-survey" element={<TracerSurveyPage />} />
+        <Route path="surveys" element={<Navigate to="/tracer-survey" replace />} />
         <Route path="surveys/:id" element={<SurveyPage />} />
         <Route path="support" element={<SupportPage />} />
+        <Route path="help" element={<Navigate to="/support" replace />} />
 
       </Route>
 

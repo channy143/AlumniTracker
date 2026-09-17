@@ -1,45 +1,86 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ShieldCheckIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
+import { getOrCreateDeviceId, getTrustedDeviceToken, saveTrustedDeviceToken } from '@/utils/device';
+import FieldErrorAlert from '@/components/auth/FieldErrorAlert';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  // Field error states
+  const [hasError, setHasError] = useState(false);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+
+  // Rate limit cooldown state
+  const [rateLimitCooldown, setRateLimitCooldown] = useState(0);
 
   // MFA state
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaToken, setMfaToken] = useState('');
   const [otp, setOtp] = useState('');
   const [mfaSending, setMfaSending] = useState(false);
-  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [mfaCooldownSeconds, setMfaCooldownSeconds] = useState(0);
+  const [mfaError, setMfaError] = useState<string | null>(null);
 
   const { setUser, setToken } = useAuthStore();
   const navigate = useNavigate();
 
+  // Rate limit countdown effect
   useEffect(() => {
-    if (cooldownSeconds <= 0) return;
+    if (rateLimitCooldown <= 0) return;
     const timer = setInterval(() => {
-      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+      setRateLimitCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setHasError(false);
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(timer);
-  }, [cooldownSeconds]);
+  }, [rateLimitCooldown]);
+
+  // MFA resend cooldown effect
+  useEffect(() => {
+    if (mfaCooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setMfaCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [mfaCooldownSeconds]);
+
+  const clearCredentialsError = () => {
+    if (hasError) setHasError(false);
+    if (remainingAttempts !== null) setRemainingAttempts(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    clearCredentialsError();
+
+    if (rateLimitCooldown > 0) {
+      setHasError(true);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const res = await authApi.login(email, password);
+      const deviceId = getOrCreateDeviceId();
+      const deviceToken = getTrustedDeviceToken(email);
+
+      const res = await authApi.login(email, password, deviceId, deviceToken);
       if (res.requiresMfa) {
         setMfaToken(res.mfaToken || '');
         setMfaRequired(true);
-        setCooldownSeconds(30);
+        setMfaCooldownSeconds(30);
         setLoading(false);
         return;
       }
@@ -61,20 +102,36 @@ export default function LoginPage() {
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password.');
+      setHasError(true);
+      const cooldown = err.cooldownSeconds || (err.status === 429 ? 30 : 0);
+      if (cooldown > 0) {
+        setRateLimitCooldown(cooldown);
+      } else if (err.remainingAttempts !== undefined) {
+        setRemainingAttempts(err.remainingAttempts);
+      } else {
+        setRemainingAttempts(null);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const sendMfaCode = async () => {
+    if (mfaCooldownSeconds > 0) return;
+
     setMfaSending(true);
-    setError('');
+    setMfaError(null);
     try {
       await authApi.sendMfaCode(email, mfaToken);
-      setCooldownSeconds(30);
+      setMfaCooldownSeconds(30);
     } catch (err: any) {
-      setError(err.message || 'Failed to send verification code.');
+      const cooldown = err.cooldownSeconds || (err.status === 429 ? 30 : 0);
+      if (cooldown > 0) {
+        setMfaCooldownSeconds(cooldown);
+        setMfaError(`Please wait ${cooldown}s before requesting a new code.`);
+      } else {
+        setMfaError(err.message || 'Failed to send verification code.');
+      }
     } finally {
       setMfaSending(false);
     }
@@ -82,14 +139,27 @@ export default function LoginPage() {
 
   const handleMfaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    if (!otp || otp.length !== 6) {
-      setError('Please enter the 6-digit code.');
+    setMfaError(null);
+
+    if (rateLimitCooldown > 0) {
+      setMfaError(`Rate limit active. Please wait ${rateLimitCooldown}s before retrying.`);
       return;
     }
+
+    if (!otp || otp.length !== 6) {
+      setMfaError('Please enter the 6-digit code.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await authApi.mfaVerify(email, otp, mfaToken);
+      const deviceId = getOrCreateDeviceId();
+      const res = await authApi.mfaVerify(email, otp, mfaToken, deviceId);
+
+      if (res.trustedDeviceToken) {
+        saveTrustedDeviceToken(email, res.trustedDeviceToken);
+      }
+
       setToken(res.token!, rememberMe);
       const loggedUser = {
         id: res.user!.id,
@@ -108,7 +178,13 @@ export default function LoginPage() {
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.message || 'Invalid verification code.');
+      const cooldown = err.cooldownSeconds || (err.status === 429 ? 30 : 0);
+      if (cooldown > 0) {
+        setRateLimitCooldown(cooldown);
+        setMfaError(`Too many unsuccessful attempts. Please try again in ${cooldown}s.`);
+      } else {
+        setMfaError('Invalid verification code. Please check and try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -121,41 +197,58 @@ export default function LoginPage() {
           <ArrowLeftIcon className="w-5 h-5" />
         </Link>
         <h2 className="text-3xl font-bold text-ctu-charcoal mb-2">Two-Factor Authentication</h2>
-        <p className="text-gray-500 mb-8">Enter the code sent to your email to complete sign-in.</p>
+        <p className="text-gray-500 mb-6">Enter the code sent to your email to verify and remember this device.</p>
 
-        {error && (
-          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">{error}</div>
-        )}
+        <div className="flex items-start gap-2.5 bg-blue-50/70 border border-blue-200/70 text-blue-800 px-3.5 py-3 rounded-xl mb-6 text-xs leading-relaxed">
+          <ShieldCheckIcon className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+          <span>
+            <strong>First time on this device:</strong> Once verified, this device will be remembered so you won't need to enter a code on future logins from this browser.
+          </span>
+        </div>
 
         <form onSubmit={handleMfaSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">
+            <label className={`block text-sm font-medium mb-1.5 ${mfaError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
               Verification Code
             </label>
             <input
               type="text"
               value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="input-field text-center text-3xl tracking-[0.5em] font-mono"
+              onChange={(e) => {
+                setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
+                if (mfaError) setMfaError(null);
+              }}
+              className={`input-field text-center text-3xl tracking-[0.5em] font-mono ${
+                mfaError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''
+              }`}
               placeholder="000000"
               maxLength={6}
               required
               autoFocus
             />
+            <FieldErrorAlert message={mfaError} />
           </div>
 
-          <button type="submit" disabled={loading} className="btn-primary w-full">
-            {loading ? 'Verifying...' : 'Verify & Sign In'}
+          <button
+            type="submit"
+            disabled={loading || rateLimitCooldown > 0}
+            className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {loading
+              ? 'Verifying...'
+              : rateLimitCooldown > 0
+                ? `Rate Limited (${rateLimitCooldown}s)`
+                : 'Verify & Sign In'}
           </button>
 
           <button
             type="button"
             onClick={() => sendMfaCode()}
-            disabled={mfaSending || cooldownSeconds > 0}
+            disabled={mfaSending || mfaCooldownSeconds > 0}
             className="w-full text-sm text-ctu-blue hover:underline disabled:opacity-50 text-center"
           >
-            {cooldownSeconds > 0
-              ? `Resend code in ${cooldownSeconds}s`
+            {mfaCooldownSeconds > 0
+              ? `Resend code in ${mfaCooldownSeconds}s`
               : mfaSending
                 ? 'Sending...'
                 : 'Resend code'}
@@ -178,39 +271,80 @@ export default function LoginPage() {
       <h2 className="text-3xl font-bold text-ctu-charcoal mb-2">Welcome Back</h2>
       <p className="text-gray-500 mb-8">Sign in to your alumni account</p>
 
-      {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
-          {error}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Username / Email textfield with red highlight on error */}
         <div>
-          <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">
+          <label className={`block text-sm font-medium mb-1.5 ${hasError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
             Email Address
           </label>
           <input
             type="text"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="input-field"
+            onChange={(e) => {
+              setEmail(e.target.value);
+              clearCredentialsError();
+            }}
+            className={`input-field ${hasError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
             placeholder="alumni@ctu.edu.ph"
             required
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">
-            Password
+        {/* Password textfield with red highlight on error */}
+        <div className="group">
+          <label className={`block text-sm font-medium mb-1.5 ${hasError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+            Enter your password
           </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input-field"
-            placeholder="Enter your password"
-            required
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                clearCredentialsError();
+              }}
+              className={`input-field pr-11 ${hasError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+              placeholder="Enter your password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              onMouseDown={(e) => e.preventDefault()}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-ctu-blue p-1 rounded-lg hover:bg-gray-100/70 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+            </button>
+          </div>
+
+          {/* Under password field: exact message matching the user screenshot */}
+          {hasError && (
+            <FieldErrorAlert
+              message={
+                rateLimitCooldown > 0 ? (
+                  `Too many unsuccessful attempts. Please try again in ${rateLimitCooldown} seconds.`
+                ) : remainingAttempts !== null && remainingAttempts > 0 ? (
+                  <>
+                    Wrong password. Try again ({remainingAttempts} attempts remaining) or click{' '}
+                    <Link to="/auth/forgot-password" className="underline font-semibold hover:text-red-700 transition-colors">
+                      Forgot password
+                    </Link>{' '}
+                    to reset it.
+                  </>
+                ) : (
+                  <>
+                    Wrong password. Try again or click{' '}
+                    <Link to="/auth/forgot-password" className="underline font-semibold hover:text-red-700 transition-colors">
+                      Forgot password
+                    </Link>{' '}
+                    to reset it.
+                  </>
+                )
+              }
+            />
+          )}
         </div>
 
         <div className="flex items-center justify-between -mt-3">
@@ -228,8 +362,16 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <button type="submit" disabled={loading} className="btn-primary w-full">
-          {loading ? 'Signing in...' : 'Sign In'}
+        <button
+          type="submit"
+          disabled={loading || rateLimitCooldown > 0}
+          className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {loading
+            ? 'Signing in...'
+            : rateLimitCooldown > 0
+              ? `Rate Limited (Try again in ${rateLimitCooldown}s)`
+              : 'Sign In'}
         </button>
       </form>
 

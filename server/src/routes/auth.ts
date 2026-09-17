@@ -22,6 +22,13 @@ import {
   resetFailedAttempts,
 } from '../services/failedAuthTracker';
 import {
+  verifyTrustedDevice,
+  mintTrustedDeviceToken,
+  registerTrustedDevice,
+  revokeAllTrustedDevices,
+} from '../services/trustedDeviceService';
+import { revokeToken } from '../services/revokedTokenService';
+import {
   sendOtpSchema,
   forgotPasswordSchema,
   registerV2Schema,
@@ -101,7 +108,11 @@ router.post('/send-otp', validate(sendOtpSchema), async (req, res, next) => {
     // Rate-limit: allow resend only after 30s
     const cooldown = await getOtpCooldownMs('register', email);
     if (cooldown > 0) {
-      throw new AppError('Please wait before requesting a new OTP', 429);
+      const waitSec = Math.ceil(cooldown / 1000);
+      return res.status(429).json({
+        message: `Please wait ${waitSec}s before requesting a new OTP.`,
+        cooldownSeconds: waitSec,
+      });
     }
 
     const { code: otp } = await createOtp('register', email);
@@ -239,7 +250,7 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
 
 router.post('/login', validate(loginSchema), async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, deviceId, deviceToken } = req.body;
     const identifier = normalizedKey(email);
     const ip = clientIp(req);
 
@@ -253,16 +264,21 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     // this (email, IP) is temporarily rate-limited, block with 429 and a
     // generic message. This check MUST run before password validation so a
     // correct password cannot bypass an active cooldown.
-    if (getCoolDownMs(identifier, ip) > 0) {
+    const activeCooldown = getCoolDownMs(identifier, ip);
+    if (activeCooldown > 0) {
+      const waitSec = Math.ceil(activeCooldown / 1000);
       logAudit(req, {
         action: 'AUTH_LOGIN_BLOCKED',
         entity: 'auth',
         actorName: email,
         severity: 'critical',
         status: 'failure',
-        details: { email, reason: 'Active cooldown / rate limit in place' },
+        details: { email, reason: 'Active cooldown / rate limit in place', waitSec },
       });
-      return res.status(429).json({ message: 'Too many unsuccessful attempts. Please try again later.' });
+      return res.status(429).json({
+        message: `Too many unsuccessful attempts. Please try again in ${waitSec} seconds.`,
+        cooldownSeconds: waitSec,
+      });
     }
 
     const exists = !user.error && user.data;
@@ -282,11 +298,19 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       });
       // After recording, either the count reached the threshold or a lock was
       // just applied in this request -> block with 429.
-      if (attempts >= 5 || getCoolDownMs(identifier, ip) > 0) {
-        return res.status(429).json({ message: 'Too many unsuccessful attempts. Please try again later.' });
+      const currentCooldown = getCoolDownMs(identifier, ip);
+      if (attempts >= 5 || currentCooldown > 0) {
+        const waitSec = Math.ceil((currentCooldown || 15 * 60 * 1000) / 1000);
+        return res.status(429).json({
+          message: `Too many unsuccessful attempts. Account locked temporarily. Please try again in ${waitSec} seconds.`,
+          cooldownSeconds: waitSec,
+        });
       }
-      // Generic message whether the account is missing or the password is wrong.
-      return res.status(401).json({ message: 'Invalid email or password.' });
+      const remaining = Math.max(0, 5 - attempts);
+      return res.status(401).json({
+        message: `Wrong username and password, try again.${remaining > 0 ? ` (${remaining} attempts remaining)` : ''}`,
+        remainingAttempts: remaining,
+      });
     }
 
     const record = user.data as any;
@@ -294,9 +318,31 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     // Successful password match -> clear failed counters.
     resetFailedAttempts(identifier, ip);
 
-    // If MFA is enabled, do NOT issue a full token yet. Issue an MFA challenge
-    // JWT and require a verified code before completing authentication.
+    // If MFA is enabled, check if this device is recognized and trusted.
     if (record.mfa_enabled) {
+      const isTrusted = await verifyTrustedDevice(record.id, record.email, deviceId, deviceToken);
+      if (isTrusted) {
+        const token = signAccessToken(record.id, record.email, record.role);
+        logAudit(req, {
+          action: 'AUTH_LOGIN_TRUSTED_DEVICE',
+          entity: 'user',
+          entityId: record.id,
+          actorId: record.id,
+          actorName: record.email,
+          actorRole: record.role,
+          severity: 'info',
+          status: 'success',
+          details: { email: record.email, role: record.role, trustedDevice: true },
+        });
+
+        return res.json({
+          user: { id: record.id, email: record.email, role: record.role, survey_completed: !!record.survey_completed },
+          token,
+          trustedDevice: true,
+        });
+      }
+
+      // If device is not trusted / first login on this device, send OTP code.
       const cooldown = await getOtpCooldownMs('mfa', record.email);
       if (cooldown === 0) {
         const { code: otp } = await createOtp('mfa', record.email);
@@ -304,7 +350,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       }
 
       const mfaPending = jwt.sign(
-        { userId: record.id, email: record.email, role: record.role, mfa: 'pending' },
+        { userId: record.id, email: record.email, role: record.role, mfa: 'pending', deviceId },
         getJwtSecret(),
         { expiresIn: '10m' },
       );
@@ -339,7 +385,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
  */
 router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => {
   try {
-    const { email, otp, mfaToken } = req.body;
+    const { email, otp, mfaToken, deviceId } = req.body;
     const ip = clientIp(req);
 
     let decoded: any;
@@ -358,7 +404,11 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
 
     const lockout = getMfaLockoutMs(email);
     if (lockout > 0) {
-      return res.status(429).json({ message: 'Too many unsuccessful attempts. Please try again later.' });
+      const waitSec = Math.ceil(lockout / 1000);
+      return res.status(429).json({
+        message: `Too many unsuccessful MFA attempts. Please try again in ${waitSec} seconds.`,
+        cooldownSeconds: waitSec,
+      });
     }
 
     const otpValid = await verifyOtp('mfa', email, otp);
@@ -379,6 +429,15 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
     await supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
     const token = signAccessToken(user.id, user.email, user.role);
 
+    // Register this device as trusted and mint a device token
+    const targetDeviceId = deviceId || decoded.deviceId;
+    let trustedDeviceToken: string | undefined;
+    if (targetDeviceId) {
+      trustedDeviceToken = mintTrustedDeviceToken(user.id, user.email, targetDeviceId);
+      const userAgent = (req.headers['user-agent'] as string) || 'Recognized Browser';
+      await registerTrustedDevice(user.id, targetDeviceId, userAgent);
+    }
+
     logAudit(req, {
       action: 'AUTH_MFA_LOGIN_SUCCESS',
       entity: 'user',
@@ -388,12 +447,13 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
       actorRole: user.role,
       severity: 'info',
       status: 'success',
-      details: { email: user.email, role: user.role, mfaVerified: true },
+      details: { email: user.email, role: user.role, mfaVerified: true, deviceRegistered: !!targetDeviceId },
     });
 
     res.json({
       user: { id: user.id, email: user.email, role: user.role, survey_completed: !!user.survey_completed },
       token,
+      trustedDeviceToken,
     });
   } catch (err) {
     next(err);
@@ -701,7 +761,20 @@ router.post('/disable-mfa', authenticate, async (req: AuthenticatedRequest, res,
       .update({ mfa_enabled: false })
       .eq('id', req.user!.userId);
     if (error) throw new AppError(error.message, 500);
-    res.json({ message: 'MFA disabled' });
+
+    // Also revoke any trusted devices
+    await revokeAllTrustedDevices(req.user!.userId);
+
+    res.json({ message: 'MFA disabled and recognized devices cleared' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/revoke-devices', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    await revokeAllTrustedDevices(req.user!.userId);
+    res.json({ message: 'All recognized devices have been cleared. MFA will be required on your next login.' });
   } catch (err) {
     next(err);
   }
@@ -730,6 +803,114 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res, next) => 
     }
 
     res.json({ user: { ...user, first_name: firstName, last_name: lastName, survey_completed: !!user.survey_completed } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Rule 6: Secure Logout endpoint
+ * Invalidator token on server, revokes trusted devices if requested, and logs audit event.
+ */
+router.post('/logout', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const token = req.token;
+    const userId = req.user!.userId;
+    const exp = req.user?.exp;
+    const { allDevices } = req.body || {};
+
+    if (token) {
+      await revokeToken(token, userId, exp, allDevices ? 'all_devices' : 'logout');
+    }
+
+    if (allDevices) {
+      await revokeAllTrustedDevices(userId);
+    }
+
+    // Log the secure session termination
+    await logAudit(req, {
+      actorId: userId,
+      actorName: req.user?.email || 'User',
+      actorRole: req.user?.role || 'alumni',
+      action: 'USER_LOGOUT',
+      entity: 'auth',
+      entityId: userId,
+      details: { allDevices: !!allDevices, method: 'secure_logout' },
+      severity: 'info',
+      status: 'success',
+    });
+
+    res.json({ success: true, message: 'Successfully logged out and session terminated' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Rule 6: Suspicious Activity & Security Incident Reporting
+ * Allows users to report suspicious logins, unknown device access, or privacy violations.
+ */
+router.post('/report-incident', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { incidentType, description, severity = 'medium' } = req.body;
+    if (!incidentType || !description) {
+      throw new AppError('Incident type and description are required', 400);
+    }
+
+    const validTypes = [
+      'unauthorized_access',
+      'suspicious_login',
+      'password_sharing',
+      'data_tampering',
+      'unauthorized_report_sharing',
+      'shared_computer_unlogged',
+      'other',
+    ];
+    if (!validTypes.includes(incidentType)) {
+      throw new AppError('Invalid incident type', 400);
+    }
+
+    const { data: incident, error } = await supabase
+      .from('security_incidents')
+      .insert({
+        reported_by: req.user!.userId,
+        incident_type: incidentType,
+        description,
+        severity,
+        status: 'open',
+        ip_address: clientIp(req),
+        user_agent: req.headers['user-agent'] as string,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[report-incident] Database insert failed:', error);
+      throw new AppError('Failed to record security incident', 500);
+    }
+
+    // High severity audit log for institutional compliance & Data Privacy Act
+    await logAudit(req, {
+      actorId: req.user!.userId,
+      actorName: req.user?.email || 'User',
+      actorRole: req.user?.role || 'alumni',
+      action: 'SECURITY_INCIDENT_REPORTED',
+      entity: 'security_incidents',
+      entityId: incident.id,
+      details: {
+        incidentType,
+        descriptionPreview: description.slice(0, 150),
+        severity,
+      },
+      severity: severity === 'critical' ? 'critical' : 'warning',
+      status: 'success',
+    });
+
+    res.json({
+      success: true,
+      message: 'Security incident reported to system administrators. Thank you for protecting account integrity.',
+      incidentId: incident.id,
+    });
   } catch (err) {
     next(err);
   }
