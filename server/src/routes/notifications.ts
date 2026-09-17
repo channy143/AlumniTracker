@@ -63,33 +63,86 @@ router.post('/mark-all-read', authenticate, async (req: AuthenticatedRequest, re
   } catch (err) { next(err); }
 });
 
-export async function createSurveyNotifications(survey: any) {
+export interface CreateNotificationParams {
+  userId: string;
+  type?: 'survey' | 'job' | 'application' | 'mentorship' | 'announcement' | 'event' | 'system';
+  title: string;
+  message?: string;
+  link?: string;
+  surveyId?: string;
+}
+
+export async function createNotification(params: CreateNotificationParams) {
   try {
-    const { data: alumni, error } = await supabase
-      .from('users')
-      .select('id')
-      .eq('role', 'alumni')
-      .eq('is_active', true);
+    const { error } = await supabase.from('notifications').insert({
+      user_id: params.userId,
+      type: params.type || 'system',
+      title: params.title,
+      message: params.message || null,
+      link: params.link || null,
+      survey_id: params.surveyId || null,
+      is_read: false,
+    });
+    if (error) console.error('Failed to create notification:', error);
+  } catch (err) {
+    console.error('Error creating notification:', err);
+  }
+}
 
-    if (error || !alumni || alumni.length === 0) return;
+export interface BroadcastNotificationParams {
+  role?: string;
+  type?: 'survey' | 'job' | 'application' | 'mentorship' | 'announcement' | 'event' | 'system';
+  title: string;
+  message?: string;
+  link?: string;
+  surveyId?: string;
+}
 
-    const notificationRows = alumni.map((a: any) => ({
-      user_id: a.id,
-      type: 'survey',
-      title: `📋 ${survey.title}`,
-      message: `Please complete the survey before ${survey.expires_at ? new Date(survey.expires_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the closing date'}.`,
-      link: `/surveys/${survey.id}`,
-      survey_id: survey.id,
+export async function createBroadcastNotification(params: BroadcastNotificationParams) {
+  try {
+    let query = supabase.from('users').select('id').eq('is_active', true);
+    if (params.role) {
+      query = query.eq('role', params.role);
+    } else {
+      query = query.eq('role', 'alumni');
+    }
+    const { data: users, error } = await query;
+    if (error || !users || users.length === 0) return;
+
+    const rows = users.map((u: any) => ({
+      user_id: u.id,
+      type: params.type || 'system',
+      title: params.title,
+      message: params.message || null,
+      link: params.link || null,
+      survey_id: params.surveyId || null,
+      is_read: false,
     }));
 
     const batchSize = 100;
-    for (let i = 0; i < notificationRows.length; i += batchSize) {
-      const batch = notificationRows.slice(i, i + batchSize);
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
       await supabase.from('notifications').insert(batch);
     }
+  } catch (err) {
+    console.error('Failed to broadcast notifications:', err);
+  }
+}
+
+export async function createSurveyNotifications(survey: any) {
+  try {
+    await createBroadcastNotification({
+      role: 'alumni',
+      type: 'survey',
+      title: `📋 ${survey.title}`,
+      message: `Please complete the tracer survey before ${survey.expires_at ? new Date(survey.expires_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'the closing date'}.`,
+      link: `/surveys/${survey.id}`,
+      surveyId: survey.id,
+    });
   } catch (err) {
     console.error('Failed to create survey notifications:', err);
   }
 }
 
 export default router;
+

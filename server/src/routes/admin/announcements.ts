@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
+import { createBroadcastNotification } from '../notifications';
 
 const router = Router();
 
@@ -51,6 +52,17 @@ router.post('/', async (req, res, next) => {
     }).select().single();
 
     if (error) throw new AppError(error.message, 500);
+
+    if (data && data.status === 'published') {
+      await createBroadcastNotification({
+        role: 'alumni',
+        type: 'announcement',
+        title: `📢 ${data.title}`,
+        message: data.content?.slice(0, 120) ? `${data.content.slice(0, 120)}...` : 'A new announcement has been published.',
+        link: '/',
+      });
+    }
+
     res.status(201).json(data);
   } catch (err) {
     next(err);
@@ -130,10 +142,22 @@ router.put('/:id/pin', async (req, res, next) => {
 
 router.put('/:id/publish', async (req, res, next) => {
   try {
+    const { data: ann } = await supabase.from('announcements').select('title, content').eq('id', req.params.id).maybeSingle();
     const { error } = await supabase.from('announcements').update({
       status: 'published', published_at: new Date().toISOString(),
     }).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
+
+    if (ann) {
+      await createBroadcastNotification({
+        role: 'alumni',
+        type: 'announcement',
+        title: `📢 ${ann.title}`,
+        message: ann.content?.slice(0, 120) ? `${ann.content.slice(0, 120)}...` : 'A new announcement has been published.',
+        link: '/',
+      });
+    }
+
     res.json({ message: 'Announcement published' });
   } catch (err) {
     next(err);

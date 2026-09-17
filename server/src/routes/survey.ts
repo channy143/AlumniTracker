@@ -222,6 +222,14 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
     if (responses?.province) profileUpdates.province = responses.province;
     if (responses?.middleName) profileUpdates.middle_name = responses.middleName;
 
+    // Sync employment fields if provided
+    if (responses?.employmentStatus) profileUpdates.employment_status = responses.employmentStatus;
+    if (responses?.currentJobTitle) profileUpdates.current_job_title = responses.currentJobTitle;
+    if (responses?.companyName) profileUpdates.company_name = responses.companyName;
+    if (responses?.industry) profileUpdates.industry = responses.industry;
+    if (responses?.salaryRange) profileUpdates.salary_range = responses.salaryRange;
+    if (responses?.jobType) profileUpdates.job_type = String(responses.jobType).toLowerCase();
+
     if (Object.keys(profileUpdates).length > 0) {
       profileUpdates.updated_at = new Date().toISOString();
       await supabase
@@ -231,7 +239,8 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
     }
 
     // Sync honors to education if provided
-    if (responses?.honors) {
+    if (responses?.honors !== undefined) {
+      const honorsValue = responses.honors === 'None' || responses.honors === '' ? null : responses.honors;
       const { data: profile } = await supabase
         .from('profiles')
         .select('id')
@@ -240,8 +249,39 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
       if (profile) {
         await supabase
           .from('education')
-          .update({ honors: responses.honors })
+          .update({ honors: honorsValue })
           .eq('profile_id', profile.id);
+
+        // If employed, create or update current employment record
+        if (
+          (responses.employmentStatus === 'Employed' || responses.employmentStatus === 'Self-employed') &&
+          (responses.companyName || responses.currentJobTitle)
+        ) {
+          const { data: existingEmp } = await supabase
+            .from('employment')
+            .select('id')
+            .eq('profile_id', profile.id)
+            .eq('is_current', true)
+            .maybeSingle();
+
+          const empPayload = {
+            profile_id: profile.id,
+            company_name: responses.companyName || 'Self-Employed / Independent',
+            position: responses.currentJobTitle || 'Professional',
+            company_industry: responses.industry || null,
+            employment_status: responses.employmentStatus,
+            job_type: responses.jobType ? String(responses.jobType).toLowerCase() : 'full-time',
+            salary_range: responses.salaryRange || null,
+            is_current: true,
+            start_date: new Date().toISOString().split('T')[0],
+          };
+
+          if (existingEmp) {
+            await supabase.from('employment').update(empPayload).eq('id', existingEmp.id);
+          } else {
+            await supabase.from('employment').insert(empPayload);
+          }
+        }
       }
     }
 

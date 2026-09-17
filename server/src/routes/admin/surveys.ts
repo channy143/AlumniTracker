@@ -187,7 +187,7 @@ router.get('/standard-questions', (_req, res) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { title, description, academic_year, target_type, target_value, opens_at, closes_at, status, notes } = req.body;
+    const { title, description, academic_year, target_type, target_value, opens_at, closes_at, status, notes, questions } = req.body;
     if (!title) throw new AppError('Survey title is required', 400);
 
     if (status === 'published') {
@@ -208,7 +208,7 @@ router.post('/', async (req, res, next) => {
     const { data, error } = await supabase.from('surveys').insert({
       title,
       description: description || '',
-      questions: STANDARD_QUESTIONS,
+      questions: (Array.isArray(questions) && questions.length > 0) ? questions : STANDARD_QUESTIONS,
       academic_year: academic_year || null,
       target_type: target_type || 'all',
       target_value: target_value || null,
@@ -252,7 +252,7 @@ router.get('/:id', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const { title, description, academic_year, target_type, target_value, opens_at, closes_at, status, notes } = req.body;
+    const { title, description, academic_year, target_type, target_value, opens_at, closes_at, status, notes, questions } = req.body;
     const updates: Record<string, any> = {};
     if (title !== undefined) updates.title = title;
     if (description !== undefined) updates.description = description;
@@ -263,6 +263,7 @@ router.put('/:id', async (req, res, next) => {
     if (closes_at !== undefined) updates.expires_at = closes_at;
     if (status !== undefined) { updates.status = status; updates.is_active = status === 'published'; }
     if (notes !== undefined) updates.notes = notes;
+    if (questions !== undefined) updates.questions = questions;
 
     if (status === 'published') {
       const { data: current } = await supabase.from('surveys').select('target_type, target_value').eq('id', req.params.id).single();

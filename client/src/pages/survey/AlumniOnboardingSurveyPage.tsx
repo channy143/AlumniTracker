@@ -52,21 +52,30 @@ export default function AlumniOnboardingSurveyPage() {
     currentResidenceLocation: 'Within Cebu / Naga City',
   });
 
-  // Step 3: Academic Background (No employment!)
+  // Step 3: Academic Background
   const [academicInfo, setAcademicInfo] = useState({
     program: '',
     yearGraduated: '',
-    honors: 'None',
+    honors: '',
     licensureStatus: 'Not Applicable',
     licensureExamName: '',
     reasonsForEnrolling: [] as string[],
   });
 
-  // Step 4: Skills & Lifelong Learning (No employment!)
+  // Step 4: Skills, Lifelong Learning & Existing Employment
   const [skillsInfo, setSkillsInfo] = useState({
     furtherStudies: 'No plans at this time',
     postGradCertifications: '',
     competenciesDeveloped: [] as string[],
+  });
+
+  const [employmentInfo, setEmploymentInfo] = useState({
+    employmentStatus: 'Unemployed',
+    currentJobTitle: '',
+    companyName: '',
+    industry: '',
+    salaryRange: '',
+    jobType: 'Full-time',
   });
 
   // Step 5: CTU Institutional Feedback & Engagement
@@ -111,8 +120,20 @@ export default function AlumniOnboardingSurveyPage() {
             ...prev,
             program: res.profile.program || prev.program,
             yearGraduated: res.profile.yearGraduated ? String(res.profile.yearGraduated) : prev.yearGraduated,
-            honors: res.profile.honors || prev.honors,
+            honors: res.profile.honors && res.profile.honors !== 'None' ? res.profile.honors : prev.honors,
           }));
+
+          if (res.profile.employment_status || res.profile.current_job_title) {
+            setEmploymentInfo((prev) => ({
+              ...prev,
+              employmentStatus: res.profile.employment_status || prev.employmentStatus,
+              currentJobTitle: res.profile.current_job_title || prev.currentJobTitle,
+              companyName: res.profile.company_name || prev.companyName,
+              industry: res.profile.industry || prev.industry,
+              salaryRange: res.profile.salary_range || prev.salaryRange,
+              jobType: res.profile.job_type ? (res.profile.job_type.charAt(0).toUpperCase() + res.profile.job_type.slice(1)) : prev.jobType,
+            }));
+          }
         }
       })
       .catch(() => {
@@ -221,6 +242,7 @@ export default function AlumniOnboardingSurveyPage() {
           ...academicInfo,
           ...skillsInfo,
           ...feedbackInfo,
+          ...employmentInfo,
         },
       };
 
@@ -612,18 +634,19 @@ export default function AlumniOnboardingSurveyPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Academic Honors</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Academic Honors / Latin Honors</label>
                       <select
                         value={academicInfo.honors}
                         onChange={(e) => setAcademicInfo((a) => ({ ...a, honors: e.target.value }))}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
+                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
                       >
-                        <option value="None">None</option>
-                        <option value="Summa Cum Laude">Summa Cum Laude</option>
-                        <option value="Magna Cum Laude">Magna Cum Laude</option>
+                        <option value="">Select Latin Honors (Optional)</option>
                         <option value="Cum Laude">Cum Laude</option>
+                        <option value="Magna Cum Laude">Magna Cum Laude</option>
+                        <option value="Summa Cum Laude">Summa Cum Laude</option>
                         <option value="Dean's Lister">Dean's Lister</option>
                         <option value="Leadership Awardee">Leadership Awardee</option>
+                        <option value="None">None / Regular Graduate</option>
                       </select>
                     </div>
                   </div>
@@ -797,8 +820,142 @@ export default function AlumniOnboardingSurveyPage() {
                     </div>
                   </div>
 
-                  <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
-                    <span className="font-semibold text-gray-800">Employment Section:</span> Per university guidelines, your employment details will be updated in your career profile once hired for a position.
+                  {/* Current / Existing Employment Background */}
+                  <div className="pt-2 border-t border-gray-100 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800">
+                          Current Employment Information
+                        </label>
+                        <p className="text-[11px] text-gray-500">
+                          Alumni who already have a job may record their existing employment to reflect immediately on their career profile.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Employment Status
+                        </label>
+                        <select
+                          value={employmentInfo.employmentStatus}
+                          onChange={(e) =>
+                            setEmploymentInfo((emp) => ({ ...emp, employmentStatus: e.target.value }))
+                          }
+                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                        >
+                          <option value="Unemployed">Unemployed / Seeking First Job</option>
+                          <option value="Employed">Employed (Full-time / Part-time)</option>
+                          <option value="Self-employed">Self-employed / Freelance / Entrepreneur</option>
+                          <option value="Seeking Opportunities">Seeking Opportunities</option>
+                          <option value="Retired">Retired</option>
+                        </select>
+                      </div>
+
+                      {employmentInfo.employmentStatus !== 'Unemployed' && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Employment Type
+                          </label>
+                          <select
+                            value={employmentInfo.jobType}
+                            onChange={(e) =>
+                              setEmploymentInfo((emp) => ({ ...emp, jobType: e.target.value }))
+                            }
+                            className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                          >
+                            <option value="Full-time">Full-time</option>
+                            <option value="Part-time">Part-time</option>
+                            <option value="Contract">Contractual / Project-based</option>
+                            <option value="Freelance">Freelance</option>
+                            <option value="Internship">Internship / Apprenticeship</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {(employmentInfo.employmentStatus === 'Employed' ||
+                      employmentInfo.employmentStatus === 'Self-employed') && (
+                      <div className="space-y-2.5 bg-orange-50/40 border border-orange-200/70 rounded-xl p-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Current Job Title / Position
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Junior Software Engineer, Teacher..."
+                              value={employmentInfo.currentJobTitle}
+                              onChange={(e) =>
+                                setEmploymentInfo((emp) => ({ ...emp, currentJobTitle: e.target.value }))
+                              }
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Company / Organization Name
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Accenture, DepEd, Self-Employed..."
+                              value={employmentInfo.companyName}
+                              onChange={(e) =>
+                                setEmploymentInfo((emp) => ({ ...emp, companyName: e.target.value }))
+                              }
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Industry / Field
+                            </label>
+                            <select
+                              value={employmentInfo.industry}
+                              onChange={(e) =>
+                                setEmploymentInfo((emp) => ({ ...emp, industry: e.target.value }))
+                              }
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                            >
+                              <option value="">Select Industry</option>
+                              <option value="Information Technology">Information Technology</option>
+                              <option value="Education / Academia">Education / Academia</option>
+                              <option value="Industrial & Manufacturing">Industrial & Manufacturing</option>
+                              <option value="Engineering & Construction">Engineering & Construction</option>
+                              <option value="Business, Finance & BPO">Business, Finance & BPO</option>
+                              <option value="Hospitality & Tourism">Hospitality & Tourism</option>
+                              <option value="Government & Public Service">Government & Public Service</option>
+                              <option value="Healthcare & Life Sciences">Healthcare & Life Sciences</option>
+                              <option value="Creative Arts & Media">Creative Arts & Media</option>
+                              <option value="Other">Other Industry</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Monthly Salary Range (₱)
+                            </label>
+                            <select
+                              value={employmentInfo.salaryRange}
+                              onChange={(e) =>
+                                setEmploymentInfo((emp) => ({ ...emp, salaryRange: e.target.value }))
+                              }
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                            >
+                              <option value="">Select Range (Optional)</option>
+                              <option value="Below ₱20,000">Below ₱20,000</option>
+                              <option value="₱20,000–₱40,000">₱20,000–₱40,000</option>
+                              <option value="₱40,000–₱60,000">₱40,000–₱60,000</option>
+                              <option value="₱60,000–₱80,000">₱60,000–₱80,000</option>
+                              <option value="₱80,000+">₱80,000 and above</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}

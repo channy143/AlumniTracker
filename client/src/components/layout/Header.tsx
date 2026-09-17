@@ -15,6 +15,9 @@ import {
   XMarkIcon,
   ShieldCheckIcon,
   ShieldExclamationIcon,
+  UserGroupIcon,
+  MegaphoneIcon,
+  CalendarIcon,
 } from '@heroicons/react/24/outline';
 import { JellyBlobMascot, BlobSpeech } from '@/components/ui/feral-blob/JellyBlobMascot';
 import { SecurityPolicyModal } from '@/components/security/SecurityPolicyModal';
@@ -199,8 +202,27 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   }, []);
 
   const notifIcon = (type: string) => {
-    if (type === 'survey') return ClipboardDocumentCheckIcon;
-    return AcademicCapIcon;
+    switch (type) {
+      case 'survey': return ClipboardDocumentCheckIcon;
+      case 'job': return BriefcaseIcon;
+      case 'application': return BriefcaseIcon;
+      case 'mentorship': return UserGroupIcon;
+      case 'announcement': return MegaphoneIcon;
+      case 'event': return CalendarIcon;
+      default: return AcademicCapIcon;
+    }
+  };
+
+  const notifActionText = (type: string) => {
+    switch (type) {
+      case 'survey': return 'Complete Survey →';
+      case 'job': return 'View Job →';
+      case 'application': return 'View Application →';
+      case 'mentorship': return 'View Mentorship →';
+      case 'announcement': return 'View Announcement →';
+      case 'event': return 'View Event →';
+      default: return 'View Details →';
+    }
   };
 
   const handleLogout = async () => {
@@ -296,8 +318,12 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                               <p className="text-sm text-gray-800 leading-snug">{n.title}</p>
                               {n.message && <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>}
                               <div className="flex items-center gap-2 mt-1">
-                                {n.link && <span className="text-[10px] font-medium text-orange-600">Complete Survey &rarr;</span>}
-                                <span className="text-[10px] text-gray-300">
+                                {n.link && (
+                                  <span className="text-[10px] font-medium text-orange-600 hover:text-orange-700">
+                                    {notifActionText(n.type)}
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-gray-400">
                                   {new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </span>
                               </div>

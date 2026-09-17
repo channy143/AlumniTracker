@@ -20,6 +20,7 @@ import {
   AcademicCapIcon,
   StarIcon,
   CheckCircleIcon,
+  UserMinusIcon,
 } from '@heroicons/react/24/outline';
 
 const ORANGE = '#f97316';
@@ -28,7 +29,6 @@ const STATUS_COLORS: Record<string, string> = {
   'Employed': '#003366',
   'Self-employed': '#f97316',
   'Unemployed': '#ef4444',
-  'Pursuing Further Studies': '#8b5cf6',
 };
 
 const inputCls = 'text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400 bg-white';
@@ -276,6 +276,7 @@ export default function CareerAnalytics() {
       rows: [
         { Metric: 'Total Alumni', Value: overview.totalAlumni },
         { Metric: 'Employment Rate', Value: `${overview.employmentRate}%` },
+        { Metric: 'Unemployment Rate', Value: `${overview.unemployedRate ?? (100 - (overview.employmentRate || 0))}%` },
         { Metric: 'Average Salary', Value: formatPeso(overview.averageSalary) },
         { Metric: 'Average Time to Employment', Value: formatMonths(overview.averageTimeToEmployment) },
         { Metric: 'Work Alignment Rate', Value: `${overview.workAlignmentRate}%` },
@@ -433,8 +434,8 @@ export default function CareerAnalytics() {
 
       {loading ? (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => <KpiSkeleton key={i} />)}
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => <KpiSkeleton key={i} />)}
           </div>
           <div className="lg:flex lg:gap-3 lg:items-start mt-3">
             <div className="flex-1 min-w-0 space-y-3">
@@ -455,8 +456,9 @@ export default function CareerAnalytics() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-3">
-            <KpiCard icon={BriefcaseIcon} label="Employment Rate" value={`${overview.employmentRate}%`} sub={`${overview.totalAlumni} alumni`} />
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-3">
+            <KpiCard icon={BriefcaseIcon} label="Employment Rate" value={`${overview.employmentRate}%`} sub={`${overview.employedCount ?? Math.round(((overview.employmentRate || 0) / 100) * (overview.totalAlumni || 0))} employed`} />
+            <KpiCard icon={UserMinusIcon} label="Unemployment Rate" value={`${overview.unemployedRate ?? (100 - (overview.employmentRate || 0))}%`} sub={`${overview.unemployedCount ?? 0} seeking`} />
             <KpiCard icon={BanknotesIcon} label="Average Salary" value={formatPeso(overview.averageSalary)} />
             <KpiCard icon={ClockIcon} label="Time to Employment" value={formatMonths(overview.averageTimeToEmployment)} />
             <KpiCard icon={CheckBadgeIcon} label="Work Alignment Rate" value={`${overview.workAlignmentRate}%`} />

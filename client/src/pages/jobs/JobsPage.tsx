@@ -924,6 +924,15 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     if (file) {
+      const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+      const validExts = ['.pdf', '.docx'];
+      const validMimes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      if (!validExts.includes(ext) && !validMimes.includes(file.type)) {
+        setError('Unsupported file format. Only PDF (.pdf) and Word documents (.docx) are accepted.');
+        setResume(null);
+        e.target.value = '';
+        return;
+      }
       if (file.size > 10 * 1024 * 1024) {
         setError(`"${file.name}" is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum allowed file size is 10MB.`);
         setResume(null);
@@ -1041,7 +1050,7 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-medium text-gray-700">
-                  Resume (PDF or DOC/DOCX){!profileResume && <span className="text-red-500"> *</span>}
+                  Resume (PDF or DOCX){!profileResume && <span className="text-red-500"> *</span>}
                 </label>
                 <span className="text-[10px] text-gray-400">Max 10MB</span>
               </div>
@@ -1056,12 +1065,12 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
                 </span>
                 <input
                   type="file"
-                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   className="hidden"
                   onChange={handleFileChange}
                 />
               </label>
-              <p className="text-[10px] text-gray-400 mt-1">Accepted formats: PDF, DOC, DOCX up to 10MB.</p>
+              <p className="text-[10px] text-gray-400 mt-1">Accepted formats: PDF (.pdf) and Word documents (.docx) up to 10MB.</p>
             </div>
 
             <div>

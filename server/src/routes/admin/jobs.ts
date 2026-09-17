@@ -4,6 +4,7 @@ import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { validate } from '../../middleware/validate';
 import { AuthenticatedRequest } from '../../types';
+import { createNotification, createBroadcastNotification } from '../notifications';
 import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
 import { sanitizeRichText } from '../../utils/sanitizeHtml';
 import {
@@ -186,6 +187,17 @@ router.post('/', validate(adminCreateJobSchema), async (req, res, next) => {
     }).select().single();
     if (error && (error.code === '42P01' || error.code === 'PGRST205')) throw new AppError('Job postings table not available', 400);
     if (error) throw new AppError(error.message, 500);
+
+    if (data) {
+      await createBroadcastNotification({
+        role: 'alumni',
+        type: 'job',
+        title: `💼 New Job Opening: ${data.position}`,
+        message: `${data.company_name} is hiring for ${data.position} in ${data.industry || data.location}. View details and apply now.`,
+        link: '/jobs',
+      });
+    }
+
     res.status(201).json(data);
   } catch (err) {
     next(err);
@@ -459,6 +471,42 @@ router.put('/applications/:applicationId/status', validate(applicationStatusSche
 
     if (status === 'hired' || status === 'accepted') {
       await syncHiredApplicationToEmployment(req.params.applicationId);
+    }
+
+    // Send notification to applicant
+    try {
+      const { data: application } = await supabase
+        .from('job_applications')
+        .select('id, user_id, job:job_postings(position, company_name)')
+        .eq('id', req.params.applicationId)
+        .maybeSingle();
+
+      if (application) {
+        const jobInfo: any = application.job;
+        const pos = jobInfo?.position || 'applied position';
+        const company = jobInfo?.company_name || 'the company';
+        let title = `Application Update: ${pos}`;
+        let message = `Your application for ${pos} at ${company} is now ${status.replace('_', ' ')}.`;
+        if (status === 'shortlisted') {
+          title = `🌟 Shortlisted for ${pos}!`;
+          message = `Great news! Your application for ${pos} at ${company} has been shortlisted for referral.`;
+        } else if (status === 'hired' || status === 'accepted') {
+          title = `🎉 Hired for ${pos}!`;
+          message = `Congratulations! You have been hired for ${pos} at ${company}. Your employment profile has been updated.`;
+        } else if (status === 'rejected') {
+          title = `Application Status: ${pos}`;
+          message = `Thank you for your interest in ${pos} at ${company}. You were not selected at this time.`;
+        }
+        await createNotification({
+          userId: application.user_id,
+          type: 'application',
+          title,
+          message,
+          link: '/jobs',
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Could not send application status notification:', notifErr);
     }
 
     res.json({ message: 'Application status updated', status });

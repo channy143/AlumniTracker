@@ -2,11 +2,10 @@ import { fromBuffer } from 'file-type';
 
 const ALLOWED_RESUME_MIME = new Set([
   'application/pdf',
-  'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
 
-const ALLOWED_RESUME_EXT = new Set(['pdf', 'doc', 'docx']);
+const ALLOWED_RESUME_EXT = new Set(['pdf', 'docx']);
 
 export interface ResumeValidationResult {
   ok: boolean;
@@ -37,7 +36,7 @@ export async function validateResumeContent(buffer: Buffer): Promise<ResumeValid
   }
 
   if (!ALLOWED_RESUME_MIME.has(detected.mime)) {
-    return { ok: false, error: 'Only PDF and DOC/DOCX files are allowed' };
+    return { ok: false, error: 'Unsupported file format. Only PDF (.pdf) and Word documents (.docx) are accepted.' };
   }
 
   return {

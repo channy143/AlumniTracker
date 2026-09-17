@@ -11,6 +11,12 @@ import {
   EyeIcon,
   AcademicCapIcon,
   UserGroupIcon,
+  PlusIcon,
+  TrashIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  ArrowPathIcon,
+  PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -28,7 +34,7 @@ export default function GraduateTracerSurveys() {
   const [batchFilter, setBatchFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState<any>(null);
-  const [detailTab, setDetailTab] = useState<'overview' | 'responses' | 'analytics' | 'settings'>('overview');
+  const [detailTab, setDetailTab] = useState<'overview' | 'questions' | 'responses' | 'analytics' | 'settings'>('overview');
   const addNotification = useUIStore((s) => s.addNotification);
   const years = generateYears(2014, new Date().getFullYear()).map(String);
 
@@ -206,10 +212,16 @@ export default function GraduateTracerSurveys() {
             {survey.description && <p className="text-xs text-gray-500 mt-2">{survey.description}</p>}
 
             <div className="flex items-center gap-1 border-b border-gray-200 mt-4 pb-0">
-              {(['overview', 'responses', 'analytics', 'settings'] as const).map((t) => (
-                <button key={t} onClick={() => setDetailTab(t)}
-                  className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors capitalize ${detailTab === t ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                  {t}
+              {[
+                { key: 'overview', label: 'Overview' },
+                { key: 'questions', label: 'Questions & CHED Requirements' },
+                { key: 'responses', label: 'Responses' },
+                { key: 'analytics', label: 'Analytics' },
+                { key: 'settings', label: 'Settings' },
+              ].map(({ key, label }) => (
+                <button key={key} onClick={() => setDetailTab(key as any)}
+                  className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${detailTab === key ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  {label}
                 </button>
               ))}
             </div>
@@ -217,6 +229,15 @@ export default function GraduateTracerSurveys() {
         </div>
 
         {detailTab === 'overview' && <SurveyOverview survey={survey} />}
+        {detailTab === 'questions' && (
+          <SurveyQuestionsEditor
+            survey={survey}
+            onUpdate={(updatedQuestions: any) => {
+              setSelectedSurvey((prev: any) => ({ ...prev, questions: updatedQuestions }));
+              load();
+            }}
+          />
+        )}
         {detailTab === 'responses' && <SurveyResponses survey={survey} />}
         {detailTab === 'analytics' && <SurveyAnalytics surveyId={survey.id} />}
         {detailTab === 'settings' && <SurveySettings survey={survey} onClose={handleClose} onDuplicate={handleDuplicate} onDelete={handleDelete} onUpdate={(data: any) => { setSelectedSurvey((prev: any) => ({ ...prev, ...data })); load(); }} />}
@@ -387,7 +408,7 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
                       </div>
                     ))}
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-2">This survey uses the standardized university tracer questionnaire. Questions cannot be modified.</p>
+                  <p className="text-[10px] text-gray-500 mt-2">Initialized with standard CHED questions. You can add, edit, or customize questions in the Questions tab.</p>
                 </div>
               </div>
 
@@ -516,6 +537,523 @@ function SurveyOverview({ survey }: { survey: any }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface SurveyQuestionItem {
+  id: string;
+  section?: string;
+  label?: string;
+  type: string;
+  options?: string[];
+  required?: boolean;
+}
+
+function SurveyQuestionsEditor({ survey, onUpdate }: { survey: any; onUpdate: (questions: any[]) => void }) {
+  const addNotification = useUIStore((s) => s.addNotification);
+  const [questions, setQuestions] = useState<SurveyQuestionItem[]>(() => {
+    if (Array.isArray(survey.questions) && survey.questions.length > 0) {
+      return JSON.parse(JSON.stringify(survey.questions));
+    }
+    return [];
+  });
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newQuestion, setNewQuestion] = useState<SurveyQuestionItem>({
+    id: '',
+    section: 'general',
+    label: '',
+    type: 'text',
+    required: false,
+    options: [],
+  });
+  const [rawOptions, setRawOptions] = useState('');
+
+  useEffect(() => {
+    if (Array.isArray(survey.questions) && survey.questions.length > 0) {
+      setQuestions(JSON.parse(JSON.stringify(survey.questions)));
+    } else {
+      adminApi.surveyStandardQuestions().then((std) => {
+        if (Array.isArray(std) && std.length > 0) {
+          setQuestions(JSON.parse(JSON.stringify(std)));
+        }
+      }).catch(() => {});
+    }
+  }, [survey.id, survey.questions]);
+
+  const handleResetToStandard = async () => {
+    if (!window.confirm('Reset all questions to the standard CHED Tracer Study questions? Any custom questions will be overwritten.')) return;
+    try {
+      const std = await adminApi.surveyStandardQuestions();
+      if (Array.isArray(std)) {
+        setQuestions(JSON.parse(JSON.stringify(std)));
+        addNotification('Reset to standard CHED questions. Click Save to apply.', 'info');
+      }
+    } catch {
+      addNotification('Failed to load standard CHED questions', 'error');
+    }
+  };
+
+  const handleMove = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= questions.length) return;
+    const next = [...questions];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved);
+    setQuestions(next);
+  };
+
+  const handleDelete = (index: number) => {
+    const item = questions[index];
+    const label = item.type === 'section' ? `section "${item.section}"` : `question "${item.label || item.id}"`;
+    if (!window.confirm(`Are you sure you want to remove this ${label}?`)) return;
+    const next = questions.filter((_, i) => i !== index);
+    setQuestions(next);
+  };
+
+  const handleQuestionChange = (index: number, field: keyof SurveyQuestionItem, value: any) => {
+    const next = [...questions];
+    next[index] = { ...next[index], [field]: value };
+    setQuestions(next);
+  };
+
+  const handleAddQuestion = () => {
+    if (!newQuestion.id.trim()) {
+      newQuestion.id = (newQuestion.label || 'q')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '') || `q_${Date.now()}`;
+    }
+    const finalItem: SurveyQuestionItem = {
+      ...newQuestion,
+      options: newQuestion.type === 'choice' && rawOptions.trim()
+        ? rawOptions.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined,
+    };
+    setQuestions([...questions, finalItem]);
+    setShowAddModal(false);
+    setNewQuestion({ id: '', section: 'general', label: '', type: 'text', required: false, options: [] });
+    setRawOptions('');
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await adminApi.surveyUpdate(survey.id, { questions });
+      addNotification('Survey questions saved successfully!', 'success');
+      onUpdate(questions);
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to save survey questions', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const totalQuestions = questions.filter((q) => q.type !== 'section').length;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold text-gray-900">CHED & Institutional Tracer Questions</h2>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-800">
+              {totalQuestions} Questions
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Conforms to CHED Tracer Study guidelines. Easily add, edit, or adjust questions to reflect changing CHED mandates.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleResetToStandard}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors cursor-pointer"
+            title="Reset questions to standard CHED survey template"
+          >
+            <ArrowPathIcon className="w-3.5 h-3.5" />
+            Reset to CHED Standard
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors shadow-2xs cursor-pointer"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            Add Question
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg transition-colors shadow-2xs cursor-pointer"
+          >
+            {saving ? 'Saving...' : 'Save Questionnaire'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs divide-y divide-gray-100">
+        {questions.length === 0 ? (
+          <div className="p-8 text-center text-xs text-gray-400">
+            No questions configured for this survey. Click &quot;Reset to CHED Standard&quot; or &quot;Add Question&quot; to begin.
+          </div>
+        ) : (
+          questions.map((q, idx) => {
+            const isSection = q.type === 'section';
+            const isEditing = editingId === q.id || editingId === `${q.id}_${idx}`;
+
+            if (isSection) {
+              return (
+                <div key={q.id || idx} className="p-3 bg-gray-50/80 border-l-4 border-l-orange-500 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-1">
+                    <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider bg-orange-100/60 px-2 py-0.5 rounded">
+                      Section Header
+                    </span>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={q.section || ''}
+                        onChange={(e) => handleQuestionChange(idx, 'section', e.target.value)}
+                        className="text-xs font-bold text-gray-900 border border-gray-300 rounded px-2 py-1 flex-1 max-w-md bg-white"
+                      />
+                    ) : (
+                      <h3 className="text-xs font-bold text-gray-900">{q.section || q.id}</h3>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(isEditing ? null : (q.id || `${q.id}_${idx}`))}
+                      className="p-1 text-gray-500 hover:text-gray-700 rounded cursor-pointer"
+                      title={isEditing ? 'Done editing' : 'Edit section title'}
+                    >
+                      {isEditing ? <span className="text-xs font-bold text-orange-600">Done</span> : <PencilSquareIcon className="w-4 h-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => handleMove(idx, 'up')}
+                      className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-20 cursor-pointer"
+                      title="Move Up"
+                    >
+                      <ArrowUpIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === questions.length - 1}
+                      onClick={() => handleMove(idx, 'down')}
+                      className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-20 cursor-pointer"
+                      title="Move Down"
+                    >
+                      <ArrowDownIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(idx)}
+                      className="p-1 text-gray-400 hover:text-red-600 rounded cursor-pointer"
+                      title="Delete section"
+                    >
+                      <TrashIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div key={q.id || idx} className="p-4 hover:bg-gray-50/50 transition-colors">
+                {!isEditing ? (
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                          #{idx + 1}
+                        </span>
+                        <span className="text-xs font-semibold text-gray-900">{q.label || q.id}</span>
+                        {q.required && (
+                          <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
+                            Required
+                          </span>
+                        )}
+                        <span className="text-[10px] font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded uppercase">
+                          {q.type}
+                        </span>
+                        {q.section && (
+                          <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                            Section: {q.section}
+                          </span>
+                        )}
+                      </div>
+                      {q.options && q.options.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap pt-1">
+                          <span className="text-[10px] text-gray-400">Options:</span>
+                          {q.options.map((opt, oIdx) => (
+                            <span key={oIdx} className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                              {opt}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(q.id || `${q.id}_${idx}`)}
+                        className="p-1.5 text-gray-400 hover:text-gray-700 rounded hover:bg-gray-100 cursor-pointer"
+                        title="Edit question"
+                      >
+                        <PencilSquareIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMove(idx, 'up')}
+                        className="p-1.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 rounded hover:bg-gray-100 cursor-pointer"
+                        title="Move Up"
+                      >
+                        <ArrowUpIcon className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === questions.length - 1}
+                        onClick={() => handleMove(idx, 'down')}
+                        className="p-1.5 text-gray-400 hover:text-gray-700 disabled:opacity-20 rounded hover:bg-gray-100 cursor-pointer"
+                        title="Move Down"
+                      >
+                        <ArrowDownIcon className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(idx)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 cursor-pointer"
+                        title="Delete question"
+                      >
+                        <TrashIcon className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-900">Editing Question #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                        className="text-xs font-semibold text-orange-600 hover:text-orange-700 cursor-pointer"
+                      >
+                        Done Editing
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-700 mb-1">Question Label *</label>
+                        <input
+                          type="text"
+                          value={q.label || ''}
+                          onChange={(e) => handleQuestionChange(idx, 'label', e.target.value)}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white outline-none focus:border-orange-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-700 mb-1">Field Key / ID</label>
+                        <input
+                          type="text"
+                          value={q.id || ''}
+                          onChange={(e) => handleQuestionChange(idx, 'id', e.target.value)}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white font-mono outline-none focus:border-orange-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-700 mb-1">Question Type</label>
+                        <select
+                          value={q.type}
+                          onChange={(e) => handleQuestionChange(idx, 'type', e.target.value)}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white outline-none focus:border-orange-500"
+                        >
+                          <option value="text">Text Input (Short)</option>
+                          <option value="textarea">Textarea (Long)</option>
+                          <option value="choice">Choice / Select Dropdown</option>
+                          <option value="number">Number</option>
+                          <option value="rating">Rating (1-5)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-700 mb-1">Section Identifier</label>
+                        <input
+                          type="text"
+                          value={q.section || ''}
+                          onChange={(e) => handleQuestionChange(idx, 'section', e.target.value)}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white outline-none focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+                    {q.type === 'choice' && (
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                          Options (comma-separated)
+                        </label>
+                        <input
+                          type="text"
+                          value={(q.options || []).join(', ')}
+                          onChange={(e) =>
+                            handleQuestionChange(
+                              idx,
+                              'options',
+                              e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
+                            )
+                          }
+                          placeholder="e.g. Employed, Self-employed, Unemployed"
+                          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white outline-none focus:border-orange-500"
+                        />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`req_${idx}`}
+                        checked={!!q.required}
+                        onChange={(e) => handleQuestionChange(idx, 'required', e.target.checked)}
+                        className="rounded accent-orange-500"
+                      />
+                      <label htmlFor={`req_${idx}`} className="text-xs text-gray-700 cursor-pointer">
+                        Mark as mandatory/required
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" onClick={() => setShowAddModal(false)}>
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-100 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="text-sm font-bold text-gray-900">Add New Survey Question / Section</h3>
+              <button type="button" onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium text-gray-700 mb-1">Item Type *</label>
+                <select
+                  value={newQuestion.type}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, type: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 bg-white outline-none focus:border-orange-500"
+                >
+                  <option value="text">Question: Text Field</option>
+                  <option value="textarea">Question: Paragraph / Feedback</option>
+                  <option value="choice">Question: Multiple Choice Options</option>
+                  <option value="number">Question: Number</option>
+                  <option value="rating">Question: Rating (1-5)</option>
+                  <option value="section">Section Break / Category Header</option>
+                </select>
+              </div>
+
+              {newQuestion.type === 'section' ? (
+                <div>
+                  <label className="block font-medium text-gray-700 mb-1">Section Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newQuestion.section || ''}
+                    onChange={(e) => setNewQuestion({ ...newQuestion, section: e.target.value })}
+                    placeholder="e.g. Employment History & Progression"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1">Question Text / Prompt *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newQuestion.label || ''}
+                      onChange={(e) => setNewQuestion({ ...newQuestion, label: e.target.value })}
+                      placeholder="e.g. How long did it take to secure your first job?"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">Section Assignment</label>
+                      <input
+                        type="text"
+                        value={newQuestion.section || ''}
+                        onChange={(e) => setNewQuestion({ ...newQuestion, section: e.target.value })}
+                        placeholder="e.g. employment_info"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">Field Identifier (Optional)</label>
+                      <input
+                        type="text"
+                        value={newQuestion.id || ''}
+                        onChange={(e) => setNewQuestion({ ...newQuestion, id: e.target.value })}
+                        placeholder="auto-generated if empty"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {newQuestion.type === 'choice' && (
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">Options (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={rawOptions}
+                        onChange={(e) => setRawOptions(e.target.value)}
+                        placeholder="Option 1, Option 2, Option 3"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="new_req"
+                      checked={!!newQuestion.required}
+                      onChange={(e) => setNewQuestion({ ...newQuestion, required: e.target.checked })}
+                      className="rounded accent-orange-500"
+                    />
+                    <label htmlFor="new_req" className="text-gray-700 cursor-pointer">
+                      Mandatory field (alumni must answer)
+                    </label>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddQuestion}
+                className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-xs cursor-pointer"
+              >
+                Add to Survey
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

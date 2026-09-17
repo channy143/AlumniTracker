@@ -5,6 +5,7 @@ import { validate } from '../middleware/validate';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { mentorshipApplySchema, mentorshipUpdateSchema } from '../middleware/validationSchemas';
+import { createNotification } from './notifications';
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.post('/apply', authenticate, validate(mentorshipApplySchema), async (req:
     const db = createUserScopedClient(req.token!);
     const { data: profile } = await db
       .from('profiles')
-      .select('id')
+      .select('id, first_name, last_name')
       .eq('user_id', req.user!.userId)
       .single();
 
@@ -55,6 +56,27 @@ router.post('/apply', authenticate, validate(mentorshipApplySchema), async (req:
       .single();
 
     if (error) throw new AppError(error.message, 500);
+
+    try {
+      const { data: mentorProf } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('id', req.body.mentor_id)
+        .maybeSingle();
+
+      if (mentorProf?.user_id) {
+        const applicantName = `${profile.first_name || 'An alumnus'} ${profile.last_name || ''}`.trim();
+        await createNotification({
+          userId: mentorProf.user_id,
+          type: 'mentorship',
+          title: '🤝 New Mentorship Request',
+          message: `${applicantName} has requested you as a mentor. Check your mentorship dashboard to review.`,
+          link: '/mentorship',
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Could not send mentorship notification:', notifErr);
+    }
 
     res.status(201).json(mentorship);
   } catch (err) {
@@ -94,6 +116,31 @@ router.put('/:id', authenticate, validate(mentorshipUpdateSchema), async (req: A
       .single();
 
     if (error) throw new AppError(error.message, 500);
+
+    try {
+      const { data: menteeProf } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('id', existing.mentee_id)
+        .maybeSingle();
+
+      if (menteeProf?.user_id) {
+        const statusText = req.body.status;
+        const title = statusText === 'accepted' ? '🎉 Mentorship Request Accepted!' : `Mentorship Status: ${statusText}`;
+        const message = statusText === 'accepted'
+          ? 'Your mentor has accepted your request. Connect now in the mentorship hub.'
+          : `Your mentorship request status is now ${statusText}.`;
+        await createNotification({
+          userId: menteeProf.user_id,
+          type: 'mentorship',
+          title,
+          message,
+          link: '/mentorship',
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Could not send mentee notification:', notifErr);
+    }
 
     res.json(mentorship);
   } catch (err) {

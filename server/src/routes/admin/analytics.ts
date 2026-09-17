@@ -556,8 +556,8 @@ router.get('/career-statistics', async (req, res, next) => {
 
     const totalAlumni = filteredProfiles.length;
 
-    const statusCount: Record<string, number> = { 'Employed': 0, 'Self-employed': 0, 'Unemployed': 0, 'Pursuing Further Studies': 0 };
-    const statusOrder = ['Employed', 'Self-employed', 'Unemployed', 'Pursuing Further Studies'];
+    const statusCount: Record<string, number> = { 'Employed': 0, 'Self-employed': 0, 'Unemployed': 0 };
+    const statusOrder = ['Employed', 'Self-employed', 'Unemployed'];
     const employmentRateTarget = Math.max(totalAlumni, 1);
 
     filteredProfiles.forEach((p: any) => {
@@ -566,17 +566,18 @@ router.get('/career-statistics', async (req, res, next) => {
       const lower = String(raw || '').toLowerCase();
       let bucket = 'Unemployed';
       if (raw === 'Employed' || lower === 'employed') bucket = 'Employed';
-      else if (raw === 'Self-employed' || lower === 'self-employed' || lower === 'entrepreneur') bucket = 'Self-employed';
-      else if (lower === 'student') bucket = 'Pursuing Further Studies';
+      else if (raw === 'Self-employed' || lower === 'self-employed' || lower === 'entrepreneur' || lower === 'freelance') bucket = 'Self-employed';
+      else bucket = 'Unemployed';
       statusCount[bucket] = (statusCount[bucket] || 0) + 1;
     });
 
     const statusDistribution = statusOrder
-      .filter((s) => statusCount[s] > 0)
-      .map((s) => ({ status: s, count: statusCount[s], percentage: Math.round((statusCount[s] / employmentRateTarget) * 100) }));
+      .map((s) => ({ status: s, count: statusCount[s] || 0, percentage: Math.round(((statusCount[s] || 0) / employmentRateTarget) * 100) }));
 
     const employedCount = statusCount['Employed'] + statusCount['Self-employed'];
     const employmentRate = Math.round((employedCount / employmentRateTarget) * 100);
+    const unemployedCount = statusCount['Unemployed'] || 0;
+    const unemployedRate = Math.round((unemployedCount / employmentRateTarget) * 100);
 
     const currentEmployment = employment.filter((e: any) => isCurrent(e) && filteredProfiles.some((p: any) => p.id === e.profile_id));
 
@@ -874,7 +875,10 @@ router.get('/career-statistics', async (req, res, next) => {
     res.json({
       overview: {
         totalAlumni,
+        employedCount,
         employmentRate,
+        unemployedCount,
+        unemployedRate,
         averageSalary,
         averageTimeToEmployment,
         workAlignmentRate,

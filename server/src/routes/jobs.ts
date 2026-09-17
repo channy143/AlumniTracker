@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { applyJobSchema } from '../middleware/validationSchemas';
 import { validateResumeContent } from '../utils/validateResume';
+import { createNotification } from './notifications';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -298,6 +299,16 @@ router.post('/:id/apply', authenticate, upload.single('resume'), validate(applyJ
       if (error.code === '23505') throw new AppError('You have already applied to this job', 409);
       if (error.code === '42P01' || error.code === 'PGRST205') throw new AppError('Job applications are not yet set up in the database', 500);
       throw new AppError(error.message, 500);
+    }
+
+    if (data) {
+      await createNotification({
+        userId: req.user!.userId,
+        type: 'application',
+        title: `Application Received: ${job.position}`,
+        message: `Your application for ${job.position} at ${job.company_name} was successfully submitted and is under review.`,
+        link: '/jobs',
+      });
     }
 
     res.status(201).json(data);

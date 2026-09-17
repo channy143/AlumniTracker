@@ -192,10 +192,26 @@ export default function ProfilePage() {
       if (form.address !== undefined) payload.address = form.address;
       if (form.city !== undefined) payload.city = form.city;
       if (form.province !== undefined) payload.province = form.province;
-      if (form.bio !== undefined) payload.bio = form.bio;
       if (form.privacy_settings !== undefined) payload.privacy_settings = form.privacy_settings;
-      // Note: Employment fields are verified & locked. They automatically update when hired for a job.
       const updated = await profileApi.update(payload);
+
+      // Save career and employment fields
+      if (
+        form.employment_status !== undefined ||
+        form.current_job_title !== undefined ||
+        form.company_name !== undefined ||
+        form.industry !== undefined ||
+        form.salary_range !== undefined
+      ) {
+        await profileApi.updateCareer({
+          employment_status: form.employment_status || 'Unemployed',
+          current_job_title: form.current_job_title || null,
+          company_name: form.company_name || null,
+          industry: form.industry || null,
+          salary_range: form.salary_range || null,
+        });
+      }
+
       await profileApi.batchSkills(editSkills.map((name: string) => ({ name })));
       const origEdu = profile?.education || [];
       const origIds = origEdu.map((e: any) => e.id);
@@ -343,9 +359,11 @@ export default function ProfilePage() {
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const allowed = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowed.includes(file.type)) {
-      setError('Only PDF and DOC/DOCX files are allowed');
+    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+    const validExts = ['.pdf', '.docx'];
+    const validMimes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!validExts.includes(ext) && !validMimes.includes(file.type)) {
+      setError('Unsupported file format. Only PDF (.pdf) and Word documents (.docx) are accepted.');
       return;
     }
     try {
@@ -649,88 +667,103 @@ export default function ProfilePage() {
                   </div>
 
                   <div>
-                    <SectionLine label="Employment" />
-                    <div className="mt-2.5 p-2.5 bg-amber-50/90 border border-amber-200/80 rounded-lg flex items-start gap-2 text-xs text-amber-900">
-                      <LockClosedIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <SectionLine label="Employment Information" />
+                    <p className="text-[11px] text-gray-500 mt-1 mb-2.5">
+                      Maintain your current employment status and workplace details. You can update these anytime.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <span className="font-semibold text-amber-950">Employment Details are Verified & Locked</span>
-                        <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                          These fields cannot be edited manually. They will automatically update when you are hired for a job through the portal.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
-                          <span>Employment Status</span>
-                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        <label className="text-xs text-gray-600 font-medium mb-1 block">
+                          Employment Status
                         </label>
-                        <input
-                          disabled
-                          readOnly
+                        <select
                           value={form.employment_status || 'Unemployed'}
-                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
+                          onChange={(e) => setForm((prev: any) => ({ ...prev, employment_status: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                        >
+                          <option value="Unemployed">Unemployed / Seeking</option>
+                          <option value="Employed">Employed</option>
+                          <option value="Self-employed">Self-employed / Freelance</option>
+                          <option value="Seeking Opportunities">Seeking Opportunities</option>
+                          <option value="Retired">Retired</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-medium mb-1 block">
+                          Current Position / Title
+                        </label>
+                        <input
+                          value={form.current_job_title || ''}
+                          onChange={(e) => setForm((prev: any) => ({ ...prev, current_job_title: e.target.value }))}
+                          placeholder="e.g. Software Engineer, Teacher"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
-                          <span>Current Position</span>
-                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        <label className="text-xs text-gray-600 font-medium mb-1 block">
+                          Company / Organization
                         </label>
                         <input
-                          disabled
-                          readOnly
-                          value={form.current_job_title || '—'}
-                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
+                          value={form.company_name || ''}
+                          onChange={(e) => setForm((prev: any) => ({ ...prev, company_name: e.target.value }))}
+                          placeholder="e.g. Google, Accenture, DepEd"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
-                          <span>Company</span>
-                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        <label className="text-xs text-gray-600 font-medium mb-1 block">
+                          Industry
                         </label>
-                        <input
-                          disabled
-                          readOnly
-                          value={form.company_name || '—'}
-                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
-                        />
+                        <select
+                          value={form.industry || ''}
+                          onChange={(e) => setForm((prev: any) => ({ ...prev, industry: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                        >
+                          <option value="">Select Industry</option>
+                          <option value="Information Technology">Information Technology</option>
+                          <option value="Education / Academia">Education / Academia</option>
+                          <option value="Industrial & Manufacturing">Industrial & Manufacturing</option>
+                          <option value="Engineering & Construction">Engineering & Construction</option>
+                          <option value="Business, Finance & BPO">Business, Finance & BPO</option>
+                          <option value="Hospitality & Tourism">Hospitality & Tourism</option>
+                          <option value="Government & Public Service">Government & Public Service</option>
+                          <option value="Healthcare & Life Sciences">Healthcare & Life Sciences</option>
+                          <option value="Creative Arts & Media">Creative Arts & Media</option>
+                          <option value="Other">Other</option>
+                        </select>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
-                          <span>Industry</span>
-                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        <label className="text-xs text-gray-600 font-medium mb-1 block">
+                          Monthly Salary Range (₱)
                         </label>
-                        <input
-                          disabled
-                          readOnly
-                          value={form.industry || '—'}
-                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
-                        />
+                        <select
+                          value={form.salary_range || ''}
+                          onChange={(e) => setForm((prev: any) => ({ ...prev, salary_range: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                        >
+                          <option value="">Select Salary Range</option>
+                          <option value="Below ₱20,000">Below ₱20,000</option>
+                          <option value="₱20,000–₱40,000">₱20,000–₱40,000</option>
+                          <option value="₱40,000–₱60,000">₱40,000–₱60,000</option>
+                          <option value="₱60,000–₱80,000">₱60,000–₱80,000</option>
+                          <option value="₱80,000+">₱80,000 and above</option>
+                        </select>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
-                          <span>Salary Range (₱)</span>
-                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
+                        <label className="text-xs text-gray-600 font-medium mb-1 block">
+                          Employment Type
                         </label>
-                        <input
-                          disabled
-                          readOnly
-                          value={form.salary_range || '—'}
-                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 flex items-center justify-between">
-                          <span>Employment Type</span>
-                          <LockClosedIcon className="w-3 h-3 text-gray-400" />
-                        </label>
-                        <input
-                          disabled
-                          readOnly
-                          value={form.job_type ? (form.job_type.charAt(0).toUpperCase() + form.job_type.slice(1)) : '—'}
-                          className="w-full border border-gray-200 bg-gray-100 text-gray-600 rounded-lg px-3 py-2 text-sm cursor-not-allowed select-none shadow-none"
-                        />
+                        <select
+                          value={form.job_type || 'full-time'}
+                          onChange={(e) => setForm((prev: any) => ({ ...prev, job_type: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                        >
+                          <option value="full-time">Full-time</option>
+                          <option value="part-time">Part-time</option>
+                          <option value="contract">Contractual</option>
+                          <option value="freelance">Freelance</option>
+                          <option value="internship">Internship</option>
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -787,7 +820,18 @@ export default function ProfilePage() {
                               <input type="number" value={edu.year_graduated || ''} onChange={(e) => { const next = [...editEducation]; next[i] = { ...next[i], year_graduated: parseInt(e.target.value) || '' }; setEditEducation(next); }} placeholder="Year" className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-orange-400" />
                             </div>
                             <input value={edu.institution || edu.campus || ''} onChange={(e) => { const next = [...editEducation]; next[i] = { ...next[i], institution: e.target.value, campus: e.target.value }; setEditEducation(next); }} placeholder="Institution" className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-orange-400" />
-                            <input value={edu.honors || ''} onChange={(e) => { const next = [...editEducation]; next[i] = { ...next[i], honors: e.target.value }; setEditEducation(next); }} placeholder="Honors" className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-orange-400" />
+                            <select
+                              value={edu.honors || ''}
+                              onChange={(e) => { const next = [...editEducation]; next[i] = { ...next[i], honors: e.target.value }; setEditEducation(next); }}
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-orange-400 bg-white"
+                            >
+                              <option value="">No Honors (Regular Graduate)</option>
+                              <option value="Cum Laude">Cum Laude</option>
+                              <option value="Magna Cum Laude">Magna Cum Laude</option>
+                              <option value="Summa Cum Laude">Summa Cum Laude</option>
+                              <option value="Dean's Lister">Dean's Lister</option>
+                              <option value="Leadership Awardee">Leadership Awardee</option>
+                            </select>
                           </div>
                           <button onClick={() => setEditEducation(prev => prev.filter((_, idx) => idx !== i))} className="text-black/30 hover:text-red-500 shrink-0 mt-1 p-0.5 cursor-pointer">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1219,8 +1263,10 @@ export default function ProfilePage() {
                     {edu.year_started && (
                       <span className="text-xs text-gray-400">(Enrolled {edu.year_started})</span>
                     )}
-                    {edu.honors && (
-                      <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-medium rounded-full">{edu.honors}</span>
+                    {edu.honors && edu.honors !== 'None' && (
+                      <span className="px-2.5 py-0.5 bg-amber-100 border border-amber-200 text-amber-800 text-xs font-semibold rounded-full shadow-2xs">
+                        🏅 {edu.honors}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -1602,7 +1648,7 @@ export default function ProfilePage() {
                 </button>
 
                 {/* Resume upload */}
-                <input ref={resumeRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={handleResumeUpload} />
+                <input ref={resumeRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleResumeUpload} />
                 {profile?.resume_url ? (
                   <div className="flex items-center gap-2">
                     <a href={profile.resume_url} target="_blank" rel="noopener noreferrer"
