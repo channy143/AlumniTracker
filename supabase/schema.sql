@@ -129,7 +129,7 @@ CREATE TABLE public.community_groups (
     category IN ('tech', 'business', 'education', 'entrepreneurship', 'general')
   ),
   member_count INTEGER DEFAULT 0,
-  created_by UUID REFERENCES public.profiles(id),
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -171,7 +171,7 @@ CREATE TABLE public.job_postings (
   ),
   salary_range VARCHAR(50),
   application_url TEXT,
-  posted_by UUID REFERENCES public.profiles(id),
+  posted_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   is_alumni_exclusive BOOLEAN DEFAULT FALSE,
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -224,7 +224,7 @@ CREATE TABLE public.events (
   starts_at TIMESTAMPTZ NOT NULL,
   ends_at TIMESTAMPTZ NOT NULL,
   max_participants INTEGER,
-  created_by UUID REFERENCES public.profiles(id),
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -323,7 +323,7 @@ CREATE TABLE IF NOT EXISTS public.companies (
   contact_email VARCHAR(255),
   contact_phone VARCHAR(20),
   is_verified BOOLEAN DEFAULT FALSE,
-  verified_by UUID REFERENCES public.users(id),
+  verified_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
   verified_at TIMESTAMPTZ,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -355,7 +355,7 @@ CREATE TABLE IF NOT EXISTS public.announcements (
 -- AUDIT LOGS TABLE
 CREATE TABLE IF NOT EXISTS public.audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES public.users(id),
+  user_id UUID,
   action VARCHAR(50) NOT NULL,
   entity VARCHAR(50) NOT NULL,
   entity_id UUID,
@@ -381,7 +381,7 @@ CREATE TABLE IF NOT EXISTS public.settings (
   key VARCHAR(100) UNIQUE NOT NULL,
   value JSONB NOT NULL DEFAULT '{}',
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_by UUID REFERENCES public.users(id)
+  updated_by UUID REFERENCES public.users(id) ON DELETE SET NULL
 );
 
 -- AUDIT LOG TRIGGER FUNCTION

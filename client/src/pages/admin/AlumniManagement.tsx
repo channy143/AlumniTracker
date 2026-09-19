@@ -35,6 +35,7 @@ export default function AlumniManagement() {
   const [eligError, setEligError] = useState('');
   const [savingEligible, setSavingEligible] = useState(false);
   const [deletingEligible, setDeletingEligible] = useState<string | null>(null);
+  const [deletingAlumni, setDeletingAlumni] = useState<string | null>(null);
   const addNotification = useUIStore((s) => s.addNotification);
   const batchYears = generateYears(2014, new Date().getFullYear());
 
@@ -150,11 +151,19 @@ export default function AlumniManagement() {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Permanently delete this alumni? This cannot be undone.')) return;
+    setDeletingAlumni(id);
     try {
       await adminApi.alumniDelete(id);
-      addNotification('Alumni deleted', 'success');
+      addNotification('Alumni deleted permanently', 'success');
+      if (showDetail && detailData?.id === id) {
+        setShowDetail(false);
+      }
       load();
-    } catch (err: any) { addNotification(err.message || 'Failed to delete', 'error'); }
+    } catch (err: any) {
+      addNotification(err.response?.data?.message || err.message || 'Failed to delete', 'error');
+    } finally {
+      setDeletingAlumni(null);
+    }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -381,7 +390,13 @@ export default function AlumniManagement() {
                     ) : (
                       <button onClick={() => handleArchive(user.id)} className="text-[10px] px-2 py-1 font-medium bg-amber-50 text-amber-600 rounded-md hover:bg-amber-100">Archive</button>
                     )}
-                    <button onClick={() => handleDelete(user.id)} className="text-[10px] px-2 py-1 font-medium bg-red-50 text-red-500 rounded-md hover:bg-red-100">Delete</button>
+                    <button
+                      onClick={() => handleDelete(user.id)}
+                      disabled={deletingAlumni === user.id}
+                      className="text-[10px] px-2 py-1 font-medium bg-red-50 text-red-500 rounded-md hover:bg-red-100 disabled:opacity-40 cursor-pointer"
+                    >
+                      {deletingAlumni === user.id ? 'Deleting...' : 'Delete'}
+                    </button>
                   </div>
                 </div>
               );

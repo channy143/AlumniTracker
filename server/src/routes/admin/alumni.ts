@@ -5,6 +5,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
 import { formatProgramLongName } from '../../utils/formatProgram';
 import { logAudit } from '../../services/auditLogger';
+import { AuthenticatedRequest } from '../../types';
 
 const router = Router();
 
@@ -445,10 +446,40 @@ router.get('/:id/employment', async (req, res, next) => {
   }
 });
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { error } = await supabase.from('users').delete().eq('id', req.params.id);
+    const targetId = req.params.id;
+
+    // Guard: Prevent admin from deleting their own account
+    if (req.user && req.user.userId === targetId) {
+      throw new AppError('You cannot delete your own account', 400);
+    }
+
+    // Verify user exists and has role 'alumni'
+    const { data: targetUser, error: findError } = await supabase
+      .from('users')
+      .select('id, email, role')
+      .eq('id', targetId)
+      .maybeSingle();
+
+    if (findError) throw new AppError(findError.message, 500);
+    if (!targetUser) throw new AppError('Alumni not found', 404);
+    if (targetUser.role !== 'alumni') {
+      throw new AppError('Only alumni accounts can be deleted from Alumni Management', 400);
+    }
+
+    const { error } = await supabase.from('users').delete().eq('id', targetId);
     if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: 'ALUMNI_DELETED',
+      entity: 'alumni',
+      entityId: targetId,
+      severity: 'critical',
+      status: 'success',
+      details: { targetAlumniId: targetId, email: targetUser.email },
+    });
+
     res.json({ message: 'Alumni deleted permanently' });
   } catch (err) {
     next(err);

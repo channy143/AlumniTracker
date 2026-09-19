@@ -88,6 +88,7 @@ async function main() {
     { path: './supabase/migration_alumni_onboarding_survey.sql', label: 'Alumni onboarding survey migration' },
     { path: './supabase/migration_trusted_devices.sql', label: 'Trusted devices migration' },
     { path: './supabase/migration_security_rules_rls.sql', label: 'Security rules and RLS policy migration' },
+    { path: './supabase/migration_fix_alumni_delete.sql', label: 'Fix alumni deletion and reference constraints migration' },
   ];
 
   for (const f of files) {
