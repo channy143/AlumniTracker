@@ -18,6 +18,7 @@ import {
   MinusIcon,
   ChatBubbleLeftRightIcon,
   ExclamationTriangleIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 
 const ORANGE = '#f97316';
@@ -160,7 +161,7 @@ function RankedBarList({ items }: { items: any[] }) {
       {items.map((item, i) => (
         <div key={item.name} className="flex items-center gap-2 text-xs">
           <span className="text-gray-400 w-4 text-right shrink-0">{i + 1}</span>
-          <span className="text-gray-700 truncate shrink-0 max-w-[130px]" title={item.name}>{item.name}</span>
+          <span className="text-gray-700 truncate shrink-0 max-w-[170px]" title={item.name}>{item.name}</span>
           <div className="flex-1 bg-gray-100 rounded-full h-2">
             <div className="bg-orange-500 rounded-full h-2" style={{ width: `${Math.max((item.count / max) * 100, 4)}%` }} />
           </div>
@@ -286,6 +287,11 @@ export default function CurriculumInsights() {
     academic_year: '', batch: '', course: '', industry: '', employment_status: '', work_alignment: '', date_from: '', date_to: '',
   });
 
+  const handleRefresh = () => {
+    cacheRef.current.clear();
+    setReloadKey((k) => k + 1);
+  };
+
   const hasActiveFilters = Object.values(filters).some((v) => v !== '');
 
   const f = data?.filters || {};
@@ -366,6 +372,14 @@ export default function CurriculumInsights() {
         </div>
         {data && (
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={loading || refreshing}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+            >
+              <ArrowPathIcon className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-orange-500' : 'text-gray-500'}`} />
+              Refresh
+            </button>
             <button onClick={handleExportPDF} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-orange-300">
               <ArrowDownTrayIcon className="w-3.5 h-3.5" /> PDF
             </button>

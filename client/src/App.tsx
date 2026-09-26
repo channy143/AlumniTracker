@@ -24,6 +24,7 @@ import SurveyPage from '@/pages/survey/SurveyPage';
 import TracerSurveyPage from '@/pages/survey/TracerSurveyPage';
 import AlumniOnboardingSurveyPage from '@/pages/survey/AlumniOnboardingSurveyPage';
 import EmployerDashboard from '@/pages/employer/EmployerDashboard';
+import NotificationsPage from '@/pages/notifications/NotificationsPage';
 
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AlumniManagement from '@/pages/admin/AlumniManagement';
@@ -127,6 +128,7 @@ export default function App() {
         <Route path="surveys/:id" element={<SurveyPage />} />
         <Route path="support" element={<SupportPage />} />
         <Route path="help" element={<Navigate to="/support" replace />} />
+        <Route path="notifications" element={<NotificationsPage />} />
 
       </Route>
 
@@ -167,6 +169,7 @@ export default function App() {
         <Route path="/admin/reports" element={<ReportsPage />} />
         <Route path="/admin/settings" element={<SystemSettings />} />
         <Route path="/admin/activity" element={<AdminActivity />} />
+        <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>
   );

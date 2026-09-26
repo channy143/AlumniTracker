@@ -382,15 +382,24 @@ export default function AdminActivity() {
   const limit = 25;
 
   // Security Incidents State (Rule 6)
-  const [incidents, setIncidents] = useState<any[]>([]);
+  const [allIncidents, setAllIncidents] = useState<any[]>([]);
   const [loadingIncidents, setLoadingIncidents] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
+  const [incidentSearch, setIncidentSearch] = useState('');
   const [incidentStatusFilter, setIncidentStatusFilter] = useState('all');
+  const [incidentSeverityFilter, setIncidentSeverityFilter] = useState('all');
   const [resolvingNotes, setResolvingNotes] = useState('');
   const [resolvingStatus, setResolvingStatus] = useState('resolved');
+  const [resolvingSeverity, setResolvingSeverity] = useState('medium');
   const [updatingIncident, setUpdatingIncident] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const queryIdRef = useRef(0);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   // Load incidents on initial mount so tab badge is populated
   useEffect(() => {
@@ -459,10 +468,8 @@ export default function AdminActivity() {
   const loadIncidents = async () => {
     setLoadingIncidents(true);
     try {
-      const data = await adminApi.securityIncidents({
-        status: incidentStatusFilter !== 'all' ? incidentStatusFilter : undefined,
-      });
-      setIncidents(data || []);
+      const data = await adminApi.securityIncidents();
+      setAllIncidents(data || []);
     } catch (err) {
       console.error('Failed to load incidents:', err);
     } finally {
@@ -470,11 +477,24 @@ export default function AdminActivity() {
     }
   };
 
-  useEffect(() => {
-    if (mainTab === 'incidents') {
-      loadIncidents();
-    }
-  }, [mainTab, incidentStatusFilter]);
+  const filteredIncidents = useMemo(() => {
+    return allIncidents.filter((inc) => {
+      if (incidentStatusFilter !== 'all' && inc.status !== incidentStatusFilter) return false;
+      if (incidentSeverityFilter !== 'all' && (inc.severity || 'low').toLowerCase() !== incidentSeverityFilter.toLowerCase()) return false;
+      if (incidentSearch.trim()) {
+        const q = incidentSearch.toLowerCase().trim();
+        const reporterName = inc.reporter ? `${inc.reporter.first_name || ''} ${inc.reporter.last_name || ''}`.toLowerCase() : '';
+        const reporterEmail = (inc.reporter?.email || '').toLowerCase();
+        const type = (inc.incident_type || '').toLowerCase();
+        const desc = (inc.description || '').toLowerCase();
+        const ip = (inc.ip_address || '').toLowerCase();
+        if (!reporterName.includes(q) && !reporterEmail.includes(q) && !type.includes(q) && !desc.includes(q) && !ip.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allIncidents, incidentStatusFilter, incidentSeverityFilter, incidentSearch]);
 
   const handleUpdateIncident = async () => {
     if (!selectedIncident) return;
@@ -483,15 +503,63 @@ export default function AdminActivity() {
       const updated = await adminApi.updateSecurityIncident(selectedIncident.id, {
         status: resolvingStatus,
         adminNotes: resolvingNotes,
+        severity: resolvingSeverity,
       });
-      setIncidents((prev) => prev.map((inc) => (inc.id === updated.id ? { ...inc, ...updated } : inc)));
+      setAllIncidents((prev) => prev.map((inc) => (inc.id === updated.id ? { ...inc, ...updated } : inc)));
       setSelectedIncident(null);
+      showToast('Incident updated and notification dispatched to reporter');
       loadIncidents();
     } catch (err) {
       console.error('Failed to update incident:', err);
+      showToast('Failed to update incident. Please try again.');
     } finally {
       setUpdatingIncident(false);
     }
+  };
+
+  const handleExportIncidentsCsv = () => {
+    if (!allIncidents || allIncidents.length === 0) return;
+    const headers = [
+      'Incident ID',
+      'Reported At',
+      'Reporter Name',
+      'Reporter Email',
+      'Incident Type',
+      'Severity',
+      'Status',
+      'Origin IP',
+      'Description',
+      'Admin Notes',
+      'Resolved At',
+    ];
+    const rows = filteredIncidents.map((inc) => {
+      const reporterName = inc.reporter ? `${inc.reporter.first_name || ''} ${inc.reporter.last_name || ''}`.trim() : 'Anonymous / User';
+      const reporterEmail = inc.reporter?.email || 'N/A';
+      return [
+        inc.id,
+        inc.created_at,
+        reporterName,
+        reporterEmail,
+        inc.incident_type,
+        inc.severity,
+        inc.status,
+        inc.ip_address || '',
+        inc.description || '',
+        inc.admin_notes || '',
+        inc.resolved_at || '',
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `security_incidents_report_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('Security incident report exported as CSV');
   };
 
   useEffect(() => {
@@ -563,6 +631,16 @@ export default function AdminActivity() {
               Export Audit Trail (CSV)
             </button>
           )}
+          {mainTab === 'incidents' && (
+            <button
+              onClick={handleExportIncidentsCsv}
+              disabled={allIncidents.length === 0}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+            >
+              <ArrowDownTrayIcon className="w-3.5 h-3.5" />
+              Export Incidents (CSV)
+            </button>
+          )}
         </div>
       </div>
 
@@ -596,13 +674,13 @@ export default function AdminActivity() {
         >
           <ShieldExclamationIcon className="w-4 h-4 text-red-500" />
           <span>Security / Incident Reports</span>
-          {incidents.filter((i) => i.status === 'open' || i.status === 'investigating').length > 0 ? (
+          {allIncidents.filter((i) => i.status === 'open' || i.status === 'investigating').length > 0 ? (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">
-              {incidents.filter((i) => i.status === 'open' || i.status === 'investigating').length} Active
+              {allIncidents.filter((i) => i.status === 'open' || i.status === 'investigating').length} Active
             </span>
           ) : (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-              {incidents.length}
+              {allIncidents.length}
             </span>
           )}
         </button>
@@ -616,7 +694,7 @@ export default function AdminActivity() {
               <ShieldExclamationIcon className="w-4 h-4 text-orange-500" />
               <span className="text-[11px] font-semibold uppercase tracking-wider">Total Reports</span>
             </div>
-            <p className="text-2xl font-black text-gray-900">{incidents.length}</p>
+            <p className="text-2xl font-black text-gray-900">{allIncidents.length}</p>
             <p className="text-[10px] text-gray-400 mt-0.5">Submitted security incidents</p>
           </div>
 
@@ -626,7 +704,7 @@ export default function AdminActivity() {
               <span className="text-[11px] font-semibold uppercase tracking-wider">Open &amp; Investigating</span>
             </div>
             <p className="text-2xl font-black text-amber-600">
-              {incidents.filter((i) => i.status === 'open' || i.status === 'investigating').length}
+              {allIncidents.filter((i) => i.status === 'open' || i.status === 'investigating').length}
             </p>
             <p className="text-[10px] text-gray-400 mt-0.5">Requires administrator action</p>
           </div>
@@ -637,7 +715,7 @@ export default function AdminActivity() {
               <span className="text-[11px] font-semibold uppercase tracking-wider">Critical Severity</span>
             </div>
             <p className="text-2xl font-black text-red-600">
-              {incidents.filter((i) => i.severity === 'critical').length}
+              {allIncidents.filter((i) => i.severity === 'critical').length}
             </p>
             <p className="text-[10px] text-gray-400 mt-0.5">High-priority security breaches</p>
           </div>
@@ -648,7 +726,7 @@ export default function AdminActivity() {
               <span className="text-[11px] font-semibold uppercase tracking-wider">Resolved Reports</span>
             </div>
             <p className="text-2xl font-black text-emerald-600">
-              {incidents.filter((i) => i.status === 'resolved').length}
+              {allIncidents.filter((i) => i.status === 'resolved').length}
             </p>
             <p className="text-[10px] text-gray-400 mt-0.5">Verified &amp; mitigated incidents</p>
           </div>
@@ -826,18 +904,68 @@ export default function AdminActivity() {
                 Investigate user-reported suspicious logins, credential leaks, and unauthorized access attempts.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Incident Search */}
+              <div className="relative">
+                <MagnifyingGlassIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search reporter, IP, type..."
+                  value={incidentSearch}
+                  onChange={(e) => setIncidentSearch(e.target.value)}
+                  className="text-xs pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg outline-none focus:border-orange-400 bg-white w-48 sm:w-56"
+                />
+                {incidentSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setIncidentSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                    title="Clear search"
+                  >
+                    <XMarkIcon className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Status Filter */}
               <select
                 value={incidentStatusFilter}
                 onChange={(e) => setIncidentStatusFilter(e.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
               >
-                <option value="all">All Incidents</option>
+                <option value="all">All Statuses</option>
                 <option value="open">Open</option>
                 <option value="investigating">Investigating</option>
                 <option value="resolved">Resolved</option>
                 <option value="dismissed">Dismissed</option>
               </select>
+
+              {/* Severity Filter */}
+              <select
+                value={incidentSeverityFilter}
+                onChange={(e) => setIncidentSeverityFilter(e.target.value)}
+                className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
+              >
+                <option value="all">All Severities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+
+              {(incidentStatusFilter !== 'all' || incidentSeverityFilter !== 'all' || incidentSearch) && (
+                <button
+                  onClick={() => {
+                    setIncidentStatusFilter('all');
+                    setIncidentSeverityFilter('all');
+                    setIncidentSearch('');
+                  }}
+                  className="text-xs font-medium text-orange-600 hover:text-orange-700 px-2 py-1"
+                >
+                  Reset
+                </button>
+              )}
+
               <button
                 onClick={loadIncidents}
                 disabled={loadingIncidents}
@@ -869,21 +997,30 @@ export default function AdminActivity() {
                       Loading security incidents...
                     </td>
                   </tr>
-                ) : incidents.length === 0 ? (
+                ) : filteredIncidents.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center py-12 text-gray-400">
                       <ShieldCheckIcon className="w-8 h-8 text-emerald-400 mx-auto mb-1.5" />
-                      <p className="font-semibold text-gray-700">No security incidents reported</p>
-                      <p className="text-[11px] text-gray-400">All alumni accounts currently secure.</p>
+                      <p className="font-semibold text-gray-700">
+                        {allIncidents.length === 0
+                          ? 'No security incidents reported'
+                          : 'No incidents match your search or filter'}
+                      </p>
+                      <p className="text-[11px] text-gray-400">
+                        {allIncidents.length === 0
+                          ? 'All alumni accounts currently secure.'
+                          : 'Try adjusting your search criteria or resetting filters.'}
+                      </p>
                     </td>
                   </tr>
                 ) : (
-                  incidents.map((inc) => (
+                  filteredIncidents.map((inc) => (
                     <tr
                       key={inc.id}
                       onClick={() => {
                         setSelectedIncident(inc);
                         setResolvingStatus(inc.status || 'resolved');
+                        setResolvingSeverity(inc.severity || 'medium');
                         setResolvingNotes(inc.admin_notes || '');
                       }}
                       className="hover:bg-gray-50/70 transition-colors cursor-pointer"
@@ -898,25 +1035,27 @@ export default function AdminActivity() {
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                             inc.severity === 'critical'
-                              ? 'bg-red-100 text-red-700'
+                              ? 'bg-red-100 text-red-700 border border-red-200'
                               : inc.severity === 'high'
-                              ? 'bg-orange-100 text-orange-700'
-                              : 'bg-yellow-100 text-yellow-700'
+                              ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                              : inc.severity === 'medium'
+                              ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                              : 'bg-blue-100 text-blue-700 border border-blue-200'
                           }`}
                         >
-                          {inc.severity}
+                          {inc.severity || 'low'}
                         </span>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                             inc.status === 'resolved'
-                              ? 'bg-emerald-100 text-emerald-700'
+                              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                               : inc.status === 'investigating'
-                              ? 'bg-blue-100 text-blue-700'
+                              ? 'bg-blue-100 text-blue-700 border border-blue-200'
                               : inc.status === 'dismissed'
-                              ? 'bg-gray-100 text-gray-600'
-                              : 'bg-red-100 text-red-700'
+                              ? 'bg-gray-100 text-gray-600 border border-gray-200'
+                              : 'bg-red-100 text-red-700 border border-red-200'
                           }`}
                         >
                           {inc.status}
@@ -934,6 +1073,7 @@ export default function AdminActivity() {
                             e.stopPropagation();
                             setSelectedIncident(inc);
                             setResolvingStatus(inc.status || 'resolved');
+                            setResolvingSeverity(inc.severity || 'medium');
                             setResolvingNotes(inc.admin_notes || '');
                           }}
                           className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-md transition-colors"
@@ -1124,7 +1264,7 @@ export default function AdminActivity() {
                 <div>
                   <span className="text-gray-400 block text-[10px] uppercase">Reported By</span>
                   <span className="font-semibold text-gray-900">
-                    {selectedIncident.reporter ? `${selectedIncident.reporter.email}` : 'Authenticated User'}
+                    {selectedIncident.reporter ? `${selectedIncident.reporter.first_name || ''} ${selectedIncident.reporter.last_name || ''} (${selectedIncident.reporter.email})` : 'Authenticated User'}
                   </span>
                 </div>
                 <div>
@@ -1144,18 +1284,34 @@ export default function AdminActivity() {
                 </p>
               </div>
 
-              <div>
-                <label className="text-gray-700 font-semibold block mb-1">Status:</label>
-                <select
-                  value={resolvingStatus}
-                  onChange={(e) => setResolvingStatus(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-white text-xs"
-                >
-                  <option value="open">Open</option>
-                  <option value="investigating">Investigating</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="dismissed">Dismissed</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-gray-700 font-semibold block mb-1">Status:</label>
+                  <select
+                    value={resolvingStatus}
+                    onChange={(e) => setResolvingStatus(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-white text-xs outline-none focus:border-orange-400"
+                  >
+                    <option value="open">Open</option>
+                    <option value="investigating">Investigating</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="dismissed">Dismissed</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-gray-700 font-semibold block mb-1">Severity Classification:</label>
+                  <select
+                    value={resolvingSeverity}
+                    onChange={(e) => setResolvingSeverity(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-white text-xs outline-none focus:border-orange-400"
+                  >
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -1164,8 +1320,8 @@ export default function AdminActivity() {
                   value={resolvingNotes}
                   onChange={(e) => setResolvingNotes(e.target.value)}
                   rows={3}
-                  placeholder="Record action taken (e.g. forced password reset, session revoked, or false alarm)..."
-                  className="w-full border border-gray-200 rounded-xl p-3 bg-white text-xs focus:ring-2 focus:ring-orange-500/20"
+                  placeholder="Record action taken (e.g. forced password reset, session revoked, notified alumnus, or verified false positive)..."
+                  className="w-full border border-gray-200 rounded-xl p-3 bg-white text-xs focus:ring-2 focus:ring-orange-500/20 outline-none"
                 />
               </div>
             </div>
@@ -1186,6 +1342,14 @@ export default function AdminActivity() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-[200] flex items-center gap-2 bg-gray-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-xl animate-fade-in border border-gray-800">
+          <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
         </div>
       )}
 

@@ -8,16 +8,39 @@ const router = Router();
 
 router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 20;
-    const { data: notifications, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', req.user!.userId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
+    const type = req.query.type as string;
+    const unreadOnly = req.query.unread === 'true';
 
-    if (error && (error.code === '42P01' || error.code === 'PGRST205')) return res.json([]);
+    let query = supabase
+      .from('notifications')
+      .select('*', { count: 'exact' })
+      .eq('user_id', req.user!.userId)
+      .order('created_at', { ascending: false });
+
+    if (type && type !== 'all') {
+      query = query.eq('type', type);
+    }
+    if (unreadOnly) {
+      query = query.eq('is_read', false);
+    }
+
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: notifications, count, error } = await query;
+
+    if (error && (error.code === '42P01' || error.code === 'PGRST205')) return res.json({ notifications: [], total: 0 });
     if (error) throw new AppError(error.message, 500);
+
+    // If client requested via older array contract (e.g. Header), we can return array or object.
+    // To maintain backward compatibility with `res.json(notifications || [])` in Header:
+    // If query has `all` or `page` or `count`, we can return both or array with property.
+    // But in JS, res.json(notifications) is an array. To avoid breaking Header.tsx `setNotifications(data)` which expects an Array:
+    // Let's check: if req.query.envelope === 'true' return { notifications, total: count }, otherwise res.json(notifications || []).
+    if (req.query.envelope === 'true') {
+      return res.json({ notifications: notifications || [], total: count || 0 });
+    }
 
     res.json(notifications || []);
   } catch (err) { next(err); }
@@ -58,6 +81,37 @@ router.post('/mark-all-read', authenticate, async (req: AuthenticatedRequest, re
       .eq('user_id', req.user!.userId)
       .eq('is_read', false);
 
+    if (error) throw new AppError(error.message, 500);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('user_id', req.user!.userId);
+
+    if (error) throw new AppError(error.message, 500);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const readOnly = req.query.read_only === 'true';
+    let query = supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', req.user!.userId);
+
+    if (readOnly) {
+      query = query.eq('is_read', true);
+    }
+
+    const { error } = await query;
     if (error) throw new AppError(error.message, 500);
     res.json({ success: true });
   } catch (err) { next(err); }

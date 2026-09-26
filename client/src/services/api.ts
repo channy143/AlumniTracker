@@ -254,9 +254,13 @@ export const surveyApi = {
 
 export const notificationsApi = {
   list: (limit = 20) => api.get<any[]>(`/notifications?limit=${limit}`),
+  listDetailed: (params: { limit?: number; offset?: number; type?: string; unread?: boolean } = {}) =>
+    api.get<{ notifications: any[]; total: number }>(`/notifications?envelope=true&${toQuery(params)}`),
   unreadCount: () => api.get<{ count: number }>('/notifications/unread-count'),
   markRead: (id: string) => api.post<any>(`/notifications/${id}/read`, {}),
   markAllRead: () => api.post<any>('/notifications/mark-all-read', {}),
+  delete: (id: string) => api.delete<any>(`/notifications/${id}`),
+  clearAll: (readOnly = false) => api.delete<any>(`/notifications?read_only=${readOnly}`),
 };
 
 function toQuery(obj: Record<string, any>) {

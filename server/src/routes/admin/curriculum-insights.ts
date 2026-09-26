@@ -19,10 +19,22 @@ function alignmentCategory(value: string): string | null {
   const v = String(value || '').toLowerCase().trim();
   if (!v) return null;
   if (v.includes('closely') || v === 'aligned' || v === 'fully aligned') return 'Aligned with Degree';
-  if (v.includes('partially') || v.includes('somewhat')) return 'Partially Aligned';
+  if (v.includes('partially') || v.includes('somewhat') || v.includes('moderate')) return 'Partially Aligned';
   if (v.includes('not')) return 'Not Aligned';
   if (v.includes('aligned')) return 'Aligned with Degree';
   return null;
+}
+
+function cleanSkillName(raw: string): string {
+  let s = String(raw || '').trim();
+  if (/years? of experience/i.test(s)) {
+    if (/python/i.test(s) && /c\+\+/i.test(s)) return 'Python / C++';
+    if (/python/i.test(s)) return 'Python';
+    if (/c\+\+/i.test(s)) return 'C++';
+    if (/react/i.test(s)) return 'React';
+    return s.replace(/^.*(?:in|with)\s+/i, '').trim();
+  }
+  return s;
 }
 
 const SAT_SCORE: Record<string, number> = {
@@ -34,43 +46,118 @@ const SAT_SCORE: Record<string, number> = {
 };
 
 const EMERGING_TECHS = [
-  { technology: 'Artificial Intelligence', match: /artificial intelligence|\bai\b|machine learning|deep learning|neural|tensorflow|pytorch|\bnlp\b/i },
-  { technology: 'Cloud Computing', match: /cloud|\baws\b|\bazure\b|google cloud|\bgcp\b|serverless|lambda/i },
-  { technology: 'Cybersecurity', match: /cyber|security|penetration|ethical hacking|network security|encryption/i },
-  { technology: 'Data Analytics', match: /data analytics|data analysis|big data|power bi|tableau|data science|visualization/i },
-  { technology: 'Machine Learning', match: /machine learning|\bml\b|deep learning|tensorflow|pytorch|scikit/i },
-  { technology: 'DevOps', match: /devops|ci\/cd|docker|kubernetes|jenkins|gitlab|terraform/i },
+  { technology: 'Artificial Intelligence & ML', match: /artificial intelligence|\bai\b|machine learning|deep learning|neural|tensorflow|pytorch|\bnlp\b/i },
+  { technology: 'Cloud Computing (AWS/GCP/Azure)', match: /cloud|\baws\b|\bazure\b|google cloud|\bgcp\b|serverless|lambda/i },
+  { technology: 'DevOps & Containerization', match: /devops|ci\/cd|docker|kubernetes|container|jenkins|gitlab|terraform/i },
+  { technology: 'Modern Databases & SQL', match: /postgresql|postgres|database management|sql|nosql|mongodb|redis/i },
+  { technology: 'Cybersecurity & Systems', match: /cyber|security|linux|network admin|penetration|ethical hacking|sysadmin/i },
+  { technology: 'Full-Stack Web & Mobile', match: /react|node\.?js|typescript|frontend|backend|full.?stack|mobile|figma/i },
+  { technology: 'Data Analytics & Visualization', match: /data analytics|data analysis|big data|power bi|tableau|data science|visualization/i },
 ];
 
 const REC_TEXTS: Record<string, string> = {
-  'cloud computing': 'Strengthen cloud-related coursework and add hands-on cloud laboratory activities.',
-  'cloud': 'Strengthen cloud-related coursework and add hands-on cloud laboratory activities.',
-  'cybersecurity': 'Introduce additional cybersecurity electives and embed security fundamentals across courses.',
-  'data analytics': 'Increase practical data analysis activities using real-world datasets.',
-  'artificial intelligence': 'Introduce or expand AI/ML coursework and applied projects.',
-  'machine learning': 'Introduce or expand machine learning coursework and projects.',
-  'devops': 'Consider adding DevOps, containerization, and CI/CD topics to software courses.',
+  'cloud computing': 'Strengthen cloud architecture coursework (AWS/GCP/Azure) and introduce hands-on cloud deployment labs.',
+  'cloud': 'Strengthen cloud architecture coursework (AWS/GCP/Azure) and introduce hands-on cloud deployment labs.',
+  'docker': 'Introduce containerization (Docker, Kubernetes) and CI/CD automation into software development electives.',
+  'kubernetes': 'Add container orchestration, cloud-native deployments, and microservices labs.',
+  'postgresql': 'Deepen relational database curriculum with hands-on PostgreSQL, indexing, query optimization, and schema migrations.',
+  'database management': 'Strengthen database administration, SQL optimization, and database security coursework.',
+  'linux': 'Incorporate Linux system administration, bash scripting, and server configuration into the systems track.',
+  'network administration': 'Strengthen networking laboratories with router/switch configuration, VPN, and network security monitoring.',
+  'technical support': 'Introduce practical IT service management, troubleshooting labs, and customer support frameworks.',
+  'cybersecurity': 'Introduce additional cybersecurity electives and embed secure coding practices across courses.',
+  'data analytics': 'Increase practical data analysis activities using real-world datasets and modern SQL/Python tooling.',
+  'artificial intelligence': 'Introduce or expand AI/ML coursework, prompt engineering, and applied automation projects.',
+  'machine learning': 'Introduce or expand machine learning coursework and data engineering projects.',
+  'devops': 'Add DevOps, containerization, automated testing, and CI/CD topics to software engineering courses.',
+  'social media marketing': 'Offer elective workshops on digital media marketing, audience analytics, and online content strategy.',
+  'content creation': 'Incorporate digital media production, brand communication, and modern creative workflows.',
+  'inventory management': 'Offer coursework in enterprise resource planning, logistics management, and automated inventory systems.',
+  'python / c++': 'Emphasize high-performance algorithms, system programming, and modern software design patterns.',
+  'python': 'Expand advanced Python applications in data science, automation, and backend API engineering.',
+  'typescript': 'Adopt TypeScript across modern web and full-stack development coursework.',
+  'react': 'Reinforce modern frontend web development with React, component design, and state management.',
+  'node.js': 'Emphasize RESTful API design, microservices, and asynchronous event-driven backend development.',
 };
 
 const FEEDBACK_THEMES = [
   { theme: 'More hands-on laboratory work', match: /hand.?on|laborator|\blab\b|practical session/i },
-  { theme: 'Increase internship opportunities', match: /intern/i },
-  { theme: 'More industry certifications', match: /certific|license/i },
-  { theme: 'More cloud computing topics', match: /cloud/i },
-  { theme: 'More real-world projects', match: /real.world|capstone|\bproject/i },
-  { theme: 'Increase industry collaboration', match: /industry|partner|collaborat|with companies/i },
-  { theme: 'More programming and software skills', match: /program|coding|software|develop|\bcode\b/i },
-  { theme: 'Improve soft skills training', match: /communic|teamwork|soft skill|presentation|leadership/i },
+  { theme: 'Increase internship opportunities', match: /intern|oij|practicum/i },
+  { theme: 'More industry certifications (TESDA, Cloud)', match: /certific|license|tesda|nc\s?ii/i },
+  { theme: 'More cloud computing & DevOps topics', match: /cloud|docker|devops/i },
+  { theme: 'More real-world capstone projects', match: /real.world|capstone|\bproject/i },
+  { theme: 'Increase industry collaboration & job fairs', match: /industry|partner|collaborat|job fair|career talk/i },
+  { theme: 'More programming & software skills', match: /program|coding|software|develop|\bcode\b|python|javascript/i },
+  { theme: 'Improve soft skills & interview readiness', match: /communic|teamwork|soft skill|presentation|leadership|interview/i },
 ];
-
-function topKey(counts: Record<string, number>): string | null {
-  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-}
 
 function toRanked(obj: Record<string, number>) {
   return Object.entries(obj)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
+}
+
+function classifyAlignment(
+  mergedResp: any,
+  eduPrograms: string[],
+  currentEmp: any[],
+  profileJob?: string,
+  profileIndustry?: string
+): 'Aligned with Degree' | 'Partially Aligned' | 'Not Aligned' {
+  // 1. Direct survey course_alignment
+  const ca = alignmentCategory(mergedResp.course_alignment);
+  if (ca) return ca as any;
+
+  // 2. Direct survey curriculumRelevance / curriculum_relevance
+  const cr = String(mergedResp.curriculumRelevance || mergedResp.curriculum_relevance || '').toLowerCase().trim();
+  if (cr.includes('extremely') || cr.includes('very')) return 'Aligned with Degree';
+  if (cr.includes('moderate') || cr.includes('somewhat')) return 'Partially Aligned';
+  if (cr.includes('slightly') || cr.includes('not')) return 'Not Aligned';
+
+  // 3. Program vs actual position / industry
+  const programStr = (eduPrograms.join(' ') + ' ' + (mergedResp.program || '')).toLowerCase();
+  const jobTitle = [
+    ...currentEmp.map((e) => e.position || ''),
+    profileJob || '',
+    mergedResp.position || '',
+    mergedResp.currentJobTitle || '',
+  ].join(' ').toLowerCase();
+
+  const industry = [
+    ...currentEmp.map((e) => e.company_industry || ''),
+    profileIndustry || '',
+    mergedResp.industry || '',
+  ].join(' ').toLowerCase();
+
+  const isIT = programStr.includes('it') || programStr.includes('information') || programStr.includes('computer');
+  const isEducation = programStr.includes('education') || programStr.includes('bsed') || programStr.includes('beed') || programStr.includes('teach');
+
+  if (isIT) {
+    if (
+      /software|developer|engineer|programmer|web|systems?|database|network|cloud|tech|devops|full.?stack|analyst|code|coding/i.test(jobTitle) ||
+      /information technology|\bit\b|software|technology/i.test(industry)
+    ) {
+      return 'Aligned with Degree';
+    }
+    if (/support|help.?desk|technical|technician|specialist|operations|assistant/i.test(jobTitle)) {
+      return 'Partially Aligned';
+    }
+    if (jobTitle.trim() && !/unemployed/i.test(jobTitle)) {
+      return 'Not Aligned';
+    }
+  } else if (isEducation) {
+    if (/teacher|instructor|educator|professor|faculty|tutor|teaching/i.test(jobTitle) || /education|school|college|academic/i.test(industry)) {
+      return 'Aligned with Degree';
+    }
+    if (/coordinator|librarian|adviser|counselor/i.test(jobTitle)) {
+      return 'Partially Aligned';
+    }
+    if (jobTitle.trim() && !/unemployed/i.test(jobTitle)) {
+      return 'Not Aligned';
+    }
+  }
+
+  return 'Partially Aligned';
 }
 
 const router = Router();
@@ -86,15 +173,17 @@ router.get('/statistics', async (req, res, next) => {
     const dateFrom = req.query.date_from as string;
     const dateTo = req.query.date_to as string;
 
-    const { data: users } = await supabase.from('users').select('id').eq('role', 'alumni');
+    // 1. Fetch alumni users
+    const { data: users } = await supabase.from('users').select('id, email').eq('role', 'alumni');
     const alumniUsers = users || [];
     const alumniUserIds = alumniUsers.map((u: any) => u.id);
 
+    // 2. Fetch profiles
     let profiles: any[] = [];
     if (alumniUserIds.length > 0) {
       const { data: p } = await supabase
         .from('profiles')
-        .select('id, user_id, first_name, last_name, employment_status, current_job_title, company_name, industry, city, province')
+        .select('id, user_id, first_name, last_name, email, employment_status, current_job_title, company_name, industry, city, province')
         .in('user_id', alumniUserIds);
       profiles = p || [];
     }
@@ -105,15 +194,22 @@ router.get('/statistics', async (req, res, next) => {
     let skills: any[] = [];
     if (profileIds.length > 0) {
       const [{ data: e }, { data: emp }, { data: sk }] = await Promise.all([
-        supabase.from('education').select('profile_id, program, year_graduated').in('profile_id', profileIds),
+        supabase.from('education').select('profile_id, program, year_graduated, campus').in('profile_id', profileIds),
         supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, job_type, start_date, end_date, is_current, updated_at').in('profile_id', profileIds),
-        supabase.from('skills').select('profile_id, name, category').in('profile_id', profileIds),
+        supabase.from('skills').select('profile_id, name, category, proficiency_level').in('profile_id', profileIds),
       ]);
       education = e || [];
       employment = emp || [];
       skills = sk || [];
     }
 
+    // 3. Fetch real job postings (market demand)
+    const { data: jp } = await supabase
+      .from('job_postings')
+      .select('id, position, company_name, industry, required_skills, requirements, description');
+    const jobPostings = jp || [];
+
+    // 4. Fetch career feedback (if present)
     let careerFeedback: any[] = [];
     if (profileIds.length > 0) {
       const { data: cf } = await supabase
@@ -123,26 +219,45 @@ router.get('/statistics', async (req, res, next) => {
       careerFeedback = cf || [];
     }
 
+    // 5. Fetch surveys and survey responses
     const { data: surveys } = await supabase.from('surveys').select('id, academic_year, status, is_active');
     const { data: surveyResponses } = await supabase
       .from('survey_responses')
       .select('survey_id, user_id, responses, submitted_at')
       .order('submitted_at', { ascending: true });
 
-    const profileByUser = new Map(profiles.map((p: any) => [p.user_id, p.id]));
-    const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
+    // Lookup maps
     const eduByProfile = new Map<string, any[]>();
     education.forEach((e: any) => {
       if (!eduByProfile.has(e.profile_id)) eduByProfile.set(e.profile_id, []);
       eduByProfile.get(e.profile_id)!.push(e);
     });
+
     const empByProfile = new Map<string, any[]>();
     employment.forEach((e: any) => {
       if (!empByProfile.has(e.profile_id)) empByProfile.set(e.profile_id, []);
       empByProfile.get(e.profile_id)!.push(e);
     });
+
     const feedbackByProfile = new Map<string, any>();
     careerFeedback.forEach((c: any) => feedbackByProfile.set(c.profile_id, c));
+
+    // Consolidate survey responses per user
+    const allResponsesByUser = new Map<string, any[]>();
+    (surveyResponses || []).forEach((r: any) => {
+      if (!allResponsesByUser.has(r.user_id)) allResponsesByUser.set(r.user_id, []);
+      allResponsesByUser.get(r.user_id)!.push(r.responses || {});
+    });
+
+    const getMergedUserResponse = (userId: string, email?: string) => {
+      let list = allResponsesByUser.get(userId) || [];
+      if (list.length === 0 && email) {
+        list = (surveyResponses || [])
+          .filter((sr: any) => (sr.responses?.email || '').toLowerCase() === email.toLowerCase())
+          .map((sr: any) => sr.responses || {});
+      }
+      return Object.assign({}, ...list);
+    };
 
     const academicYears = [...new Set((surveys || []).map((s: any) => s.academic_year).filter(Boolean))].sort();
     const academicYearUserIds = new Set<string>();
@@ -154,38 +269,41 @@ router.get('/statistics', async (req, res, next) => {
       });
     }
 
-    const latestResponseByUser = new Map<string, any>();
-    (surveyResponses || []).forEach((r: any) => {
-      latestResponseByUser.set(r.user_id, r);
-    });
-
     const isCurrent = (e: any) => e.is_current === true;
-    const employmentStatusOf = (p: any) => {
-      const raw = p.employment_status || (empByProfile.get(p.id) || []).find(isCurrent)?.employment_status || null;
+    const employmentStatusOf = (p: any, mergedResp: any) => {
+      const raw =
+        p.employment_status ||
+        (empByProfile.get(p.id) || []).find(isCurrent)?.employment_status ||
+        mergedResp.employmentStatus ||
+        mergedResp.employment_status ||
+        null;
       const lower = String(raw || '').toLowerCase();
       if (raw === 'Employed' || lower === 'employed') return 'Employed';
       if (lower === 'self-employed' || lower === 'entrepreneur') return 'Self-employed';
-      if (lower === 'student') return 'Pursuing Further Studies';
+      if (lower === 'student' || lower.includes('further studies')) return 'Pursuing Further Studies';
       return 'Unemployed';
     };
 
+    // Filter eligible profiles
     const eligibleProfiles = profiles.filter((p: any) => {
       if (academicYear && !academicYearUserIds.has(p.user_id)) return false;
       const edu = eduByProfile.get(p.id) || [];
       if (batch && !edu.some((e: any) => String(e.year_graduated) === batch)) return false;
       if (course && !edu.some((e: any) => abbreviateProgram(e.program) === course)) return false;
 
-      const status = employmentStatusOf(p);
+      const mergedResp = getMergedUserResponse(p.user_id, p.email);
+      const status = employmentStatusOf(p, mergedResp);
       if (statusFilter && status !== statusFilter) return false;
 
-      const resp = latestResponseByUser.get(p.user_id)?.responses || {};
-      const alignment = alignmentCategory(resp.course_alignment);
+      const currentEmp = (empByProfile.get(p.id) || []).filter(isCurrent);
+      const eduPrograms = edu.map((e: any) => e.program || '');
+      const alignment = classifyAlignment(mergedResp, eduPrograms, currentEmp, p.current_job_title, p.industry);
       if (alignmentFilter && alignment !== alignmentFilter) return false;
 
-      const emp = empByProfile.get(p.id) || [];
-      const currentEmp = emp.filter(isCurrent);
       if (industryFilter) {
-        const industries = currentEmp.map((e: any) => String(e.company_industry || '').trim()).concat(p.industry || '');
+        const industries = currentEmp
+          .map((e: any) => String(e.company_industry || '').trim())
+          .concat(p.industry || '', mergedResp.industry || '');
         if (!industries.some((i: any) => i === industryFilter)) return false;
       }
 
@@ -207,20 +325,29 @@ router.get('/statistics', async (req, res, next) => {
     const eligibleEmployment = employment.filter((e: any) => eligibleIds.has(e.profile_id));
     const eligibleSkills = skills.filter((s: any) => eligibleIds.has(s.profile_id));
 
-    // --- Degree Alignment (from latest survey response per user) ---
+    // --- Degree Alignment ---
     const alignmentCounts: Record<string, number> = { 'Aligned with Degree': 0, 'Partially Aligned': 0, 'Not Aligned': 0 };
     let alignmentTotal = 0;
     eligibleProfiles.forEach((p: any) => {
-      const resp = latestResponseByUser.get(p.user_id)?.responses || {};
-      const cat = alignmentCategory(resp.course_alignment);
-      if (cat) {
+      const mergedResp = getMergedUserResponse(p.user_id, p.email);
+      const edu = eduByProfile.get(p.id) || [];
+      const currentEmp = (empByProfile.get(p.id) || []).filter(isCurrent);
+      const eduPrograms = edu.map((e: any) => e.program || '');
+      const status = employmentStatusOf(p, mergedResp);
+
+      // Only count alumni who are employed or who provided survey feedback
+      const hasJob = currentEmp.length > 0 || p.current_job_title || mergedResp.position;
+      if (status !== 'Unemployed' || hasJob || mergedResp.curriculumRelevance || mergedResp.course_alignment) {
+        const cat = classifyAlignment(mergedResp, eduPrograms, currentEmp, p.current_job_title, p.industry);
         alignmentCounts[cat] = (alignmentCounts[cat] || 0) + 1;
         alignmentTotal++;
       }
     });
+
     const workAlignmentRate = alignmentTotal > 0
       ? Math.round(((alignmentCounts['Aligned with Degree'] + alignmentCounts['Partially Aligned']) / alignmentTotal) * 100)
       : 0;
+
     const degreeAlignment = Object.entries(alignmentCounts)
       .filter(([, c]) => c > 0)
       .map(([category, count]) => ({
@@ -233,10 +360,25 @@ router.get('/statistics', async (req, res, next) => {
     let satisfactionSum = 0;
     let satisfactionCount = 0;
     eligibleProfiles.forEach((p: any) => {
-      const resp = latestResponseByUser.get(p.user_id)?.responses || {};
-      const score = SAT_SCORE[resp.satisfaction_rating];
-      if (score) {
-        satisfactionSum += score;
+      const resp = getMergedUserResponse(p.user_id, p.email);
+      const scores: number[] = [];
+
+      if (resp.satisfaction_rating && SAT_SCORE[resp.satisfaction_rating]) {
+        scores.push(SAT_SCORE[resp.satisfaction_rating]);
+      }
+      ['facultyRating', 'facilitiesRating', 'studentServicesRating'].forEach((k) => {
+        const v = parseFloat(String(resp[k] || ''));
+        if (!isNaN(v) && v >= 1 && v <= 5) scores.push(v);
+      });
+      const cr = String(resp.curriculumRelevance || resp.curriculum_relevance || '').toLowerCase();
+      if (cr.includes('extremely')) scores.push(5);
+      else if (cr.includes('very')) scores.push(4.5);
+      else if (cr.includes('moderate')) scores.push(3.5);
+      else if (cr.includes('slightly')) scores.push(2);
+
+      if (scores.length > 0) {
+        const userAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        satisfactionSum += userAvg;
         satisfactionCount++;
       }
     });
@@ -265,88 +407,123 @@ router.get('/statistics', async (req, res, next) => {
       : null;
 
     // --- Skills Frequently Used ---
+    // Merge: alumni skills + survey reported competencies + real employer job postings
     const skillCount: Record<string, number> = {};
     eligibleSkills.forEach((s: any) => {
-      const name = String(s.name || '').trim();
+      const name = cleanSkillName(s.name);
       if (name) skillCount[name] = (skillCount[name] || 0) + 1;
     });
+
+    eligibleProfiles.forEach((p: any) => {
+      const resp = getMergedUserResponse(p.user_id, p.email);
+      if (resp.skills_list) {
+        String(resp.skills_list)
+          .split(/[,;\n]+/)
+          .map((s) => cleanSkillName(s))
+          .filter(Boolean)
+          .forEach((s) => {
+            skillCount[s] = (skillCount[s] || 0) + 1;
+          });
+      }
+    });
+
     careerFeedback.forEach((c: any) => {
       if (!eligibleIds.has(c.profile_id)) return;
       (c.skills_used_at_work || []).forEach((name: string) => {
-        const n = String(name || '').trim();
+        const n = cleanSkillName(name);
         if (n) skillCount[n] = (skillCount[n] || 0) + 1;
       });
     });
+
+    // Also include skills demanded in active employer postings
+    jobPostings.forEach((j: any) => {
+      (j.required_skills || []).forEach((name: string) => {
+        const n = cleanSkillName(name);
+        if (n) skillCount[n] = (skillCount[n] || 0) + 1;
+      });
+    });
+
     const skillsFrequentlyUsed = toRanked(skillCount)
-      .map((s) => ({ name: s.name, count: s.count, percentage: totalAlumni > 0 ? Math.round((s.count / totalAlumni) * 100) : 0 }))
+      .map((s) => ({
+        name: s.name,
+        count: s.count,
+        percentage: totalAlumni > 0 ? Math.min(100, Math.round((s.count / Math.max(totalAlumni, 1)) * 100)) : 0,
+      }))
       .slice(0, 12);
 
     // --- Emerging Technologies ---
-    const profileSkills = new Map<string, Set<string>>();
-    eligibleSkills.forEach((s: any) => {
-      const name = String(s.name || '').trim();
-      if (!name) return;
-      if (!profileSkills.has(s.profile_id)) profileSkills.set(s.profile_id, new Set());
-      profileSkills.get(s.profile_id)!.add(name);
+    const allTechStrings: string[] = [];
+    eligibleSkills.forEach((s: any) => allTechStrings.push(s.name || ''));
+    eligibleProfiles.forEach((p: any) => {
+      const resp = getMergedUserResponse(p.user_id, p.email);
+      if (resp.skills_list) allTechStrings.push(resp.skills_list);
+      if (resp.postGradCertifications) allTechStrings.push(resp.postGradCertifications);
+      (resp.competenciesDeveloped || []).forEach((c: string) => allTechStrings.push(c));
     });
-    careerFeedback.forEach((c: any) => {
-      if (!eligibleIds.has(c.profile_id)) return;
-      (c.skills_used_at_work || []).forEach((name: string) => {
-        const n = String(name || '').trim();
-        if (!n) return;
-        if (!profileSkills.has(c.profile_id)) profileSkills.set(c.profile_id, new Set());
-        profileSkills.get(c.profile_id)!.add(n);
-      });
+    jobPostings.forEach((j: any) => {
+      (j.required_skills || []).forEach((s: string) => allTechStrings.push(s));
+      (j.requirements || []).forEach((r: string) => allTechStrings.push(r));
+      if (j.position) allTechStrings.push(j.position);
+      if (j.description) allTechStrings.push(j.description);
     });
 
-    const gradYearOf = (profileId: string) => {
-      const edu = eduByProfile.get(profileId) || [];
-      const years = edu.map((e: any) => Number(e.year_graduated)).filter((y: number) => !isNaN(y));
-      return years.length ? Math.max(...years) : null;
-    };
-    const recentCutoff = 2;
+    const combinedTechCorpus = allTechStrings.join(' ');
     const emergingTechnologies = EMERGING_TECHS.map((tech) => {
       let count = 0;
-      let recent = 0;
-      let earlier = 0;
-      profileSkills.forEach((names, profileId) => {
-        const hit = [...names].some((n) => tech.match.test(n));
-        if (!hit) return;
-        count++;
-        const gy = gradYearOf(profileId);
-        if (gy && gy >= new Date().getFullYear() - recentCutoff) recent++;
-        else earlier++;
+      allTechStrings.forEach((str) => {
+        if (tech.match.test(str)) count++;
       });
-      let growth: string;
-      if (count === 0) growth = 'No Usage';
-      else if (recent > 0 && earlier === 0) growth = 'New';
-      else if (recent > earlier) growth = 'Trending Up';
-      else growth = 'Stable';
-      return { technology: tech.technology, count, growth };
+      // Also check occurrences in active employer job postings
+      const jobHits = jobPostings.filter((j: any) => {
+        const text = `${j.position || ''} ${(j.required_skills || []).join(' ')} ${(j.requirements || []).join(' ')}`;
+        return tech.match.test(text);
+      }).length;
+
+      let growth = 'Stable';
+      if (jobHits >= 2) growth = 'Trending Up';
+      else if (jobHits === 1) growth = 'New';
+      else if (count >= 3) growth = 'Trending Up';
+
+      return { technology: tech.technology, count: Math.max(count, jobHits), growth };
     }).filter((t) => t.count > 0);
 
-    // --- Skills Gap Analysis ---
-    const curriculumCoverage: Record<string, number> = {};
-    eligibleSkills.forEach((s: any) => {
-      const name = String(s.name || '').trim();
-      if (name) curriculumCoverage[name] = (curriculumCoverage[name] || 0) + 1;
-    });
-    const workplaceUsage: Record<string, number> = {};
-    careerFeedback.forEach((c: any) => {
-      if (!eligibleIds.has(c.profile_id)) return;
-      (c.skills_used_at_work || []).forEach((name: string) => {
-        const n = String(name || '').trim();
-        if (n) workplaceUsage[n] = (workplaceUsage[n] || 0) + 1;
+    // --- Skills Gap Analysis (Real Market Demand vs Alumni Curriculum Coverage) ---
+    const marketDemand: Record<string, number> = {};
+    jobPostings.forEach((j: any) => {
+      (j.required_skills || []).forEach((name: string) => {
+        const n = cleanSkillName(name);
+        if (n) marketDemand[n] = (marketDemand[n] || 0) + 1;
       });
     });
-    const skillsGap = Object.entries(workplaceUsage)
-      .map(([skill, usage]) => {
+
+    const curriculumCoverage: Record<string, number> = {};
+    eligibleSkills.forEach((s: any) => {
+      const n = cleanSkillName(s.name);
+      if (n) curriculumCoverage[n] = (curriculumCoverage[n] || 0) + 1;
+    });
+    eligibleProfiles.forEach((p: any) => {
+      const resp = getMergedUserResponse(p.user_id, p.email);
+      if (resp.skills_list) {
+        String(resp.skills_list)
+          .split(/[,;\n]+/)
+          .map((s) => cleanSkillName(s))
+          .filter(Boolean)
+          .forEach((s) => {
+            curriculumCoverage[s] = (curriculumCoverage[s] || 0) + 1;
+          });
+      }
+    });
+
+    // Compute gaps where market demand exceeds coverage or where employers require emerging tech
+    const skillsGap = Object.entries(marketDemand)
+      .map(([skill, demand]) => {
         const coverage = curriculumCoverage[skill] || 0;
+        const gap = Math.max(0, demand - coverage);
         return {
           skill,
-          workplaceUsage: usage,
+          workplaceUsage: demand,
           curriculumCoverage: coverage,
-          gap: usage - coverage,
+          gap,
         };
       })
       .filter((g) => g.gap > 0)
@@ -357,26 +534,41 @@ router.get('/statistics', async (req, res, next) => {
         workplaceUsage: g.workplaceUsage,
         curriculumCoverage: g.curriculumCoverage,
         gap: g.gap,
-        recommendation: REC_TEXTS[normalize(g.skill)] || `Consider integrating ${g.skill} more deeply into the curriculum with hands-on projects.`,
+        recommendation:
+          REC_TEXTS[normalize(g.skill)] ||
+          `Consider integrating ${g.skill} more deeply into the program curriculum through laboratory exercises and capstone projects.`,
       }));
 
     // --- Curriculum Recommendation Cards ---
     const candidates = [
-      ...emergingTechnologies.map((t) => ({ title: t.technology, count: t.count, kind: 'technology' as const })),
-      ...skillsGap.map((g) => ({ title: g.skill, count: g.workplaceUsage, kind: 'gap' as const, gap: g.gap, coverage: g.curriculumCoverage })),
+      ...skillsGap.map((g) => ({
+        title: g.skill,
+        count: g.workplaceUsage,
+        kind: 'gap' as const,
+        gap: g.gap,
+        coverage: g.curriculumCoverage,
+      })),
+      ...emergingTechnologies.map((t) => ({
+        title: t.technology,
+        count: t.count,
+        kind: 'technology' as const,
+        gap: 0,
+        coverage: 0,
+      })),
     ];
+
     const maxCount = Math.max(1, ...candidates.map((c) => c.count));
     const recommendations = candidates
-      .sort((a, b) => b.count - a.count)
       .slice(0, 4)
       .map((c) => {
-        const priority = c.count >= 0.6 * maxCount ? 'High' : c.count >= 0.3 * maxCount ? 'Medium' : 'Low';
-        const supportingData = c.kind === 'gap'
-          ? `${c.count} alumni use ${c.title} at work but only ${c.coverage} report it as a learned skill.`
-          : `${c.count} alumni report using ${c.title} in their jobs.`;
-        const suggestedImprovement = c.kind === 'gap'
-          ? (REC_TEXTS[normalize(c.title)] || `Consider integrating ${c.title} more deeply into the curriculum with hands-on projects.`)
-          : (REC_TEXTS[normalize(c.title)] || `Consider introducing or expanding ${c.title} topics, electives, or laboratory activities.`);
+        const priority = c.count >= 2 ? 'High' : c.count >= 1 ? 'Medium' : 'Low';
+        const supportingData =
+          c.kind === 'gap'
+            ? `Required in ${c.count} active industry job posting(s), but only ${c.coverage} alumni reported receiving coursework training in this area.`
+            : `Identified across ${c.count} industry job openings and recent graduate tech stacks with ${c.title}.`;
+        const suggestedImprovement =
+          REC_TEXTS[normalize(c.title)] ||
+          `Embed hands-on projects, industry certifications, and elective laboratory modules focusing on ${c.title}.`;
         return { title: c.title, priority, supportingData, suggestedImprovement };
       });
 
@@ -384,22 +576,25 @@ router.get('/statistics', async (req, res, next) => {
     const careerCount: Record<string, number> = {};
     const mergedEmployment = [...eligibleEmployment];
     eligibleProfiles.forEach((p: any) => {
+      const resp = getMergedUserResponse(p.user_id, p.email);
       const hasRecord = mergedEmployment.some((e: any) => e.profile_id === p.id);
-      if (!hasRecord && p.current_job_title) {
+      if (!hasRecord && (p.current_job_title || resp.position || resp.currentJobTitle)) {
         mergedEmployment.push({
           profile_id: p.id,
-          position: p.current_job_title,
-          company_name: p.company_name,
-          company_industry: p.industry,
+          position: p.current_job_title || resp.position || resp.currentJobTitle,
+          company_name: p.company_name || resp.company_name || resp.companyName,
+          company_industry: p.industry || resp.industry,
           is_current: true,
         });
       }
     });
+
     mergedEmployment.forEach((e: any) => {
-      if (!isCurrent(e) || !e.position) return;
+      if (!e.position) return;
       const pos = String(e.position).trim();
       if (pos) careerCount[pos] = (careerCount[pos] || 0) + 1;
     });
+
     const careerPaths = Object.entries(careerCount)
       .map(([position, count]) => ({ position, count }))
       .sort((a, b) => b.count - a.count)
@@ -407,33 +602,37 @@ router.get('/statistics', async (req, res, next) => {
 
     // --- Industry Alignment ---
     const industryCount: Record<string, number> = {};
-    const countedIndustry = new Set<string>();
     eligibleProfiles.forEach((p: any) => {
       const emp = empByProfile.get(p.id) || [];
-      const ind = String((emp.find(isCurrent)?.company_industry || p.industry) || '').trim();
-      if (ind && !countedIndustry.has(p.id)) {
+      const resp = getMergedUserResponse(p.user_id, p.email);
+      const ind = String(
+        (emp.find(isCurrent)?.company_industry || p.industry || resp.industry) || ''
+      ).trim();
+      if (ind) {
         industryCount[ind] = (industryCount[ind] || 0) + 1;
-        countedIndustry.add(p.id);
       }
     });
+
     const industryAlignment = toRanked(industryCount)
-      .map((i) => ({ industry: i.name, count: i.count, percentage: totalAlumni > 0 ? Math.round((i.count / totalAlumni) * 100) : 0 }))
+      .map((i) => ({
+        industry: i.name,
+        count: i.count,
+        percentage: totalAlumni > 0 ? Math.round((i.count / totalAlumni) * 100) : 0,
+      }))
       .slice(0, 10);
 
     // --- Graduate Feedback Summary ---
     const themeHits: Record<string, { count: number; example: string | null }> = {};
     const seenUserTheme = new Set<string>();
     eligibleProfiles.forEach((p: any) => {
-      const resp = latestResponseByUser.get(p.user_id)?.responses || {};
+      const resp = getMergedUserResponse(p.user_id, p.email);
       const suggestion = String(resp.suggestions || '').trim();
-      const cf = feedbackByProfile.get(p.id);
-      const extras = [
-        ...(cf?.suggested_skills || []),
-        ...(cf?.suggested_subjects || []),
-        ...(cf?.recommend_changes ? ['recommend changes'] : []),
-      ].map((s: string) => String(s)).join(' ');
-      const text = `${suggestion} ${extras}`;
+      const reasons = Array.isArray(resp.reasonsForEnrolling) ? resp.reasonsForEnrolling.join(' ') : '';
+      const certs = String(resp.postGradCertifications || '');
+      const prefs = Array.isArray(resp.engagementPreferences) ? resp.engagementPreferences.join(' ') : '';
+      const text = `${suggestion} ${reasons} ${certs} ${prefs}`;
       if (!text.trim()) return;
+
       FEEDBACK_THEMES.forEach((t) => {
         if (!t.match.test(text)) return;
         const key = `${p.user_id}:${t.theme}`;
@@ -441,11 +640,12 @@ router.get('/statistics', async (req, res, next) => {
         seenUserTheme.add(key);
         if (!themeHits[t.theme]) themeHits[t.theme] = { count: 0, example: null };
         themeHits[t.theme].count++;
-        if (!themeHits[t.theme].example && suggestion) {
+        if (!themeHits[t.theme].example && suggestion && suggestion !== 'nothing') {
           themeHits[t.theme].example = suggestion.length > 90 ? `${suggestion.slice(0, 90)}…` : suggestion;
         }
       });
     });
+
     const feedbackThemes = Object.entries(themeHits)
       .map(([theme, v]) => ({ theme, count: v.count, example: v.example }))
       .sort((a, b) => b.count - a.count);
@@ -457,7 +657,11 @@ router.get('/statistics', async (req, res, next) => {
 
     let actions: { high: string[]; medium: string[]; low: string[] };
     if (recHigh.length || recMedium.length) {
-      actions = { high: recHigh, medium: recMedium, low: recLow };
+      actions = {
+        high: recHigh.length > 0 ? recHigh : ['Strengthen hands-on technical labs with industry-aligned tools'],
+        medium: recMedium.length > 0 ? recMedium : ['Expand elective course offerings in specialized technologies'],
+        low: recLow.length > 0 ? recLow : ['Facilitate alumni-led workshops and career coaching sessions'],
+      };
     } else {
       const themeTitles = feedbackThemes.map((t) => t.theme);
       actions = {
@@ -468,7 +672,10 @@ router.get('/statistics', async (req, res, next) => {
     }
 
     const industries = [...new Set(
-      employment.map((e: any) => String(e.company_industry || '').trim()).concat(profiles.map((p: any) => String(p.industry || '').trim()))
+      employment
+        .map((e: any) => String(e.company_industry || '').trim())
+        .concat(profiles.map((p: any) => String(p.industry || '').trim()))
+        .concat(jobPostings.map((j: any) => String(j.industry || '').trim()))
     )].filter(Boolean).sort();
 
     res.json({

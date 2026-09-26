@@ -4,6 +4,8 @@ import { AppError } from '../../middleware/errorHandler';
 import { AuthenticatedRequest } from '../../types';
 import { logAudit } from '../../services/auditLogger';
 
+import { createNotification } from '../notifications';
+
 const router = Router();
 
 function clientIp(req: any): string {
@@ -93,6 +95,24 @@ router.patch('/:id', async (req: AuthenticatedRequest, res, next) => {
       .single();
 
     if (error) throw error;
+
+    // Automatically notify the reporting alumnus that their incident has been reviewed/resolved
+    if (incident?.reported_by) {
+      try {
+        const statusLabel = status ? (status.charAt(0).toUpperCase() + status.slice(1)) : 'Updated';
+        await createNotification({
+          userId: incident.reported_by,
+          type: 'system',
+          title: `Security Report Status: ${statusLabel}`,
+          message: adminNotes
+            ? `Admin response: "${adminNotes}"`
+            : `Your reported security incident (${(incident.incident_type || 'activity').replace(/_/g, ' ')}) is now marked as ${statusLabel}.`,
+          link: '/notifications',
+        });
+      } catch (notifErr) {
+        console.error('Failed to notify incident reporter:', notifErr);
+      }
+    }
 
     await logAudit(req, {
       actorId: req.user!.userId,

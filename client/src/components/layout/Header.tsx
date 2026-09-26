@@ -334,6 +334,18 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                       })}
                     </div>
                   )}
+                  <div className="p-2 border-t border-gray-100 bg-gray-50/70 text-center">
+                    <button
+                      onClick={() => {
+                        setNotifDropdownOpen(false);
+                        navigate(user?.role === 'admin' ? '/admin/notifications' : '/notifications');
+                      }}
+                      className="w-full py-1.5 px-3 text-xs font-semibold text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>View all notifications</span>
+                      <span aria-hidden="true">&rarr;</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
