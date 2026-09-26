@@ -304,6 +304,9 @@ router.post('/', async (req, res, next) => {
         const { data: testCol } = await supabase.from('profiles').select('id_number').limit(1);
         if (testCol !== undefined) profileInsertPayload.id_number = idNumber;
       } catch {}
+      try {
+        await supabase.from('alumni_eligible').update({ user_id: user.id }).eq('student_id', idNumber);
+      } catch {}
     }
     await supabase.from('profiles').insert(profileInsertPayload);
 

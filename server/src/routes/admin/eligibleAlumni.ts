@@ -9,7 +9,35 @@ const router = Router();
 router.get('/', async (req, res, next) => {
   try {
     const search = (req.query.search as string) || '';
-    let query = supabase.from('alumni_eligible').select('id, student_id, first_name, last_name, birth_date, program, year_graduated, user_id, created_at');
+
+    // Automatically check and link any unclaimed eligible records whose student_id is registered in profiles
+    try {
+      const { data: registeredProfiles } = await supabase
+        .from('profiles')
+        .select('user_id, id_number')
+        .not('id_number', 'is', null);
+
+      if (registeredProfiles && registeredProfiles.length > 0) {
+        for (const p of registeredProfiles) {
+          if (p.id_number && p.user_id) {
+            await supabase
+              .from('alumni_eligible')
+              .update({ user_id: p.user_id })
+              .eq('student_id', p.id_number)
+              .is('user_id', null);
+          }
+        }
+      }
+    } catch (syncErr) {
+      console.warn('Could not sync eligible claimed status:', syncErr);
+    }
+
+    // Only return eligible records that are truly unclaimed (user_id IS NULL)
+    let query = supabase
+      .from('alumni_eligible')
+      .select('id, student_id, first_name, last_name, birth_date, program, year_graduated, user_id, created_at')
+      .is('user_id', null);
+
     if (search) {
       const s = search.toLowerCase();
       query = query.or(`student_id.ilike.%${s}%,first_name.ilike.%${s}%,last_name.ilike.%${s}%`);

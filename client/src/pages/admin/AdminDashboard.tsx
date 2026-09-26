@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { adminApi, activitiesApi } from '@/services/api';
 import { Link } from 'react-router-dom';
 import { formatMonths } from '@/utils/formatExperience';
@@ -15,6 +15,7 @@ import {
   ClipboardDocumentListIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   FireIcon,
   StarIcon,
   RocketLaunchIcon,
@@ -297,6 +298,9 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
 }
 
 export default function AdminDashboard() {
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>({});
   const [charts, setCharts] = useState<any>({});
@@ -304,9 +308,30 @@ export default function AdminDashboard() {
   const [events, setEvents] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
 
+  const availableYears = useMemo(() => {
+    const list: number[] = [];
+    for (let y = currentYear + 2; y >= currentYear - 6; y--) {
+      list.push(y);
+    }
+    return list;
+  }, [currentYear]);
+
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+    adminApi.dashboardStats(year).then(setStats).catch(() => {});
+  };
+
+  useEffect(() => {
+    const handleClickOutside = () => setYearDropdownOpen(false);
+    if (yearDropdownOpen) {
+      window.addEventListener('click', handleClickOutside);
+      return () => window.removeEventListener('click', handleClickOutside);
+    }
+  }, [yearDropdownOpen]);
+
   useEffect(() => {
     Promise.all([
-      adminApi.dashboardStats().then(setStats).catch(() => {}),
+      adminApi.dashboardStats(selectedYear).then(setStats).catch(() => {}),
       adminApi.dashboardCharts().then(setCharts).catch(() => {}),
       adminApi.surveyList().then(setSurveys).catch(() => {}),
       adminApi.dashboardUpcomingEvents().then(setEvents).catch(() => {}),
@@ -388,15 +413,15 @@ export default function AdminDashboard() {
       href: '/admin/surveys',
     },
     {
-      label: 'Alumni Registered This Year',
+      label: selectedYear === currentYear ? 'Alumni Registered This Year' : `Alumni Registered in ${selectedYear}`,
       value: stats?.registeredThisYear != null ? stats.registeredThisYear.toLocaleString() : '—',
       icon: UserPlusIcon,
       color: 'text-cyan-600',
       bg: 'bg-cyan-50',
       border: 'border-cyan-100',
-      badge: `${new Date().getFullYear()} YTD`,
+      badge: selectedYear === currentYear ? `${currentYear} YTD` : `Year ${selectedYear}`,
       badgeBg: 'bg-cyan-50 text-cyan-700 border border-cyan-200/60',
-      subtitle: 'New alumni registrations',
+      subtitle: selectedYear === currentYear ? 'New alumni registrations' : `Registrations for ${selectedYear}`,
       href: '/admin/alumni',
     },
     {
@@ -424,9 +449,72 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="mb-5">
-        <h1 className="text-base font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-xs text-gray-500 mt-0.5">Executive overview of alumni, employment, surveys, and system activity.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+        <div>
+          <h1 className="text-base font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Executive overview of alumni, employment, surveys, and system activity.</p>
+        </div>
+
+        {/* Year Selector: < "year" > */}
+        <div className="inline-flex items-center gap-1 self-start sm:self-auto bg-white border border-gray-200/90 rounded-xl px-2 py-1 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => handleYearChange(selectedYear - 1)}
+            className="p-1 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer"
+            title="Previous Year"
+          >
+            <ChevronLeftIcon className="w-4 h-4" />
+          </button>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setYearDropdownOpen((prev) => !prev);
+              }}
+              className="px-2.5 py-1 rounded-lg text-xs font-bold text-gray-800 hover:text-orange-600 hover:bg-orange-50 transition-colors flex items-center gap-1 cursor-pointer"
+              title="Select Year"
+            >
+              <span>"{selectedYear}"</span>
+              <ChevronDownIcon className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+
+            {yearDropdownOpen && (
+              <div
+                className="absolute right-0 mt-1 w-28 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 max-h-56 overflow-y-auto animate-in fade-in duration-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {availableYears.map((yr) => (
+                  <button
+                    key={yr}
+                    type="button"
+                    onClick={() => {
+                      handleYearChange(yr);
+                      setYearDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                      yr === selectedYear
+                        ? 'bg-orange-50 text-orange-600 font-bold'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    "{yr}"
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleYearChange(selectedYear + 1)}
+            className="p-1 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer"
+            title="Next Year"
+          >
+            <ChevronRightIcon className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards - Grid */}

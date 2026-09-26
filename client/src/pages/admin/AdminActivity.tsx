@@ -369,6 +369,8 @@ export default function AdminActivity() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
 
+  const [mainTab, setMainTab] = useState<'audit' | 'incidents'>('audit');
+
   // Filters
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -389,6 +391,11 @@ export default function AdminActivity() {
   const [updatingIncident, setUpdatingIncident] = useState(false);
 
   const queryIdRef = useRef(0);
+
+  // Load incidents on initial mount so tab badge is populated
+  useEffect(() => {
+    loadIncidents();
+  }, []);
 
   // Debounced search - only triggers when search actually changes, not on initial mount
   useEffect(() => {
@@ -464,10 +471,10 @@ export default function AdminActivity() {
   };
 
   useEffect(() => {
-    if (category === 'incidents') {
+    if (mainTab === 'incidents') {
       loadIncidents();
     }
-  }, [category, incidentStatusFilter]);
+  }, [mainTab, incidentStatusFilter]);
 
   const handleUpdateIncident = async () => {
     if (!selectedIncident) return;
@@ -488,10 +495,10 @@ export default function AdminActivity() {
   };
 
   useEffect(() => {
-    if (category !== 'incidents') {
+    if (mainTab === 'audit') {
       loadData();
     }
-  }, [page, category, severity, status, datePreset, debouncedSearch]);
+  }, [page, category, severity, status, datePreset, debouncedSearch, mainTab]);
 
   const handleExportCsv = () => {
     const params: Record<string, any> = {};
@@ -518,7 +525,6 @@ export default function AdminActivity() {
   const categories = [
     { id: 'all', label: 'All Events' },
     { id: 'auth', label: 'Auth & Security' },
-    { id: 'incidents', label: 'Reported Incidents (Rule 6)' },
     { id: 'admin', label: 'Admin Actions' },
     { id: 'alumni', label: 'Alumni & Profile' },
     { id: 'survey', label: 'Surveys & Tracer' },
@@ -532,188 +538,283 @@ export default function AdminActivity() {
         <div>
           <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
             <ShieldCheckIcon className="w-5 h-5 text-orange-500" />
-            Audit & Security Logs
+            Audit &amp; Activity Logs
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Immutable, compliance-grade trail of authentication, data modifications, and administrative operations.
+            Immutable, compliance-grade trail of authentication, data modifications, and user-reported security incidents.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => loadData(true)}
-            disabled={refreshing}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-2xs"
+            onClick={() => (mainTab === 'incidents' ? loadIncidents() : loadData(true))}
+            disabled={mainTab === 'incidents' ? loadingIncidents : refreshing}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
           >
-            <ArrowPathIcon className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-orange-500' : 'text-gray-500'}`} />
+            <ArrowPathIcon className={`w-3.5 h-3.5 ${(mainTab === 'incidents' ? loadingIncidents : refreshing) ? 'animate-spin text-orange-500' : 'text-gray-500'}`} />
             Refresh
           </button>
-          <button
-            onClick={handleExportCsv}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-colors shadow-2xs"
-          >
-            <ArrowDownTrayIcon className="w-3.5 h-3.5" />
-            Export Audit Trail (CSV)
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {loading && !stats ? (
-          <>
-            <SkeletonAuditKpi />
-            <SkeletonAuditKpi />
-            <SkeletonAuditKpi />
-            <SkeletonAuditKpi />
-          </>
-        ) : (
-          <>
-            <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-gray-500 mb-1">
-                <ShieldCheckIcon className="w-4 h-4 text-orange-500" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider">Total Audited Events</span>
-              </div>
-              <p className="text-2xl font-black text-gray-900">
-                {stats ? stats.totalEvents.toLocaleString() : totalCount.toLocaleString()}
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Appended immutable logs</p>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-red-600 mb-1">
-                <ShieldExclamationIcon className="w-4 h-4" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider">Security Alerts</span>
-              </div>
-              <p className="text-2xl font-black text-gray-900">
-                {stats ? stats.securityAlerts.toLocaleString() : '0'}
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Warnings & critical events</p>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-purple-600 mb-1">
-                <UserIcon className="w-4 h-4" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider">Admin Operations</span>
-              </div>
-              <p className="text-2xl font-black text-gray-900">
-                {stats ? stats.adminActions.toLocaleString() : '0'}
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Staff & admin modifications</p>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-blue-600 mb-1">
-                <CalendarDaysIcon className="w-4 h-4" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider">Today's Activity</span>
-              </div>
-              <p className="text-2xl font-black text-gray-900">
-                {stats ? stats.todayCount.toLocaleString() : '0'}
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Logged in last 24 hours</p>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Filter Toolbar */}
-      <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-3">
-        {/* Category Pills */}
-        <div className="flex flex-wrap gap-1.5">
-          {categories.map((c) => (
+          {mainTab === 'audit' && (
             <button
-              key={c.id}
-              onClick={() => {
-                setCategory(c.id);
-                setPage(1);
-              }}
-              className={`text-xs px-3 py-1 rounded-lg font-medium transition-colors ${
-                category === c.id
-                  ? 'bg-orange-500 text-white shadow-2xs'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-colors shadow-2xs cursor-pointer"
             >
-              {c.label}
+              <ArrowDownTrayIcon className="w-3.5 h-3.5" />
+              Export Audit Trail (CSV)
             </button>
-          ))}
+          )}
         </div>
+      </div>
 
-        {/* Search & Dropdown Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
-          {/* Search Input */}
-          <div className="relative">
-            <MagnifyingGlassIcon className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search action, actor, IP..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full text-xs pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg outline-none focus:border-orange-400 bg-white"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch('');
-                  setDebouncedSearch('');
-                  setPage(1);
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full"
-                title="Clear search"
-              >
-                <XMarkIcon className="w-3.5 h-3.5" />
-              </button>
-            )}
+      {/* Top Main Navigation Tabs */}
+      <div className="flex gap-2 border-b border-gray-200 pb-0">
+        <button
+          onClick={() => setMainTab('audit')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
+            mainTab === 'audit'
+              ? 'border-orange-500 text-orange-600'
+              : 'border-transparent text-gray-500 hover:text-gray-800'
+          }`}
+        >
+          <ShieldCheckIcon className="w-4 h-4" />
+          <span>Audit &amp; Activity Logs</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+            {stats ? stats.totalEvents.toLocaleString() : totalCount.toLocaleString()}
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            setMainTab('incidents');
+            loadIncidents();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
+            mainTab === 'incidents'
+              ? 'border-orange-500 text-orange-600'
+              : 'border-transparent text-gray-500 hover:text-gray-800'
+          }`}
+        >
+          <ShieldExclamationIcon className="w-4 h-4 text-red-500" />
+          <span>Security / Incident Reports</span>
+          {incidents.filter((i) => i.status === 'open' || i.status === 'investigating').length > 0 ? (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">
+              {incidents.filter((i) => i.status === 'open' || i.status === 'investigating').length} Active
+            </span>
+          ) : (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+              {incidents.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Incidents KPI Cards */}
+      {mainTab === 'incidents' && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+            <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+              <ShieldExclamationIcon className="w-4 h-4 text-orange-500" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Total Reports</span>
+            </div>
+            <p className="text-2xl font-black text-gray-900">{incidents.length}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Submitted security incidents</p>
           </div>
 
-          {/* Severity Dropdown */}
-          <select
-            value={severity}
-            onChange={(e) => {
-              setSeverity(e.target.value);
-              setPage(1);
-            }}
-            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
-          >
-            <option value="all">All Severities</option>
-            <option value="info">Info</option>
-            <option value="warning">Warning</option>
-            <option value="critical">Critical</option>
-          </select>
+          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+            <div className="flex items-center gap-1.5 text-amber-600 mb-1">
+              <ExclamationTriangleIcon className="w-4 h-4" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Open &amp; Investigating</span>
+            </div>
+            <p className="text-2xl font-black text-amber-600">
+              {incidents.filter((i) => i.status === 'open' || i.status === 'investigating').length}
+            </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Requires administrator action</p>
+          </div>
 
-          {/* Status Dropdown */}
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
-            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
-          >
-            <option value="all">All Statuses</option>
-            <option value="success">Success</option>
-            <option value="failure">Failure</option>
-          </select>
+          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+            <div className="flex items-center gap-1.5 text-red-600 mb-1">
+              <ExclamationCircleIcon className="w-4 h-4" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Critical Severity</span>
+            </div>
+            <p className="text-2xl font-black text-red-600">
+              {incidents.filter((i) => i.severity === 'critical').length}
+            </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">High-priority security breaches</p>
+          </div>
 
-          {/* Date Preset */}
-          <select
-            value={datePreset}
-            onChange={(e) => {
-              setDatePreset(e.target.value);
-              setPage(1);
-            }}
-            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
-          >
-            <option value="all">All Time</option>
-            <option value="today">Today</option>
-            <option value="7days">Last 7 Days</option>
-            <option value="30days">Last 30 Days</option>
-          </select>
+          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+            <div className="flex items-center gap-1.5 text-emerald-600 mb-1">
+              <CheckCircleIcon className="w-4 h-4" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Resolved Reports</span>
+            </div>
+            <p className="text-2xl font-black text-emerald-600">
+              {incidents.filter((i) => i.status === 'resolved').length}
+            </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Verified &amp; mitigated incidents</p>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Audit KPI Summary Cards */}
+      {mainTab === 'audit' && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {loading && !stats ? (
+            <>
+              <SkeletonAuditKpi />
+              <SkeletonAuditKpi />
+              <SkeletonAuditKpi />
+              <SkeletonAuditKpi />
+            </>
+          ) : (
+            <>
+              <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+                <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+                  <ShieldCheckIcon className="w-4 h-4 text-orange-500" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">Total Audited Events</span>
+                </div>
+                <p className="text-2xl font-black text-gray-900">
+                  {stats ? stats.totalEvents.toLocaleString() : totalCount.toLocaleString()}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Appended immutable logs</p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+                <div className="flex items-center gap-1.5 text-red-600 mb-1">
+                  <ShieldExclamationIcon className="w-4 h-4" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">Security Alerts</span>
+                </div>
+                <p className="text-2xl font-black text-gray-900">
+                  {stats ? stats.securityAlerts.toLocaleString() : '0'}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Warnings &amp; critical events</p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+                <div className="flex items-center gap-1.5 text-purple-600 mb-1">
+                  <UserIcon className="w-4 h-4" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">Admin Operations</span>
+                </div>
+                <p className="text-2xl font-black text-gray-900">
+                  {stats ? stats.adminActions.toLocaleString() : '0'}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Staff &amp; admin modifications</p>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+                <div className="flex items-center gap-1.5 text-blue-600 mb-1">
+                  <CalendarDaysIcon className="w-4 h-4" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">Today's Activity</span>
+                </div>
+                <p className="text-2xl font-black text-gray-900">
+                  {stats ? stats.todayCount.toLocaleString() : '0'}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Logged in last 24 hours</p>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Filter Toolbar (Only for Audit Logs) */}
+      {mainTab === 'audit' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-3">
+          {/* Category Pills */}
+          <div className="flex flex-wrap gap-1.5">
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  setCategory(c.id);
+                  setPage(1);
+                }}
+                className={`text-xs px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                  category === c.id
+                    ? 'bg-orange-500 text-white shadow-2xs'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search & Dropdown Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
+            {/* Search Input */}
+            <div className="relative">
+              <MagnifyingGlassIcon className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search action, actor, IP..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full text-xs pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg outline-none focus:border-orange-400 bg-white"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('');
+                    setDebouncedSearch('');
+                    setPage(1);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full"
+                  title="Clear search"
+                >
+                  <XMarkIcon className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Severity Dropdown */}
+            <select
+              value={severity}
+              onChange={(e) => {
+                setSeverity(e.target.value);
+                setPage(1);
+              }}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
+            >
+              <option value="all">All Severities</option>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="critical">Critical</option>
+            </select>
+
+            {/* Status Dropdown */}
+            <select
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setPage(1);
+              }}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
+            >
+              <option value="all">All Statuses</option>
+              <option value="success">Success</option>
+              <option value="failure">Failure</option>
+            </select>
+
+            {/* Date Preset */}
+            <select
+              value={datePreset}
+              onChange={(e) => {
+                setDatePreset(e.target.value);
+                setPage(1);
+              }}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
+            >
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="7days">Last 7 Days</option>
+              <option value="30days">Last 30 Days</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Audit Log or Security Incidents Table */}
-      {category === 'incidents' ? (
+      {mainTab === 'incidents' ? (
         <div className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 bg-red-50/20">
             <div>

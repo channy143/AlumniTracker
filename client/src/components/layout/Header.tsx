@@ -354,13 +354,15 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
               {dropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-100 rounded-xl shadow-xl py-1.5 z-50 animate-in fade-in duration-150">
-                  <button
-                    onClick={() => { setDropdownOpen(false); navigate('/profile'); }}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-left"
-                  >
-                    <UserIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                    <span>My Profile</span>
-                  </button>
+                  {user?.role !== 'admin' && (
+                    <button
+                      onClick={() => { setDropdownOpen(false); navigate('/profile'); }}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-left"
+                    >
+                      <UserIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                      <span>My Profile</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => { setDropdownOpen(false); setShowPolicyModal(true); }}
                     className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-left"
@@ -368,13 +370,15 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                     <ShieldCheckIcon className="w-4 h-4 text-orange-500 shrink-0" />
                     <span>Security &amp; Policy</span>
                   </button>
-                  <button
-                    onClick={() => { setDropdownOpen(false); setShowReportModal(true); }}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-left"
-                  >
-                    <ShieldExclamationIcon className="w-4 h-4 text-red-500 shrink-0" />
-                    <span>Report Suspicious Activity</span>
-                  </button>
+                  {user?.role !== 'admin' && (
+                    <button
+                      onClick={() => { setDropdownOpen(false); setShowReportModal(true); }}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-left"
+                    >
+                      <ShieldExclamationIcon className="w-4 h-4 text-red-500 shrink-0" />
+                      <span>Report Suspicious Activity</span>
+                    </button>
+                  )}
                   <div className="border-t border-gray-100 my-1.5" />
                   <button
                     onClick={() => { setDropdownOpen(false); setLogoutAllDevices(false); setShowLogoutModal(true); }}

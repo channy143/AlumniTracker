@@ -79,6 +79,21 @@ export const api = {
       return res;
     });
   },
+  blob: (endpoint: string) => {
+    const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
+    return fetch(`${API_BASE}${endpoint}`, {
+      method: 'GET',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    }).then(async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Download failed: ${res.statusText}`);
+      }
+      return res.blob();
+    });
+  },
   upload: <T>(endpoint: string, formData: FormData) => {
     const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
     return fetch(`${API_BASE}${endpoint}`, {
@@ -254,7 +269,7 @@ export const adminApi = {
   updateUser: (id: string, data: any) => api.put<any>(`/admin/users/${id}`, data),
   exportData: (format: string) => api.get<Blob>(`/admin/export?format=${format}`),
 
-  dashboardStats: () => api.get<any>('/admin/dashboard/stats'),
+  dashboardStats: (year?: number) => api.get<any>(`/admin/dashboard/stats${year ? `?year=${year}` : ''}`),
   dashboardCharts: () => api.get<any>('/admin/dashboard/charts'),
   dashboardUpcomingEvents: () => api.get<any[]>('/admin/dashboard/upcoming-events'),
 
@@ -275,6 +290,10 @@ export const adminApi = {
   companyUpdate: (id: string, data: any) => api.put<any>(`/admin/companies/${id}`, data),
   companyTogglePartnership: (id: string, partnership_status: 'partner' | 'non-partner') => api.put<any>(`/admin/companies/${id}/partnership`, { partnership_status }),
   companyVerify: (id: string) => api.put<any>(`/admin/companies/${id}/verify`, {}),
+  companyVerifyAgreement: (id: string, data: { verification_status: 'pending' | 'verified' | 'rejected'; notes?: string }) =>
+    api.post<any>(`/admin/companies/${id}/verify-agreement`, data),
+  companyUploadAgreement: (id: string, formData: FormData) =>
+    api.upload<any>(`/admin/companies/${id}/upload-agreement`, formData),
   companySyncEmployers: () => api.post<any>('/admin/companies/sync-employers', {}),
   companyDelete: (id: string) => api.delete(`/admin/companies/${id}`),
 
@@ -329,11 +348,33 @@ export const adminApi = {
   announcementPin: (id: string, isPinned: boolean) => api.put<any>(`/admin/announcements/${id}/pin`, { is_pinned: isPinned }),
   announcementPublish: (id: string) => api.put<any>(`/admin/announcements/${id}/publish`, {}),
 
-  reportAlumni: (format = 'json') => api.get<Blob>(`/admin/reports/alumni?format=${format}`),
-  reportEmployment: (format = 'json') => api.get<Blob>(`/admin/reports/employment?format=${format}`),
-  reportEmployer: (format = 'json') => api.get<Blob>(`/admin/reports/employer?format=${format}`),
-  reportSurvey: (id: string, format = 'json') => api.get<Blob>(`/admin/reports/survey/${id}?format=${format}`),
-  reportCareerProgress: (format = 'json') => api.get<Blob>(`/admin/reports/career-progress?format=${format}`),
+  reportStats: () => api.get<any>('/admin/reports/stats'),
+  reportAlumni: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/alumni?${toQuery(params)}`) : api.get<any>(`/admin/reports/alumni?${toQuery(params)}`),
+  reportEmployment: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/employment?${toQuery(params)}`) : api.get<any>(`/admin/reports/employment?${toQuery(params)}`),
+  reportEmployer: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/employer?${toQuery(params)}`) : api.get<any>(`/admin/reports/employer?${toQuery(params)}`),
+  reportCareerProgress: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/career-progress?${toQuery(params)}`) : api.get<any>(`/admin/reports/career-progress?${toQuery(params)}`),
+  reportSalaryDistribution: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/salary-distribution?${toQuery(params)}`) : api.get<any>(`/admin/reports/salary-distribution?${toQuery(params)}`),
+  reportEmploymentByCourse: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/employment-by-course?${toQuery(params)}`) : api.get<any>(`/admin/reports/employment-by-course?${toQuery(params)}`),
+  reportBatchEmployment: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/batch-employment?${toQuery(params)}`) : api.get<any>(`/admin/reports/batch-employment?${toQuery(params)}`),
+  reportDegreeAlignment: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/degree-alignment?${toQuery(params)}`) : api.get<any>(`/admin/reports/degree-alignment?${toQuery(params)}`),
+  reportSurveys: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/surveys?${toQuery(params)}`) : api.get<any>(`/admin/reports/surveys?${toQuery(params)}`),
+  reportSurvey: (id: string, params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/survey/${id}?${toQuery(params)}`) : api.get<any>(`/admin/reports/survey/${id}?${toQuery(params)}`),
+  reportSkills: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/skills?${toQuery(params)}`) : api.get<any>(`/admin/reports/skills?${toQuery(params)}`),
+  reportJobs: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/jobs?${toQuery(params)}`) : api.get<any>(`/admin/reports/jobs?${toQuery(params)}`),
+  reportSystemMaster: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/system-master?${toQuery(params)}`) : api.get<any>(`/admin/reports/system-master?${toQuery(params)}`),
   exportHistory: () => api.get<any[]>('/admin/reports/export-history'),
   securityIncidents: (params?: { status?: string; severity?: string }) => {
     const qs = new URLSearchParams(params as any).toString();

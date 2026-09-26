@@ -71,8 +71,13 @@ router.get('/upcoming-events', async (_req, res, next) => {
   }
 });
 
-router.get('/stats', async (_req, res, next) => {
+router.get('/stats', async (req, res, next) => {
   try {
+    const currentYear = new Date().getFullYear();
+    const rawYear = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+    const selectedYear = rawYear && !isNaN(rawYear) ? rawYear : currentYear;
+    const isFiltered = rawYear !== undefined && !isNaN(rawYear);
+
     const partnershipTracked = await hasPartnershipColumn();
     const [
       totalAlumni,
@@ -82,50 +87,77 @@ router.get('/stats', async (_req, res, next) => {
       totalProfiles,
       allEmployment,
       allEducation,
-      partnerCompanies,
-      activeSurveyCount,
+      allCompanies,
+      activeSurveys,
     ] = await Promise.all([
       safeCount(supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'alumni')),
       safeCount(supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'alumni').eq('is_verified', true)),
       safeData(supabase.from('employment').select('employment_status, salary_range, profile_id, start_date').eq('is_current', true)),
-      safeData(supabase.from('users').select('created_at').eq('role', 'alumni')),
+      safeData(supabase.from('users').select('id, created_at, is_verified').eq('role', 'alumni')),
       safeCount(supabase.from('profiles').select('*', { count: 'exact', head: true })),
       safeData(supabase.from('employment').select('salary_range, profile_id, start_date, employment_status, company_industry')),
       safeData(supabase.from('education').select('program, year_graduated, profile_id')),
       partnershipTracked
-        ? safeCount(supabase.from('companies').select('*', { count: 'exact', head: true }).eq('partnership_status', 'partner'))
-        : Promise.resolve(null),
-      safeCount(supabase.from('surveys').select('*', { count: 'exact', head: true }).eq('is_active', true)),
+        ? safeData(supabase.from('companies').select('id, name, partnership_status, employer_type, created_at, agreement_start_date, agreement_end_date'))
+        : Promise.resolve([]),
+      safeData(supabase.from('surveys').select('id, title, is_active, created_at')),
     ]);
 
-    const employedCount = currentEmployment.filter((e: any) =>
+    // Calculate alumni registered in the selected year
+    const registeredInSelectedYear = allAlumniUsers.filter((u: any) => {
+      if (!u.created_at) return false;
+      const d = new Date(u.created_at);
+      return d.getFullYear() === selectedYear;
+    }).length;
+
+    // Cumulative alumni up to selected year if filtered
+    const alumniUpToYear = isFiltered
+      ? allAlumniUsers.filter((u: any) => u.created_at && new Date(u.created_at).getFullYear() <= selectedYear)
+      : allAlumniUsers;
+    const resolvedTotalAlumni = isFiltered ? alumniUpToYear.length : (totalAlumni || 0);
+    const resolvedVerifiedAlumni = isFiltered
+      ? alumniUpToYear.filter((u: any) => u.is_verified).length
+      : (verifiedAlumni || 0);
+
+    // Partner companies active/created in or up to selected year
+    const partnerCompaniesCount = (allCompanies || []).filter((c: any) => {
+      const isPartner = c.partnership_status === 'partner' || c.employer_type === 'partner';
+      if (!isPartner) return false;
+      if (!isFiltered) return true;
+      const cDate = c.agreement_start_date ? new Date(c.agreement_start_date) : (c.created_at ? new Date(c.created_at) : null);
+      if (!cDate) return true;
+      return cDate.getFullYear() <= selectedYear;
+    }).length;
+
+    // Employment metrics filtered by year if requested
+    const targetEmployment = isFiltered
+      ? currentEmployment.filter((e: any) => {
+          if (!e.start_date) return true;
+          return new Date(e.start_date).getFullYear() <= selectedYear;
+        })
+      : currentEmployment;
+
+    const employedCount = targetEmployment.filter((e: any) =>
       ['employed', 'self-employed', 'entrepreneur'].includes(e.employment_status)
     ).length;
-    const unemployedCount = currentEmployment.filter((e: any) =>
+    const unemployedCount = targetEmployment.filter((e: any) =>
       ['unemployed', 'seeking'].includes(e.employment_status)
     ).length;
-    const totalWithStatus = currentEmployment.length || 1;
+    const totalWithStatus = targetEmployment.length || 1;
 
-    const salaries = currentEmployment
+    const salaries = targetEmployment
       .filter((e: any) => e.salary_range)
       .map((e: any) => {
         const range = e.salary_range.replace(/[₱,\s]/g, '').split('-');
         return range.length === 2 ? (Number(range[0]) + Number(range[1])) / 2 : Number(range[0]);
       })
       .filter((n: number) => !isNaN(n));
-    const alumniWithSalary = currentEmployment.filter((e: any) => e.salary_range).length;
+    const alumniWithSalary = targetEmployment.filter((e: any) => e.salary_range).length;
     const averageSalary = salaries.length > 0
       ? Math.round(salaries.reduce((a: number, b: number) => a + b, 0) / salaries.length)
       : 0;
     const highestSalary = salaries.length > 0 ? Math.round(Math.max(...salaries)) : 0;
     const lowestSalary = salaries.length > 0 ? Math.round(Math.min(...salaries)) : 0;
-
-    const registeredThisYear = allAlumniUsers.filter((u: any) => {
-      if (!u.created_at) return false;
-      const d = new Date(u.created_at);
-      const now = new Date();
-      return d.getFullYear() === now.getFullYear();
-    }).length;
 
     const eduMap = new Map(allEducation?.map((e: any) => [e.profile_id, e]) || []);
     let matchedCount = 0;
@@ -155,6 +187,7 @@ router.get('/stats', async (_req, res, next) => {
       const edu = eduMap.get(emp.profile_id);
       if (edu && edu.year_graduated && emp.start_date) {
         const gradYear = Number(edu.year_graduated);
+        if (isFiltered && gradYear !== selectedYear) return;
         const start = new Date(emp.start_date);
         if (!isNaN(gradYear) && !isNaN(start.getTime())) {
           const gradDate = new Date(gradYear, 5, 1);
@@ -163,28 +196,46 @@ router.get('/stats', async (_req, res, next) => {
         }
       }
     });
+    // Fall back to general if cohort specific has no data
+    if (timeToEmployment.length === 0 && isFiltered) {
+      allEmployment?.forEach((emp: any) => {
+        const edu = eduMap.get(emp.profile_id);
+        if (edu && edu.year_graduated && emp.start_date) {
+          const gradYear = Number(edu.year_graduated);
+          const start = new Date(emp.start_date);
+          if (!isNaN(gradYear) && !isNaN(start.getTime())) {
+            const gradDate = new Date(gradYear, 5, 1);
+            const monthsDiff = (start.getFullYear() - gradDate.getFullYear()) * 12 + (start.getMonth() - gradDate.getMonth());
+            if (monthsDiff >= 0) timeToEmployment.push(monthsDiff);
+          }
+        }
+      });
+    }
+
     const averageTimeToEmployment = timeToEmployment.length > 0
       ? Math.round(timeToEmployment.reduce((a: number, b: number) => a + b, 0) / timeToEmployment.length)
       : null;
 
-    const activeSurveys = await safeData(supabase.from('surveys').select('id, title').eq('is_active', true));
+    const activeList = (activeSurveys || []).filter((s: any) => s.is_active);
     let tracerSurveyCompletionRate = 0;
     let surveyResponsesCount = 0;
-    if (activeSurveys.length > 0) {
-      const active = activeSurveys[0];
+    if (activeList.length > 0) {
+      const active = activeList[0];
       const respondents = await safeCount(
         supabase.from('survey_responses').select('*', { count: 'exact', head: true }).eq('survey_id', active.id)
       );
       surveyResponsesCount = respondents;
-      const target = totalAlumni || 0;
+      const target = resolvedTotalAlumni || 0;
       tracerSurveyCompletionRate = target > 0 ? Math.round((respondents / target) * 100) : 0;
     }
 
     res.json({
-      totalAlumni: totalAlumni || 0,
-      verifiedAlumni: verifiedAlumni || 0,
+      selectedYear,
+      isCurrentYear: selectedYear === currentYear,
+      totalAlumni: resolvedTotalAlumni,
+      verifiedAlumni: resolvedVerifiedAlumni,
       activeAlumni: totalProfiles || 0,
-      registeredThisYear,
+      registeredThisYear: registeredInSelectedYear,
       employedCount,
       employedPercentage: Math.round((employedCount / totalWithStatus) * 100),
       unemployedPercentage: Math.round((unemployedCount / totalWithStatus) * 100),
@@ -200,9 +251,9 @@ router.get('/stats', async (_req, res, next) => {
       workAlignmentTotal: alignmentTotal + notAlignedCount,
       tracerSurveyCompletionRate,
       surveyResponsesCount,
-      surveyTargetCount: totalAlumni || 0,
-      partnerCompanies,
-      activeSurveyCount: activeSurveyCount || 0,
+      surveyTargetCount: resolvedTotalAlumni,
+      partnerCompanies: partnerCompaniesCount,
+      activeSurveyCount: activeList.length,
     });
   } catch (err) {
     next(err);

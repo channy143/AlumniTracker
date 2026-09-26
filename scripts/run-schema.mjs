@@ -89,6 +89,8 @@ async function main() {
     { path: './supabase/migration_trusted_devices.sql', label: 'Trusted devices migration' },
     { path: './supabase/migration_security_rules_rls.sql', label: 'Security rules and RLS policy migration' },
     { path: './supabase/migration_fix_alumni_delete.sql', label: 'Fix alumni deletion and reference constraints migration' },
+    { path: './supabase/migration_report_exports.sql', label: 'Report exports and audit trail migration' },
+    { path: './supabase/migration_partnership_agreement.sql', label: 'Partnership agreement migration' },
   ];
 
   for (const f of files) {

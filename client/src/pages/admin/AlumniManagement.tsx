@@ -174,6 +174,7 @@ export default function AlumniManagement() {
       setForm({ email: '', password: '', firstName: '', lastName: '', idNumber: '', program: '', yearGraduated: '' });
       addNotification('Alumni created', 'success');
       load();
+      loadEligible();
     } catch (err: any) { setError(err.message); }
   };
 
@@ -187,14 +188,17 @@ export default function AlumniManagement() {
   const loadEligible = useCallback(async () => {
     try {
       const res = await adminApi.eligibleAlumniList({});
-      setEligible(Array.isArray(res) ? res : []);
+      setEligible(Array.isArray(res) ? res.filter((e: any) => !e.user_id) : []);
     } catch { addNotification('Failed to load eligible alumni', 'error'); }
   }, [addNotification]);
 
   useEffect(() => {
-    if (tab === 'eligible') loadEligible();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, loadEligible]);
+    if (tab === 'eligible') {
+      loadEligible();
+    } else {
+      load();
+    }
+  }, [tab, loadEligible, load]);
 
   const openEligibleForm = () => {
     setEligibleForm({ student_id: '', first_name: '', last_name: '', birth_date: '', program: '', year_graduated: '' });
@@ -251,7 +255,7 @@ export default function AlumniManagement() {
 
   const s = search.trim().toLowerCase();
   const eligibleCards = (tab === 'eligible')
-    ? eligible.filter((e: any) => !s || (e.student_id || '').toLowerCase().includes(s) || `${e.first_name || ''} ${e.last_name || ''}`.toLowerCase().includes(s))
+    ? eligible.filter((e: any) => !e.user_id && (!s || (e.student_id || '').toLowerCase().includes(s) || `${e.first_name || ''} ${e.last_name || ''}`.toLowerCase().includes(s)))
     : [];
 
   return (
