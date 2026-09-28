@@ -32,7 +32,8 @@ router.get('/', authenticate, async (req, res, next) => {
       description: e.content || '',
       date: e.event_date
         ? new Date(e.event_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-        : new Date(e.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        : (e.created_at ? new Date(e.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''),
+      event_date: e.event_date || null,
       time: e.event_time || '',
       location: e.event_location || '',
       organizer: e.company || '',

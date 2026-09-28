@@ -3,7 +3,7 @@ import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
 import { MegaphoneIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
-const EMPTY_FORM = { title: '', content: '', image_url: '', document_url: '', is_pinned: false, send_to_all: true, linked_survey_id: '' };
+const EMPTY_FORM = { title: '', content: '', image_url: '', document_url: '', is_pinned: false, send_to_all: true, linked_survey_id: '', status: 'published' };
 
 export default function AnnouncementManagement() {
   const [data, setData] = useState<any[]>([]);
@@ -53,6 +53,7 @@ export default function AnnouncementManagement() {
       is_pinned: !!item.is_pinned,
       send_to_all: item.send_to_all !== false,
       linked_survey_id: item.linked_survey_id || '',
+      status: item.status || 'published',
     });
     setShowForm(true);
   };
@@ -277,10 +278,17 @@ export default function AnnouncementManagement() {
                       {availableSurveys.map((s: any) => <option key={s.id} value={s.id}>{s.title}</option>)}
                     </select>
                   </div>
-                  <div className="flex items-center gap-4 pt-5">
-                    <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.is_pinned} onChange={(e) => setForm((f: any) => ({ ...f, is_pinned: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500 rounded" /> Pin Announcement</label>
-                    <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.send_to_all} onChange={(e) => setForm((f: any) => ({ ...f, send_to_all: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500 rounded" /> Send to All</label>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                    <select value={form.status || 'published'} onChange={(e) => setForm((f: any) => ({ ...f, status: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white w-full">
+                      <option value="published">Published (Visible to all alumni)</option>
+                      <option value="draft">Draft (Saved privately)</option>
+                    </select>
                   </div>
+                </div>
+                <div className="flex items-center gap-4 pt-1">
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.is_pinned} onChange={(e) => setForm((f: any) => ({ ...f, is_pinned: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500 rounded" /> Pin Announcement</label>
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.send_to_all} onChange={(e) => setForm((f: any) => ({ ...f, send_to_all: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500 rounded" /> Send to All</label>
                 </div>
               </div>
 

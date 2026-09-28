@@ -25,7 +25,10 @@ function inferCategory(title: string, content: string): string {
 }
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 export default function AnnouncementsPage() {
@@ -39,17 +42,25 @@ export default function AnnouncementsPage() {
 
   useEffect(() => {
     announcementsApi.list()
-      .then((data: any) => { if (data) setAnnouncements(data); })
+      .then((data: any) => {
+        const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+        setAnnouncements(list);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const years = [...new Set(announcements.map((a) => new Date(a.created_at).getFullYear().toString()))].sort((a, b) => Number(b) - Number(a));
+  const years = [...new Set(announcements.map((a) => {
+    const d = new Date(a.created_at);
+    return !isNaN(d.getTime()) ? d.getFullYear().toString() : '';
+  }).filter(Boolean))].sort((a, b) => Number(b) - Number(a));
+
   const categories = [...new Set(announcements.map((a) => inferCategory(a.title, a.content)))];
 
   const filtered = announcements.filter((a) => {
     const matchesSearch = !search || `${a.title} ${a.content}`.toLowerCase().includes(search.toLowerCase());
-    const matchesYear = yearFilter === 'all' || new Date(a.created_at).getFullYear().toString() === yearFilter;
+    const itemYear = a.created_at ? new Date(a.created_at).getFullYear().toString() : '';
+    const matchesYear = yearFilter === 'all' || itemYear === yearFilter;
     const matchesCategory = categoryFilter === 'all' || inferCategory(a.title, a.content) === categoryFilter;
     return matchesSearch && matchesYear && matchesCategory;
   });
@@ -101,6 +112,21 @@ export default function AnnouncementsPage() {
               <DocumentTextIcon className="w-4 h-4" />
               View Attached Document
             </a>
+          )}
+
+          {selected.linked_survey && (
+            <div className="mt-4 p-3.5 bg-orange-50/70 border border-orange-200 rounded-xl flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-orange-950">{selected.linked_survey.title || 'Linked Tracer Survey'}</p>
+                <p className="text-[11px] text-orange-800 mt-0.5">Please take a moment to answer this tracer survey for institutional data.</p>
+              </div>
+              <a
+                href={`/surveys/${selected.linked_survey.id}`}
+                className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold shrink-0 transition-colors"
+              >
+                Take Survey
+              </a>
+            </div>
           )}
         </div>
       </div>

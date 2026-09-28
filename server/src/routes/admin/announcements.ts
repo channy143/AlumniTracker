@@ -42,12 +42,15 @@ router.post('/', async (req, res, next) => {
     const { title, content, image_url, document_url, is_pinned, is_scheduled, scheduled_at, send_to_all, send_by_batch, send_by_course, target_batches, target_courses, status, linked_survey_id } = req.body;
     if (!title || !content) throw new AppError('Title and content are required', 400);
 
+    const effectiveStatus = status || 'published';
     const { data, error } = await supabase.from('announcements').insert({
       title, content, image_url, document_url, is_pinned: is_pinned || false,
       is_scheduled: is_scheduled || false, scheduled_at,
       send_to_all: send_to_all !== false, send_by_batch: send_by_batch || false, send_by_course: send_by_course || false,
       target_batches: target_batches || [], target_courses: target_courses || [],
-      status: status || 'draft', created_by: (req as any).user!.userId,
+      status: effectiveStatus,
+      published_at: effectiveStatus === 'published' ? new Date().toISOString() : null,
+      created_by: (req as any).user!.userId,
       linked_survey_id: linked_survey_id || null,
     }).select().single();
 
@@ -71,7 +74,7 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const { title, content, image_url, document_url, is_pinned, is_scheduled, scheduled_at, send_to_all, send_by_batch, send_by_course, target_batches, target_courses, linked_survey_id } = req.body;
+    const { title, content, image_url, document_url, is_pinned, is_scheduled, scheduled_at, send_to_all, send_by_batch, send_by_course, target_batches, target_courses, status, linked_survey_id } = req.body;
 
     const payload: any = {};
     if (title !== undefined) payload.title = title;
@@ -86,6 +89,10 @@ router.put('/:id', async (req, res, next) => {
     if (send_by_course !== undefined) payload.send_by_course = send_by_course;
     if (target_batches !== undefined) payload.target_batches = target_batches || [];
     if (target_courses !== undefined) payload.target_courses = target_courses || [];
+    if (status !== undefined) {
+      payload.status = status;
+      if (status === 'published') payload.published_at = new Date().toISOString();
+    }
     if (linked_survey_id !== undefined) payload.linked_survey_id = linked_survey_id || null;
 
     payload.updated_at = new Date().toISOString();
