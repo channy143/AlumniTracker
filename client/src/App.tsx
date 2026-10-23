@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useHeartbeat } from '@/hooks/useHeartbeat';
 import MainLayout from '@/components/layout/MainLayout';
 import AuthLayout from '@/components/layout/AuthLayout';
 
@@ -106,6 +107,7 @@ function IndexRoute() {
 
 export default function App() {
   useAuth();
+  useHeartbeat();
   return (
     <Routes>
       <Route path="/" element={<IndexRoute />}>

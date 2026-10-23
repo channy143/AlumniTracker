@@ -6,8 +6,13 @@ export const loginSchema = z.object({
 });
 
 export const verifyAlumniSchema = z.object({
-  studentId: z.string().min(3, 'Student ID is required'),
-  birthDate: z.string().min(1, 'Birthdate is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  firstName: z.string().min(1, 'First name is required'),
+  middleName: z.string().optional(),
+  graduationDate: z.string().min(1, 'Graduation day is required'),
+  batchYear: z.string().min(1, 'Batch year is required'),
+  studentId: z.string().optional(),
+  birthDate: z.string().optional(),
 });
 
 export const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~])/;
@@ -46,15 +51,18 @@ export function isPasswordStrong(password: string): boolean {
 
 export const registerSchema = z
   .object({
-    studentId: z.string().min(3, 'Student ID is required'),
-    birthDate: z.string().min(1, 'Birthdate is required'),
-    firstName: z.string().min(2, 'First name is required'),
-    lastName: z.string().min(2, 'Last name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    firstName: z.string().min(1, 'First name is required'),
+    middleName: z.string().optional(),
+    graduationDate: z.string().min(1, 'Graduation day is required'),
+    batchYear: z.string().min(1, 'Batch year is required'),
     email: z.string().email('Invalid email address'),
     password: strongPasswordSchema,
     confirmPassword: z.string(),
-    program: z.string().min(1, 'Program is required'),
-    yearGraduated: z.string().min(4, 'Graduation year is required'),
+    program: z.string().min(1, 'Degree is required'),
+    yearGraduated: z.string().optional(),
+    studentId: z.string().optional(),
+    birthDate: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',

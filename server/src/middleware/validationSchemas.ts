@@ -38,20 +38,28 @@ export const registerSchema = z.object({
 }).strict();
 
 export const registerV2Schema = z.object({
-  studentId: z.string().min(1, 'Student ID is required').max(50),
-  birthDate: z.string().min(1, 'Birthdate is required').max(20),
+  studentId: z.string().max(50).optional().nullable(),
+  birthDate: z.string().max(20).optional().nullable(),
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
+  middleName: z.string().max(100).optional().nullable(),
+  graduationDate: z.string().max(20).optional().nullable(),
+  batchYear: z.union([z.string(), z.number()]).optional().nullable(),
   email: z.string().email('Valid email is required').max(255),
   password: strongPasswordSchema,
   program: z.string().min(1, 'Program is required').max(200),
-  yearGraduated: z.string().min(1).max(10),
+  yearGraduated: z.union([z.string().min(1), z.number()]).transform((v) => String(v)),
   otp: z.string().min(6).max(6),
 }).strict();
 
 export const verifyAlumniSchema = z.object({
-  studentId: z.string().min(1, 'Student ID is required').max(50),
-  birthDate: z.string().min(1, 'Birthdate is required').max(20),
+  lastName: z.string().min(1, 'Last name is required').max(100).optional(),
+  firstName: z.string().min(1, 'First name is required').max(100).optional(),
+  middleName: z.string().max(100).optional().nullable(),
+  graduationDate: z.string().max(20).optional().nullable(),
+  batchYear: z.union([z.string(), z.number()]).optional().nullable(),
+  studentId: z.string().max(50).optional().nullable(),
+  birthDate: z.string().max(20).optional().nullable(),
 }).strict();
 
 export const loginSchema = z.object({
@@ -328,11 +336,45 @@ export const adminResetPasswordSchema = z.object({
 // -----------------------------------------------------------------------------
 
 export const adminEligibleCreateSchema = z.object({
-  student_id: z.string().min(1, 'Student ID is required').max(50),
+  student_id: z.string().max(50).optional().nullable(),
   first_name: z.string().min(1, 'First name is required').max(100),
   last_name: z.string().min(1, 'Last name is required').max(100),
-  birth_date: z.string().min(1, 'Birthdate is required').max(20),
+  middle_name: z.string().max(100).optional().nullable(),
+  birth_date: z.string().max(20).optional().nullable(),
+  graduation_date: z.string().max(20).optional().nullable(),
   program: z.string().max(200).optional().nullable(),
   year_graduated: z.number().int().min(1900).max(2100).optional().nullable(),
 }).strict();
+
+// -----------------------------------------------------------------------------
+// Feed Posts
+// -----------------------------------------------------------------------------
+
+export const createPostSchema = z.object({
+  content: z.string().min(1, 'Post content is required').max(10000),
+  title: z.string().max(300).optional().nullable(),
+  image_url: z.string().max(2000).optional().nullable().or(z.literal('')),
+  type: z.enum(['post', 'discussion', 'announcement', 'event', 'text']).optional(),
+  tag: z.string().max(50).optional().nullable(),
+  audience: z.enum(['public', 'friends', 'only_me']).optional().default('public'),
+  feeling: z.string().max(100).optional().nullable().or(z.literal('')),
+  location: z.string().max(150).optional().nullable().or(z.literal('')),
+  tagged_friends: z.any().optional().nullable(),
+  media_type: z.enum(['photo', 'video']).optional(),
+  video_url: z.string().max(2000).optional().nullable().or(z.literal('')),
+}).strict();
+
+export const updatePostSchema = z.object({
+  content: z.string().min(1, 'Post content is required').max(10000).optional(),
+  title: z.string().max(300).optional().nullable(),
+  image_url: z.string().max(2000).optional().nullable().or(z.literal('')),
+  media_type: z.enum(['photo', 'video']).optional(),
+  video_url: z.string().max(2000).optional().nullable().or(z.literal('')),
+  audience: z.enum(['public', 'friends', 'only_me']).optional(),
+  feeling: z.string().max(100).optional().nullable().or(z.literal('')),
+  location: z.string().max(150).optional().nullable().or(z.literal('')),
+  tagged_friends: z.any().optional().nullable(),
+  comments_disabled: z.boolean().optional(),
+}).strict();
+
 

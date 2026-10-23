@@ -3,30 +3,46 @@ import rateLimit from 'express-rate-limit';
 // Global per-IP limiter applied to all API requests.
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 300,
+  limit: process.env.NODE_ENV === 'production' ? 2500 : 10000,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) =>
+    process.env.NODE_ENV !== 'production' ||
+    req.ip === '127.0.0.1' ||
+    req.ip === '::1' ||
+    req.ip === 'localhost' ||
+    Boolean(req.ip?.includes('127.0.0.1')),
   message: { message: 'Too many requests, please try again later.' },
 });
 
 // Stricter limiter for authentication endpoints (login, register, OTP, password reset).
-// Per-account brute-force protection is handled by the failedAuthTracker (5 failures ->
-// escalating cooldown, reset on success). This global per-IP limiter is a coarse safety
-// net only, so it is set high enough not to lock out a legitimate user who performs a
-// handful of auth actions (logins, MFA, resends) from a shared IP.
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 100,
+  limit: process.env.NODE_ENV === 'production' ? 100 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) =>
+    process.env.NODE_ENV !== 'production' &&
+    (req.ip === '127.0.0.1' || req.ip === '::1' || Boolean(req.ip?.includes('127.0.0.1'))),
   message: { message: 'Too many authentication attempts, please try again later.' },
 });
 
 // Per-endpoint limiter for high-volume write endpoints (messaging, submissions).
+// Only applies to mutating methods (POST, PUT, DELETE, PATCH). GET/OPTIONS/HEAD are exempt.
 export const writeLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 100,
+  limit: process.env.NODE_ENV === 'production' ? 500 : 5000,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: 'Too many requests, please try again later.' },
+  skip: (req) =>
+    req.method === 'GET' ||
+    req.method === 'OPTIONS' ||
+    req.method === 'HEAD' ||
+    process.env.NODE_ENV !== 'production' ||
+    req.ip === '127.0.0.1' ||
+    req.ip === '::1' ||
+    req.ip === 'localhost' ||
+    Boolean(req.ip?.includes('127.0.0.1')),
+  message: { message: 'Too many write requests, please try again later.' },
 });
+

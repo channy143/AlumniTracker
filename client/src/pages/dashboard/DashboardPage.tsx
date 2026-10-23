@@ -1,35 +1,38 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/store/authStore';
 import { feedApi, careerTrendsApi, profileApi, surveyApi } from '@/services/api';
-import { CalendarDaysIcon, MegaphoneIcon, UserGroupIcon, BuildingOfficeIcon, BriefcaseIcon, ChartBarIcon, CheckCircleIcon, ExclamationCircleIcon, SparklesIcon, ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
+import {
+  CalendarDaysIcon,
+  MegaphoneIcon,
+  UserGroupIcon,
+  BuildingOfficeIcon,
+  BriefcaseIcon,
+  ChartBarIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  SparklesIcon,
+  ClipboardDocumentCheckIcon,
+  ChatBubbleOvalLeftIcon,
+  HandThumbUpIcon as ThumbUpOutline,
+  TrashIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
+import { HandThumbUpIcon as ThumbUpSolid } from '@heroicons/react/24/solid';
 import { decodeUnicode } from '@/utils/helpers';
 import { formatExperience } from '@/utils/formatExperience';
+import CreatePostBox from '@/components/dashboard/CreatePostBox';
+import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
 
 
+type PostType = 'text' | 'post' | 'job' | 'announcement' | 'event' | 'discussion' | 'guide';
 
-type PostType = 'text' | 'job' | 'announcement' | 'event' | 'discussion' | 'guide';
+export type FeedPost = PostItem;
 
-interface FeedPost {
-  id: string;
-  type: PostType;
-  title: string;
-  content: string;
-  author: string;
-  author_avatar: string;
-  created_at: string;
-  like_count: number;
-  comment_count: number;
-  liked?: boolean;
-  tag?: string;
-  tag_color?: string;
-  image_url?: string;
-  company?: string;
-  job_url?: string;
-}
+type CategoryFilter = 'all' | 'post' | 'announcement' | 'event';
 
-type CategoryFilter = 'all' | 'announcement' | 'event';
 
 function formatDate(dateStr: string): string {
   const now = Date.now();
@@ -98,47 +101,295 @@ function InfoCard({ post, onViewDetails }: { post: FeedPost; onViewDetails: () =
   );
 }
 
-function PostDetailView({ post, onBack }: { post: FeedPost; onBack: () => void }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg">
-      <div className="px-4 py-2 border-b border-gray-100">
-        <button onClick={onBack} className="flex items-center gap-1 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          Back to feed
-        </button>
-      </div>
+function PostDetailView({
+  post,
+  onBack,
+  currentUser,
+  currentProfile,
+}: {
+  post: FeedPost;
+  onBack: () => void;
+  currentUser?: any;
+  currentProfile?: any;
+}) {
+  const [comments, setComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(true);
+  const [commentText, setCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [liked, setLiked] = useState(!!post.liked);
+  const [likeCount, setLikeCount] = useState(post.like_count || 0);
 
-      <div className="px-4 py-3">
-        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
-          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${post.author === 'CTU-Naga Alumni Office' ? 'bg-blue-800' : post.author === 'Career Services' ? 'bg-orange-500' : 'bg-gray-500'}`}>
-            {post.author_avatar || post.author.charAt(0).toUpperCase()}
+  useEffect(() => {
+    feedApi.get(post.id)
+      .then((fullPost) => {
+        if (fullPost?.comments) {
+          setComments(fullPost.comments);
+        }
+        if (typeof fullPost?.liked === 'boolean') {
+          setLiked(fullPost.liked);
+        }
+        if (typeof fullPost?.like_count === 'number') {
+          setLikeCount(fullPost.like_count);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingComments(false));
+  }, [post.id]);
+
+  const handleToggleLike = async () => {
+    const nextLiked = !liked;
+    setLiked(nextLiked);
+    setLikeCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+    try {
+      const res = await feedApi.like(post.id);
+      if (res && typeof res.liked === 'boolean') setLiked(res.liked);
+    } catch {
+      setLiked(!nextLiked);
+      setLikeCount((prev) => (!nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+    }
+  };
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentText.trim() || submittingComment) return;
+    setSubmittingComment(true);
+    try {
+      const newComment = await feedApi.addComment(post.id, commentText.trim());
+      setComments((prev) => [...prev, newComment]);
+      setCommentText('');
+    } catch (err: any) {
+      alert(err.message || 'Failed to post comment.');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      await feedApi.deleteComment(commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete comment.');
+    }
+  };
+
+  // Lock body scroll while post detail modal is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  const userInitial = currentProfile?.first_name?.[0] || currentUser?.first_name?.[0] || currentUser?.email?.[0]?.toUpperCase() || 'U';
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)' }}
+      onClick={onBack}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-2xl sm:max-w-3xl md:max-w-4xl w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Back & Close header */}
+        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+              <span>Back to network feed</span>
+            </button>
+            <span className="text-gray-300">|</span>
+            <span className="text-xs text-gray-500 font-medium">Alumni post details</span>
           </div>
-          <span className="font-medium text-gray-700">{post.author}</span>
-          <span className="text-gray-400">&middot;</span>
-          <span>{formatDate(post.created_at)}</span>
-          {post.tag && (
-            <>
-              <span className="text-gray-400">&middot;</span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${post.tag_color || 'bg-gray-100 text-gray-600'}`}>
-                {post.tag}
-              </span>
-            </>
-          )}
+
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+            title="Close"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
         </div>
 
-        <h3 className="text-base font-bold text-gray-900 mb-2">{post.title}</h3>
+        {/* Scrollable Modal Content */}
+        <div className="overflow-y-auto flex-1 scrollbar-hover">
+          <div className="p-5">
+            {/* Post Author Info */}
+            <div className="flex items-center gap-2.5 text-xs text-gray-500 mb-1">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden shadow-xs">
+            {post.author_avatar && (post.author_avatar.startsWith('http') || post.author_avatar.startsWith('/')) ? (
+              <img src={post.author_avatar} alt="" className="w-full h-full object-cover" />
+            ) : (
+              post.author_avatar || post.author?.charAt(0)?.toUpperCase() || 'A'
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-gray-900 text-sm">{post.author}</span>
+              {post.tag && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${post.tag_color || 'bg-orange-50 text-orange-700'}`}>
+                  {post.tag}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400">{formatDate(post.created_at)}</p>
+          </div>
+        </div>
 
-        <p className="text-sm text-gray-700 leading-relaxed mb-3 whitespace-pre-line">
+        {/* Post Title */}
+        {post.title && (
+          <h3 className="text-base font-bold text-gray-900 mb-2 leading-snug">{post.title}</h3>
+        )}
+
+        {/* Post Content */}
+        <p className="text-sm text-gray-800 leading-relaxed mb-3 whitespace-pre-line">
           {decodeUnicode(post.content)}
         </p>
 
+        {/* Post Image */}
         {post.image_url && (
-          <img src={post.image_url} alt="" className="w-full rounded-lg mb-3" />
+          <div className="rounded-xl overflow-hidden mb-3 max-h-96 bg-gray-50 flex items-center justify-center border border-gray-100">
+            <img src={post.image_url} alt="" className="w-full object-cover max-h-96" />
+          </div>
+        )}
+
+        {/* Linked Survey */}
+        {(post as any).linked_survey && (
+          <div className="px-3.5 py-2.5 bg-orange-50/70 border border-orange-100 rounded-xl flex items-center justify-between mb-3">
+            <span className="text-xs text-orange-900 font-medium">
+              Survey: {(post as any).linked_survey.title}
+            </span>
+            <button
+              onClick={() => window.location.href = `/surveys/${(post as any).linked_survey.id}`}
+              className="text-xs bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3 py-1 rounded-lg transition-colors"
+            >
+              Complete Survey &rarr;
+            </button>
+          </div>
+        )}
+
+        {/* Endorsement & Discussion bar */}
+        <div className="pt-2.5 pb-2 border-t border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-4 text-gray-500">
+            <button
+              onClick={handleToggleLike}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors cursor-pointer text-xs font-semibold ${
+                liked ? 'text-blue-600 bg-blue-50' : 'hover:text-blue-600 hover:bg-gray-100 text-gray-600'
+              }`}
+              title={liked ? 'Endorsed' : 'Endorse'}
+            >
+              <span className="text-sm">👍</span>
+              <span>{liked ? 'Endorsed' : 'Endorse'}</span>
+              {likeCount > 0 && <span className="text-gray-500 font-medium">({likeCount})</span>}
+            </button>
+            <div className="flex items-center gap-1.5 px-2 py-1 text-gray-600 text-xs font-medium">
+              <ChatBubbleOvalLeftIcon className="w-4 h-4 text-gray-400" />
+              <span>{comments.length} Comments</span>
+            </div>
+          </div>
+
+          <div className="flex items-center -space-x-1 select-none">
+            <span className="w-5 h-5 rounded-full bg-white ring-1 ring-gray-200 flex items-center justify-center text-xs shadow-2xs">
+              👍
+            </span>
+            <span className="w-5 h-5 rounded-full bg-white ring-1 ring-gray-200 flex items-center justify-center text-xs shadow-2xs">
+              👏
+            </span>
+            <span className="w-5 h-5 rounded-full bg-white ring-1 ring-gray-200 flex items-center justify-center text-xs shadow-2xs">
+              🎓
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Comments section */}
+      <div className="p-4 bg-gray-50/70 border-t border-gray-100">
+        <h4 className="text-xs font-bold text-gray-800 mb-3">
+          Discussion & Comments ({comments.length})
+        </h4>
+
+        {/* Add comment input */}
+        <form onSubmit={handleAddComment} className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-full bg-orange-500 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">
+            {currentProfile?.avatar_url ? (
+              <img src={currentProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              userInitial
+            )}
+          </div>
+          <input
+            type="text"
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Write a comment or response..."
+            className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-xs text-gray-800 placeholder-gray-400 outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition-all shadow-2xs"
+            autoFocus
+          />
+          <button
+            type="submit"
+            disabled={!commentText.trim() || submittingComment}
+            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-full text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+          >
+            Submit
+          </button>
+        </form>
+
+        {/* Comments list */}
+        {loadingComments ? (
+          <div className="py-6 text-center text-xs text-gray-400">Loading comments...</div>
+        ) : comments.length === 0 ? (
+          <div className="py-6 text-center text-xs text-gray-400 bg-white rounded-xl border border-gray-100 p-4">
+            No comments yet. Be the first to join the conversation!
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {comments.map((c) => {
+              const isOwnComment = currentUser?.id && c.user_id && currentUser.id === c.user_id;
+              const canDelete = isOwnComment || currentUser?.role === 'admin';
+              return (
+                <div key={c.id} className="flex items-start gap-2.5 text-xs group">
+                  <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center shrink-0 text-xs overflow-hidden shadow-2xs">
+                    {c.author_avatar ? (
+                      <img src={c.author_avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      c.author?.[0]?.toUpperCase() || 'U'
+                    )}
+                  </div>
+                  <div className="flex-1 bg-white p-3 rounded-2xl border border-gray-200/70 shadow-2xs">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="font-bold text-gray-900">{c.author}</span>
+                      <span className="text-[10px] text-gray-400">{formatDate(c.created_at)}</span>
+                    </div>
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">{c.content}</p>
+                  </div>
+                  {canDelete && (
+                    <button
+                      onClick={() => handleDeleteComment(c.id)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition-opacity cursor-pointer"
+                      title="Delete comment"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
-    </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -292,10 +543,11 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
 
   return (
     <div className="space-y-3">
-
       <div className="bg-white border border-gray-200 rounded-lg p-3">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+
           <CalendarDaysIcon className="w-4 h-4 text-orange-500" />
+
           Upcoming Events
         </h3>
         {events.length === 0 ? (
@@ -506,6 +758,13 @@ export default function DashboardPage() {
   const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    profileApi.get().then((p) => { if (p) setProfile(p); }).catch(() => {});
+  }, []);
+
+
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('Good morning');
@@ -521,20 +780,44 @@ export default function DashboardPage() {
     .finally(() => setLoading(false));
   }, []);
 
+  const handlePostCreated = (newPost: any) => {
+    setFeedPosts((prev) => [newPost, ...prev]);
+  };
+
+  const handlePostDeleted = (postId: string) => {
+    setFeedPosts((prev) => prev.filter((p) => p.id !== postId));
+  };
+
   const filtered = feedPosts
-    .filter((p) => p.type === 'announcement' || p.type === 'event')
-    .filter((p) => categoryFilter === 'all' || p.type === categoryFilter)
+    .filter((p) => {
+      if (categoryFilter === 'all') return true;
+      if (categoryFilter === 'post') {
+        return p.type === 'post' || p.type === 'text' || p.type === 'discussion' || (!p.is_official && p.type !== 'announcement' && p.type !== 'event');
+      }
+      return p.type === categoryFilter;
+    })
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  const CATEGORY_TABS: { id: CategoryFilter; label: string }[] = [
+    { id: 'all', label: 'All Updates' },
+    { id: 'post', label: 'Alumni Posts' },
+    { id: 'announcement', label: 'Announcements' },
+    { id: 'event', label: 'Events' },
+  ];
 
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white text-sm font-bold">
-          {user?.email ? user.email[0].toUpperCase() : '?'}
+        <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white text-sm font-bold shadow-xs">
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+          ) : (
+            user?.email ? user.email[0].toUpperCase() : '?'
+          )}
         </div>
         <div>
           <h1 className="text-base font-bold text-gray-900">
-            {greeting}{user?.first_name ? `, ${user.first_name}!` : '!'}
+            {greeting}{profile?.first_name ? `, ${profile.first_name}!` : user?.first_name ? `, ${user.first_name}!` : '!'}
           </h1>
           <p className="text-xs text-gray-500">Welcome to the CTU-Naga Alumni Network</p>
         </div>
@@ -542,48 +825,70 @@ export default function DashboardPage() {
 
       <SurveyBanner />
 
-      <div className="flex items-center gap-3 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
+      <div className="flex items-center gap-3 mb-3 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-xs">
         <SparklesIcon className="w-4 h-4 text-orange-500 shrink-0" />
-        <div className="flex items-center gap-1">
-          {(['all', 'announcement', 'event'] as const).map((option) => (
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5">
+          {CATEGORY_TABS.map((tab) => (
             <button
-              key={option}
-              onClick={() => setCategoryFilter(option)}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                categoryFilter === option
-                  ? 'bg-orange-500 text-white shadow-sm'
-                  : 'text-gray-500 hover:bg-gray-100'
+              key={tab.id}
+              onClick={() => setCategoryFilter(tab.id)}
+              className={`px-3 py-1 text-xs font-semibold rounded-full transition-all whitespace-nowrap ${
+                categoryFilter === tab.id
+                  ? 'bg-orange-500 text-white shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
-              {option === 'all' ? 'All Posts' : option === 'announcement' ? 'Announcements' : 'Events'}
+              {tab.label}
             </button>
           ))}
         </div>
-        <span className="text-gray-300 mx-1">|</span>
-        <span className="text-xs text-gray-400 flex items-center gap-1">
+        <span className="text-gray-200 mx-1 hidden sm:inline">|</span>
+        <span className="text-xs text-gray-400 hidden sm:flex items-center gap-1 shrink-0 ml-auto">
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
           </svg>
-          Latest
+          Alumni Network Updates
         </span>
       </div>
 
       <div className="flex gap-4">
         <div className="flex-1 min-w-0 space-y-3">
-          {selectedPost ? (
-            <PostDetailView post={selectedPost} onBack={() => setSelectedPost(null)} />
-          ) : loading ? (
+          {/* Post Creation Box */}
+          <CreatePostBox
+            currentUser={user}
+            currentProfile={profile}
+            onPostCreated={handlePostCreated}
+          />
+
+          {/* Post Detail Modal (Overlaid on top of feed with dimmed background) */}
+          {selectedPost && (
+            <PostDetailView
+              post={selectedPost}
+              onBack={() => setSelectedPost(null)}
+              currentUser={user}
+              currentProfile={profile}
+            />
+          )}
+
+          {loading ? (
             <div className="space-y-3">
               <SkeletonCard />
               <SkeletonCard />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">
-              No {categoryFilter === 'all' ? 'posts' : categoryFilter + 's'} yet. Check back soon!
+            <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-xl">
+              No {categoryFilter === 'all' ? 'updates' : categoryFilter + 's'} yet. Share a milestone or opportunity with your fellow alumni!
             </div>
           ) : (
             filtered.map((post) => (
-              <InfoCard key={post.id} post={post} onViewDetails={() => setSelectedPost(post)} />
+              <FeedPostCard
+                key={post.id}
+                post={post}
+                currentUserId={user?.id}
+                currentUserRole={user?.role}
+                onPostDeleted={handlePostDeleted}
+                onViewDetails={setSelectedPost}
+              />
             ))
           )}
         </div>
@@ -598,4 +903,5 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+
 }

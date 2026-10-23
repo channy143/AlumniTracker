@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { UserGroupIcon, UserPlusIcon, CheckIcon, XMarkIcon, ChatBubbleLeftRightIcon, HandRaisedIcon } from '@heroicons/react/24/outline';
 import { connectionsApi, directoryApi, messagesApi, profileApi } from '@/services/api';
 import { formatProgramLongName } from '@/utils/formatProgram';
+import { useChatStore } from '@/store/chatStore';
+
 
 const tabs = ['All', 'Pending', 'Accepted'];
 
@@ -109,14 +111,12 @@ export default function ConnectionsPage() {
   };
 
   const handleMessage = async (profileId: string, name: string) => {
-    const msg = prompt(`Send a message to ${name}:`);
-    if (msg && msg.trim()) {
-      try {
-        await messagesApi.send(profileId, msg.trim());
-        alert('Message sent!');
-      } catch {}
-    }
+    useChatStore.getState().openChat({
+      profileId,
+      name,
+    });
   };
+
 
   const totalPages = Math.ceil(total / limit);
 

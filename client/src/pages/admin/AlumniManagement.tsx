@@ -201,7 +201,16 @@ export default function AlumniManagement() {
   }, [tab, loadEligible, load]);
 
   const openEligibleForm = () => {
-    setEligibleForm({ student_id: '', first_name: '', last_name: '', birth_date: '', program: '', year_graduated: '' });
+    setEligibleForm({
+      student_id: '',
+      first_name: '',
+      last_name: '',
+      middle_name: '',
+      graduation_date: '',
+      birth_date: '',
+      program: '',
+      year_graduated: '',
+    });
     setEligError('');
     setShowEligibleForm(true);
   };
@@ -209,17 +218,19 @@ export default function AlumniManagement() {
   const handleCreateEligible = async (e: React.FormEvent) => {
     e.preventDefault();
     setEligError('');
-    if (!eligibleForm.student_id.trim() || !eligibleForm.first_name.trim() || !eligibleForm.last_name.trim() || !eligibleForm.birth_date) {
-      setEligError('Student ID, names, and birthdate are required.');
+    if (!eligibleForm.last_name.trim() || !eligibleForm.first_name.trim()) {
+      setEligError('Last name and first name are required.');
       return;
     }
     setSavingEligible(true);
     try {
       await adminApi.eligibleAlumniCreate({
-        student_id: eligibleForm.student_id.trim(),
+        student_id: eligibleForm.student_id ? eligibleForm.student_id.trim() : null,
         first_name: eligibleForm.first_name.trim(),
         last_name: eligibleForm.last_name.trim(),
-        birth_date: eligibleForm.birth_date,
+        middle_name: eligibleForm.middle_name ? eligibleForm.middle_name.trim() : null,
+        graduation_date: eligibleForm.graduation_date || null,
+        birth_date: eligibleForm.birth_date || null,
         program: eligibleForm.program.trim() || null,
         year_graduated: eligibleForm.year_graduated ? Number(eligibleForm.year_graduated) : null,
       });
@@ -455,12 +466,14 @@ export default function AlumniManagement() {
                   </div>
                 </div>
                 <div className="p-[15px] flex-1 flex flex-col gap-1">
-                  <p className="text-xs font-semibold text-gray-900 leading-tight">{item.first_name || ''} {item.last_name || ''}</p>
+                  <p className="text-xs font-semibold text-gray-900 leading-tight">
+                    {item.last_name || ''}, {item.first_name || ''} {item.middle_name ? `(${item.middle_name})` : ''}
+                  </p>
                   <div className="space-y-0.5 text-[10px] text-gray-500">
                     <p><span className="text-gray-400">ID:</span> {item.student_id || '---'}</p>
                     <p><span className="text-gray-400">Course:</span> {item.program ? courseShort(item.program) : '---'}</p>
                     <p><span className="text-gray-400">Batch:</span> {item.year_graduated || '---'}</p>
-                    <p><span className="text-gray-400">Birthdate:</span> {item.birth_date ? new Date(item.birth_date).toLocaleDateString() : '---'}</p>
+                    <p><span className="text-gray-400">Graduation Day:</span> {item.graduation_date ? new Date(item.graduation_date).toLocaleDateString() : '---'}</p>
                   </div>
                 </div>
                 <div className="px-2.5 pb-2.5 flex flex-wrap gap-1">
@@ -814,24 +827,42 @@ export default function AlumniManagement() {
 
             <form onSubmit={handleCreateEligible} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Student ID *</label>
-                  <input type="text" value={eligibleForm.student_id} onChange={(e) => setEligibleForm((f: any) => ({ ...f, student_id: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" placeholder="e.g. CTU-2020-0001" required />
-                </div>
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">First Name *</label>
-                    <input type="text" value={eligibleForm.first_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, first_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Last Name *</label>
+                    <input type="text" value={eligibleForm.last_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, last_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" placeholder="e.g. Dela Cruz" required />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Last Name *</label>
-                    <input type="text" value={eligibleForm.last_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, last_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
+                    <label className="block text-xs font-medium text-gray-700 mb-1">First Name *</label>
+                    <input type="text" value={eligibleForm.first_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, first_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" placeholder="e.g. Juan" required />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Birthdate *</label>
-                  <input type="date" value={eligibleForm.birth_date} onChange={(e) => setEligibleForm((f: any) => ({ ...f, birth_date: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Middle Name (Optional)</label>
+                    <input type="text" value={eligibleForm.middle_name || ''} onChange={(e) => setEligibleForm((f: any) => ({ ...f, middle_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500" placeholder="e.g. Santos" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Student ID (Optional)</label>
+                    <input type="text" value={eligibleForm.student_id} onChange={(e) => setEligibleForm((f: any) => ({ ...f, student_id: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500" placeholder="e.g. CTU-2020-0001" />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Graduation Day (Date)</label>
+                    <input type="date" value={eligibleForm.graduation_date || ''} onChange={(e) => setEligibleForm((f: any) => ({ ...f, graduation_date: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Batch Year</label>
+                    <select value={eligibleForm.year_graduated} onChange={(e) => setEligibleForm((f: any) => ({ ...f, year_graduated: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
+                      <option value="">Select Year</option>
+                      {batchYears.map((y) => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Program / Course</label>
@@ -846,13 +877,11 @@ export default function AlumniManagement() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Year Graduated</label>
-                    <select value={eligibleForm.year_graduated} onChange={(e) => setEligibleForm((f: any) => ({ ...f, year_graduated: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
-                      <option value="">Select Year</option>
-                      {batchYears.map((y) => <option key={y} value={y}>{y}</option>)}
-                    </select>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Birthdate (Optional)</label>
+                    <input type="date" value={eligibleForm.birth_date} onChange={(e) => setEligibleForm((f: any) => ({ ...f, birth_date: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500" />
                   </div>
                 </div>
+
                 {eligError && <p className="text-xs text-red-600 bg-red-50 p-2 rounded-lg border border-red-100">{eligError}</p>}
               </div>
               <div className="px-6 py-3.5 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2.5 shrink-0">

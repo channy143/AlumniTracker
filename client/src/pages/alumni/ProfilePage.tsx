@@ -1,22 +1,27 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { api, profileApi, employmentApi, authApi } from '@/services/api';
+import { api, profileApi, employmentApi, authApi, feedApi } from '@/services/api';
 import {
   CameraIcon, PencilIcon, BriefcaseIcon, MapPinIcon,
   AcademicCapIcon, CheckBadgeIcon, UserIcon, ClockIcon,
   BuildingOfficeIcon, ChartBarIcon, LinkIcon, CalendarDaysIcon,
   TrophyIcon, ArrowTrendingUpIcon, UserCircleIcon, XMarkIcon,
-  LockClosedIcon, ShieldCheckIcon, ShieldExclamationIcon, InformationCircleIcon
+  LockClosedIcon, ShieldCheckIcon, ShieldExclamationIcon, InformationCircleIcon,
+  ChatBubbleBottomCenterTextIcon
 } from '@heroicons/react/24/outline';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { playTing } from '@/utils/helpers';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
 import { formatProgramLongName } from '@/utils/formatProgram';
 import { useUIStore } from '@/store/uiStore';
+import { useAuthStore } from '@/store/authStore';
 import { clearTrustedDeviceToken } from '@/utils/device';
 import { isPasswordStrong, checkPasswordCriteria } from '@/utils/validation';
+import CreatePostBox from '@/components/dashboard/CreatePostBox';
+import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: UserIcon },
+  { id: 'posts', label: 'Posts', icon: ChatBubbleBottomCenterTextIcon },
   { id: 'career', label: 'Career', icon: ArrowTrendingUpIcon },
   { id: 'education', label: 'Education', icon: AcademicCapIcon },
   { id: 'history', label: 'History', icon: ClockIcon },
@@ -94,6 +99,43 @@ export default function ProfilePage() {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaOtp, setMfaOtp] = useState('');
   const [mfaLoading, setMfaLoading] = useState(false);
+
+  // Posts management on profile
+  const { user } = useAuthStore();
+  const [myPosts, setMyPosts] = useState<PostItem[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [postsLoaded, setPostsLoaded] = useState(false);
+
+  const loadMyPosts = useCallback(async () => {
+    try {
+      setLoadingPosts(true);
+      const res = await feedApi.mine();
+      setMyPosts(Array.isArray(res) ? res : (res as any)?.posts || []);
+      setPostsLoaded(true);
+    } catch (err: any) {
+      console.error('Failed to load my posts:', err);
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'posts' && !postsLoaded) {
+      loadMyPosts();
+    }
+  }, [activeTab, postsLoaded, loadMyPosts]);
+
+  const handlePostCreated = (newPost: PostItem) => {
+    setMyPosts(prev => [newPost, ...prev]);
+  };
+
+  const handlePostDeleted = (postId: string) => {
+    setMyPosts(prev => prev.filter(p => p.id !== postId));
+  };
+
+  const handlePostUpdated = (updatedPost: PostItem) => {
+    setMyPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p));
+  };
 
 
   const closeSkillDropdown = useCallback(() => setShowSkillDropdown(false), []);
@@ -1555,9 +1597,49 @@ export default function ProfilePage() {
     );
   };
 
+  const renderPosts = () => (
+    <div className="space-y-4">
+      {/* Create Post on Profile */}
+      <CreatePostBox
+        currentUser={user}
+        currentProfile={profile}
+        onPostCreated={handlePostCreated}
+      />
+
+      {loadingPosts ? (
+        <div className="space-y-3">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      ) : myPosts.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+          <ChatBubbleBottomCenterTextIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-sm font-semibold text-gray-800">No posts shared yet</h3>
+          <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+            Create your first post above to share updates, milestones, and connect with your alumni network.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {myPosts.map((post) => (
+            <FeedPostCard
+              key={post.id}
+              post={post}
+              currentUserId={user?.id}
+              currentUserRole={user?.role}
+              onPostDeleted={handlePostDeleted}
+              onPostUpdated={handlePostUpdated}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview': return renderOverview();
+      case 'posts': return renderPosts();
       case 'career': return renderCareer();
       case 'education': return renderEducation();
       case 'history': return renderHistory();

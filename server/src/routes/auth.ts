@@ -28,6 +28,7 @@ import {
   revokeAllTrustedDevices,
 } from '../services/trustedDeviceService';
 import { revokeToken } from '../services/revokedTokenService';
+import { userPresenceMap } from './messages';
 import {
   sendOtpSchema,
   forgotPasswordSchema,
@@ -127,7 +128,7 @@ router.post('/send-otp', validate(sendOtpSchema), async (req, res, next) => {
 
 router.post('/register', validate(registerV2Schema), async (req, res, next) => {
   try {
-    const { studentId, birthDate, firstName, lastName, email, password, program, yearGraduated, otp } = req.body;
+    const { studentId, birthDate, firstName, lastName, middleName, graduationDate, batchYear, email, password, program, yearGraduated, otp } = req.body;
 
     if (!otp) throw new AppError('OTP is required', 400);
 
@@ -136,36 +137,29 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
       throw new AppError('Invalid or expired OTP', 400);
     }
 
-    // Verify the student ID + birthdate against the eligible-alumni registry.
-    const { data: eligible, error } = await supabase
-      .from('alumni_eligible')
-      .select('id, student_id, birth_date, user_id')
-      .eq('student_id', studentId)
-      .maybeSingle();
-
-    if (error && error.code === '42P01') {
-      throw new AppError('Alumni registry is not configured', 500);
-    }
-    if (error) throw new AppError(error.message, 500);
-
-    if (!eligible) {
-      throw new AppError('We could not verify your alumni information. Please contact the registrar.', 400);
+    // Verify against the eligible-alumni registry.
+    let eligible: any = null;
+    if (studentId) {
+      const { data } = await supabase
+        .from('alumni_eligible')
+        .select('id, student_id, first_name, last_name, middle_name, birth_date, graduation_date, year_graduated, user_id')
+        .eq('student_id', studentId)
+        .maybeSingle();
+      eligible = data;
     }
 
-    const storedDate = new Date(eligible.birth_date);
-    const inputDate = new Date(birthDate);
-    const datesMatch =
-      !isNaN(storedDate.getTime()) &&
-      !isNaN(inputDate.getTime()) &&
-      storedDate.getUTCFullYear() === inputDate.getUTCFullYear() &&
-      storedDate.getUTCMonth() === inputDate.getUTCMonth() &&
-      storedDate.getUTCDate() === inputDate.getUTCDate();
+    if (!eligible && lastName && firstName) {
+      const { data: candidates } = await supabase
+        .from('alumni_eligible')
+        .select('id, student_id, first_name, last_name, middle_name, birth_date, graduation_date, year_graduated, user_id')
+        .ilike('last_name', lastName.trim())
+        .ilike('first_name', firstName.trim());
 
-    if (!datesMatch) {
-      throw new AppError('We could not verify your alumni information. Please contact the registrar.', 400);
+      const targetBatch = parseInt(String(yearGraduated || batchYear || '0'), 10);
+      eligible = (candidates || []).find((c: any) => !targetBatch || !c.year_graduated || c.year_graduated === targetBatch) || candidates?.[0];
     }
 
-    if (eligible.user_id) {
+    if (eligible && eligible.user_id) {
       throw new AppError('An account for this alumni record already exists. Please sign in.', 409);
     }
 
@@ -198,10 +192,11 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
       user_id: user.id,
       first_name: firstName,
       last_name: lastName,
+      middle_name: middleName || null,
       email,
       country: 'Philippines',
-      birth_date: birthDate,
-      id_number: studentId,
+      birth_date: birthDate || null,
+      id_number: studentId || eligible?.student_id || null,
     };
     const { data: profileRecord, error: profileError } = await supabase.from('profiles').insert(profileInsertPayload).select('id').single();
 
@@ -210,10 +205,12 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
       throw new AppError('Failed to create profile', 500);
     }
 
+    const gradYear = parseInt(String(yearGraduated || batchYear || '0'), 10);
     const { error: eduError } = await supabase.from('education').insert({
       profile_id: profileRecord.id,
       program,
-      year_graduated: parseInt(yearGraduated),
+      year_graduated: gradYear || new Date().getFullYear(),
+      graduation_date: graduationDate || null,
       campus: 'Naga Extension Campus',
     });
 
@@ -221,9 +218,10 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
       console.error('[Register] Education insert error:', eduError);
     }
 
-    // Link the eligible registry record to the newly created account so the
-    // student ID cannot be re-registered.
-    await supabase.from('alumni_eligible').update({ user_id: user.id }).eq('id', eligible.id);
+    // Link the eligible registry record to the newly created account so it cannot be re-registered.
+    if (eligible) {
+      await supabase.from('alumni_eligible').update({ user_id: user.id }).eq('id', eligible.id);
+    }
 
     const token = signAccessToken(user.id, user.email, user.role);
 
@@ -323,6 +321,11 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       const isTrusted = await verifyTrustedDevice(record.id, record.email, deviceId, deviceToken);
       if (isTrusted) {
         const token = signAccessToken(record.id, record.email, record.role);
+        const nowIso = new Date().toISOString();
+        userPresenceMap.set(record.id, Date.now());
+        await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', record.id);
+        await supabase.from('profiles').update({ last_active_at: nowIso }).eq('user_id', record.id);
+
         logAudit(req, {
           action: 'AUTH_LOGIN_TRUSTED_DEVICE',
           entity: 'user',
@@ -358,6 +361,10 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     }
 
     const token = signAccessToken(record.id, record.email, record.role);
+    const nowIso = new Date().toISOString();
+    userPresenceMap.set(record.id, Date.now());
+    await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', record.id);
+    await supabase.from('profiles').update({ last_active_at: nowIso }).eq('user_id', record.id);
 
     logAudit(req, {
       action: 'AUTH_LOGIN_SUCCESS',
@@ -426,7 +433,10 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
       .single();
     if (error || !user) throw new AppError('Invalid email or password.', 401);
 
-    await supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
+    const nowIso = new Date().toISOString();
+    userPresenceMap.set(user.id, Date.now());
+    await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', user.id);
+    await supabase.from('profiles').update({ last_active_at: nowIso }).eq('user_id', user.id);
     const token = signAccessToken(user.id, user.email, user.role);
 
     // Register this device as trusted and mint a device token
@@ -461,72 +471,136 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
 });
 
 /**
- * Verify a Student ID + Birthdate against the eligible-alumni registry.
- * Returns only a boolean-ish confirmation; never leaks other record data.
+ * Verify alumni identity against the eligible-alumni registry.
+ * Matches by Last Name, First Name, Middle Name (optional), Graduation Day, and Batch Year.
+ * Returns only confirmation and autofill metadata.
  */
 router.post('/verify-alumni', validate(verifyAlumniSchema), async (req, res, next) => {
   try {
-    const { studentId, birthDate } = req.body;
+    const { lastName, firstName, middleName, graduationDate, batchYear, studentId, birthDate } = req.body;
 
-    const { data, error } = await supabase
-      .from('alumni_eligible')
-      .select('id, student_id, first_name, last_name, program, year_graduated, user_id')
-      .eq('student_id', studentId)
-      .maybeSingle();
+    // Check if using the primary name & graduation verification flow
+    if (lastName && firstName) {
+      const { data: candidates, error } = await supabase
+        .from('alumni_eligible')
+        .select('id, student_id, first_name, last_name, middle_name, birth_date, graduation_date, program, year_graduated, user_id')
+        .ilike('last_name', lastName.trim())
+        .ilike('first_name', firstName.trim());
 
-    if (error && error.code === '42P01') {
-      throw new AppError('Alumni registry is not configured', 500);
+      if (error && error.code === '42P01') {
+        throw new AppError('Alumni registry is not configured', 500);
+      }
+      if (error) throw new AppError(error.message, 500);
+
+      if (!candidates || candidates.length === 0) {
+        throw new AppError('We could not verify your alumni information. Please check your Last Name and First Name or contact the registrar.', 400);
+      }
+
+      const targetBatch = batchYear ? parseInt(String(batchYear), 10) : null;
+      const inputGradDate = graduationDate ? new Date(graduationDate) : null;
+
+      const matched = candidates.find((c: any) => {
+        // If batch year is provided, it should match year_graduated
+        if (targetBatch && c.year_graduated && c.year_graduated !== targetBatch) {
+          return false;
+        }
+
+        // If middle name is provided in both request and record, check prefix/initial match
+        if (middleName && middleName.trim() && c.middle_name && c.middle_name.trim()) {
+          const reqM = middleName.trim().toLowerCase();
+          const recM = c.middle_name.trim().toLowerCase();
+          if (!recM.startsWith(reqM.charAt(0)) && !reqM.startsWith(recM.charAt(0))) {
+            return false;
+          }
+        }
+
+        // If record has graduation_date set, verify it matches the graduation day input
+        if (c.graduation_date && inputGradDate && !isNaN(inputGradDate.getTime())) {
+          const storedGrad = new Date(c.graduation_date);
+          const datesMatch =
+            !isNaN(storedGrad.getTime()) &&
+            storedGrad.getUTCFullYear() === inputGradDate.getUTCFullYear() &&
+            storedGrad.getUTCMonth() === inputGradDate.getUTCMonth() &&
+            storedGrad.getUTCDate() === inputGradDate.getUTCDate();
+          if (!datesMatch) return false;
+        }
+
+        return true;
+      });
+
+      if (!matched) {
+        throw new AppError('We could not verify your alumni information. Please check your graduation day and batch year or contact the registrar.', 400);
+      }
+
+      if (matched.user_id) {
+        throw new AppError('An account for this alumni record already exists. Please sign in.', 409);
+      }
+
+      return res.json({
+        verified: true,
+        identity: {
+          studentId: matched.student_id || '',
+          firstName: matched.first_name || firstName.trim(),
+          lastName: matched.last_name || lastName.trim(),
+          middleName: matched.middle_name || middleName?.trim() || '',
+          graduationDate: matched.graduation_date || graduationDate || '',
+          batchYear: matched.year_graduated != null ? String(matched.year_graduated) : String(batchYear || ''),
+          program: matched.program || '',
+          yearGraduated: matched.year_graduated != null ? String(matched.year_graduated) : String(batchYear || ''),
+        },
+      });
     }
-    if (error) throw new AppError(error.message, 500);
 
-    if (!data) {
-      // Do not reveal whether the student ID exists.
-      throw new AppError('We could not verify your alumni information. Please contact the registrar.', 400);
+    // Fallback: legacy Student ID + Birthdate verification
+    if (studentId && birthDate) {
+      const { data, error } = await supabase
+        .from('alumni_eligible')
+        .select('id, student_id, first_name, last_name, middle_name, graduation_date, program, year_graduated, user_id, birth_date')
+        .eq('student_id', studentId)
+        .maybeSingle();
+
+      if (error && error.code === '42P01') {
+        throw new AppError('Alumni registry is not configured', 500);
+      }
+      if (error) throw new AppError(error.message, 500);
+
+      if (!data) {
+        throw new AppError('We could not verify your alumni information. Please contact the registrar.', 400);
+      }
+
+      const storedDate = new Date(data.birth_date);
+      const inputDate = new Date(birthDate);
+      const datesMatch =
+        !isNaN(storedDate.getTime()) &&
+        !isNaN(inputDate.getTime()) &&
+        storedDate.getUTCFullYear() === inputDate.getUTCFullYear() &&
+        storedDate.getUTCMonth() === inputDate.getUTCMonth() &&
+        storedDate.getUTCDate() === inputDate.getUTCDate();
+
+      if (!datesMatch) {
+        throw new AppError('We could not verify your alumni information. Please contact the registrar.', 400);
+      }
+
+      if (data.user_id) {
+        throw new AppError('An account for this alumni record already exists. Please sign in.', 409);
+      }
+
+      return res.json({
+        verified: true,
+        identity: {
+          studentId: data.student_id,
+          firstName: data.first_name || '',
+          lastName: data.last_name || '',
+          middleName: data.middle_name || '',
+          graduationDate: data.graduation_date || '',
+          batchYear: data.year_graduated != null ? String(data.year_graduated) : '',
+          program: data.program || '',
+          yearGraduated: data.year_graduated != null ? String(data.year_graduated) : '',
+        },
+      });
     }
 
-    const { data: record, error: recError } = await supabase
-      .from('alumni_eligible')
-      .select('birth_date')
-      .eq('id', data.id)
-      .single();
-
-    if (recError || !record) {
-      throw new AppError('We could not verify your alumni information. Please contact the registrar.', 400);
-    }
-
-    const storedDate = new Date(record.birth_date);
-    const inputDate = new Date(birthDate);
-    const datesMatch =
-      !isNaN(storedDate.getTime()) &&
-      !isNaN(inputDate.getTime()) &&
-      storedDate.getUTCFullYear() === inputDate.getUTCFullYear() &&
-      storedDate.getUTCMonth() === inputDate.getUTCMonth() &&
-      storedDate.getUTCDate() === inputDate.getUTCDate();
-
-    if (!datesMatch) {
-      // Generic failure — avoid confirming the ID exists.
-      throw new AppError('We could not verify your alumni information. Please contact the registrar.', 400);
-    }
-
-    // If the eligible record is already linked to a registered account,
-    // block duplicate registration.
-    if (data.user_id) {
-      throw new AppError('An account for this alumni record already exists. Please sign in.', 409);
-    }
-
-    // The person can only reach this point by knowing their own Student ID
-    // and Birthdate, so returning their own record fields (name / program /
-    // year) is safe and lets the form auto-fill instead of re-typing them.
-    res.json({
-      verified: true,
-      identity: {
-        studentId: data.student_id,
-        firstName: data.first_name || '',
-        lastName: data.last_name || '',
-        program: data.program || '',
-        yearGraduated: data.year_graduated != null ? String(data.year_graduated) : '',
-      },
-    });
+    throw new AppError('Please provide Last Name, First Name, Graduation Day, and Batch Year to verify.', 400);
   } catch (err) {
     next(err);
   }

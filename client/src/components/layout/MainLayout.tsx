@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import NotificationContainer from '../ui/Notification';
+import DockedChatBox from '@/components/chat/DockedChatBox';
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -24,6 +25,10 @@ export default function MainLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Alumni Connect Docked Messaging & Minimized Conversation Heads */}
+      <DockedChatBox />
     </div>
   );
 }
+

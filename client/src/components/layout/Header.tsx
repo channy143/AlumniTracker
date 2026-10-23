@@ -23,6 +23,7 @@ import { JellyBlobMascot, BlobSpeech } from '@/components/ui/feral-blob/JellyBlo
 import { SecurityPolicyModal } from '@/components/security/SecurityPolicyModal';
 import { ReportSuspiciousActivityModal } from '@/components/security/ReportSuspiciousActivityModal';
 import { useIdleTimer } from '@/hooks/useIdleTimer';
+import ChatDropdown from '@/components/chat/ChatDropdown';
 import '@/styles/blob.css';
 
 const SEARCH_PAGES = [
@@ -238,7 +239,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 h-12 flex items-center pr-4">
+      <header className="sticky top-0 z-[60] bg-white border-b border-gray-200 h-12 flex items-center pr-4">
+
         <div className="w-full grid grid-cols-3 items-center">
           <div className="flex items-center gap-2">
             <button onClick={onMenuClick} className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded">
@@ -278,6 +280,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           </div>
 
           <div className="flex items-center gap-1 justify-end">
+            {user?.role !== 'admin' && !location.pathname.startsWith('/admin') && (
+              <ChatDropdown />
+            )}
             <div className="relative" ref={notifDropdownRef}>
               <button onClick={() => { setNotifDropdownOpen((v) => !v); if (notifDropdownOpen) setUnreadCount(0); }} className="relative p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg" title="Notifications">
                 <BellIcon className="w-5 h-5" />

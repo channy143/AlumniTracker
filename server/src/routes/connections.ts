@@ -5,6 +5,7 @@ import { validate } from '../middleware/validate';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { connectionRequestSchema, connectionRespondSchema } from '../middleware/validationSchemas';
+import { createNotification } from './notifications';
 
 const router = Router();
 
@@ -40,22 +41,54 @@ router.post('/request', authenticate, validate(connectionRequestSchema), async (
 
     const { data: profile } = await db
       .from('profiles')
-      .select('id')
+      .select('id, first_name, last_name, user_id')
       .eq('user_id', req.user!.userId)
       .single();
     if (!profile) throw new AppError('Profile not found', 404);
-    if (profile.id === recipient_id) throw new AppError('Cannot connect with yourself', 400);
+    const targetParam = recipient_id;
+    const { data: targetProfile } = await db
+      .from('profiles')
+      .select('id, user_id, first_name, last_name')
+      .or(`id.eq.${targetParam},user_id.eq.${targetParam}`)
+      .maybeSingle();
+
+    const finalRecipientId = targetProfile ? targetProfile.id : targetParam;
+    if (profile.id === finalRecipientId) throw new AppError('Cannot connect with yourself', 400);
 
     const { data, error } = await db
       .from('connections')
-      .insert({ requester_id: profile.id, recipient_id, message: message || null })
+      .insert({ requester_id: profile.id, recipient_id: finalRecipientId, message: message || null })
       .select()
       .single();
     if (error && error.code === '23505') throw new AppError('Connection request already exists', 400);
     if (error) throw new AppError(error.message, 500);
+
+    // Create notification for the added alumnus
+    let targetUserId = targetProfile?.user_id;
+    if (!targetUserId) {
+      const { data: tp } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('id', finalRecipientId)
+        .maybeSingle();
+      if (tp?.user_id) targetUserId = tp.user_id;
+    }
+
+    if (targetUserId) {
+      const requesterName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'An alumnus';
+      await createNotification({
+        userId: targetUserId,
+        type: 'mentorship',
+        title: 'New Connection Request',
+        message: `${requesterName} sent you a connection request.`,
+        link: '/connections',
+      });
+    }
+
     res.status(201).json(data);
   } catch (err) { next(err); }
 });
+
 
 router.put('/:id/respond', authenticate, validate(connectionRespondSchema), async (req: AuthenticatedRequest, res, next) => {
   try {
@@ -65,7 +98,7 @@ router.put('/:id/respond', authenticate, validate(connectionRespondSchema), asyn
 
     const { data: profile } = await db
       .from('profiles')
-      .select('id')
+      .select('id, first_name, last_name')
       .eq('user_id', req.user!.userId)
       .single();
     if (!profile) throw new AppError('Profile not found', 404);
@@ -83,6 +116,27 @@ router.put('/:id/respond', authenticate, validate(connectionRespondSchema), asyn
       .update({ status, connected_at: status === 'accepted' ? new Date().toISOString() : null })
       .eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
+
+    // If accepted, notify the requester that their request was accepted
+    if (status === 'accepted') {
+      const { data: requesterProfile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('id', connection.requester_id)
+        .maybeSingle();
+
+      if (requesterProfile?.user_id) {
+        const accepterName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'An alumnus';
+        await createNotification({
+          userId: requesterProfile.user_id,
+          type: 'mentorship',
+          title: 'Connection Accepted',
+          message: `${accepterName} accepted your connection request.`,
+          link: '/connections',
+        });
+      }
+    }
+
     res.json({ message: `Connection ${status}` });
   } catch (err) { next(err); }
 });

@@ -1,10 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { BriefcaseIcon, AcademicCapIcon, CalendarDaysIcon, FunnelIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
-import { directoryApi } from '@/services/api';
+import {
+  BriefcaseIcon,
+  AcademicCapIcon,
+  CalendarDaysIcon,
+  FunnelIcon,
+  ChevronDownIcon,
+  UserPlusIcon,
+  CheckIcon,
+} from '@heroicons/react/24/outline';
+import { directoryApi, connectionsApi, profileApi } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
 import { SkeletonRow } from '@/components/ui/Skeleton';
 import { formatProgramLongName } from '@/utils/formatProgram';
+
+
 
 const statusColors: Record<string, string> = {
   'Employed': 'bg-emerald-100 text-emerald-700',
@@ -82,6 +93,9 @@ function FilterDropdown({ label, options, selected, onChange }: {
 export default function DirectoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+
   const query = searchParams.get('q') || '';
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,10 +112,40 @@ export default function DirectoryPage() {
   const [batchOptions, setBatchOptions] = useState<string[]>([]);
   const employmentStatusOptions = ['Employed', 'Self-employed', 'Unemployed', 'Seeking Opportunities', 'Retired'];
 
+  const [connectionsMap, setConnectionsMap] = useState<Record<string, 'pending' | 'accepted'>>({});
+  const [requestingMap, setRequestingMap] = useState<Record<string, boolean>>({});
+
   useEffect(() => {
+    profileApi.get().then((p) => { if (p?.id) setCurrentProfileId(p.id); }).catch(() => {});
     directoryApi.stats().then(setStats).catch(() => {});
     directoryApi.programs().then(setProgramOptions).catch(() => {});
+    connectionsApi.list().then((conns: any[]) => {
+      if (Array.isArray(conns)) {
+        const map: Record<string, 'pending' | 'accepted'> = {};
+        conns.forEach((c) => {
+          if (c.recipient_id) map[c.recipient_id] = c.status;
+          if (c.requester_id) map[c.requester_id] = c.status;
+          if (c.recipient?.id) map[c.recipient.id] = c.status;
+          if (c.requester?.id) map[c.requester.id] = c.status;
+        });
+        setConnectionsMap(map);
+      }
+    }).catch(() => {});
   }, []);
+
+  const handleConnect = async (profileId: string) => {
+    setRequestingMap((prev) => ({ ...prev, [profileId]: true }));
+    try {
+      await connectionsApi.request(profileId);
+      setConnectionsMap((prev) => ({ ...prev, [profileId]: 'pending' }));
+    } catch (err: any) {
+      alert(err.message || 'Connection request already exists or failed.');
+    } finally {
+      setRequestingMap((prev) => ({ ...prev, [profileId]: false }));
+    }
+  };
+
+
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -214,6 +258,8 @@ export default function DirectoryPage() {
         {!loading && results.map((profile) => {
           const emp = profile.current_employment;
           const edu = profile.education;
+          const isMe = (user?.id && profile.user_id === user.id) || (currentProfileId && profile.id === currentProfileId);
+
           return (
             <div
               key={profile.id}
@@ -261,7 +307,50 @@ export default function DirectoryPage() {
                   )}
                 </div>
               </div>
+
+              {/* Action Button: Add Connection (only for other alumni) */}
+              {!isMe && (
+                <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => handleConnect(profile.id)}
+                    disabled={!!connectionsMap[profile.id] || requestingMap[profile.id]}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs ${
+                      connectionsMap[profile.id] === 'accepted'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
+                        : connectionsMap[profile.id] === 'pending'
+                        ? 'bg-gray-100 text-gray-600 border border-gray-200 cursor-default'
+                        : 'bg-orange-500 hover:bg-orange-600 text-white cursor-pointer active:scale-95'
+                    }`}
+                    title={connectionsMap[profile.id] === 'accepted' ? 'Already connected' : connectionsMap[profile.id] === 'pending' ? 'Connection request pending' : 'Add Connection'}
+                  >
+                    {connectionsMap[profile.id] === 'accepted' ? (
+                      <>
+                        <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Connected</span>
+                      </>
+                    ) : connectionsMap[profile.id] === 'pending' ? (
+                      <>
+                        <CheckIcon className="w-3.5 h-3.5 text-gray-500" />
+                        <span>Requested</span>
+                      </>
+                    ) : requestingMap[profile.id] ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlusIcon className="w-3.5 h-3.5" />
+                        <span>Add Connection</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
+
+
           );
         })}
       </div>

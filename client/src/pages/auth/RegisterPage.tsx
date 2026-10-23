@@ -18,27 +18,46 @@ export default function RegisterPage() {
   // Rate limit cooldown state
   const [rateLimitCooldown, setRateLimitCooldown] = useState(0);
 
-  // Step 1: Identity verification (Student ID + Birthdate)
-  const [identity, setIdentity] = useState({ studentId: '', birthDate: '' });
+  // Step 1: Identity verification (Last Name, First Name, Middle Name, Graduation Day, Batch Year)
+  const [identity, setIdentity] = useState({
+    lastName: '',
+    firstName: '',
+    middleName: '',
+    graduationDate: '',
+    batchYear: '',
+    studentId: '',
+    birthDate: '',
+  });
+  const [identityErrors, setIdentityErrors] = useState<{
+    lastName?: boolean;
+    firstName?: boolean;
+    graduationDate?: boolean;
+    batchYear?: boolean;
+  }>({});
   const [_verificationToken, setVerificationToken] = useState<string | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
   // Step 2: Registration form & errors
   const [formData, setFormData] = useState({
-    firstName: '',
     lastName: '',
+    firstName: '',
+    middleName: '',
     email: '',
     password: '',
     confirmPassword: '',
     program: '',
+    graduationDate: '',
+    batchYear: '',
     yearGraduated: '',
   });
 
   const [formErrors, setFormErrors] = useState<{
-    firstName?: boolean;
     lastName?: boolean;
+    firstName?: boolean;
     email?: boolean;
     program?: boolean;
+    graduationDate?: boolean;
+    batchYear?: boolean;
     yearGraduated?: boolean;
     password?: boolean;
     confirmPassword?: boolean;
@@ -123,23 +142,45 @@ export default function RegisterPage() {
   const handleVerifyIdentity = async (e: React.FormEvent) => {
     e.preventDefault();
     setVerifyError(null);
+    setIdentityErrors({});
 
-    if (!identity.studentId.trim() || !identity.birthDate) {
-      setVerifyError('Please enter both your Student ID and Birthdate to continue.');
+    const errs: { lastName?: boolean; firstName?: boolean; graduationDate?: boolean; batchYear?: boolean } = {};
+    if (!identity.lastName.trim()) errs.lastName = true;
+    if (!identity.firstName.trim()) errs.firstName = true;
+    if (!identity.graduationDate) errs.graduationDate = true;
+    if (!identity.batchYear) errs.batchYear = true;
+
+    if (Object.keys(errs).length > 0) {
+      setIdentityErrors(errs);
+      setVerifyError('Please enter Last Name, First Name, Graduation Day, and Batch Year to continue.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await authApi.verifyAlumni(identity.studentId.trim(), identity.birthDate);
+      const res = await authApi.verifyAlumni({
+        lastName: identity.lastName.trim(),
+        firstName: identity.firstName.trim(),
+        middleName: identity.middleName.trim() || undefined,
+        graduationDate: identity.graduationDate,
+        batchYear: identity.batchYear,
+      });
+
       if (res.verified) {
         const idy = res.identity ?? {} as NonNullable<VerifyAlumniResponse['identity']>;
         setFormData((prev) => ({
           ...prev,
-          firstName: idy.firstName || prev.firstName,
-          lastName: idy.lastName || prev.lastName,
+          lastName: idy.lastName || identity.lastName.trim(),
+          firstName: idy.firstName || identity.firstName.trim(),
+          middleName: idy.middleName || identity.middleName.trim(),
+          graduationDate: idy.graduationDate || identity.graduationDate,
+          batchYear: idy.batchYear || idy.yearGraduated || identity.batchYear,
+          yearGraduated: idy.yearGraduated || idy.batchYear || identity.batchYear,
           program: idy.program || prev.program,
-          yearGraduated: idy.yearGraduated || prev.yearGraduated,
+        }));
+        setIdentity((prev) => ({
+          ...prev,
+          studentId: idy.studentId || prev.studentId,
         }));
         setVerificationToken('verified');
         setStep('form');
@@ -151,7 +192,7 @@ export default function RegisterPage() {
         setRateLimitCooldown(cooldown);
         setVerifyError(`Too many verification attempts. Please try again in ${cooldown} seconds.`);
       } else {
-        setVerifyError('We could not verify your alumni information. Please check your Student ID and Birthdate or contact the registrar.');
+        setVerifyError(err.message || 'We could not verify your alumni information. Please check your Last Name, First Name, Graduation Day, and Batch Year or contact the registrar.');
       }
     } finally {
       setLoading(false);
@@ -169,11 +210,12 @@ export default function RegisterPage() {
     setFormErrors({});
 
     const missing: Record<string, boolean> = {};
-    if (!formData.firstName) missing.firstName = true;
-    if (!formData.lastName) missing.lastName = true;
-    if (!formData.email) missing.email = true;
+    if (!formData.lastName.trim()) missing.lastName = true;
+    if (!formData.firstName.trim()) missing.firstName = true;
+    if (!formData.email.trim()) missing.email = true;
     if (!formData.program) missing.program = true;
-    if (!formData.yearGraduated) missing.yearGraduated = true;
+    if (!formData.graduationDate) missing.graduationDate = true;
+    if (!formData.batchYear && !formData.yearGraduated) missing.batchYear = true;
     if (!formData.password) missing.password = true;
     if (!formData.confirmPassword) missing.confirmPassword = true;
 
@@ -290,9 +332,17 @@ export default function RegisterPage() {
     try {
       const { confirmPassword: _dropped, ...payload } = { ...formData };
       const res = await authApi.register({
-        studentId: identity.studentId.trim(),
-        birthDate: identity.birthDate,
-        ...payload,
+        lastName: formData.lastName.trim(),
+        firstName: formData.firstName.trim(),
+        middleName: formData.middleName ? formData.middleName.trim() : undefined,
+        graduationDate: formData.graduationDate,
+        batchYear: formData.batchYear || formData.yearGraduated,
+        yearGraduated: formData.batchYear || formData.yearGraduated,
+        program: formData.program,
+        email: formData.email.trim(),
+        password: formData.password,
+        studentId: identity.studentId || undefined,
+        birthDate: identity.birthDate || undefined,
         otp,
       });
       setToken(res.token);
@@ -332,48 +382,113 @@ export default function RegisterPage() {
               Join the Community
             </div>
             <p className="text-gray-500 mb-2">First, let's confirm your alumni identity.</p>
-            <p className="text-gray-400 text-sm mb-8">
-              Enter the Student ID and Birthdate from your alumni record to begin.
+            <p className="text-gray-400 text-sm mb-6">
+              Enter your name, graduation day, and batch year from your alumni record to begin.
             </p>
 
-            <form onSubmit={handleVerifyIdentity} className="space-y-5">
-              {/* Student ID textfield with red highlight on error */}
+            <form onSubmit={handleVerifyIdentity} className="space-y-4">
+              {/* Last Name & First Name */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${identityErrors.lastName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                    Last Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={identity.lastName}
+                    onChange={(e) => {
+                      setIdentity((p) => ({ ...p, lastName: e.target.value }));
+                      if (verifyError || identityErrors.lastName) {
+                        setVerifyError(null);
+                        setIdentityErrors((p) => ({ ...p, lastName: false }));
+                      }
+                    }}
+                    className={`input-field ${identityErrors.lastName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    placeholder="e.g. Dela Cruz"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${identityErrors.firstName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={identity.firstName}
+                    onChange={(e) => {
+                      setIdentity((p) => ({ ...p, firstName: e.target.value }));
+                      if (verifyError || identityErrors.firstName) {
+                        setVerifyError(null);
+                        setIdentityErrors((p) => ({ ...p, firstName: false }));
+                      }
+                    }}
+                    className={`input-field ${identityErrors.firstName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    placeholder="e.g. Juan"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Middle Name (Optional) */}
               <div>
-                <label className={`block text-sm font-medium mb-1.5 ${verifyError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                  Student ID
+                <label className="block text-sm font-medium mb-1.5 text-ctu-charcoal">
+                  Middle Name <span className="text-gray-400 font-normal">(Optional)</span>
                 </label>
                 <input
                   type="text"
-                  value={identity.studentId}
-                  onChange={(e) => {
-                    setIdentity((p) => ({ ...p, studentId: e.target.value }));
-                    if (verifyError) setVerifyError(null);
-                  }}
-                  className={`input-field ${verifyError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
-                  placeholder="e.g. CTU-2020-0001"
-                  required
+                  value={identity.middleName}
+                  onChange={(e) => setIdentity((p) => ({ ...p, middleName: e.target.value }))}
+                  className="input-field"
+                  placeholder="e.g. Santos"
                 />
               </div>
 
-              {/* Birthdate textfield with red highlight on error */}
-              <div>
-                <label className={`block text-sm font-medium mb-1.5 ${verifyError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                  Birthdate
-                </label>
-                <input
-                  type="date"
-                  value={identity.birthDate}
-                  onChange={(e) => {
-                    setIdentity((p) => ({ ...p, birthDate: e.target.value }));
-                    if (verifyError) setVerifyError(null);
-                  }}
-                  className={`input-field ${verifyError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
-                  required
-                />
-
-                {/* Inline error alert matching screenshot */}
-                <FieldErrorAlert message={verifyError} />
+              {/* Graduation Day & Batch Year */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${identityErrors.graduationDate ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                    Graduation Day <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={identity.graduationDate}
+                    onChange={(e) => {
+                      setIdentity((p) => ({ ...p, graduationDate: e.target.value }));
+                      if (verifyError || identityErrors.graduationDate) {
+                        setVerifyError(null);
+                        setIdentityErrors((p) => ({ ...p, graduationDate: false }));
+                      }
+                    }}
+                    className={`input-field ${identityErrors.graduationDate ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${identityErrors.batchYear ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                    Batch Year <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={identity.batchYear}
+                    onChange={(e) => {
+                      setIdentity((p) => ({ ...p, batchYear: e.target.value }));
+                      if (verifyError || identityErrors.batchYear) {
+                        setVerifyError(null);
+                        setIdentityErrors((p) => ({ ...p, batchYear: false }));
+                      }
+                    }}
+                    className={`input-field ${identityErrors.batchYear ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    required
+                  >
+                    <option value="">Select batch year</option>
+                    {years.map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              {/* Inline error alert matching screenshot */}
+              <FieldErrorAlert message={verifyError} />
 
               <button
                 type="submit"
@@ -401,27 +516,15 @@ export default function RegisterPage() {
               <h2 className="text-xl font-bold text-ctu-charcoal">Identity Confirmed</h2>
             </div>
             <p className="text-gray-500 mb-4 text-sm">
-              Student ID <span className="font-semibold">{identity.studentId}</span> verified. Now complete your registration.
+              Welcome, <span className="font-semibold">{formData.firstName} {formData.lastName}</span> (Batch {formData.batchYear || identity.batchYear}). Now complete your registration.
             </p>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.firstName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleChange}
-                    className={`input-field ${formErrors.firstName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
-                    required
-                  />
-                </div>
+              {/* Row 1: Last Name & First Name */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${formErrors.lastName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                    Last Name
+                    Last Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -432,27 +535,57 @@ export default function RegisterPage() {
                     required
                   />
                 </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.firstName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    className={`input-field ${formErrors.firstName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    required
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className={`block text-sm font-medium mb-1.5 ${formErrors.email ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={`input-field ${formErrors.email ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
-                  placeholder="alumni@ctu.edu.ph"
-                  required
-                />
+              {/* Row 2: Middle Name & Email Address */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5 text-ctu-charcoal">
+                    Middle Name <span className="text-gray-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="middleName"
+                    value={formData.middleName}
+                    onChange={handleChange}
+                    className="input-field"
+                    placeholder="e.g. Santos"
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.email ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={`input-field ${formErrors.email ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    placeholder="alumni@ctu.edu.ph"
+                    required
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Row 3: Degree & Batch Year */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-sm font-medium mb-1.5 ${formErrors.program ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                    Degree
+                    Degree <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="program"
@@ -471,14 +604,17 @@ export default function RegisterPage() {
                   </select>
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.yearGraduated ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                    Year Graduated
+                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.batchYear || formErrors.yearGraduated ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                    Batch Year <span className="text-red-500">*</span>
                   </label>
                   <select
-                    name="yearGraduated"
-                    value={formData.yearGraduated}
-                    onChange={handleChange}
-                    className={`input-field ${formErrors.yearGraduated ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    name="batchYear"
+                    value={formData.batchYear || formData.yearGraduated}
+                    onChange={(e) => {
+                      setFormData((p) => ({ ...p, batchYear: e.target.value, yearGraduated: e.target.value }));
+                      setFormErrors((p) => ({ ...p, batchYear: false, yearGraduated: false, message: null }));
+                    }}
+                    className={`input-field ${formErrors.batchYear || formErrors.yearGraduated ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     required
                   >
                     <option value="">Select year</option>
@@ -487,6 +623,21 @@ export default function RegisterPage() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Row 4: Graduation Day */}
+              <div>
+                <label className={`block text-sm font-medium mb-1.5 ${formErrors.graduationDate ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  Graduation Day <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  name="graduationDate"
+                  value={formData.graduationDate}
+                  onChange={handleChange}
+                  className={`input-field ${formErrors.graduationDate ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                  required
+                />
               </div>
 
               {/* Password & Confirm Password with red highlight on mismatch or error */}

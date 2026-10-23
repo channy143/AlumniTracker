@@ -35,12 +35,12 @@ router.get('/', async (req, res, next) => {
     // Only return eligible records that are truly unclaimed (user_id IS NULL)
     let query = supabase
       .from('alumni_eligible')
-      .select('id, student_id, first_name, last_name, birth_date, program, year_graduated, user_id, created_at')
+      .select('id, student_id, first_name, last_name, middle_name, birth_date, graduation_date, program, year_graduated, user_id, created_at')
       .is('user_id', null);
 
     if (search) {
       const s = search.toLowerCase();
-      query = query.or(`student_id.ilike.%${s}%,first_name.ilike.%${s}%,last_name.ilike.%${s}%`);
+      query = query.or(`student_id.ilike.%${s}%,first_name.ilike.%${s}%,last_name.ilike.%${s}%,middle_name.ilike.%${s}%`);
     }
     query = query.order('created_at', { ascending: false }).limit(500);
     const { data, error } = await query;
@@ -56,15 +56,17 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', validate(adminEligibleCreateSchema), async (req, res, next) => {
   try {
-    const { student_id, first_name, last_name, birth_date, program, year_graduated } = req.body;
+    const { student_id, first_name, last_name, middle_name, birth_date, graduation_date, program, year_graduated } = req.body;
     const { data, error } = await supabase.from('alumni_eligible').insert({
-      student_id,
-      first_name,
-      last_name,
-      birth_date,
+      student_id: student_id ? student_id.trim() : null,
+      first_name: first_name.trim(),
+      last_name: last_name.trim(),
+      middle_name: middle_name ? middle_name.trim() : null,
+      birth_date: birth_date || null,
+      graduation_date: graduation_date || null,
       program: program || null,
       year_graduated: year_graduated || null,
-    }).select('id, student_id, first_name, last_name').single();
+    }).select('id, student_id, first_name, last_name, middle_name, graduation_date').single();
 
     if (error) {
       if (error.code === '23505') throw new AppError('Student ID already exists in the registry', 409);

@@ -126,12 +126,25 @@ export interface LoginResponse {
 export interface VerifyAlumniResponse {
   verified: boolean;
   identity?: {
-    studentId: string;
-    firstName: string;
-    lastName: string;
-    program: string;
-    yearGraduated: string;
+    studentId?: string;
+    firstName?: string;
+    lastName?: string;
+    middleName?: string;
+    graduationDate?: string;
+    batchYear?: string;
+    program?: string;
+    yearGraduated?: string;
   };
+}
+
+export interface VerifyAlumniPayload {
+  lastName?: string;
+  firstName?: string;
+  middleName?: string;
+  graduationDate?: string;
+  batchYear?: string;
+  studentId?: string;
+  birthDate?: string;
 }
 
 export const authApi = {
@@ -139,8 +152,12 @@ export const authApi = {
     api.post<LoginResponse>('/auth/login', { email, password, deviceId, deviceToken }),
   mfaVerify: (email: string, otp: string, mfaToken: string, deviceId?: string) =>
     api.post<{ user: any; token: string; trustedDeviceToken?: string }>('/auth/mfa-verify', { email, otp, mfaToken, deviceId }),
-  verifyAlumni: (studentId: string, birthDate: string) =>
-    api.post<VerifyAlumniResponse>('/auth/verify-alumni', { studentId, birthDate }),
+  verifyAlumni: (dataOrStudentId: VerifyAlumniPayload | string, birthDate?: string) => {
+    if (typeof dataOrStudentId === 'string') {
+      return api.post<VerifyAlumniResponse>('/auth/verify-alumni', { studentId: dataOrStudentId, birthDate });
+    }
+    return api.post<VerifyAlumniResponse>('/auth/verify-alumni', dataOrStudentId);
+  },
   register: (data: any) =>
     api.post<{ user: any; token: string }>('/auth/register', data),
   sendOtp: (email: string, turnstileToken?: string) =>
@@ -439,12 +456,60 @@ export const connectionsApi = {
 export const messagesApi = {
   send: (receiverId: string, body: string, subject?: string, connectionId?: string) =>
     api.post<any>('/messages', { receiver_id: receiverId, body, subject, connection_id: connectionId }),
+  conversations: () => api.get<any[]>('/messages/conversations'),
+  getConversation: (profileId: string) => api.get<any[]>(`/messages/${profileId}`),
+  unreadCount: () => api.get<{ count: number }>('/messages/unread/count'),
+  heartbeat: () => api.post<{ success: boolean; last_active_at: string }>('/messages/heartbeat', {}),
+  getPresence: (profileIds: string[]) =>
+    api.get<Record<string, { is_online: boolean; last_active_at: string | null }>>(
+      `/messages/presence?profileIds=${encodeURIComponent(profileIds.join(','))}`
+    ),
 };
 
 export const feedApi = {
   list: (sort?: string) => api.get<any[]>(`/feed${sort ? `?sort=${sort}` : ''}`),
+  mine: () => api.get<any[]>('/feed/mine'),
+  userPosts: (userId: string) => api.get<any[]>(`/feed/user/${userId}`),
   get: (id: string) => api.get<any>(`/feed/${id}`),
+  create: (data: {
+    content: string;
+    title?: string | null;
+    image_url?: string | null;
+    type?: string;
+    tag?: string;
+    audience?: 'public' | 'friends' | 'only_me';
+    feeling?: string | null;
+    location?: string | null;
+    tagged_friends?: any[];
+    media_type?: 'photo' | 'video';
+    video_url?: string | null;
+  }) => api.post<any>('/feed', data),
+  update: (id: string, data: any) => api.put<any>(`/feed/${id}`, data),
+  like: (id: string) => api.post<{ liked: boolean; user_reaction?: string; like_count: number }>(`/feed/${id}/like`, {}),
+  react: (id: string, reaction: string) =>
+    api.post<{ liked: boolean; user_reaction: string | null; like_count: number; reactions_summary: any; top_reactions: string[] }>(`/feed/${id}/reaction`, { reaction }),
+  getReactions: (id: string) => api.get<any[]>(`/feed/${id}/reactions`),
+  addComment: (id: string, content: string, parent_id?: string | null) =>
+    api.post<any>(`/feed/${id}/comments`, { content, parent_id }),
+  reactComment: (commentId: string, reaction?: string) =>
+    api.post<{ liked: boolean; user_reaction: string | null; like_count: number }>(`/feed/comments/${commentId}/reaction`, { reaction }),
+  deleteComment: (commentId: string) => api.delete<any>(`/feed/comments/${commentId}`),
+  report: (id: string, reason: string, details?: string) =>
+    api.post<{ message: string }>(`/feed/${id}/report`, { reason, details }),
+  share: (id: string) => api.post<{ share_count: number }>(`/feed/${id}/share`, {}),
+  delete: (id: string) => api.delete<any>(`/feed/${id}`),
+  uploadMedia: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.upload<{
+      url: string;
+      media_type: 'photo' | 'video';
+      file_name: string;
+      size: number;
+    }>('/feed/upload', formData);
+  },
 };
+
 
 export const activitiesApi = {
   list: (limit?: number) => api.get<any[]>(`/activities${limit ? `?limit=${limit}` : ''}`),
