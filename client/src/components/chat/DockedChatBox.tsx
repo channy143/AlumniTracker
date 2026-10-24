@@ -3,9 +3,20 @@ import {
   MinusIcon,
   XMarkIcon,
   PaperAirplaneIcon,
+  FaceSmileIcon,
 } from '@heroicons/react/24/outline';
 import { useChatStore } from '@/store/chatStore';
 import { messagesApi, profileApi } from '@/services/api';
+import EmojiPicker from '@/components/ui/EmojiPicker';
+
+function isOnlyEmojis(text: string): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  const emojiRegex = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff]|\uFE0F|\u200D)+/g;
+  const stripped = trimmed.replace(emojiRegex, '').replace(/\s+/g, '');
+  return stripped.length === 0;
+}
 
 interface MessageItem {
   id: string;
@@ -13,6 +24,7 @@ interface MessageItem {
   receiver_id: string;
   body: string;
   created_at: string;
+  failed?: boolean;
 }
 
 function formatLastActive(dateStr?: string | null): string {
@@ -48,6 +60,7 @@ export default function DockedChatBox() {
   const [overflowHovered, setOverflowHovered] = useState(false);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputText, setInputText] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [loadingChat, setLoadingChat] = useState(false);
@@ -87,7 +100,21 @@ export default function DockedChatBox() {
     if (isInitial) setLoadingChat(true);
     try {
       const data = await messagesApi.getConversation(activeChat.profileId);
-      setMessages(data || []);
+      if (Array.isArray(data)) {
+        setMessages((prev) => {
+          // Keep pending optimistic messages that haven't been confirmed yet
+          const pending = prev.filter(
+            (p) =>
+              p.id.startsWith('temp-') &&
+              !data.some(
+                (d: any) =>
+                  d.id === p.id ||
+                  (d.body === p.body && (d.sender_id === p.sender_id || p.sender_id === 'me'))
+              )
+          );
+          return [...data, ...pending];
+        });
+      }
     } catch {
       // Ignore network hiccup
     } finally {
@@ -123,28 +150,54 @@ export default function DockedChatBox() {
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
-    if (!text || !activeChat?.profileId || sending) return;
+    if (!text || !activeChat?.profileId) return;
 
+    // Immediately clear input field if sending what was typed
+    if (!textToSend) {
+      setInputText('');
+    }
+
+    const targetProfileId = activeChat.profileId;
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const optimisticMsg: MessageItem = {
-      id: `temp-${Date.now()}`,
+      id: tempId,
       sender_id: currentProfileId || 'me',
-      receiver_id: activeChat.profileId,
+      receiver_id: targetProfileId,
       body: text,
       created_at: new Date().toISOString(),
     };
 
+    // 1. Instant zero-delay optimistic append in UI
     setMessages((prev) => [...prev, optimisticMsg]);
-    setInputText('');
-    setSending(true);
 
+    // 2. Immediate smooth scroll to newest message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 10);
+
+    // 3. Asynchronous background delivery without freezing UI or disabling buttons
     try {
-      await messagesApi.send(activeChat.profileId, text);
-      await loadMessages();
-    } catch {
-      // If error, reload
-      loadMessages();
-    } finally {
-      setSending(false);
+      const realMsg = await messagesApi.send(targetProfileId, text);
+      if (realMsg?.id) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? {
+                  ...m,
+                  id: realMsg.id,
+                  created_at: realMsg.created_at || m.created_at,
+                  sender_id: realMsg.sender_id || m.sender_id,
+                }
+              : m
+          )
+        );
+      }
+    } catch (err: any) {
+      console.error('Failed to deliver message:', err);
+      // Mark temporary message as failed if network error
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m))
+      );
     }
   };
 
@@ -401,24 +454,47 @@ export default function DockedChatBox() {
               </div>
             ) : (
               messages.map((m) => {
-                const isMe = currentProfileId ? m.sender_id === currentProfileId : m.sender_id !== activeChat.profileId;
+                const isMe = m.id.startsWith('temp-') || (currentProfileId ? m.sender_id === currentProfileId : m.sender_id !== activeChat.profileId);
+                const emojiOnly = isOnlyEmojis(m.body);
+                const isPending = m.id.startsWith('temp-');
+                const isFailed = m.failed;
+
                 return (
                   <div
                     key={m.id}
-                    className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                    className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} transition-opacity duration-150 ${isPending ? 'opacity-90' : 'opacity-100'}`}
                   >
-                    <div
-                      className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed max-w-[80%] break-words ${
-                        isMe
-                          ? 'bg-blue-600 text-white rounded-br-xs shadow-xs'
-                          : 'bg-gray-200/90 text-gray-900 rounded-bl-xs'
-                      }`}
-                    >
-                      {m.body}
+                    {emojiOnly ? (
+                      <div
+                        className={`text-3xl sm:text-4xl py-0.5 px-1 select-none animate-emoji-pop ${
+                          isMe ? 'text-right' : 'text-left'
+                        }`}
+                        title={m.body}
+                      >
+                        {m.body}
+                      </div>
+                    ) : (
+                      <div
+                        className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed max-w-[80%] break-words ${
+                          isMe
+                            ? 'bg-blue-600 text-white rounded-br-xs shadow-xs'
+                            : 'bg-gray-200/90 text-gray-900 rounded-bl-xs'
+                        } ${isFailed ? 'border border-red-400 bg-red-600 text-white' : ''}`}
+                      >
+                        {m.body}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1 px-1 mt-0.5">
+                      <span className="text-[9px] text-gray-400">
+                        {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {isPending && (
+                        <span className="text-[9px] text-gray-400 italic">Sending...</span>
+                      )}
+                      {isFailed && (
+                        <span className="text-[9px] text-red-500 font-semibold">Failed to send</span>
+                      )}
                     </div>
-                    <span className="text-[9px] text-gray-400 px-1 mt-0.5">
-                      {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
                   </div>
                 );
               })
@@ -426,8 +502,51 @@ export default function DockedChatBox() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Quick Emoji Reaction Strip */}
+          <div className="px-3 py-1 bg-gray-50/90 border-t border-gray-100 flex items-center justify-between text-xs shrink-0">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Quick:</span>
+            <div className="flex items-center gap-1.5">
+              {['🎓', '👍', '❤️', '🔥', '🎉', '👏', '🚀'].map((em) => (
+                <button
+                  key={em}
+                  type="button"
+                  onClick={() => handleSend(em)}
+                  className="text-base hover:scale-135 active:scale-95 transition-transform duration-150 p-1 rounded-md hover:bg-gray-200/70 cursor-pointer"
+                  title={`Send ${em}`}
+                >
+                  {em}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Input / Send Bar */}
-          <div className="p-2.5 bg-white border-t border-gray-200 flex items-center gap-1.5">
+          <div className="p-2.5 bg-white border-t border-gray-200 flex items-center gap-1.5 relative">
+            {/* Dynamic Emoji Picker Popover */}
+            {showEmojiPicker && (
+              <EmojiPicker
+                position="top"
+                className="left-2 bottom-full mb-2"
+                onSelect={(emoji) => {
+                  setInputText((prev) => prev + emoji);
+                }}
+                onClose={() => setShowEmojiPicker(false)}
+              />
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+              className={`p-1.5 rounded-full transition-colors cursor-pointer shrink-0 ${
+                showEmojiPicker
+                  ? 'text-blue-600 bg-blue-100'
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              }`}
+              title="Choose dynamic emoji"
+            >
+              <FaceSmileIcon className="w-5 h-5" />
+            </button>
+
             <input
               type="text"
               value={inputText}
@@ -440,8 +559,7 @@ export default function DockedChatBox() {
             {inputText.trim() ? (
               <button
                 onClick={() => handleSend()}
-                disabled={sending}
-                className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors shadow-xs disabled:opacity-50"
+                className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors shadow-xs cursor-pointer active:scale-95"
                 title="Send message"
               >
                 <PaperAirplaneIcon className="w-4 h-4" />
@@ -449,7 +567,7 @@ export default function DockedChatBox() {
             ) : (
               <button
                 onClick={() => handleSend('👋')}
-                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-full transition-colors text-base"
+                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-full transition-colors text-base cursor-pointer active:scale-95"
                 title="Send Wave"
               >
                 👋

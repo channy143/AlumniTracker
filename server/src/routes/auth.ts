@@ -28,7 +28,7 @@ import {
   revokeAllTrustedDevices,
 } from '../services/trustedDeviceService';
 import { revokeToken } from '../services/revokedTokenService';
-import { userPresenceMap } from './messages';
+import { markUserOffline, markUserActive } from '../services/presenceService';
 import {
   sendOtpSchema,
   forgotPasswordSchema,
@@ -322,7 +322,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       if (isTrusted) {
         const token = signAccessToken(record.id, record.email, record.role);
         const nowIso = new Date().toISOString();
-        userPresenceMap.set(record.id, Date.now());
+        markUserActive(record.id);
         await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', record.id);
         await supabase.from('profiles').update({ last_active_at: nowIso }).eq('user_id', record.id);
 
@@ -362,7 +362,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
 
     const token = signAccessToken(record.id, record.email, record.role);
     const nowIso = new Date().toISOString();
-    userPresenceMap.set(record.id, Date.now());
+    markUserActive(record.id);
     await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', record.id);
     await supabase.from('profiles').update({ last_active_at: nowIso }).eq('user_id', record.id);
 
@@ -434,7 +434,7 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
     if (error || !user) throw new AppError('Invalid email or password.', 401);
 
     const nowIso = new Date().toISOString();
-    userPresenceMap.set(user.id, Date.now());
+    markUserActive(user.id);
     await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', user.id);
     await supabase.from('profiles').update({ last_active_at: nowIso }).eq('user_id', user.id);
     const token = signAccessToken(user.id, user.email, user.role);
@@ -900,6 +900,9 @@ router.post('/logout', authenticate, async (req: AuthenticatedRequest, res, next
     if (allDevices) {
       await revokeAllTrustedDevices(userId);
     }
+
+    // Immediately mark user offline in presence system
+    await markUserOffline(userId);
 
     // Log the secure session termination
     await logAudit(req, {

@@ -10,9 +10,12 @@ export function useHeartbeat() {
     if (!token) return;
 
     const sendHeartbeat = async () => {
+      // If client browser is offline (internet dropped), do not attempt
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
       const now = Date.now();
-      // Throttle heartbeats to minimum 10 seconds apart
-      if (now - lastHeartbeatRef.current < 10000) return;
+      // Throttle heartbeats to minimum 12 seconds apart
+      if (now - lastHeartbeatRef.current < 12000) return;
       lastHeartbeatRef.current = now;
       try {
         await messagesApi.heartbeat();
@@ -21,30 +24,66 @@ export function useHeartbeat() {
       }
     };
 
-    // Immediate initial heartbeat upon mounting/session available
+    // Immediate initial heartbeat upon mount/auth
     sendHeartbeat();
 
-    // Regular interval: every 30 seconds while page is visible
+    // Regular pulse interval: every 20 seconds while page is open & visible
     const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
         sendHeartbeat();
       }
-    }, 30000);
+    }, 20000);
 
-    // Heartbeat promptly when user switches back to this tab or focuses window
-    const handleActivity = () => {
-      if (document.visibilityState === 'visible') {
+    // Active user interactions (clicks, keypresses, scrolls) trigger heartbeat
+    const handleUserInteraction = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
         sendHeartbeat();
       }
     };
 
-    document.addEventListener('visibilitychange', handleActivity);
-    window.addEventListener('focus', handleActivity);
+    // Promptly send heartbeat when switching tabs or focusing window
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        sendHeartbeat();
+      }
+    };
+
+    // Internet connectivity drop and restoration handlers
+    const handleOnline = () => {
+      sendHeartbeat();
+    };
+
+    const handleOffline = () => {
+      // Internet lost: send offline signal if possible or note state
+      messagesApi.offline();
+    };
+
+    // Tab/Window close or navigation away: notify server immediately
+    const handlePageUnload = () => {
+      messagesApi.offline();
+    };
+
+    const interactionEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'] as const;
+    interactionEvents.forEach((ev) => window.addEventListener(ev, handleUserInteraction, { passive: true }));
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('beforeunload', handlePageUnload);
+    window.addEventListener('pagehide', handlePageUnload);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleActivity);
-      window.removeEventListener('focus', handleActivity);
+      interactionEvents.forEach((ev) => window.removeEventListener(ev, handleUserInteraction));
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('beforeunload', handlePageUnload);
+      window.removeEventListener('pagehide', handlePageUnload);
+      // Also send offline if unmounting due to logout
+      handlePageUnload();
     };
   }, [token]);
 }

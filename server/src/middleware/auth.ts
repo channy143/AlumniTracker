@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthenticatedRequest, AuthPayload } from '../types';
 import { isTokenRevoked } from '../services/revokedTokenService';
+import { markUserActive } from '../services/presenceService';
 
 export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -46,6 +47,10 @@ export async function authenticate(req: AuthenticatedRequest, res: Response, nex
 
     req.user = decoded;
     req.token = token;
+
+    // Mark user active in real-time presence service
+    markUserActive(decoded.userId).catch(() => {});
+
     next();
   } catch {
     return res.status(401).json({ message: 'Invalid or expired token' });

@@ -416,13 +416,16 @@ export default function LandingPage() {
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <button onClick={scrollToTop} className="text-left group">
-            <h1 className={`text-xl font-bold font-display transition-colors duration-300 ${showHeader ? 'text-ctu-blue group-hover:text-ctu-marigold' : 'text-white'}`}>
-              CTU-Naga Alumni
-            </h1>
-            <p className={`text-xs -mt-0.5 transition-colors duration-300 ${showHeader ? 'text-gray-400' : 'text-white/60'}`}>
-              Bridging Education to Eternity
-            </p>
+          <button onClick={scrollToTop} className="flex items-center gap-3 text-left group">
+            <img src="/favicon.svg" alt="CTU-Naga Alumni" className="w-9 h-9 rounded-xl shadow-md shrink-0" />
+            <div>
+              <h1 className={`text-xl font-bold font-display transition-colors duration-300 ${showHeader ? 'text-ctu-blue group-hover:text-ctu-marigold' : 'text-white'}`}>
+                CTU-Naga Alumni
+              </h1>
+              <p className={`text-xs -mt-0.5 transition-colors duration-300 ${showHeader ? 'text-gray-400' : 'text-white/60'}`}>
+                Bridging Education to Eternity
+              </p>
+            </div>
           </button>
 
           <div className="hidden lg:flex items-center gap-1">

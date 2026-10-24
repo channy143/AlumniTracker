@@ -246,10 +246,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             <button onClick={onMenuClick} className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded">
               <Bars3Icon className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-1.5">
-              <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">C</span>
-              </div>
+            <div className="flex items-center gap-2">
+              <img src="/favicon.svg" alt="CTU-Naga Alumni" className="w-7 h-7 rounded-lg shadow-xs shrink-0" />
               <span className="hidden sm:block text-sm font-semibold text-gray-800">CTU-Naga</span>
             </div>
           </div>

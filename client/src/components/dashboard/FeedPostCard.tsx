@@ -17,10 +17,12 @@ import {
   ArrowUturnLeftIcon,
   PhotoIcon,
   ArrowUpTrayIcon,
+  FaceSmileIcon,
 } from '@heroicons/react/24/outline';
 import { feedApi, connectionsApi, messagesApi, directoryApi } from '@/services/api';
 import { decodeUnicode } from '@/utils/helpers';
 import { useChatStore } from '@/store/chatStore';
+import EmojiPicker from '@/components/ui/EmojiPicker';
 
 export const REAL_REACTIONS = [
   { emoji: '👍', label: 'Endorse', color: 'text-blue-600', activeBg: 'bg-blue-50 text-blue-600' },
@@ -135,6 +137,10 @@ export default function FeedPostCard({
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const pickerTimeoutRef = useRef<any>(null);
 
+  // Dynamic emoji bursts state
+  const [bursts, setBursts] = useState<Array<{ id: number; emoji: string; offset: number; rotation: number; delay: number }>>([]);
+  const [showCommentEmojiPicker, setShowCommentEmojiPicker] = useState(false);
+
   // Reactions Breakdown Modal
   const [showReactionsModal, setShowReactionsModal] = useState(false);
   const [reactionsList, setReactionsList] = useState<any[]>([]);
@@ -223,8 +229,22 @@ export default function FeedPostCard({
 
     if (wasLikedSame) {
       setLikeCount((prev) => Math.max(0, prev - 1));
-    } else if (!userReaction) {
-      setLikeCount((prev) => prev + 1);
+    } else {
+      if (!userReaction) {
+        setLikeCount((prev) => prev + 1);
+      }
+      // Dynamic bursting emoji particles
+      const offsets = [-34, -18, -4, 12, 26, 40];
+      const rotations = [-16, -9, 0, 8, 15, 22];
+      const newBursts = offsets.map((off, i) => ({
+        id: Date.now() + i,
+        emoji,
+        offset: off,
+        rotation: rotations[i],
+        delay: i * 35,
+      }));
+      setBursts(newBursts);
+      setTimeout(() => setBursts([]), 1000);
     }
 
     try {
@@ -794,17 +814,38 @@ export default function FeedPostCard({
               pickerTimeoutRef.current = setTimeout(() => setShowReactionPicker(false), 300);
             }}
           >
+            {/* Dynamic Burst Particles on React */}
+            {bursts.length > 0 && (
+              <div className="absolute inset-x-0 bottom-full pointer-events-none flex justify-center z-50">
+                {bursts.map((b) => (
+                  <span
+                    key={b.id}
+                    className="absolute text-2xl select-none animate-emoji-burst pointer-events-none"
+                    style={{
+                      left: '50%',
+                      bottom: '8px',
+                      ['--dx' as any]: `${b.offset}px`,
+                      ['--rot' as any]: `${b.rotation}deg`,
+                      animationDelay: `${b.delay}ms`,
+                    }}
+                  >
+                    {b.emoji}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => handleReact(userReaction || '👍')}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer select-none font-semibold text-xs ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer select-none font-semibold text-xs active:scale-95 ${
                 liked && currentReactionObj
-                  ? currentReactionObj.activeBg
+                  ? `${currentReactionObj.activeBg} animate-emoji-pop`
                   : 'hover:bg-gray-100 text-gray-600'
               }`}
               title={liked ? `Reacted ${userReaction}` : 'Endorse / React'}
             >
-              <span className="text-sm">{userReaction || '👍'}</span>
+              <span className={`text-sm ${liked ? 'animate-emoji-pop' : ''}`}>{userReaction || '👍'}</span>
               <span>{userReaction ? currentReactionObj?.label || 'Endorsed' : 'Endorse'}</span>
             </button>
 
@@ -919,13 +960,40 @@ export default function FeedPostCard({
               <div className="w-8 h-8 rounded-full bg-orange-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
                 Me
               </div>
-              <input
-                type="text"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Write a comment..."
-                className="flex-1 bg-white border border-gray-200 rounded-full px-3.5 py-1.5 text-xs text-gray-800 placeholder-gray-400 outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition-all"
-              />
+              <div className="flex-1 relative flex items-center bg-white border border-gray-200 rounded-full px-3 py-1 focus-within:ring-1 focus-within:ring-orange-500 focus-within:border-orange-500 transition-all">
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Write a comment..."
+                  className="flex-1 bg-transparent text-xs text-gray-800 placeholder-gray-400 outline-none pr-1"
+                />
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowCommentEmojiPicker((prev) => !prev)}
+                    className={`p-1 rounded-full transition-colors cursor-pointer ${
+                      showCommentEmojiPicker
+                        ? 'text-orange-600 bg-orange-100'
+                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                    }`}
+                    title="Insert emoji"
+                  >
+                    <FaceSmileIcon className="w-4 h-4" />
+                  </button>
+
+                  {showCommentEmojiPicker && (
+                    <EmojiPicker
+                      position="top"
+                      className="right-0"
+                      onSelect={(emoji) => {
+                        setCommentText((prev) => prev + emoji);
+                      }}
+                      onClose={() => setShowCommentEmojiPicker(false)}
+                    />
+                  )}
+                </div>
+              </div>
               <button
                 type="submit"
                 disabled={!commentText.trim() || submittingComment}
@@ -1209,7 +1277,7 @@ export default function FeedPostCard({
               </button>
             </div>
 
-            <div className="space-y-3 py-3">
+            <div className="space-y-3 py-3 overflow-y-auto flex-1 scrollbar-hover pr-1">
               <div>
                 <label className="text-xs font-semibold text-gray-700 block mb-1">Update Content</label>
                 <textarea
@@ -1337,7 +1405,7 @@ export default function FeedPostCard({
             onClick={() => setShowReportModal(false)}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150 p-4"
+              className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150 p-4 max-h-[90vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
@@ -1354,7 +1422,7 @@ export default function FeedPostCard({
               </button>
             </div>
 
-            <form onSubmit={handleSubmitReport} className="py-3 space-y-3">
+            <form onSubmit={handleSubmitReport} className="py-3 space-y-3 overflow-y-auto flex-1 scrollbar-hover pr-1">
               <div>
                 <label className="text-xs font-semibold text-gray-700 block mb-1">
                   Why are you reporting this post?

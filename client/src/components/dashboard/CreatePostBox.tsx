@@ -21,6 +21,7 @@ import {
   FaceSmileIcon as FaceSmileSolid,
 } from '@heroicons/react/24/solid';
 import { feedApi, connectionsApi } from '@/services/api';
+import EmojiPicker from '@/components/ui/EmojiPicker';
 
 interface CreatePostBoxProps {
   onPostCreated: (newPost: any) => void;
@@ -81,6 +82,7 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
   // Feeling / Activity
   const [feeling, setFeeling] = useState<{ emoji: string; label: string } | null>(null);
   const [showFeelingPicker, setShowFeelingPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // Location
   const [location, setLocation] = useState('');
@@ -96,13 +98,12 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Lock body scroll when composer modal is open
+  // Lock body scroll only while composer modal is open, and safely restore natural scroll on close
   useEffect(() => {
     if (isExpanded) {
-      const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => {
-        document.body.style.overflow = originalOverflow;
+        document.body.style.overflow = '';
       };
     }
   }, [isExpanded]);
@@ -191,16 +192,6 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
     .join('')
     .toUpperCase();
 
-  // Lock body scroll when modal is expanded
-  useEffect(() => {
-    if (isExpanded) {
-      const prevOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = prevOverflow;
-      };
-    }
-  }, [isExpanded]);
 
   // Load connections for tagging
   const loadFriends = async () => {
@@ -269,6 +260,7 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
       setShowMediaInput(false);
       setShowFeelingPicker(false);
       setShowLocationInput(false);
+      setShowEmojiPicker(false);
       setIsExpanded(false);
     } catch (err: any) {
       setError(err.message || 'Failed to publish post. Please try again.');
@@ -839,6 +831,31 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
                   >
                     <MapPinIcon className="w-5 h-5" />
                   </button>
+
+                  {/* Dynamic Emoji Picker */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker((prev) => !prev)}
+                      className={`p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer text-orange-500 ${
+                        showEmojiPicker ? 'bg-orange-100' : ''
+                      }`}
+                      title="Insert dynamic emoji"
+                    >
+                      <span className="text-lg leading-none">😊</span>
+                    </button>
+
+                    {showEmojiPicker && (
+                      <EmojiPicker
+                        position="top"
+                        className="right-0 sm:right-auto sm:left-0"
+                        onSelect={(emoji) => {
+                          setContent((prev) => prev + emoji);
+                        }}
+                        onClose={() => setShowEmojiPicker(false)}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

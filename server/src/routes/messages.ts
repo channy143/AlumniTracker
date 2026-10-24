@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { supabase, createUserScopedClient } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
@@ -7,10 +7,22 @@ import { AuthenticatedRequest } from '../types';
 import { sanitizeFilterInput } from '../utils/sanitizeFilterInput';
 import { sendMessageSchema } from '../middleware/validationSchemas';
 
-const router = Router();
+import jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../middleware/auth';
+import {
+  userPresenceMap,
+  markUserActive,
+  markUserOffline,
+  checkIsOnline,
+  getProfileIdForUser,
+  resolveReceiverProfileId,
+  ONLINE_THRESHOLD_MS,
+} from '../services/presenceService';
 
-// In-memory presence map: key = profileId or userId, value = timestamp (ms)
-export const userPresenceMap = new Map<string, number>();
+// Re-export userPresenceMap for any consumers
+export { userPresenceMap };
+
+const router = Router();
 
 router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
@@ -34,11 +46,8 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
 
 router.post('/heartbeat', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const nowIso = new Date().toISOString();
-    const nowMs = Date.now();
     const userId = req.user!.userId;
-
-    userPresenceMap.set(userId, nowMs);
+    const nowIso = new Date().toISOString();
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -46,21 +55,45 @@ router.post('/heartbeat', authenticate, async (req: AuthenticatedRequest, res, n
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (profile?.id) {
-      userPresenceMap.set(profile.id, nowMs);
-      await supabase
-        .from('profiles')
-        .update({ last_active_at: nowIso })
-        .eq('id', profile.id);
-    }
-
-    await supabase
-      .from('users')
-      .update({ last_active_at: nowIso })
-      .eq('id', userId);
+    await markUserActive(userId, profile?.id);
 
     res.json({ success: true, last_active_at: nowIso });
   } catch (err) { next(err); }
+});
+
+/**
+ * Explicit offline signal (sent via navigator.sendBeacon on tab close or pagehide)
+ */
+router.post('/offline', async (req: Request, res: Response) => {
+  try {
+    let userId: string | null = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.split(' ')[1], getJwtSecret()) as any;
+        userId = decoded.userId;
+      } catch {}
+    }
+
+    if (!userId && req.body?.token) {
+      try {
+        const decoded = jwt.verify(req.body.token, getJwtSecret()) as any;
+        userId = decoded.userId;
+      } catch {}
+    }
+
+    if (!userId && req.body?.userId) {
+      userId = req.body.userId;
+    }
+
+    if (userId) {
+      await markUserOffline(userId);
+    }
+
+    res.json({ success: true, is_online: false });
+  } catch {
+    res.json({ success: false });
+  }
 });
 
 router.get('/presence', authenticate, async (req: AuthenticatedRequest, res, next) => {
@@ -74,9 +107,6 @@ router.get('/presence', authenticate, async (req: AuthenticatedRequest, res, nex
     if (ids.length === 0) {
       return res.json({});
     }
-
-    const now = Date.now();
-    const ONLINE_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
 
     const { data: profilesById } = await supabase
       .from('profiles')
@@ -105,20 +135,11 @@ router.get('/presence', authenticate, async (req: AuthenticatedRequest, res, nex
 
     for (const id of ids) {
       const p = profileMap.get(id);
-      const memTs =
-        userPresenceMap.get(id) ||
-        (p?.id ? userPresenceMap.get(p.id) : 0) ||
-        (p?.user_id ? userPresenceMap.get(p.user_id) : 0) ||
-        0;
-      const dbTs = p?.last_active_at ? new Date(p.last_active_at).getTime() : 0;
-      const effectiveTs = Math.max(memTs, dbTs);
-
-      const isOnline = effectiveTs > 0 && now - effectiveTs < ONLINE_THRESHOLD_MS;
-      const lastActiveAt = effectiveTs > 0 ? new Date(effectiveTs).toISOString() : (p?.last_active_at || null);
+      const presence = checkIsOnline(id, p?.last_active_at);
 
       result[id] = {
-        is_online: isOnline,
-        last_active_at: lastActiveAt,
+        is_online: presence.isOnline,
+        last_active_at: presence.lastActiveAt,
       };
     }
 
@@ -181,18 +202,11 @@ router.get('/conversations', authenticate, async (req: AuthenticatedRequest, res
       }
     });
 
-    const now = Date.now();
-    const ONLINE_THRESHOLD_MS = 3 * 60 * 1000;
-
     conversationMap.forEach((conv, id) => {
       conv.unread = unreadCounts[id] || 0;
-      const memActive = userPresenceMap.get(id) || 0;
-      const dbActive = conv.last_active_at ? new Date(conv.last_active_at).getTime() : 0;
-      const effectiveTs = Math.max(memActive, dbActive);
-      conv.is_online = effectiveTs > 0 && now - effectiveTs < ONLINE_THRESHOLD_MS;
-      if (effectiveTs > 0) {
-        conv.last_active_at = new Date(effectiveTs).toISOString();
-      }
+      const presence = checkIsOnline(id, conv.last_active_at);
+      conv.is_online = presence.isOnline;
+      conv.last_active_at = presence.lastActiveAt;
     });
 
     res.json(Array.from(conversationMap.values()).sort(
@@ -203,37 +217,28 @@ router.get('/conversations', authenticate, async (req: AuthenticatedRequest, res
 
 router.get('/:profileId', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const db = createUserScopedClient(req.token!);
-    const { data: profile } = await db
-      .from('profiles')
-      .select('id')
-      .eq('user_id', req.user!.userId)
-      .single();
-    if (!profile) throw new AppError('Profile not found', 404);
+    const senderProfileId = await getProfileIdForUser(req.user!.userId);
+    if (!senderProfileId) throw new AppError('Profile not found', 404);
 
     const targetParam = sanitizeFilterInput(req.params.profileId);
-    // Resolve target profile id (whether passed profile.id or profile.user_id)
-    const { data: targetProfile } = await db
-      .from('profiles')
-      .select('id')
-      .or(`id.eq.${targetParam},user_id.eq.${targetParam}`)
-      .maybeSingle();
+    const targetProfileId = await resolveReceiverProfileId(targetParam);
 
-    const targetProfileId = targetProfile ? targetProfile.id : targetParam;
-
+    const db = createUserScopedClient(req.token!);
     const { data, error } = await db
       .from('messages')
       .select('*, sender:profiles!messages_sender_id_fkey(id, first_name, last_name, avatar_url), receiver:profiles!messages_receiver_id_fkey(id, first_name, last_name, avatar_url)')
-      .or(`and(sender_id.eq.${profile.id},receiver_id.eq.${targetProfileId}),and(sender_id.eq.${targetProfileId},receiver_id.eq.${profile.id})`)
+      .or(`and(sender_id.eq.${senderProfileId},receiver_id.eq.${targetProfileId}),and(sender_id.eq.${targetProfileId},receiver_id.eq.${senderProfileId})`)
       .order('created_at', { ascending: true });
     if (error) throw new AppError(error.message, 500);
 
-    await db
-      .from('messages')
-      .update({ is_read: true, read_at: new Date().toISOString() })
-      .eq('receiver_id', profile.id)
-      .eq('sender_id', targetProfileId)
-      .eq('is_read', false);
+    // Asynchronously mark messages as read in background without delaying response
+    Promise.resolve(
+      db.from('messages')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('receiver_id', senderProfileId)
+        .eq('sender_id', targetProfileId)
+        .eq('is_read', false)
+    ).catch(() => {});
 
     res.json(data || []);
   } catch (err) { next(err); }
@@ -241,30 +246,21 @@ router.get('/:profileId', authenticate, async (req: AuthenticatedRequest, res, n
 
 router.post('/', authenticate, validate(sendMessageSchema), async (req: AuthenticatedRequest, res, next) => {
   try {
-    const db = createUserScopedClient(req.token!);
     const { receiver_id, subject, body, connection_id } = req.body;
     if (!receiver_id || !body) throw new AppError('Receiver and message body are required', 400);
 
-    const { data: profile } = await db
-      .from('profiles')
-      .select('id')
-      .eq('user_id', req.user!.userId)
-      .single();
-    if (!profile) throw new AppError('Profile not found', 404);
+    // Fast profile resolution using RAM cache
+    const senderProfileId = await getProfileIdForUser(req.user!.userId);
+    if (!senderProfileId) throw new AppError('Profile not found', 404);
 
     const targetParam = sanitizeFilterInput(receiver_id);
-    const { data: targetProfile } = await db
-      .from('profiles')
-      .select('id')
-      .or(`id.eq.${targetParam},user_id.eq.${targetParam}`)
-      .maybeSingle();
+    const finalReceiverId = await resolveReceiverProfileId(targetParam);
 
-    const finalReceiverId = targetProfile ? targetProfile.id : targetParam;
-
+    const db = createUserScopedClient(req.token!);
     const { data, error } = await db
       .from('messages')
       .insert({
-        sender_id: profile.id,
+        sender_id: senderProfileId,
         receiver_id: finalReceiverId,
         subject: subject || null,
         body,
@@ -273,6 +269,10 @@ router.post('/', authenticate, validate(sendMessageSchema), async (req: Authenti
       .select()
       .single();
     if (error) throw new AppError(error.message, 500);
+
+    // Mark user active without blocking
+    markUserActive(req.user!.userId, senderProfileId).catch(() => {});
+
     res.status(201).json(data);
   } catch (err) { next(err); }
 });

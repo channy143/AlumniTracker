@@ -460,6 +460,20 @@ export const messagesApi = {
   getConversation: (profileId: string) => api.get<any[]>(`/messages/${profileId}`),
   unreadCount: () => api.get<{ count: number }>('/messages/unread/count'),
   heartbeat: () => api.post<{ success: boolean; last_active_at: string }>('/messages/heartbeat', {}),
+  offline: () => {
+    const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      const blob = new Blob([JSON.stringify({ token })], { type: 'application/json' });
+      navigator.sendBeacon(`${API_BASE}/messages/offline`, blob);
+    } else {
+      fetch(`${API_BASE}/messages/offline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ token }),
+        keepalive: true,
+      }).catch(() => {});
+    }
+  },
   getPresence: (profileIds: string[]) =>
     api.get<Record<string, { is_online: boolean; last_active_at: string | null }>>(
       `/messages/presence?profileIds=${encodeURIComponent(profileIds.join(','))}`

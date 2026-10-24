@@ -282,8 +282,8 @@ export default function AlumniOnboardingSurveyPage() {
   }
 
   return (
-    <div className="h-screen max-h-screen w-screen overflow-hidden bg-gray-50 flex flex-col justify-center items-center p-3 sm:p-4 select-none">
-      <div className="max-w-2xl w-full flex flex-col justify-between overflow-hidden max-h-[96vh]">
+    <div className="min-h-screen w-full overflow-y-auto bg-gray-50 flex flex-col justify-center items-center p-3 sm:p-4 select-none">
+      <div className="max-w-2xl w-full flex flex-col justify-between my-auto">
         {/* Top Survey Header Card - Matches SurveyPage.tsx exactly */}
         <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 mb-2.5 shadow-xs shrink-0">
           <div className="flex items-start justify-between gap-2">
