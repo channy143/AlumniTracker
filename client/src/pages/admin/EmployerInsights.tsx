@@ -246,7 +246,7 @@ function EmployerDirectoryModal({ open, onClose, directory, filteredDirectory, d
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/55 backdrop-blur-xs" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150" onClick={onClose}>
       <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 shrink-0 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white">
           <div className="flex items-center gap-3">

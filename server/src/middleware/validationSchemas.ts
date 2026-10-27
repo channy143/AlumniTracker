@@ -127,7 +127,16 @@ export const updateProfileSchema = z.object({
 }).strict();
 
 export const updateCareerSchema = z.object({
-  employment_status: z.enum(['Employed', 'Unemployed', 'Self-employed', 'Seeking Opportunities', 'Retired']).nullable().optional(),
+  employment_status: z.preprocess((val) => {
+    if (!val || typeof val !== 'string') return null;
+    const lower = val.trim().toLowerCase();
+    if (lower === 'employed') return 'Employed';
+    if (lower === 'unemployed' || lower === 'student') return 'Unemployed';
+    if (lower === 'self-employed' || lower === 'self employed') return 'Self-employed';
+    if (lower.includes('seeking')) return 'Seeking Opportunities';
+    if (lower === 'retired') return 'Retired';
+    return val.trim();
+  }, z.enum(['Employed', 'Unemployed', 'Self-employed', 'Seeking Opportunities', 'Retired']).nullable().optional()),
   current_job_title: z.string().max(200).optional().nullable(),
   company_name: z.string().max(200).optional().nullable(),
   industry: z.string().max(100).optional().nullable(),

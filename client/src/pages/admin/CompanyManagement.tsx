@@ -1137,7 +1137,7 @@ export default function CompanyManagement() {
       {/* Add / Edit Company Modal */}
       {modalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/55 backdrop-blur-xs"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
           onClick={() => setModalOpen(false)}
         >
           <div
@@ -1530,7 +1530,7 @@ export default function CompanyManagement() {
       {/* Agreement Verification Modal */}
       {verifyModalOpen && verifyingCompany && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/55 backdrop-blur-xs"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
           onClick={() => setVerifyModalOpen(false)}
         >
           <div

@@ -17,13 +17,15 @@ import {
   SparklesIcon,
   FunnelIcon,
   EyeIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 
 const NOTIF_TYPES: Record<string, { id: string; label: string; icon: any }> = {
   survey: { id: 'survey', label: 'Surveys', icon: DocumentTextIcon },
   job: { id: 'job', label: 'Job Opportunities', icon: BriefcaseIcon },
   application: { id: 'application', label: 'Applications', icon: BriefcaseIcon },
-  mentorship: { id: 'mentorship', label: 'Mentorship', icon: UserGroupIcon },
+  mentorship: { id: 'mentorship', label: 'Connections', icon: UserGroupIcon },
+  post: { id: 'post', label: 'Alumni Posts', icon: ChatBubbleLeftRightIcon },
   announcement: { id: 'announcement', label: 'Announcements', icon: MegaphoneIcon },
   event: { id: 'event', label: 'Events', icon: CalendarDaysIcon },
   system: { id: 'system', label: 'System & Security', icon: ShieldExclamationIcon },
@@ -49,12 +51,21 @@ function getNotifConfig(type?: string) {
         actionLabel: 'View Details',
       };
     case 'mentorship':
+    case 'connection':
       return {
         icon: UserGroupIcon,
         color: 'text-blue-600',
         bg: 'bg-blue-50',
-        badge: 'Mentorship',
-        actionLabel: 'View Mentorship',
+        badge: 'Connection',
+        actionLabel: 'View Request',
+      };
+    case 'post':
+      return {
+        icon: ChatBubbleLeftRightIcon,
+        color: 'text-orange-600',
+        bg: 'bg-orange-50',
+        badge: 'Post Activity',
+        actionLabel: 'View Post',
       };
     case 'announcement':
       return {

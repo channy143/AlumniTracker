@@ -39,10 +39,60 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       throw new AppError(`Profile query failed: ${error.message}`, 500);
     }
 
+    if (profile?.resume_url) {
+      let filePath = profile.resume_url;
+      if (filePath.includes('/resumes/')) {
+        const parts = filePath.split('/resumes/');
+        filePath = 'resumes/' + parts[parts.length - 1].split('?')[0];
+      }
+      try {
+        const { data: signedData } = await db.storage
+          .from('resumes')
+          .createSignedUrl(filePath, 604800); // 7 days
+        if (signedData?.signedUrl) {
+          profile.resume_url = signedData.signedUrl;
+        }
+      } catch (e) {
+        console.error('[Profile GET] Failed to refresh resume signed URL:', e);
+      }
+    }
+
     res.json(profile);
   } catch (err) {
     next(err);
   }
+});
+
+// GET /api/profile/resume - fresh redirect to resume
+router.get('/resume', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db
+      .from('profiles')
+      .select('resume_url')
+      .eq('user_id', req.user!.userId)
+      .maybeSingle();
+
+    if (!profile?.resume_url) {
+      throw new AppError('No resume uploaded', 404);
+    }
+
+    let filePath = profile.resume_url;
+    if (filePath.includes('/resumes/')) {
+      const parts = filePath.split('/resumes/');
+      filePath = 'resumes/' + parts[parts.length - 1].split('?')[0];
+    }
+
+    const { data: signedData, error } = await db.storage
+      .from('resumes')
+      .createSignedUrl(filePath, 3600);
+
+    if (error || !signedData?.signedUrl) {
+      throw new AppError('Unable to generate resume link', 500);
+    }
+
+    res.redirect(signedData.signedUrl);
+  } catch (err) { next(err); }
 });
 
 router.put('/', authenticate, validate(updateProfileSchema), async (req: AuthenticatedRequest, res, next) => {
@@ -73,11 +123,27 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
     const updates: Record<string, any> = {};
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
-        if (field === 'employment_status' && req.body[field] !== null) {
-          const valid = ['Employed', 'Unemployed', 'Self-employed', 'Seeking Opportunities', 'Retired'];
-          if (!valid.includes(req.body[field])) {
+        if (field === 'employment_status') {
+          if (req.body[field] === null || req.body[field] === '') {
+            updates[field] = null;
+            continue;
+          }
+          const lower = String(req.body[field]).trim().toLowerCase();
+          const map: Record<string, string> = {
+            'employed': 'Employed',
+            'unemployed': 'Unemployed',
+            'student': 'Unemployed',
+            'self-employed': 'Self-employed',
+            'self employed': 'Self-employed',
+            'seeking opportunities': 'Seeking Opportunities',
+            'retired': 'Retired',
+          };
+          const mapped = map[lower];
+          if (!mapped) {
             throw new AppError('Invalid employment status', 400);
           }
+          updates[field] = mapped;
+          continue;
         }
         updates[field] = req.body[field];
       }
@@ -170,21 +236,21 @@ router.post('/resume', authenticate, upload.single('resume'), async (req: Authen
 
     const { data: urlData, error: signedError } = await db.storage
       .from('resumes')
-      .createSignedUrl(fileName, 3600);
+      .createSignedUrl(fileName, 604800);
     if (signedError || !urlData?.signedUrl) {
       throw new AppError('Failed to generate resume link', 500);
     }
 
     const { error: updateError } = await db
       .from('profiles')
-      .update({ resume_url: urlData.signedUrl })
+      .update({ resume_url: fileName })
       .eq('user_id', req.user!.userId);
 
     if (updateError) {
       throw new AppError(`Profile update failed: ${updateError.message}`, 500);
     }
 
-    res.json({ url: urlData.signedUrl, expiresIn: 3600 });
+    res.json({ url: urlData.signedUrl, path: fileName, expiresIn: 604800 });
   } catch (err) { next(err); }
 });
 

@@ -92,6 +92,7 @@ async function main() {
     { path: './supabase/migration_report_exports.sql', label: 'Report exports and audit trail migration' },
     { path: './supabase/migration_partnership_agreement.sql', label: 'Partnership agreement migration' },
     { path: './supabase/migration_eligible_graduation_fields.sql', label: 'Eligible alumni graduation fields migration' },
+    { path: './supabase/migration_chat_groups.sql', label: 'Chat groups and group messaging migration' },
   ];
 
   for (const f of files) {

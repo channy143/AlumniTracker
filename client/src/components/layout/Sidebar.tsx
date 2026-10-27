@@ -109,7 +109,13 @@ export default function Sidebar({
         </button>
 
         <div className="flex flex-col h-full">
-          <div className="h-12 flex items-center justify-end px-3 border-b border-gray-200 shrink-0">
+          <div className="h-12 flex items-center justify-between px-3 border-b border-gray-200 shrink-0">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <img src="/logo.png" alt="CTU-Naga" className="w-7 h-7 object-contain rounded-md shrink-0" />
+              {!collapsed && (
+                <span className="font-bold text-sm text-gray-800 tracking-tight">CTU-Naga</span>
+              )}
+            </div>
             <button onClick={onMobileClose} className="lg:hidden p-1 text-gray-400 hover:text-gray-600">
               <XMarkIcon className="w-5 h-5" />
             </button>

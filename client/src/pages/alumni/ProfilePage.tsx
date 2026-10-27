@@ -125,6 +125,17 @@ export default function ProfilePage() {
     }
   }, [activeTab, postsLoaded, loadMyPosts]);
 
+  useEffect(() => {
+    if (editing) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [editing]);
+
   const handlePostCreated = (newPost: PostItem) => {
     setMyPosts(prev => [newPost, ...prev]);
   };
@@ -230,12 +241,18 @@ export default function ProfilePage() {
       const payload: any = {};
       if (form.first_name !== undefined) payload.first_name = form.first_name;
       if (form.last_name !== undefined) payload.last_name = form.last_name;
+      if (form.middle_name !== undefined) payload.middle_name = form.middle_name;
       if (form.phone !== undefined) payload.phone = form.phone;
       if (form.address !== undefined) payload.address = form.address;
       if (form.city !== undefined) payload.city = form.city;
       if (form.province !== undefined) payload.province = form.province;
+      if (form.headline !== undefined) payload.headline = form.headline;
+      if (form.bio !== undefined) payload.bio = form.bio;
+      if (form.linkedin_url !== undefined) payload.linkedin_url = form.linkedin_url || null;
+      if (form.github_url !== undefined) payload.github_url = form.github_url || null;
+      if (form.portfolio_url !== undefined) payload.portfolio_url = form.portfolio_url || null;
       if (form.privacy_settings !== undefined) payload.privacy_settings = form.privacy_settings;
-      const updated = await profileApi.update(payload);
+      await profileApi.update(payload);
 
       // Save career and employment fields
       if (
@@ -245,8 +262,16 @@ export default function ProfilePage() {
         form.industry !== undefined ||
         form.salary_range !== undefined
       ) {
+        let status = form.employment_status || 'Unemployed';
+        const lower = String(status).toLowerCase();
+        if (lower === 'employed') status = 'Employed';
+        else if (lower === 'unemployed' || lower === 'student') status = 'Unemployed';
+        else if (lower.includes('self')) status = 'Self-employed';
+        else if (lower.includes('seeking')) status = 'Seeking Opportunities';
+        else if (lower === 'retired') status = 'Retired';
+
         await profileApi.updateCareer({
-          employment_status: form.employment_status || 'Unemployed',
+          employment_status: status,
           current_job_title: form.current_job_title || null,
           company_name: form.company_name || null,
           industry: form.industry || null,
@@ -254,7 +279,13 @@ export default function ProfilePage() {
         });
       }
 
-      await profileApi.batchSkills(editSkills.map((name: string) => ({ name })));
+      if (Array.isArray(editSkills) && editSkills.length > 0) {
+        const validSkills = editSkills.map((name: string) => ({ name: String(name).trim() })).filter(s => s.name);
+        if (validSkills.length > 0) {
+          await profileApi.batchSkills(validSkills);
+        }
+      }
+
       const origEdu = profile?.education || [];
       const origIds = origEdu.map((e: any) => e.id);
       const currIds = editEducation.filter((e: any) => e.id).map((e: any) => e.id);
@@ -263,8 +294,16 @@ export default function ProfilePage() {
         await profileApi.deleteEducation(id);
       }
       for (const edu of editEducation) {
+        if (!edu || !edu.program || !edu.program.trim()) continue;
         const { program, major, year_started, year_graduated, campus, institution, honors } = edu;
-        const p: any = { program, major, year_started, year_graduated, campus: campus || institution, honors };
+        const p: any = {
+          program: program.trim(),
+          major: major ? String(major).trim() : null,
+          year_started: year_started ? parseInt(year_started, 10) : null,
+          year_graduated: year_graduated ? parseInt(year_graduated, 10) : null,
+          campus: (campus || institution || '').trim() || 'CTU-Naga Extension Campus',
+          honors: honors ? String(honors).trim() : null,
+        };
         if (edu.id) {
           await profileApi.updateEducation(edu.id, p);
         } else {
@@ -609,7 +648,7 @@ export default function ProfilePage() {
   const renderEditModal = () => {
     if (!editing) return null;
     return (
-      <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setEditing(false)}>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setEditing(false)}>
         <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">

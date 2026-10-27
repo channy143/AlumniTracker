@@ -35,6 +35,7 @@ export default function AlumniManagement() {
   const [eligError, setEligError] = useState('');
   const [savingEligible, setSavingEligible] = useState(false);
   const [deletingEligible, setDeletingEligible] = useState<string | null>(null);
+  const [eligPage, setEligPage] = useState(1);
   const [deletingAlumni, setDeletingAlumni] = useState<string | null>(null);
   const addNotification = useUIStore((s) => s.addNotification);
   const batchYears = generateYears(2014, new Date().getFullYear());
@@ -266,8 +267,18 @@ export default function AlumniManagement() {
 
   const s = search.trim().toLowerCase();
   const eligibleCards = (tab === 'eligible')
-    ? eligible.filter((e: any) => !e.user_id && (!s || (e.student_id || '').toLowerCase().includes(s) || `${e.first_name || ''} ${e.last_name || ''}`.toLowerCase().includes(s)))
+    ? eligible.filter((e: any) => {
+        if (e.user_id) return false;
+        if (s && !(e.student_id || '').toLowerCase().includes(s) && !`${e.first_name || ''} ${e.last_name || ''}`.toLowerCase().includes(s)) return false;
+        if (filters.course && courseShort(e.program || '').toLowerCase() !== filters.course.toLowerCase()) return false;
+        if (filters.year && String(e.year_graduated) !== String(filters.year)) return false;
+        return true;
+      })
     : [];
+
+  const eligLimit = 25;
+  const totalEligPages = Math.max(1, Math.ceil(eligibleCards.length / eligLimit));
+  const pagedEligible = eligibleCards.slice((eligPage - 1) * eligLimit, eligPage * eligLimit);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -284,29 +295,29 @@ export default function AlumniManagement() {
       </div>
 
       <div className="flex gap-1 mb-3 flex-wrap">
-        <button onClick={() => setTab('registered')} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'registered' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
+        <button onClick={() => { setTab('registered'); setPage(1); }} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'registered' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
           Registered
         </button>
-        <button onClick={() => setTab('eligible')} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'eligible' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
+        <button onClick={() => { setTab('eligible'); setEligPage(1); }} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'eligible' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
           Eligible / Unclaimed
         </button>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-3">
-        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); setEligPage(1); }}
           placeholder={tab === 'eligible' ? "Search eligible by name or student ID..." : "Search by name, email, or ID..."} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-56" />
-        {tab === 'registered' && (
-          <>
-        <select value={filters.course} onChange={(e) => { setFilters((f) => ({ ...f, course: e.target.value })); setPage(1); }}
+        <select value={filters.course} onChange={(e) => { setFilters((f) => ({ ...f, course: e.target.value })); setPage(1); setEligPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="">All Courses</option>
           {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED-HE', 'BTLED-ICT'].map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
-        <select value={filters.year} onChange={(e) => { setFilters((f) => ({ ...f, year: e.target.value })); setPage(1); }}
+        <select value={filters.year} onChange={(e) => { setFilters((f) => ({ ...f, year: e.target.value })); setPage(1); setEligPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="">All Batches</option>
           {batchYears.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
+        {tab === 'registered' && (
+          <>
         <select value={filters.employment_status} onChange={(e) => { setFilters((f) => ({ ...f, employment_status: e.target.value })); setPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="">All Status</option>
@@ -454,39 +465,50 @@ export default function AlumniManagement() {
             {search.trim() ? 'No eligible alumni match your search' : 'No eligible alumni yet. Use "+ Eligible Alumni" to add records so they can verify and register.'}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {eligibleCards.map((item: any) => (
-              <div key={item.id} className="bg-white border border-gray-200 hover:shadow-md transition-shadow flex flex-col">
-                <div className="relative">
-                  <div className="w-full h-44 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center overflow-hidden">
-                    <span className="text-2xl font-bold text-orange-400">{((item.first_name?.[0] || '') + (item.last_name?.[0] || '')).toUpperCase()}</span>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {pagedEligible.map((item: any) => (
+                <div key={item.id} className="bg-white border border-gray-200 hover:shadow-md transition-shadow flex flex-col">
+                  <div className="relative">
+                    <div className="w-full h-44 bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center overflow-hidden">
+                      <span className="text-2xl font-bold text-orange-400">{((item.first_name?.[0] || '') + (item.last_name?.[0] || '')).toUpperCase()}</span>
+                    </div>
+                    <div className="absolute top-1.5 right-1.5">
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-50 text-amber-700">Unclaimed</span>
+                    </div>
                   </div>
-                  <div className="absolute top-1.5 right-1.5">
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-50 text-amber-700">Unclaimed</span>
+                  <div className="p-[15px] flex-1 flex flex-col gap-1">
+                    <p className="text-xs font-semibold text-gray-900 leading-tight">
+                      {item.last_name || ''}, {item.first_name || ''} {item.middle_name ? `(${item.middle_name})` : ''}
+                    </p>
+                    <div className="space-y-0.5 text-[10px] text-gray-500">
+                      <p><span className="text-gray-400">ID:</span> {item.student_id || '---'}</p>
+                      <p><span className="text-gray-400">Course:</span> {item.program ? courseShort(item.program) : '---'}</p>
+                      <p><span className="text-gray-400">Batch:</span> {item.year_graduated || '---'}</p>
+                      <p><span className="text-gray-400">Graduation Day:</span> {item.graduation_date ? new Date(item.graduation_date).toLocaleDateString() : '---'}</p>
+                    </div>
+                  </div>
+                  <div className="px-2.5 pb-2.5 flex flex-wrap gap-1">
+                    <button onClick={() => handleDeleteEligible(item.id)} disabled={deletingEligible === item.id} className="text-[10px] px-2 py-1 font-medium bg-red-50 text-red-500 rounded-md hover:bg-red-100 disabled:opacity-40">{deletingEligible === item.id ? 'Removing...' : 'Remove'}</button>
                   </div>
                 </div>
-                <div className="p-[15px] flex-1 flex flex-col gap-1">
-                  <p className="text-xs font-semibold text-gray-900 leading-tight">
-                    {item.last_name || ''}, {item.first_name || ''} {item.middle_name ? `(${item.middle_name})` : ''}
-                  </p>
-                  <div className="space-y-0.5 text-[10px] text-gray-500">
-                    <p><span className="text-gray-400">ID:</span> {item.student_id || '---'}</p>
-                    <p><span className="text-gray-400">Course:</span> {item.program ? courseShort(item.program) : '---'}</p>
-                    <p><span className="text-gray-400">Batch:</span> {item.year_graduated || '---'}</p>
-                    <p><span className="text-gray-400">Graduation Day:</span> {item.graduation_date ? new Date(item.graduation_date).toLocaleDateString() : '---'}</p>
-                  </div>
-                </div>
-                <div className="px-2.5 pb-2.5 flex flex-wrap gap-1">
-                  <button onClick={() => handleDeleteEligible(item.id)} disabled={deletingEligible === item.id} className="text-[10px] px-2 py-1 font-medium bg-red-50 text-red-500 rounded-md hover:bg-red-100 disabled:opacity-40">{deletingEligible === item.id ? 'Removing...' : 'Remove'}</button>
+              ))}
+            </div>
+            {totalEligPages > 1 && (
+              <div className="flex items-center justify-between mt-3 px-3 py-2.5 bg-white border border-gray-200 rounded-lg">
+                <span className="text-xs text-gray-400">Page {eligPage} of {totalEligPages} ({eligibleCards.length} eligible)</span>
+                <div className="flex gap-1">
+                  <button disabled={eligPage <= 1} onClick={() => setEligPage((p) => p - 1)} className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40">Prev</button>
+                  <button disabled={eligPage >= totalEligPages} onClick={() => setEligPage((p) => p + 1)} className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40">Next</button>
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )
       )}
 
       {showDetail && detailData && (
-        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setShowDetail(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setShowDetail(false)}>
           <div className="bg-white max-w-5xl w-full flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150" style={{ height: '84vh' }} onClick={(e) => e.stopPropagation()}>
             {/* Header bar */}
             <div className="flex items-center justify-between px-6 py-4 shrink-0 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white sticky top-0 z-10">
@@ -727,7 +749,7 @@ export default function AlumniManagement() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setShowForm(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setShowForm(false)}>
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
               <div className="flex items-center gap-3">
@@ -804,7 +826,7 @@ export default function AlumniManagement() {
       )}
 
       {showEligibleForm && (
-        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={() => setShowEligibleForm(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setShowEligibleForm(false)}>
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
               <div className="flex items-center gap-3">

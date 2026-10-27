@@ -8,6 +8,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { addActivity } from '../services/activityStore';
 import { createPostSchema, updatePostSchema } from '../middleware/validationSchemas';
+import { createNotification } from './notifications';
 
 const router = Router();
 
@@ -235,7 +236,22 @@ router.get('/mine', authenticate, async (req: AuthenticatedRequest, res, next) =
 // GET /api/feed/user/:userId - get posts by a specific user (with audience checks)
 router.get('/user/:userId', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const targetUserId = req.params.userId;
+    let targetUserId = req.params.userId;
+    if (!targetUserId || targetUserId === 'undefined' || targetUserId === 'null') {
+      return res.json([]);
+    }
+
+    // Support looking up by profile id or user id
+    const { data: profileCheck } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('id', targetUserId)
+      .maybeSingle();
+
+    if (profileCheck?.user_id) {
+      targetUserId = profileCheck.user_id;
+    }
+
     const isMe = targetUserId === req.user!.userId;
 
     let query = supabase
@@ -648,6 +664,34 @@ router.post('/:id/reaction', authenticate, async (req: AuthenticatedRequest, res
       .update({ like_count: totalCount, reactions_summary: summary })
       .eq('id', postId);
 
+    if (liked) {
+      const { data: postData } = await supabase
+        .from('feed_posts')
+        .select('id, user_id, title, content')
+        .eq('id', postId)
+        .maybeSingle();
+
+      if (postData && postData.user_id && postData.user_id !== userId) {
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        const senderName = senderProfile
+          ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
+          : 'An alumnus';
+
+        createNotification({
+          userId: postData.user_id,
+          type: 'post',
+          title: 'New Reaction on Your Post',
+          message: `${senderName} reacted ${userReaction || '👍'} to your post.`,
+          link: '/?post=' + postId,
+        }).catch(() => {});
+      }
+    }
+
     const topReactions = Object.entries(summary)
       .filter(([_, count]) => count > 0)
       .sort((a, b) => b[1] - a[1])
@@ -718,6 +762,34 @@ router.post('/:id/like', authenticate, async (req: AuthenticatedRequest, res, ne
       .update({ like_count: totalCount, reactions_summary: summary })
       .eq('id', postId);
 
+    if (liked) {
+      const { data: postData } = await supabase
+        .from('feed_posts')
+        .select('id, user_id')
+        .eq('id', postId)
+        .maybeSingle();
+
+      if (postData && postData.user_id && postData.user_id !== userId) {
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        const senderName = senderProfile
+          ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
+          : 'An alumnus';
+
+        createNotification({
+          userId: postData.user_id,
+          type: 'post',
+          title: 'New Reaction on Your Post',
+          message: `${senderName} reacted ${userReaction || '👍'} to your post.`,
+          link: '/?post=' + postId,
+        }).catch(() => {});
+      }
+    }
+
     const topReactions = Object.entries(summary)
       .filter(([_, count]) => count > 0)
       .sort((a, b) => b[1] - a[1])
@@ -743,7 +815,7 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
     // Check if comments disabled
     const { data: post } = await supabase
       .from('feed_posts')
-      .select('id, comments_disabled')
+      .select('id, user_id, comments_disabled')
       .eq('id', req.params.id)
       .single();
 
@@ -792,6 +864,43 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
 
     addActivity(displayName, parent_id ? 'replied to a comment on' : 'commented on', 'a post').catch(() => {});
 
+    // Notify post author if not self
+    if (post && post.user_id && post.user_id !== req.user!.userId) {
+      const snippet = content.trim().length > 60 ? content.trim().slice(0, 60) + '...' : content.trim();
+      createNotification({
+        userId: post.user_id,
+        type: 'post',
+        title: 'New Comment on Your Post',
+        message: `${displayName} commented: "${snippet}"`,
+        link: '/?post=' + req.params.id,
+      }).catch(() => {});
+    }
+
+    // If this is a reply to another comment, notify the parent comment author
+    if (parent_id) {
+      const { data: parentComment } = await supabase
+        .from('feed_post_comments')
+        .select('user_id')
+        .eq('id', parent_id)
+        .maybeSingle();
+
+      if (
+        parentComment &&
+        parentComment.user_id &&
+        parentComment.user_id !== req.user!.userId &&
+        parentComment.user_id !== post?.user_id
+      ) {
+        const snippet = content.trim().length > 60 ? content.trim().slice(0, 60) + '...' : content.trim();
+        createNotification({
+          userId: parentComment.user_id,
+          type: 'post',
+          title: 'New Reply to Your Comment',
+          message: `${displayName} replied: "${snippet}"`,
+          link: '/?post=' + req.params.id,
+        }).catch(() => {});
+      }
+    }
+
     res.status(201).json({ ...comment, replies: [], liked: false, user_reaction: null });
   } catch (err) { next(err); }
 });
@@ -833,6 +942,34 @@ router.post('/comments/:id/reaction', authenticate, async (req: AuthenticatedReq
       .eq('comment_id', commentId);
 
     await supabase.from('feed_post_comments').update({ like_count: count || 0 }).eq('id', commentId);
+
+    if (liked) {
+      const { data: c } = await supabase
+        .from('feed_post_comments')
+        .select('id, user_id, post_id, content')
+        .eq('id', commentId)
+        .maybeSingle();
+
+      if (c && c.user_id && c.user_id !== userId) {
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        const senderName = senderProfile
+          ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
+          : 'An alumnus';
+
+        createNotification({
+          userId: c.user_id,
+          type: 'post',
+          title: 'Reaction to Your Comment',
+          message: `${senderName} reacted ${userReaction || '👍'} to your comment.`,
+          link: '/?post=' + c.post_id,
+        }).catch(() => {});
+      }
+    }
 
     res.json({ liked, user_reaction: userReaction, like_count: count || 0 });
   } catch (err) { next(err); }

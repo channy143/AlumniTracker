@@ -11,6 +11,7 @@ export default function SurveyPage() {
   const addNotification = useUIStore((s) => s.addNotification);
   const [survey, setSurvey] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [responses, setResponses] = useState<Record<string, any>>({});
@@ -20,6 +21,7 @@ export default function SurveyPage() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
+    setNotFound(false);
     surveyApi.get(id).then((data) => {
       setSurvey(data);
       setCompleted(data.completed);
@@ -31,15 +33,46 @@ export default function SurveyPage() {
       });
       setResponses(defaults);
     }).catch(() => {
-      addNotification('Survey not found or unavailable', 'error');
-      navigate('/');
+      setNotFound(true);
     }).finally(() => setLoading(false));
-  }, [id, navigate, addNotification]);
+  }, [id]);
 
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto py-6">
         <SkeletonCard />
+      </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-4">
+        <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-xs">
+          <div className="w-14 h-14 mx-auto bg-amber-50 rounded-2xl flex items-center justify-center mb-4 text-amber-600">
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-1.5">Survey No Longer Available</h2>
+          <p className="text-xs text-gray-500 mb-6 max-w-sm mx-auto leading-relaxed">
+            This tracer survey no longer exists, has expired, or was removed by the administrator. Stale notifications for this survey have been cleaned up.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => navigate('/notifications')}
+              className="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
+            >
+              Back to Notifications
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

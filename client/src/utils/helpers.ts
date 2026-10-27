@@ -3,7 +3,12 @@ import { format, parseISO } from 'date-fns';
 
 export function playTing() {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -22,6 +27,8 @@ export function playTing() {
     osc2.stop(ctx.currentTime + 0.4);
   } catch {}
 }
+
+export const playNotificationSound = playTing;
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);

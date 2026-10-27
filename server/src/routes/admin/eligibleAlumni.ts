@@ -42,7 +42,8 @@ router.get('/', async (req, res, next) => {
       const s = search.toLowerCase();
       query = query.or(`student_id.ilike.%${s}%,first_name.ilike.%${s}%,last_name.ilike.%${s}%,middle_name.ilike.%${s}%`);
     }
-    query = query.order('created_at', { ascending: false }).limit(500);
+    const limit = parseInt(req.query.limit as string) || 10000;
+    query = query.order('last_name', { ascending: true }).limit(limit);
     const { data, error } = await query;
     if (error) {
       if (error.code === '42P01' || error.code === '42703') return res.json([]);

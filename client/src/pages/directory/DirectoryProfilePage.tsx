@@ -1,7 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeftIcon, BriefcaseIcon, AcademicCapIcon, MapPinIcon, LinkIcon, StarIcon, CheckBadgeIcon, TrophyIcon, ClockIcon, BuildingOfficeIcon, ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
-import { directoryApi } from '@/services/api';
+import {
+  ArrowLeftIcon,
+  BriefcaseIcon,
+  AcademicCapIcon,
+  MapPinIcon,
+  LinkIcon,
+  StarIcon,
+  CheckBadgeIcon,
+  TrophyIcon,
+  ClockIcon,
+  BuildingOfficeIcon,
+  ChartBarIcon,
+  UserGroupIcon,
+  DocumentTextIcon,
+  ChatBubbleLeftRightIcon,
+} from '@heroicons/react/24/outline';
+import { directoryApi, feedApi } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
+import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
 import { SkeletonCard, SkeletonRow, SkeletonText } from '@/components/ui/Skeleton';
@@ -56,12 +73,20 @@ function TimelineArrow() {
 export default function DirectoryProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user: currentUser } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'posts'>('overview');
+  const [posts, setPosts] = useState<PostItem[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [postsLoaded, setPostsLoaded] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
+    setProfile(null);
+    setPosts([]);
+    setPostsLoaded(false);
     directoryApi.get(id)
       .then((data: any) => {
         setProfile(data);
@@ -70,6 +95,40 @@ export default function DirectoryProfilePage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    const targetUserId = profile?.user_id || profile?.id;
+    if (targetUserId) {
+      setLoadingPosts(true);
+      feedApi.userPosts(targetUserId)
+        .then((res: any) => {
+          const list = Array.isArray(res) ? res : (res as any)?.posts || [];
+          // Filter strictly so only posts authored by this specific alumnus are displayed
+          const authorFiltered = list.filter((p: any) => {
+            if (profile?.user_id && p.user_id === profile.user_id) return true;
+            if (profile?.id && p.user_id === profile.id) return true;
+            return false;
+          });
+          setPosts(authorFiltered);
+          setPostsLoaded(true);
+        })
+        .catch((err) => {
+          console.error('Failed to load user posts:', err);
+          setPosts([]);
+        })
+        .finally(() => setLoadingPosts(false));
+    } else {
+      setPosts([]);
+    }
+  }, [profile?.user_id, profile?.id]);
+
+  const handlePostDeleted = (postId: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  };
+
+  const handlePostUpdated = (updatedPost: PostItem) => {
+    setPosts((prev) => prev.map((p) => (p.id === updatedPost.id ? updatedPost : p)));
+  };
 
   if (loading) {
     return (
@@ -137,33 +196,58 @@ export default function DirectoryProfilePage() {
 
       {/* Section 1: Profile Header (Full Width Hero Card) */}
       <div className="bg-white border border-gray-200 rounded-xl p-5 sm:p-6 shadow-xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-2xl font-bold text-white shrink-0 overflow-hidden shadow-xs border-2 border-white ring-2 ring-orange-100">
-            {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              ((profile.first_name?.[0] || '') + (profile.last_name?.[0] || '')).toUpperCase()
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-gray-900 leading-snug">
-              {profile.first_name} {profile.middle_name ? profile.middle_name + ' ' : ''}{profile.last_name}
-            </h1>
-            {profile.headline && <p className="text-sm font-medium text-gray-600 mt-0.5">{profile.headline}</p>}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-500">
-              {current && (
-                <span className="flex items-center gap-1.5 text-gray-700 font-medium">
-                  <BriefcaseIcon className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                  <span>{current.position} at <strong className="font-semibold text-gray-900">{current.company_name}</strong></span>
-                </span>
-              )}
-              {(profile.city || profile.province) && (
-                <span className="flex items-center gap-1 text-gray-500">
-                  <MapPinIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                  <span>{[profile.city, profile.province].filter(Boolean).join(', ')}</span>
-                </span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5 flex-1 min-w-0">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-2xl font-bold text-white shrink-0 overflow-hidden shadow-xs border-2 border-white ring-2 ring-orange-100">
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                ((profile.first_name?.[0] || '') + (profile.last_name?.[0] || '')).toUpperCase()
               )}
             </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold text-gray-900 leading-snug">
+                {profile.first_name} {profile.middle_name ? profile.middle_name + ' ' : ''}{profile.last_name}
+              </h1>
+              {profile.headline && <p className="text-sm font-medium text-gray-600 mt-0.5">{profile.headline}</p>}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-500">
+                {current && (
+                  <span className="flex items-center gap-1.5 text-gray-700 font-medium">
+                    <BriefcaseIcon className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                    <span>{current.position} at <strong className="font-semibold text-gray-900">{current.company_name}</strong></span>
+                  </span>
+                )}
+                {(profile.city || profile.province) && (
+                  <span className="flex items-center gap-1 text-gray-500">
+                    <MapPinIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <span>{[profile.city, profile.province].filter(Boolean).join(', ')}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
+            {profile.resume_url && (
+              <a
+                href={profile.resume_url.startsWith('http') ? profile.resume_url : `/api/directory/${profile.id}/resume`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100 rounded-lg text-xs font-semibold transition-colors shadow-xs"
+              >
+                <DocumentTextIcon className="w-4 h-4 text-orange-600" />
+                View Resume / CV
+              </a>
+            )}
+            {currentUser?.id !== profile.user_id && (
+              <button
+                onClick={() => navigate('/connections')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+              >
+                <ChatBubbleLeftRightIcon className="w-4 h-4 text-gray-500" />
+                Connect & Message
+              </button>
+            )}
           </div>
         </div>
 
@@ -174,11 +258,76 @@ export default function DirectoryProfilePage() {
         )}
       </div>
 
-      {/* Main 2-Column Split: Left (Timeline + Employment History) & Right Nav (Summary, Education, Certifications, Achievements, Links, Skills) */}
+      {/* Main 2-Column Split: Left (Timeline + Employment History OR Alumni Posts) & Right Nav (Summary, Education, Certifications, Achievements, Links, Skills) */}
       <div className="flex flex-col lg:flex-row gap-4 lg:items-stretch">
         {/* Left Primary Column */}
         <div className="flex-1 min-w-0 w-full flex flex-col gap-4">
-          {/* Career Timeline */}
+          {/* Segmented View Selector */}
+          <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('overview')}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                activeTab === 'overview'
+                  ? 'bg-orange-500 text-white shadow-xs'
+                  : 'bg-white text-gray-600 hover:text-gray-900 border border-gray-200'
+              }`}
+            >
+              <BriefcaseIcon className="w-4 h-4" />
+              Career & Experience
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('posts')}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                activeTab === 'posts'
+                  ? 'bg-orange-500 text-white shadow-xs'
+                  : 'bg-white text-gray-600 hover:text-gray-900 border border-gray-200'
+              }`}
+            >
+              <ChatBubbleLeftRightIcon className="w-4 h-4" />
+              Alumni Posts
+              {posts.length > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  activeTab === 'posts' ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700'
+                }`}>
+                  {posts.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {activeTab === 'posts' ? (
+            <div className="space-y-4">
+              {loadingPosts ? (
+                <div className="space-y-3">
+                  <SkeletonCard className="h-44" />
+                  <SkeletonCard className="h-44" />
+                </div>
+              ) : posts.length === 0 ? (
+                <div className="bg-white border border-gray-200 rounded-xl p-8 text-center shadow-xs">
+                  <ChatBubbleLeftRightIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <h3 className="text-sm font-semibold text-gray-800">No alumni posts yet</h3>
+                  <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+                    This alumnus hasn't shared any posts or updates yet.
+                  </p>
+                </div>
+              ) : (
+                posts.map((post) => (
+                  <FeedPostCard
+                    key={post.id}
+                    post={post}
+                    currentUserId={currentUser?.id}
+                    currentUserRole={currentUser?.role}
+                    onPostDeleted={handlePostDeleted}
+                    onPostUpdated={handlePostUpdated}
+                  />
+                ))
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Career Timeline */}
           {timeline.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs shrink-0">
               <SectionTitle icon={ClockIcon} title="Career Timeline" />
@@ -270,6 +419,8 @@ export default function DirectoryProfilePage() {
                 })()}
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
 

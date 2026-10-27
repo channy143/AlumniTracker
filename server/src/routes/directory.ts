@@ -115,11 +115,36 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
       profileQuery = profileQuery.neq('id', currentProfile.id);
     }
 
+    let qMatchedProfileIds: string[] = [];
     if (q) {
-      const sanitized = sanitizeFilterInput(q);
-      profileQuery = profileQuery.or(
-        `first_name.ilike.${sanitized}%,last_name.ilike.${sanitized}%,headline.ilike.%${sanitized}%`
-      );
+      const sanitized = sanitizeFilterInput(q).trim();
+      const [{ data: qEdu }, { data: qEmp }] = await Promise.all([
+        db.from('education').select('profile_id').ilike('program', `%${sanitized}%`),
+        db.from('employment').select('profile_id').ilike('company_name', `%${sanitized}%`),
+      ]);
+      qMatchedProfileIds = [
+        ...new Set([
+          ...(qEdu || []).map((e: any) => e.profile_id),
+          ...(qEmp || []).map((e: any) => e.profile_id),
+        ]),
+      ].filter(Boolean);
+
+      const tokens = sanitized.split(/\s+/).filter(Boolean);
+      let orClause = '';
+      if (tokens.length === 1) {
+        const token = tokens[0];
+        orClause = `first_name.ilike.%${token}%,last_name.ilike.%${token}%,headline.ilike.%${token}%,bio.ilike.%${token}%`;
+      } else {
+        const first = tokens[0];
+        const last = tokens.slice(1).join(' ');
+        orClause = `and(first_name.ilike.%${first}%,last_name.ilike.%${last}%),first_name.ilike.%${sanitized}%,last_name.ilike.%${sanitized}%,headline.ilike.%${sanitized}%`;
+      }
+
+      if (qMatchedProfileIds.length > 0) {
+        orClause += `,id.in.(${qMatchedProfileIds.slice(0, 50).join(',')})`;
+      }
+
+      profileQuery = profileQuery.or(orClause);
     }
 
     if (employmentStatus) {
@@ -292,7 +317,24 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       employment: sanitizedEmployment,
       achievements: achievementsRes.data || [],
       career_feedback: feedbackRes.data || null,
+      resume_url: null,
     };
+
+    if (profile.resume_url) {
+      let filePath = profile.resume_url;
+      if (filePath.includes('/resumes/')) {
+        const parts = filePath.split('/resumes/');
+        filePath = 'resumes/' + parts[parts.length - 1].split('?')[0];
+      }
+      try {
+        const { data: signedData } = await db.storage
+          .from('resumes')
+          .createSignedUrl(filePath, 604800);
+        result.resume_url = signedData?.signedUrl || profile.resume_url;
+      } catch {
+        result.resume_url = profile.resume_url;
+      }
+    }
 
     // Contact information protection: only expose if user opted in or requester is owner/admin
     if (isOwnerOrAdmin || privacy.show_email) result.email = profile.email;
@@ -322,6 +364,38 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
     }
 
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+// GET /api/directory/:id/resume - redirect to fresh signed resume url
+router.get('/:id/resume', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db
+      .from('profiles')
+      .select('resume_url')
+      .eq('id', req.params.id)
+      .maybeSingle();
+
+    if (!profile?.resume_url) {
+      throw new AppError('Resume not found', 404);
+    }
+
+    let filePath = profile.resume_url;
+    if (filePath.includes('/resumes/')) {
+      const parts = filePath.split('/resumes/');
+      filePath = 'resumes/' + parts[parts.length - 1].split('?')[0];
+    }
+
+    const { data: signedData, error } = await db.storage
+      .from('resumes')
+      .createSignedUrl(filePath, 3600);
+
+    if (error || !signedData?.signedUrl) {
+      throw new AppError('Unable to generate resume link', 500);
+    }
+
+    res.redirect(signedData.signedUrl);
   } catch (err) { next(err); }
 });
 

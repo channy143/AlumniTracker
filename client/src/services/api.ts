@@ -478,6 +478,17 @@ export const messagesApi = {
     api.get<Record<string, { is_online: boolean; last_active_at: string | null }>>(
       `/messages/presence?profileIds=${encodeURIComponent(profileIds.join(','))}`
     ),
+  groups: () => api.get<any[]>('/messages/groups'),
+  createGroup: (data: { name: string; description?: string; member_ids?: string[] }) =>
+    api.post<any>('/messages/groups', data),
+  getGroupMessages: (groupId: string) => api.get<any[]>(`/messages/groups/${groupId}/messages`),
+  sendGroupMessage: (groupId: string, body: string) =>
+    api.post<any>(`/messages/groups/${groupId}/messages`, { body }),
+  addGroupMembers: (groupId: string, memberIds: string[]) =>
+    api.post<any>(`/messages/groups/${groupId}/members`, { member_ids: memberIds }),
+  removeGroupMember: (groupId: string, profileId: string) =>
+    api.delete<any>(`/messages/groups/${groupId}/members/${profileId}`),
+  leaveGroup: (groupId: string) => api.post<any>(`/messages/groups/${groupId}/leave`, {}),
 };
 
 export const feedApi = {

@@ -18,6 +18,7 @@ import {
   UserGroupIcon,
   MegaphoneIcon,
   CalendarIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 import { JellyBlobMascot, BlobSpeech } from '@/components/ui/feral-blob/JellyBlobMascot';
 import { SecurityPolicyModal } from '@/components/security/SecurityPolicyModal';
@@ -62,7 +63,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [blobMood, setBlobMood] = useState<'neutral' | 'happy' | 'sad'>('neutral');
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotifRinging, setIsNotifRinging] = useState(false);
   const lastNotifIdRef = useRef<string | null>(null);
+  const lastNotifCountRef = useRef<number | null>(null);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -125,7 +128,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       navigate(`${location.pathname}${searchStr}`, { replace: true });
     } else {
       if (!trimmed) return;
-      const defaultTarget = user?.role === 'admin' ? '/admin/companies' : '/connections';
+      const defaultTarget = user?.role === 'admin' ? '/admin/companies' : '/directory';
       navigate(`${defaultTarget}?q=${encodeURIComponent(trimmed)}`);
     }
   };
@@ -160,23 +163,35 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         notificationsApi.list(10),
         notificationsApi.unreadCount(),
       ]);
-      setUnreadCount(count || 0);
+      const currentCount = count || 0;
+      setUnreadCount(currentCount);
+
       if (data && data.length > 0) {
         const latestId = String(data[0].id);
-        if (lastNotifIdRef.current && lastNotifIdRef.current !== latestId && count > 0) {
+        const hasNewNotification =
+          (lastNotifIdRef.current && lastNotifIdRef.current !== latestId && currentCount > 0) ||
+          (lastNotifCountRef.current !== null && currentCount > lastNotifCountRef.current);
+
+        if (hasNewNotification) {
           playTing();
+          setIsNotifRinging(true);
+          setTimeout(() => setIsNotifRinging(false), 1200);
         }
-        if (!lastNotifIdRef.current) {
-          lastNotifIdRef.current = latestId;
-        }
+
+        lastNotifIdRef.current = latestId;
         setNotifications(data);
       }
+      lastNotifCountRef.current = currentCount;
     } catch { }
   }, []);
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications();
+      }
+    }, 10000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
@@ -207,7 +222,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       case 'survey': return ClipboardDocumentCheckIcon;
       case 'job': return BriefcaseIcon;
       case 'application': return BriefcaseIcon;
-      case 'mentorship': return UserGroupIcon;
+      case 'mentorship':
+      case 'connection': return UserGroupIcon;
+      case 'post': return ChatBubbleLeftRightIcon;
       case 'announcement': return MegaphoneIcon;
       case 'event': return CalendarIcon;
       default: return AcademicCapIcon;
@@ -219,7 +236,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       case 'survey': return 'Complete Survey →';
       case 'job': return 'View Job →';
       case 'application': return 'View Application →';
-      case 'mentorship': return 'View Mentorship →';
+      case 'mentorship':
+      case 'connection': return 'View Request →';
+      case 'post': return 'View Post →';
       case 'announcement': return 'View Announcement →';
       case 'event': return 'View Event →';
       default: return 'View Details →';
@@ -246,8 +265,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             <button onClick={onMenuClick} className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded">
               <Bars3Icon className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-2">
-              <img src="/favicon.svg" alt="CTU-Naga Alumni" className="w-7 h-7 rounded-lg shadow-xs shrink-0" />
+            <div className="flex lg:hidden items-center gap-2">
+              <img src="/logo.png" alt="CTU-Naga Alumni" className="w-8 h-8 rounded-lg object-contain shadow-xs shrink-0" />
               <span className="hidden sm:block text-sm font-semibold text-gray-800">CTU-Naga</span>
             </div>
           </div>
@@ -282,11 +301,32 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               <ChatDropdown />
             )}
             <div className="relative" ref={notifDropdownRef}>
-              <button onClick={() => { setNotifDropdownOpen((v) => !v); if (notifDropdownOpen) setUnreadCount(0); }} className="relative p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg" title="Notifications">
-                <BellIcon className="w-5 h-5" />
+              <button
+                onClick={() => {
+                  setNotifDropdownOpen((v) => !v);
+                  if (unreadCount > 0) {
+                    notificationsApi.markAllRead().catch(() => {});
+                    setUnreadCount(0);
+                    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+                  }
+                }}
+                className={`relative p-1.5 rounded-lg transition-all ${
+                  notifDropdownOpen
+                    ? 'bg-orange-50 text-orange-600'
+                    : unreadCount > 0
+                    ? 'text-orange-600 hover:bg-orange-50/70'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}
+                title="Notifications"
+                aria-label="Notifications"
+              >
+                <BellIcon className={`w-5 h-5 transition-transform ${isNotifRinging ? 'animate-bounce text-orange-600' : ''}`} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-orange-500 text-white text-[9px] font-bold rounded-full px-1">
-                    {unreadCount > 9 ? '9+' : unreadCount}
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                    <span className="relative inline-flex items-center justify-center min-w-[16px] h-4 bg-orange-600 text-white text-[9px] font-bold rounded-full px-1 shadow-sm">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
                   </span>
                 )}
               </button>

@@ -6,8 +6,51 @@ import { AuthenticatedRequest } from '../types';
 
 const router = Router();
 
+let lastPurgeTime = 0;
+export async function purgeOrphanedSurveyNotifications(force = false) {
+  const now = Date.now();
+  if (!force && now - lastPurgeTime < 60000) return;
+  lastPurgeTime = now;
+  try {
+    const { data: surveys } = await supabase.from('surveys').select('id, is_active, status');
+    // Only published and active surveys should have active notifications
+    const activeSurveyIds = new Set(
+      (surveys || [])
+        .filter((s: any) => s.is_active && s.status === 'published')
+        .map((s: any) => s.id)
+    );
+
+    const { data: surveyNotifs } = await supabase
+      .from('notifications')
+      .select('id, survey_id, link')
+      .or('type.eq.survey,link.ilike.%/surveys/%');
+
+    if (!surveyNotifs || surveyNotifs.length === 0) return;
+
+    const toDeleteIds: string[] = [];
+    for (const notif of surveyNotifs) {
+      let refId = notif.survey_id;
+      if (!refId && notif.link && notif.link.includes('/surveys/')) {
+        const match = notif.link.match(/\/surveys\/([a-zA-Z0-9_-]+)/);
+        if (match) refId = match[1];
+      }
+
+      if (refId && !activeSurveyIds.has(refId)) {
+        toDeleteIds.push(notif.id);
+      }
+    }
+
+    if (toDeleteIds.length > 0) {
+      await supabase.from('notifications').delete().in('id', toDeleteIds);
+    }
+  } catch (err) {
+    // Non-blocking cleanup
+  }
+}
+
 router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
+    await purgeOrphanedSurveyNotifications();
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
     const offset = parseInt(req.query.offset as string) || 0;
     const type = req.query.type as string;
@@ -48,6 +91,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
 
 router.get('/unread-count', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
+    await purgeOrphanedSurveyNotifications();
     const { count, error } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
@@ -119,7 +163,7 @@ router.delete('/', authenticate, async (req: AuthenticatedRequest, res, next) =>
 
 export interface CreateNotificationParams {
   userId: string;
-  type?: 'survey' | 'job' | 'application' | 'mentorship' | 'announcement' | 'event' | 'system';
+  type?: 'survey' | 'job' | 'application' | 'mentorship' | 'connection' | 'post' | 'announcement' | 'event' | 'system' | string;
   title: string;
   message?: string;
   link?: string;

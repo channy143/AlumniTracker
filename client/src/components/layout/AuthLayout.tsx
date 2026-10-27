@@ -33,6 +33,7 @@ export default function AuthLayout() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
           <div className="relative z-10 h-full flex flex-col items-center justify-center p-12">
             <div className="max-w-md w-full">
+              <img src="/logo.png" alt="CTU-Naga Logo" className="w-16 h-16 object-contain rounded-2xl bg-white/10 p-2 backdrop-blur-sm shadow-lg mb-6 border border-white/20" />
               <h1 className="text-5xl md:text-6xl font-bold text-white font-display leading-[1.05] tracking-tight">
                 CTU-Naga<br />
                 <span className="text-ctu-marigold">Alumni Network</span>

@@ -517,7 +517,19 @@ function JobCard({
             </p>
           </div>
 
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-1.5">
+            {job.application_url && (
+              <a
+                href={job.application_url.startsWith('http') ? job.application_url : `https://${job.application_url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="p-2.5 border border-gray-200 hover:border-orange-300 hover:bg-orange-50 text-gray-500 hover:text-orange-600 transition-colors flex items-center justify-center cursor-pointer"
+                title="Open external job posting / application link"
+              >
+                <GlobeAltIcon className="w-4 h-4" />
+              </a>
+            )}
             {isApplied ? (
               <button
                 type="button"
@@ -541,6 +553,29 @@ function JobCard({
       </div>
     </div>
   );
+}
+
+function renderTextWithLinks(text?: string) {
+  if (!text) return null;
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  const parts = text.split(urlRegex);
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      const href = part.startsWith('http') ? part : `https://${part}`;
+      return (
+        <a
+          key={index}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-orange-600 hover:text-orange-700 underline font-medium break-all"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
 }
 
 function JobDetailView({
@@ -606,6 +641,16 @@ function JobDetailView({
             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">Remote</span>
           )}
           {job.salary_range && <span className="flex items-center gap-1"><CurrencyDollarIcon className="w-4 h-4" /> {job.salary_range}</span>}
+          {job.company_website && (
+            <a
+              href={job.company_website.startsWith('http') ? job.company_website : `https://${job.company_website}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-orange-600 hover:underline font-medium"
+            >
+              <GlobeAltIcon className="w-4 h-4" /> Company Website ↗
+            </a>
+          )}
         </div>
 
         {/* Match Breakdown if profile available */}
@@ -654,16 +699,32 @@ function JobDetailView({
             </div>
           </div>
         ) : !application ? (
-          <div className="flex items-center justify-between gap-3 flex-wrap bg-orange-50 border border-orange-100 rounded-lg px-3 py-2.5 mb-4">
-            <p className="text-xs text-gray-600">Ready to take the next step?</p>
-            {onApply && (
-              <button
-                onClick={onApply}
-                className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium rounded-lg transition-colors cursor-pointer"
-              >
-                Apply for this Job
-              </button>
-            )}
+          <div className="flex items-center justify-between gap-3 flex-wrap bg-orange-50 border border-orange-100 rounded-lg px-4 py-3 mb-4">
+            <div>
+              <p className="text-xs font-bold text-gray-900">Interested in this role?</p>
+              <p className="text-[11px] text-gray-500">Apply directly through AlumniTracker or submit on the employer portal.</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {job.application_url && (
+                <a
+                  href={job.application_url.startsWith('http') ? job.application_url : `https://${job.application_url}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <GlobeAltIcon className="w-3.5 h-3.5" />
+                  <span>Apply on Company Site ↗</span>
+                </a>
+              )}
+              {onApply && (
+                <button
+                  onClick={onApply}
+                  className="px-3.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer"
+                >
+                  Apply with AlumniTracker
+                </button>
+              )}
+            </div>
           </div>
         ) : null}
 
@@ -689,7 +750,7 @@ function JobDetailView({
         {!loadingApplication && application && <ApplicationStatusCard application={application} />}
 
         <div className="text-sm text-gray-700 leading-relaxed mb-4 whitespace-pre-line">
-          {job.description}
+          {renderTextWithLinks(job.description)}
         </div>
 
         {/* Required Skills */}
@@ -975,7 +1036,7 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
 
   if (submittedApp) {
     return (
-      <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={onClose}>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={onClose}>
         <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
           <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-xs">
             <CheckCircleIcon className="w-8 h-8" />
@@ -1009,7 +1070,7 @@ function ApplyModal({ job, onClose, onApplied }: { job: any; onClose: () => void
   }
 
   return (
-    <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={onClose}>
       <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
           <div className="flex items-center gap-3">

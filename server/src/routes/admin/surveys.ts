@@ -298,7 +298,14 @@ router.put('/:id', async (req, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
-    const { error } = await supabase.from('surveys').delete().eq('id', req.params.id);
+    const surveyId = req.params.id;
+    // Clean up any notifications linked to this survey
+    await supabase.from('notifications').delete().eq('survey_id', surveyId);
+    await supabase.from('notifications').delete().ilike('link', `%/surveys/${surveyId}%`);
+    // Clean up responses
+    await supabase.from('survey_responses').delete().eq('survey_id', surveyId);
+
+    const { error } = await supabase.from('surveys').delete().eq('id', surveyId);
     if (error) throw new AppError(error.message, 500);
     res.json({ message: 'Survey deleted' });
   } catch (err) {

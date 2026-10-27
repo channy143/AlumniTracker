@@ -54,7 +54,10 @@ export async function closeExpiredSurveys() {
     .update({ is_active: false, is_closed: true, status: 'closed' })
     .in('id', ids);
 
-  await supabase.from('notifications').delete().eq('type', 'survey').in('survey_id', ids);
+  for (const id of ids) {
+    await supabase.from('notifications').delete().eq('survey_id', id);
+    await supabase.from('notifications').delete().ilike('link', `%/surveys/${id}%`);
+  }
 }
 
 function isUserEligible(survey: any, userProfile: any): boolean {

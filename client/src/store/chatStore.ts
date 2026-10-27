@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 
 export interface GroupMember {
-  id: string;
+  id?: string;
+  profile_id: string;
   name: string;
   avatar?: string;
   role?: 'admin' | 'member';
@@ -16,8 +17,14 @@ export interface ChatContact {
   lastActiveAt?: string | null;
   unread?: number;
   isGroup?: boolean;
+  creator_id?: string;
+  admin_id?: string;
+  isAdmin?: boolean;
+  myRole?: 'admin' | 'member';
   members?: GroupMember[];
   muted?: boolean;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
 }
 
 export interface ReplyTarget {
@@ -51,7 +58,9 @@ interface ChatState {
   closeHeaderDropdown: () => void;
 
   // Group Conversation Actions
-  createGroup: (name: string, members: GroupMember[], avatar?: string) => ChatContact;
+  setGroups: (groups: ChatContact[]) => void;
+  updateGroupMembers: (groupId: string, members: GroupMember[]) => void;
+  removeMemberFromGroup: (groupId: string, profileId: string) => void;
   addMemberToGroup: (groupId: string, member: GroupMember) => void;
   leaveGroup: (groupId: string) => void;
   toggleMuteGroup: (groupId: string) => void;
@@ -60,38 +69,12 @@ interface ChatState {
   setReplyingTo: (reply: ReplyTarget | null) => void;
 }
 
-const DEFAULT_GROUPS: ChatContact[] = [
-  {
-    profileId: 'group-bsit-2024',
-    name: 'BSIT Class of 2024 Alumni',
-    isGroup: true,
-    unread: 0,
-    members: [
-      { id: 'm-1', name: 'John Doe', role: 'admin' },
-      { id: 'm-2', name: 'Jane Smith', role: 'member' },
-      { id: 'm-3', name: 'Alvin Perez', role: 'member' },
-      { id: 'm-4', name: 'Grace Santos', role: 'member' },
-    ],
-  },
-  {
-    profileId: 'group-tech-careers',
-    name: 'Cebu IT & Tech Careers Hub',
-    isGroup: true,
-    unread: 0,
-    members: [
-      { id: 'm-1', name: 'Career Services', role: 'admin' },
-      { id: 'm-2', name: 'Mark Ramos', role: 'member' },
-      { id: 'm-3', name: 'Elena Cruz', role: 'member' },
-    ],
-  },
-];
-
 export const useChatStore = create<ChatState>((set, get) => ({
   isOpen: false,
   isMinimized: false,
   activeChat: null,
   minimizedChats: [],
-  groups: DEFAULT_GROUPS,
+  groups: [],
   unreadCount: 0,
   isHeaderDropdownOpen: false,
   replyingTo: null,
@@ -254,24 +237,41 @@ export const useChatStore = create<ChatState>((set, get) => ({
   closeHeaderDropdown: () => set({ isHeaderDropdownOpen: false }),
 
   // Group Conversation Handlers
-  createGroup: (name, members, avatar) => {
-    const newGroup: ChatContact = {
-      profileId: `group-${Date.now()}`,
-      name: name.trim() || 'Untitled Alumni Group',
-      avatar,
-      isGroup: true,
-      unread: 0,
-      members,
-      muted: false,
-    };
+  setGroups: (groups) => set({ groups }),
 
+  updateGroupMembers: (groupId, members) =>
     set((state) => ({
-      groups: [newGroup, ...state.groups],
-    }));
+      groups: state.groups.map((g) =>
+        g.profileId === groupId ? { ...g, members } : g
+      ),
+      activeChat:
+        state.activeChat?.profileId === groupId
+          ? { ...state.activeChat, members }
+          : state.activeChat,
+    })),
 
-    get().openChat(newGroup);
-    return newGroup;
-  },
+  removeMemberFromGroup: (groupId, profileId) =>
+    set((state) => ({
+      groups: state.groups.map((g) =>
+        g.profileId === groupId
+          ? {
+              ...g,
+              members: (g.members || []).filter(
+                (m) => m.profile_id !== profileId && m.id !== profileId
+              ),
+            }
+          : g
+      ),
+      activeChat:
+        state.activeChat?.profileId === groupId
+          ? {
+              ...state.activeChat,
+              members: (state.activeChat.members || []).filter(
+                (m) => m.profile_id !== profileId && m.id !== profileId
+              ),
+            }
+          : state.activeChat,
+    })),
 
   addMemberToGroup: (groupId, member) =>
     set((state) => ({
@@ -279,7 +279,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         g.profileId === groupId
           ? {
               ...g,
-              members: g.members?.some((m) => m.id === member.id)
+              members: g.members?.some((m) => m.profile_id === member.profile_id || m.id === member.id)
                 ? g.members
                 : [...(g.members || []), member],
             }
@@ -289,7 +289,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         state.activeChat?.profileId === groupId
           ? {
               ...state.activeChat,
-              members: state.activeChat.members?.some((m) => m.id === member.id)
+              members: state.activeChat.members?.some((m) => m.profile_id === member.profile_id || m.id === member.id)
                 ? state.activeChat.members
                 : [...(state.activeChat.members || []), member],
             }

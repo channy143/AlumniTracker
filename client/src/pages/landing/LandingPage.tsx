@@ -40,14 +40,14 @@ interface BentoFeature {
 }
 
 const features: BentoFeature[] = [
-  { title: 'Alumni Portal', desc: 'Dynamic profiles, skills tracking, and digital ID cards for every graduate.', icon: UserGroupIcon, span: 'lg:col-span-2', accent: 'blue', statKey: 'alumni' },
-  { title: 'Employment Tracking', desc: 'Visual career timelines with employment history and industry insights.', icon: BriefcaseIcon, span: 'lg:col-span-1', accent: 'marigold' },
-  { title: 'Career Analytics', desc: 'Data-driven dashboards showing industry trends and salary benchmarks.', icon: ChartBarIcon, span: 'lg:col-span-1', accent: 'gold' },
-  { title: 'Mentorship Platform', desc: 'Connect experienced alumni with students and junior graduates.', icon: HandRaisedIcon, span: 'lg:col-span-1', accent: 'charcoal' },
-  { title: 'Community Hub', desc: 'Interest-based groups, forums, and direct messaging between alumni.', icon: UsersIcon, span: 'lg:col-span-2', accent: 'blue', statKey: 'programs' },
-  { title: 'Job Opportunity Portal', desc: 'Exclusive opportunities from partner companies and fellow alumni.', icon: NewspaperIcon, span: 'lg:col-span-1', accent: 'marigold' },
-  { title: 'Surveys & Feedback', desc: 'Automated tracer studies and curriculum feedback collection.', icon: ClipboardDocumentListIcon, span: 'lg:col-span-2', accent: 'gold' },
-  { title: 'Admin Dashboard', desc: 'Powerful tools for user management, reports, and system analytics.', icon: ShieldCheckIcon, span: 'lg:col-span-2', accent: 'charcoal' },
+  { title: 'Interactive Alumni Feed', desc: 'Share career milestones, updates, multimedia, reactions, and community discussions.', icon: NewspaperIcon, span: 'lg:col-span-2', accent: 'blue', statKey: 'alumni' },
+  { title: 'Real-Time Messaging', desc: 'Direct peer-to-peer and group chats with live active presence and typing indicators.', icon: UsersIcon, span: 'lg:col-span-1', accent: 'marigold' },
+  { title: 'Career Analytics', desc: 'Data-driven dashboards showing employment trends, industries, and salary benchmarks.', icon: ChartBarIcon, span: 'lg:col-span-1', accent: 'gold' },
+  { title: 'Mentorship & Connections', desc: 'Connect experienced alumni with junior graduates for guidance and career referrals.', icon: HandRaisedIcon, span: 'lg:col-span-1', accent: 'charcoal' },
+  { title: 'Verified Alumni Directory', desc: 'Comprehensive graduate directory with tokenized search, verified degrees, and career timelines.', icon: UserGroupIcon, span: 'lg:col-span-2', accent: 'blue', statKey: 'programs' },
+  { title: 'Job Opportunity Portal', desc: 'Curated career opportunities with direct company application links and alumni referrals.', icon: BriefcaseIcon, span: 'lg:col-span-1', accent: 'marigold' },
+  { title: 'Graduate Tracer Studies', desc: 'Automated CHED-compliant tracer surveys capturing curriculum feedback and job alignment.', icon: ClipboardDocumentListIcon, span: 'lg:col-span-2', accent: 'gold' },
+  { title: 'Institutional Governance', desc: 'Administrative tools for graduate verification, audit trails, and accreditation reporting.', icon: ShieldCheckIcon, span: 'lg:col-span-2', accent: 'charcoal' },
 ];
 
 const steps = [
@@ -163,14 +163,14 @@ function TiltCard({ children, className }: { children: React.ReactNode; classNam
 }
 
 const cardImages: Record<string, string> = {
-  'Alumni Portal': 'https://images.unsplash.com/photo-1596495578065-6e0763fa1178?w=600&q=80',
-  'Employment Tracking': 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=600&q=80',
+  'Interactive Alumni Feed': 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600&q=80',
+  'Real-Time Messaging': 'https://images.unsplash.com/photo-1577563908411-5077b6dc7624?w=600&q=80',
   'Career Analytics': 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&q=80',
-  'Mentorship Platform': 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=600&q=80',
-  'Community Hub': 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600&q=80',
-  'Job Opportunity Portal': 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=600&q=80',
-  'Surveys & Feedback': 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=600&q=80',
-  'Admin Dashboard': 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&q=80',
+  'Mentorship & Connections': 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=600&q=80',
+  'Verified Alumni Directory': 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80',
+  'Job Opportunity Portal': 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=600&q=80',
+  'Graduate Tracer Studies': 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=600&q=80',
+  'Institutional Governance': 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&q=80',
 };
 
 const accentMap: Record<string, { gradient: string; iconBg: string; text: string; ring: string }> = {
@@ -417,7 +417,7 @@ export default function LandingPage() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <button onClick={scrollToTop} className="flex items-center gap-3 text-left group">
-            <img src="/favicon.svg" alt="CTU-Naga Alumni" className="w-9 h-9 rounded-xl shadow-md shrink-0" />
+            <img src="/logo.png" alt="CTU-Naga Alumni" className="w-10 h-10 object-contain rounded-xl shadow-md shrink-0 bg-white/10 p-0.5" />
             <div>
               <h1 className={`text-xl font-bold font-display transition-colors duration-300 ${showHeader ? 'text-ctu-blue group-hover:text-ctu-marigold' : 'text-white'}`}>
                 CTU-Naga Alumni

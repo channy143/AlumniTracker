@@ -26,6 +26,7 @@ import TracerSurveyPage from '@/pages/survey/TracerSurveyPage';
 import AlumniOnboardingSurveyPage from '@/pages/survey/AlumniOnboardingSurveyPage';
 import EmployerDashboard from '@/pages/employer/EmployerDashboard';
 import NotificationsPage from '@/pages/notifications/NotificationsPage';
+import ConnectionsPage from '@/pages/connections/ConnectionsPage';
 
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AlumniManagement from '@/pages/admin/AlumniManagement';
@@ -131,6 +132,8 @@ export default function App() {
         <Route path="support" element={<SupportPage />} />
         <Route path="help" element={<Navigate to="/support" replace />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="connections" element={<ConnectionsPage />} />
+        <Route path="network" element={<Navigate to="/connections" replace />} />
 
       </Route>
 
