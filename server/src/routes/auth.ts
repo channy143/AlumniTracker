@@ -156,10 +156,11 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
         .ilike('first_name', firstName.trim());
 
       const targetBatch = parseInt(String(yearGraduated || batchYear || '0'), 10);
-      eligible = (candidates || []).find((c: any) => !targetBatch || !c.year_graduated || c.year_graduated === targetBatch) || candidates?.[0];
+      // Link to an unclaimed record if one matches
+      eligible = (candidates || []).find((c: any) => !c.user_id && (!targetBatch || !c.year_graduated || c.year_graduated === targetBatch));
     }
 
-    if (eligible && eligible.user_id) {
+    if (studentId && eligible && eligible.user_id) {
       throw new AppError('An account for this alumni record already exists. Please sign in.', 409);
     }
 

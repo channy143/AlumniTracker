@@ -11,8 +11,11 @@ import FieldErrorAlert from '@/components/auth/FieldErrorAlert';
 
 type Step = 'verify' | 'form' | 'captcha' | 'otp';
 
+// Temporarily set to false to bypass alumni identity verification so users can freely register
+const REQUIRE_ALUMNI_VERIFICATION = false;
+
 export default function RegisterPage() {
-  const [step, setStep] = useState<Step>('verify');
+  const [step, setStep] = useState<Step>(REQUIRE_ALUMNI_VERIFICATION ? 'verify' : 'form');
   const [loading, setLoading] = useState(false);
 
   // Rate limit cooldown state
@@ -214,7 +217,7 @@ export default function RegisterPage() {
     if (!formData.firstName.trim()) missing.firstName = true;
     if (!formData.email.trim()) missing.email = true;
     if (!formData.program) missing.program = true;
-    if (!formData.graduationDate) missing.graduationDate = true;
+    if (REQUIRE_ALUMNI_VERIFICATION && !formData.graduationDate) missing.graduationDate = true;
     if (!formData.batchYear && !formData.yearGraduated) missing.batchYear = true;
     if (!formData.password) missing.password = true;
     if (!formData.confirmPassword) missing.confirmPassword = true;
@@ -511,13 +514,26 @@ export default function RegisterPage() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.25 }}
           >
-            <div className="flex items-center gap-2 mb-1">
-              <IdentificationIcon className="w-5 h-5 text-green-600" />
-              <h2 className="text-xl font-bold text-ctu-charcoal">Identity Confirmed</h2>
-            </div>
-            <p className="text-gray-500 mb-4 text-sm">
-              Welcome, <span className="font-semibold">{formData.firstName} {formData.lastName}</span> (Batch {formData.batchYear || identity.batchYear}). Now complete your registration.
-            </p>
+            {REQUIRE_ALUMNI_VERIFICATION ? (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <IdentificationIcon className="w-5 h-5 text-green-600" />
+                  <h2 className="text-xl font-bold text-ctu-charcoal">Identity Confirmed</h2>
+                </div>
+                <p className="text-gray-500 mb-4 text-sm">
+                  Welcome, <span className="font-semibold">{formData.firstName} {formData.lastName}</span> (Batch {formData.batchYear || identity.batchYear}). Now complete your registration.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl font-bold text-ctu-charcoal mb-2 flex items-center gap-3">
+                  Join the Community
+                </div>
+                <p className="text-gray-500 mb-6 text-sm">
+                  Create your account to connect with fellow CTU alumni, explore career opportunities, and more.
+                </p>
+              </>
+            )}
 
             <div className="space-y-4">
               {/* Row 1: Last Name & First Name */}
@@ -532,6 +548,7 @@ export default function RegisterPage() {
                     value={formData.lastName}
                     onChange={handleChange}
                     className={`input-field ${formErrors.lastName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    placeholder="e.g. Dela Cruz"
                     required
                   />
                 </div>
@@ -545,6 +562,7 @@ export default function RegisterPage() {
                     value={formData.firstName}
                     onChange={handleChange}
                     className={`input-field ${formErrors.firstName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    placeholder="e.g. Juan"
                     required
                   />
                 </div>
@@ -628,7 +646,7 @@ export default function RegisterPage() {
               {/* Row 4: Graduation Day */}
               <div>
                 <label className={`block text-sm font-medium mb-1.5 ${formErrors.graduationDate ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                  Graduation Day <span className="text-red-500">*</span>
+                  Graduation Day {REQUIRE_ALUMNI_VERIFICATION ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal">(Optional)</span>}
                 </label>
                 <input
                   type="date"
@@ -636,7 +654,7 @@ export default function RegisterPage() {
                   value={formData.graduationDate}
                   onChange={handleChange}
                   className={`input-field ${formErrors.graduationDate ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
-                  required
+                  required={REQUIRE_ALUMNI_VERIFICATION}
                 />
               </div>
 
@@ -708,13 +726,15 @@ export default function RegisterPage() {
               <button type="button" onClick={handleCreateAccount} disabled={loading} className="btn-primary w-full">
                 {loading ? 'Sending verification code...' : 'Continue'}
               </button>
-              <button
-                type="button"
-                onClick={() => { setStep('verify'); setFormErrors({}); }}
-                className="w-full text-sm text-gray-400 hover:text-ctu-blue transition-colors text-center"
-              >
-                ← Back to identity verification
-              </button>
+              {REQUIRE_ALUMNI_VERIFICATION && (
+                <button
+                  type="button"
+                  onClick={() => { setStep('verify'); setFormErrors({}); }}
+                  className="w-full text-sm text-gray-400 hover:text-ctu-blue transition-colors text-center"
+                >
+                  ← Back to identity verification
+                </button>
+              )}
             </div>
           </motion.div>
         ) : step === 'captcha' ? (
@@ -844,7 +864,7 @@ export default function RegisterPage() {
         )}
       </AnimatePresence>
 
-      {step === 'verify' && (
+      {(step === 'verify' || (!REQUIRE_ALUMNI_VERIFICATION && step === 'form')) && (
         <p className="mt-6 text-center text-sm text-gray-500">
           Already have an account?{' '}
           <Link to="/auth/login" className="text-ctu-blue font-medium hover:underline">Sign in</Link>
