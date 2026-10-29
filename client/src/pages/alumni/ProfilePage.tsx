@@ -177,10 +177,11 @@ export default function ProfilePage() {
       try {
         const records = await employmentApi.list();
         const current = records.find((r: any) => r.is_current);
-        if (current) {
+        const isNotEmployed = data?.employment_status && ['unemployed', 'seeking opportunities', 'retired', 'student'].includes(String(data.employment_status).toLowerCase());
+        if (current && !isNotEmployed) {
           currentJobType = current.job_type || '';
           if (!currentSalary && current.salary_range) currentSalary = current.salary_range;
-          if (data && !data.company_name && current.company_name) data.company_name = current.company_name;
+          if (data && !data.company_name && current.company_name && data.employment_status !== 'Self-employed') data.company_name = current.company_name;
           if (data && !data.current_job_title && current.position) data.current_job_title = current.position;
           if (data && !data.industry && current.company_industry) data.industry = current.company_industry;
           if (data && !data.employment_status && current.employment_status) data.employment_status = current.employment_status;
@@ -270,11 +271,13 @@ export default function ProfilePage() {
         else if (lower.includes('seeking')) status = 'Seeking Opportunities';
         else if (lower === 'retired') status = 'Retired';
 
+        const isNotEmployed = status === 'Unemployed' || status === 'Seeking Opportunities' || status === 'Retired';
+
         await profileApi.updateCareer({
           employment_status: status,
-          current_job_title: form.current_job_title || null,
-          company_name: form.company_name || null,
-          industry: form.industry || null,
+          current_job_title: isNotEmployed ? null : (form.current_job_title || null),
+          company_name: isNotEmployed ? null : (form.company_name || null),
+          industry: isNotEmployed ? null : (form.industry || null),
           salary_range: form.salary_range || null,
         });
       }
@@ -759,7 +762,15 @@ export default function ProfilePage() {
                         </label>
                         <select
                           value={form.employment_status || 'Unemployed'}
-                          onChange={(e) => setForm((prev: any) => ({ ...prev, employment_status: e.target.value }))}
+                          onChange={(e) => {
+                            const newStatus = e.target.value;
+                            const isNotEmployed = newStatus === 'Unemployed' || newStatus === 'Seeking Opportunities' || newStatus === 'Retired';
+                            setForm((prev: any) => ({
+                              ...prev,
+                              employment_status: newStatus,
+                              ...(isNotEmployed ? { current_job_title: '', company_name: '' } : {})
+                            }));
+                          }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
                         >
                           <option value="Unemployed">Unemployed / Seeking</option>
@@ -776,8 +787,9 @@ export default function ProfilePage() {
                         <input
                           value={form.current_job_title || ''}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, current_job_title: e.target.value }))}
-                          placeholder="e.g. Software Engineer, Teacher"
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
+                          placeholder={form.employment_status === 'Self-employed' ? 'e.g. Freelance Developer, Consultant' : (form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'N/A' : 'e.g. Software Engineer, Teacher'}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
                         />
                       </div>
                       <div>
@@ -787,8 +799,9 @@ export default function ProfilePage() {
                         <input
                           value={form.company_name || ''}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, company_name: e.target.value }))}
-                          placeholder="e.g. Google, Accenture, DepEd"
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
+                          placeholder={form.employment_status === 'Self-employed' ? 'e.g. Business Name or Client (Optional)' : (form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'N/A' : 'e.g. Google, Accenture, DepEd'}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
                         />
                       </div>
                       <div>
@@ -1738,12 +1751,34 @@ export default function ProfilePage() {
                   {programInfo}{batchInfo ? ` · Class of ${batchInfo}` : ''}
                 </p>
               )}
-              {currentEmp && (
-                <p className="text-sm text-white/90 mt-1 flex items-center gap-1.5">
-                  <BriefcaseIcon className="w-3.5 h-3.5 shrink-0" />
-                  {currentEmp.position}{currentEmp.company_name ? ` at ${currentEmp.company_name}` : ''}
-                </p>
-              )}
+              {(() => {
+                const status = (profile?.employment_status || '').toLowerCase();
+                const isNotEmployed = status === 'unemployed' || status === 'seeking opportunities' || status === 'retired' || status === 'student';
+                if (isNotEmployed) return null;
+
+                if (status === 'self-employed') {
+                  const jobTitle = profile?.current_job_title;
+                  const company = profile?.company_name;
+                  return (
+                    <p className="text-sm text-white/90 mt-1 flex items-center gap-1.5">
+                      <BriefcaseIcon className="w-3.5 h-3.5 shrink-0" />
+                      {jobTitle ? `${jobTitle} · Self-employed` : 'Self-employed / Freelance'}
+                      {company ? ` (${company})` : ''}
+                    </p>
+                  );
+                }
+
+                const position = profile?.current_job_title || currentEmp?.position;
+                const company = profile?.company_name || currentEmp?.company_name;
+                if (!position && !company) return null;
+
+                return (
+                  <p className="text-sm text-white/90 mt-1 flex items-center gap-1.5">
+                    <BriefcaseIcon className="w-3.5 h-3.5 shrink-0" />
+                    {position || 'Employed'}{company ? ` at ${company}` : ''}
+                  </p>
+                );
+              })()}
               {(profile?.city || profile?.province) && (
                 <p className="text-xs text-white/70 mt-1 flex items-center gap-1">
                   <MapPinIcon className="w-3 h-3" />
@@ -1853,23 +1888,58 @@ export default function ProfilePage() {
           {/* Current Employment */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <SectionLine label="Current Employment" />
-            {currentEmp || profile?.employment_status ? (
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="text-[11px] text-gray-500 block">Employment Status</span>
-                  <span className="font-medium text-gray-800">{((status) => status?.toLowerCase() === 'student' ? 'Unemployed' : status)(profile?.employment_status || currentEmp?.employment_status || 'Employed')}</span>
-                </div>
-                <InfoRow label="Position" value={currentEmp?.position || form.current_job_title} />
-                <InfoRow label="Company" value={currentEmp?.company_name || form.company_name} />
-                <InfoRow label="Industry" value={currentEmp?.company_industry || form.industry} />
-                <InfoRow label="Location" value={profile?.city ? `${profile.city}${profile.province ? `, ${profile.province}` : ''}` : ''} />
-                {currentEmp?.start_date && (
-                  <InfoRow label="Started" value={new Date(currentEmp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} />
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-black/50 font-light">No employment record yet.</p>
-            )}
+            {(() => {
+              const status = profile?.employment_status;
+              const statusLower = (status || '').toLowerCase();
+              const isNotEmployed = statusLower === 'unemployed' || statusLower === 'seeking opportunities' || statusLower === 'retired' || statusLower === 'student';
+
+              if (isNotEmployed) {
+                return (
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-[11px] text-gray-500 block">Employment Status</span>
+                      <span className="font-medium text-gray-800">{status || 'Unemployed'}</span>
+                    </div>
+                    <p className="text-xs text-black/50 font-light mt-1">Currently not employed or seeking opportunities.</p>
+                  </div>
+                );
+              }
+
+              if (statusLower === 'self-employed') {
+                return (
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-[11px] text-gray-500 block">Employment Status</span>
+                      <span className="font-medium text-gray-800">Self-employed / Freelance</span>
+                    </div>
+                    {profile?.current_job_title && <InfoRow label="Title / Role" value={profile.current_job_title} />}
+                    {profile?.company_name && <InfoRow label="Business / Freelance" value={profile.company_name} />}
+                    <InfoRow label="Industry" value={profile?.industry || currentEmp?.company_industry} />
+                    <InfoRow label="Location" value={profile?.city ? `${profile.city}${profile.province ? `, ${profile.province}` : ''}` : ''} />
+                  </div>
+                );
+              }
+
+              if (currentEmp || profile?.current_job_title || profile?.company_name || status) {
+                return (
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-[11px] text-gray-500 block">Employment Status</span>
+                      <span className="font-medium text-gray-800">{status || currentEmp?.employment_status || 'Employed'}</span>
+                    </div>
+                    <InfoRow label="Position" value={profile?.current_job_title || currentEmp?.position} />
+                    <InfoRow label="Company" value={profile?.company_name || currentEmp?.company_name} />
+                    <InfoRow label="Industry" value={profile?.industry || currentEmp?.company_industry} />
+                    <InfoRow label="Location" value={profile?.city ? `${profile.city}${profile.province ? `, ${profile.province}` : ''}` : ''} />
+                    {currentEmp?.start_date && (
+                      <InfoRow label="Started" value={new Date(currentEmp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} />
+                    )}
+                  </div>
+                );
+              }
+
+              return <p className="text-sm text-black/50 font-light">No employment record yet.</p>;
+            })()}
           </div>
         </div>
       </div>

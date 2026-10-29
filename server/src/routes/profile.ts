@@ -150,6 +150,14 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
     }
     updates.last_updated_at = new Date().toISOString();
 
+    if (updates.employment_status) {
+      const lowerStatus = updates.employment_status.toLowerCase();
+      if (lowerStatus === 'unemployed' || lowerStatus === 'seeking opportunities' || lowerStatus === 'retired') {
+        updates.current_job_title = null;
+        updates.company_name = null;
+      }
+    }
+
     const { data: profile, error } = await db
       .from('profiles')
       .update(updates)
@@ -158,6 +166,13 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
       .single();
 
     if (error) throw new AppError(error.message, 500);
+
+    if (updates.employment_status && profile) {
+      const lowerStatus = updates.employment_status.toLowerCase();
+      if (lowerStatus !== 'employed') {
+        await db.from('employment').update({ is_current: false }).eq('profile_id', profile.id).eq('is_current', true);
+      }
+    }
 
     const name = profile?.first_name || req.user!.email?.split('@')[0] || 'Someone';
     logActivity(name, 'updated their career info', `Status: ${updates.employment_status || 'unchanged'}`);
