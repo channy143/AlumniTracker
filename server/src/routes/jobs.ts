@@ -269,11 +269,11 @@ router.post('/:id/apply', authenticate, upload.single('resume'), validate(applyJ
         throw new AppError(validation.error || 'Invalid resume file', 400);
       }
       const fileName = `job-applications/${jobId}/${req.user!.userId}-${Date.now()}.${validation.ext}`;
-      const { error: uploadError } = await db.storage
+      const { error: uploadError } = await supabase.storage
         .from('resumes')
         .upload(fileName, req.file.buffer, { contentType: validation.mime, upsert: true });
       if (uploadError) throw new AppError(`Resume upload failed: ${uploadError.message}`, 500);
-      const { data: signedData, error: signedError } = await db.storage
+      const { data: signedData, error: signedError } = await supabase.storage
         .from('resumes')
         .createSignedUrl(fileName, 3600);
       if (signedError || !signedData?.signedUrl) throw new AppError('Failed to generate resume link', 500);

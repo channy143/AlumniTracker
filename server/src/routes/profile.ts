@@ -46,7 +46,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
         filePath = 'resumes/' + parts[parts.length - 1].split('?')[0];
       }
       try {
-        const { data: signedData } = await db.storage
+        const { data: signedData } = await supabase.storage
           .from('resumes')
           .createSignedUrl(filePath, 604800); // 7 days
         if (signedData?.signedUrl) {
@@ -83,7 +83,7 @@ router.get('/resume', authenticate, async (req: AuthenticatedRequest, res, next)
       filePath = 'resumes/' + parts[parts.length - 1].split('?')[0];
     }
 
-    const { data: signedData, error } = await db.storage
+    const { data: signedData, error } = await supabase.storage
       .from('resumes')
       .createSignedUrl(filePath, 3600);
 
@@ -238,7 +238,7 @@ router.post('/resume', authenticate, upload.single('resume'), async (req: Authen
     const db = createUserScopedClient(req.token!);
     const fileName = `resumes/${req.user!.userId}.${validation.ext}`;
 
-    const { error: uploadError } = await db.storage
+    const { error: uploadError } = await supabase.storage
       .from('resumes')
       .upload(fileName, req.file.buffer, {
         contentType: validation.mime,
@@ -249,7 +249,7 @@ router.post('/resume', authenticate, upload.single('resume'), async (req: Authen
       throw new AppError(`Storage upload failed: ${uploadError.message}`, 500);
     }
 
-    const { data: urlData, error: signedError } = await db.storage
+    const { data: urlData, error: signedError } = await supabase.storage
       .from('resumes')
       .createSignedUrl(fileName, 604800);
     if (signedError || !urlData?.signedUrl) {
@@ -273,7 +273,7 @@ router.delete('/resume', authenticate, async (req: AuthenticatedRequest, res, ne
   try {
     const db = createUserScopedClient(req.token!);
     const basePath = `resumes/${req.user!.userId}`;
-    await db.storage.from('resumes').remove([`${basePath}.pdf`, `${basePath}.doc`, `${basePath}.docx`]);
+    await supabase.storage.from('resumes').remove([`${basePath}.pdf`, `${basePath}.doc`, `${basePath}.docx`]);
 
     const { error: updateError } = await db
       .from('profiles')

@@ -459,6 +459,7 @@ export default function ProfilePage() {
       setError(err.message || 'Failed to upload resume');
     } finally {
       setUploadingResume(false);
+      e.target.value = '';
     }
   };
 

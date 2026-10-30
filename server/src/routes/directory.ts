@@ -326,7 +326,7 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
         filePath = 'resumes/' + parts[parts.length - 1].split('?')[0];
       }
       try {
-        const { data: signedData } = await db.storage
+        const { data: signedData } = await supabase.storage
           .from('resumes')
           .createSignedUrl(filePath, 604800);
         result.resume_url = signedData?.signedUrl || profile.resume_url;
@@ -386,7 +386,7 @@ router.get('/:id/resume', authenticate, async (req: AuthenticatedRequest, res, n
       filePath = 'resumes/' + parts[parts.length - 1].split('?')[0];
     }
 
-    const { data: signedData, error } = await db.storage
+    const { data: signedData, error } = await supabase.storage
       .from('resumes')
       .createSignedUrl(filePath, 3600);
 
