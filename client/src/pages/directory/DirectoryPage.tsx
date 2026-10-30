@@ -7,6 +7,7 @@ import {
   FunnelIcon,
   ChevronDownIcon,
   UserPlusIcon,
+  UserMinusIcon,
   CheckIcon,
   ClockIcon,
   XMarkIcon,
@@ -118,6 +119,7 @@ export default function DirectoryPage() {
     Record<string, { id: string; status: 'pending' | 'accepted' | 'declined'; requester_id: string; recipient_id: string }>
   >({});
   const [requestingMap, setRequestingMap] = useState<Record<string, boolean>>({});
+  const [openUnfriendId, setOpenUnfriendId] = useState<string | null>(null);
 
   useEffect(() => {
     profileApi.get().then((p) => { if (p?.id) setCurrentProfileId(p.id); }).catch(() => {});
@@ -367,17 +369,48 @@ export default function DirectoryPage() {
                 </div>
               </div>
 
-              {/* Action Button: Add / Cancel Connection (only for other alumni) */}
+              {/* Action Button: Add / Cancel / Unfriend Connection (only for other alumni) */}
               {!isMe && (
                 <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   {connectionsMap[profile.id]?.status === 'accepted' ? (
-                    <span
-                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-xs"
-                      title="Already connected"
-                    >
-                      <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Connected</span>
-                    </span>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenUnfriendId((prev) => (prev === profile.id ? null : profile.id))
+                        }
+                        disabled={requestingMap[profile.id]}
+                        className="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                        title="Click to manage connection"
+                      >
+                        <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{requestingMap[profile.id] ? 'Removing...' : 'Connected'}</span>
+                        <ChevronDownIcon className="w-3 h-3 text-emerald-600" />
+                      </button>
+
+                      {openUnfriendId === profile.id && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={() => setOpenUnfriendId(null)}
+                          />
+                          <div className="absolute right-0 mt-1.5 w-40 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-40">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenUnfriendId(null);
+                                handleCancelRequest(profile.id);
+                              }}
+                              disabled={requestingMap[profile.id]}
+                              className="w-full px-3 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
+                            >
+                              <UserMinusIcon className="w-4 h-4 text-red-500 shrink-0" />
+                              <span>Unfriend</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   ) : connectionsMap[profile.id]?.status === 'pending' ? (
                     currentProfileId && connectionsMap[profile.id]?.recipient_id === currentProfileId ? (
                       <div className="flex items-center gap-1.5">

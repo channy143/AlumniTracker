@@ -16,6 +16,8 @@ import {
   DocumentTextIcon,
   ChatBubbleLeftRightIcon,
   UserPlusIcon,
+  UserMinusIcon,
+  ChevronDownIcon,
   CheckIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
@@ -85,6 +87,7 @@ export default function DirectoryProfilePage() {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [postsLoaded, setPostsLoaded] = useState(false);
   const [connectionLoading, setConnectionLoading] = useState(false);
+  const [showUnfriendMenu, setShowUnfriendMenu] = useState(false);
 
   const handleConnect = async () => {
     if (!profile?.id || connectionLoading) return;
@@ -324,10 +327,42 @@ export default function DirectoryProfilePage() {
               <>
                 {profile.connection_status === 'accepted' ? (
                   <>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold shadow-xs">
-                      <CheckIcon className="w-4 h-4 text-emerald-600" />
-                      Connected
-                    </span>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowUnfriendMenu((v) => !v)}
+                        disabled={connectionLoading}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                        title="Click to manage connection"
+                      >
+                        <CheckIcon className="w-4 h-4 text-emerald-600" />
+                        <span>{connectionLoading ? 'Removing...' : 'Connected'}</span>
+                        <ChevronDownIcon className="w-3.5 h-3.5 text-emerald-600" />
+                      </button>
+
+                      {showUnfriendMenu && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={() => setShowUnfriendMenu(false)}
+                          />
+                          <div className="absolute right-0 mt-1.5 w-44 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-40">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowUnfriendMenu(false);
+                                handleCancelRequest();
+                              }}
+                              disabled={connectionLoading}
+                              className="w-full px-3 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
+                            >
+                              <UserMinusIcon className="w-4 h-4 text-red-500 shrink-0" />
+                              <span>Unfriend</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={handleMessage}
