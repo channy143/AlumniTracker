@@ -16,12 +16,16 @@ CREATE INDEX IF NOT EXISTS idx_otp_codes_expires_at ON public.otp_codes(expires_
 
 -- Purge expired OTPs periodically (called on write operations).
 CREATE OR REPLACE FUNCTION purge_expired_otps()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   DELETE FROM public.otp_codes WHERE expires_at < NOW();
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trigger_purge_expired_otps ON public.otp_codes;
 CREATE TRIGGER trigger_purge_expired_otps

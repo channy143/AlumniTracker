@@ -14,7 +14,10 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_status ON public.audit_logs(status);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at_desc ON public.audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_role ON public.audit_logs(actor_role);
 
--- 3. Sanitize existing legacy audit records (redact password hashes)
+-- 3. Temporarily drop immutability trigger so idempotent re-runs can sanitize legacy records
+DROP TRIGGER IF EXISTS trg_prevent_audit_tamper ON public.audit_logs;
+
+-- Sanitize existing legacy audit records (redact password hashes)
 UPDATE public.audit_logs
 SET details = (
   CASE 
@@ -36,8 +39,13 @@ SET details = (
 WHERE details ? 'old' AND details->'old' ? 'password_hash';
 
 -- 4. Secure the trigger function to automatically redact credentials and handle DELETE operations
-CREATE OR REPLACE FUNCTION log_audit()
-RETURNS TRIGGER AS $$
+-- Marked SECURITY DEFINER so row-level audit triggers invoked by authenticated users bypass audit_logs RLS.
+CREATE OR REPLACE FUNCTION public.log_audit()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   v_user_id UUID;
   v_old JSONB;
@@ -45,9 +53,12 @@ DECLARE
   v_entity_id UUID;
 BEGIN
   BEGIN
-    v_user_id := current_setting('app.current_user_id', TRUE)::UUID;
+    v_user_id := COALESCE(
+      NULLIF(current_setting('app.current_user_id', TRUE), '')::UUID,
+      auth.uid()
+    );
   EXCEPTION WHEN OTHERS THEN
-    v_user_id := NULL;
+    v_user_id := auth.uid();
   END;
 
   IF (TG_OP = 'DELETE') THEN
@@ -81,7 +92,7 @@ BEGIN
     RETURN NEW;
   END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- 5. Immutability Trigger: Prohibit direct UPDATE and DELETE on audit_logs
 CREATE OR REPLACE FUNCTION prevent_audit_tamper()

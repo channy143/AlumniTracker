@@ -24,6 +24,53 @@ if (!databaseUrl) {
 
 const pg = new Client({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
 
+function splitSqlStatements(sql) {
+  const statements = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDollarQuote = false;
+
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    const next = sql[i + 1];
+
+    if (!inSingleQuote && ch === '$' && next === '$') {
+      inDollarQuote = !inDollarQuote;
+      current += '$$';
+      i++;
+      continue;
+    }
+
+    if (!inDollarQuote && ch === "'") {
+      if (inSingleQuote && next === "'") {
+        current += "''";
+        i++;
+        continue;
+      }
+      inSingleQuote = !inSingleQuote;
+      current += ch;
+      continue;
+    }
+
+    if (!inSingleQuote && !inDollarQuote && ch === ';') {
+      const trimmed = current.trim();
+      if (trimmed.length > 0) {
+        statements.push(trimmed);
+      }
+      current = '';
+      continue;
+    }
+
+    current += ch;
+  }
+
+  const trimmed = current.trim();
+  if (trimmed.length > 0) {
+    statements.push(trimmed);
+  }
+  return statements;
+}
+
 async function runSqlFile(filePath, label) {
   try {
     const sql = readFileSync(filePath, 'utf8');
@@ -31,10 +78,7 @@ async function runSqlFile(filePath, label) {
     const cleaned = lines
       .filter(l => !l.trim().startsWith('--'))
       .join('\n');
-    const statements = cleaned
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
+    const statements = splitSqlStatements(cleaned);
     let applied = 0;
     for (const stmt of statements) {
       try {
@@ -88,6 +132,7 @@ async function main() {
     { path: './supabase/migration_alumni_onboarding_survey.sql', label: 'Alumni onboarding survey migration' },
     { path: './supabase/migration_trusted_devices.sql', label: 'Trusted devices migration' },
     { path: './supabase/migration_security_rules_rls.sql', label: 'Security rules and RLS policy migration' },
+    { path: './supabase/migration_secure_audit_logs.sql', label: 'Secure audit logs and immutability migration' },
     { path: './supabase/migration_fix_alumni_delete.sql', label: 'Fix alumni deletion and reference constraints migration' },
     { path: './supabase/migration_report_exports.sql', label: 'Report exports and audit trail migration' },
     { path: './supabase/migration_partnership_agreement.sql', label: 'Partnership agreement migration' },

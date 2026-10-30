@@ -5,20 +5,28 @@
 -- CREATE TABLE IF NOT EXISTS public.audit_logs (...);
 
 -- Create/Replace the log_audit() trigger function
-CREATE OR REPLACE FUNCTION log_audit()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.log_audit()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   INSERT INTO public.audit_logs (user_id, action, entity, entity_id, details)
   VALUES (
-    COALESCE(current_setting('app.current_user_id', TRUE)::UUID, NULL),
+    COALESCE(NULLIF(current_setting('app.current_user_id', TRUE), '')::UUID, auth.uid()),
     TG_ARGV[0],
     TG_TABLE_NAME,
-    NEW.id,
+    CASE WHEN TG_OP = 'DELETE' THEN OLD.id ELSE NEW.id END,
     jsonb_build_object('old', to_jsonb(OLD), 'new', to_jsonb(NEW))
   );
-  RETURN NEW;
+  IF (TG_OP = 'DELETE') THEN
+    RETURN OLD;
+  ELSE
+    RETURN NEW;
+  END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger for users table
 DROP TRIGGER IF EXISTS trigger_audit_users ON public.users;

@@ -385,20 +385,28 @@ CREATE TABLE IF NOT EXISTS public.settings (
 );
 
 -- AUDIT LOG TRIGGER FUNCTION
-CREATE OR REPLACE FUNCTION log_audit()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.log_audit()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   INSERT INTO public.audit_logs (user_id, action, entity, entity_id, details)
   VALUES (
-    COALESCE(current_setting('app.current_user_id', TRUE)::UUID, NULL),
+    COALESCE(NULLIF(current_setting('app.current_user_id', TRUE), '')::UUID, auth.uid()),
     TG_ARGV[0],
     TG_TABLE_NAME,
-    NEW.id,
+    CASE WHEN TG_OP = 'DELETE' THEN OLD.id ELSE NEW.id END,
     jsonb_build_object('old', to_jsonb(OLD), 'new', to_jsonb(NEW))
   );
-  RETURN NEW;
+  IF (TG_OP = 'DELETE') THEN
+    RETURN OLD;
+  ELSE
+    RETURN NEW;
+  END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- REPORT EXPORTS TABLE (Governed by Rule 5 and RA 10173)
 CREATE TABLE IF NOT EXISTS public.report_exports (

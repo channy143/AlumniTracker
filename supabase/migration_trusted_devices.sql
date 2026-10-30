@@ -14,12 +14,16 @@ CREATE INDEX IF NOT EXISTS idx_user_trusted_devices_expires_at ON public.user_tr
 
 -- Purge expired devices periodically on insert
 CREATE OR REPLACE FUNCTION purge_expired_trusted_devices()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   DELETE FROM public.user_trusted_devices WHERE expires_at < NOW();
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trigger_purge_expired_trusted_devices ON public.user_trusted_devices;
 CREATE TRIGGER trigger_purge_expired_trusted_devices

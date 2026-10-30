@@ -10,7 +10,11 @@ CREATE INDEX IF NOT EXISTS idx_forum_posts_group_id ON public.forum_posts(group_
 
 -- Trigger function to update member_count
 CREATE OR REPLACE FUNCTION update_community_group_member_count()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     UPDATE public.community_groups
@@ -25,7 +29,7 @@ BEGIN
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger for group_members
 DROP TRIGGER IF EXISTS trigger_update_member_count ON public.group_members;
@@ -35,7 +39,11 @@ FOR EACH ROW EXECUTE FUNCTION update_community_group_member_count();
 
 -- Trigger function to update post_count
 CREATE OR REPLACE FUNCTION update_community_group_post_count()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     UPDATE public.community_groups
@@ -50,7 +58,7 @@ BEGIN
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger for forum_posts
 DROP TRIGGER IF EXISTS trigger_update_post_count ON public.forum_posts;

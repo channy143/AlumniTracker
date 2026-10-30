@@ -153,6 +153,8 @@ CREATE POLICY "Users can delete own achievements"
 ALTER TABLE public.career_feedback ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Career feedback viewable by owner and admin" ON public.career_feedback;
 DROP POLICY IF EXISTS "Users can manage own career feedback" ON public.career_feedback;
+DROP POLICY IF EXISTS "Users can insert own career feedback" ON public.career_feedback;
+DROP POLICY IF EXISTS "Users can update own career feedback" ON public.career_feedback;
 
 CREATE POLICY "Career feedback viewable by owner and admin"
   ON public.career_feedback FOR SELECT
@@ -492,12 +494,16 @@ CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires_at ON public.revoked_token
 
 -- Auto-purge expired revoked tokens
 CREATE OR REPLACE FUNCTION public.purge_expired_revoked_tokens()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   DELETE FROM public.revoked_tokens WHERE expires_at < NOW();
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_purge_expired_revoked_tokens ON public.revoked_tokens;
 CREATE TRIGGER trg_purge_expired_revoked_tokens
@@ -544,6 +550,7 @@ ALTER TABLE public.security_incidents ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can report security incidents" ON public.security_incidents;
 DROP POLICY IF EXISTS "Users can view own reported incidents" ON public.security_incidents;
 DROP POLICY IF EXISTS "Admins can view and manage all security incidents" ON public.security_incidents;
+DROP POLICY IF EXISTS "Admins can manage security incidents" ON public.security_incidents;
 
 -- Authenticated users can insert their own reports
 CREATE POLICY "Users can report security incidents"
