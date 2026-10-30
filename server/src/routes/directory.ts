@@ -77,8 +77,7 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
           'BSIT': ['BSIT', 'BS Information Technology', 'Bachelor of Science in Information Technology'],
           'BEEd': ['BEEd', 'Bachelor of Elementary Education'],
           'BSEd-Math': ['BSEd-Math', 'BSEd Math', 'Bachelor of Secondary Education'],
-          'BTLED-HE': ['BTLED-HE', 'BTLED HE', 'Bachelor of Technology and Livelihood Education'],
-          'BTLED-ICT': ['BTLED-ICT', 'BTLED ICT', 'Bachelor of Technology and Livelihood Education'],
+          'BTLED': ['BTLED', 'BTLED HE', 'BTLED ICT', 'BTLED-HE', 'BTLED-ICT', 'Bachelor of Technology and Livelihood Education'],
           'BIT': ['BIT', 'Bachelor of Industrial Technology'],
         };
         const programs = program.split(',').map(s => s.trim()).filter(Boolean);

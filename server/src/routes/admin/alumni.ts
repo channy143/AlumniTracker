@@ -73,8 +73,7 @@ router.get('/', async (req, res, next) => {
             'BIT': ['BIT', 'Bachelor in Industrial Technology'],
             'BEEd': ['BEEd', 'Bachelor of Elementary Education'],
             'BSEd-Math': ['BSEd-Math', 'Bachelor of Secondary Education', 'Bachelor of Secondary Education major in Mathematics'],
-            'BTLED-HE': ['BTLED-HE', 'Bachelor of Technology and Livelihood Education major in Home Economics'],
-            'BTLED-ICT': ['BTLED-ICT', 'Bachelor of Technology and Livelihood Education major in Information and Communications Technology'],
+            'BTLED': ['BTLED', 'Bachelor of Technology and Livelihood Education', 'BTLED-HE', 'BTLED-ICT'],
           };
           const matchKey = Object.keys(courseAliases).find((k) => k.toLowerCase() === course.toLowerCase()) || course;
           const aliases = courseAliases[matchKey] || [sanitizeFilterInput(course)];

@@ -377,7 +377,7 @@ CTU-NAGA ALUMNI CONNECT ECOSYSTEM
 #### FR-REPT-02: Universal Institutional Filtering Toolbar
 - **Actor:** ACT-01
 - **Description:** Global filtering system updating both live data previews and exported files simultaneously:
-  - By Academic Degree Program (`BSIT`, `BIT`, `BEEd`, `BSEd-Math`, `BTLED-HE`, `BTLED-ICT`, etc.)
+  - By Academic Degree Program (`BSIT`, `BIT`, `BEEd`, `BSEd-Math`, `BTLED`, etc.)
   - By Graduation Batch Year (`2014` to `2026`, or All)
   - By Employment Status (`Employed`, `Unemployed`, `Self-Employed`, `Seeking`, etc.)
 

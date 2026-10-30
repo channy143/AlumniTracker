@@ -74,13 +74,13 @@ const PROGRAM_MAP: Record<string, string> = {
   'bsedvalues': 'Bachelor of Secondary Education major in Values Education',
   'bsedve': 'Bachelor of Secondary Education major in Values Education',
   'btled': 'Bachelor of Technology and Livelihood Education',
-  'btledhe': 'Bachelor of Technology and Livelihood Education major in Home Economics',
-  'btledhomeeconomics': 'Bachelor of Technology and Livelihood Education major in Home Economics',
-  'btledict': 'Bachelor of Technology and Livelihood Education major in Information and Communications Technology',
-  'btledia': 'Bachelor of Technology and Livelihood Education major in Industrial Arts',
-  'btledindustrialarts': 'Bachelor of Technology and Livelihood Education major in Industrial Arts',
-  'btledafa': 'Bachelor of Technology and Livelihood Education major in Agri-Fishery Arts',
-  'btledagri': 'Bachelor of Technology and Livelihood Education major in Agri-Fishery Arts',
+  'btledhe': 'Bachelor of Technology and Livelihood Education',
+  'btledhomeeconomics': 'Bachelor of Technology and Livelihood Education',
+  'btledict': 'Bachelor of Technology and Livelihood Education',
+  'btledia': 'Bachelor of Technology and Livelihood Education',
+  'btledindustrialarts': 'Bachelor of Technology and Livelihood Education',
+  'btledafa': 'Bachelor of Technology and Livelihood Education',
+  'btledagri': 'Bachelor of Technology and Livelihood Education',
   'bped': 'Bachelor of Physical Education',
   'sned': 'Bachelor of Special Needs Education',
   'dpe': 'Diploma in Professional Education',
@@ -245,17 +245,8 @@ export function formatProgramLongName(rawProgram: string | null | undefined): st
   if (/^bsed[\s\-_/]+(soc|social|socialstudies)/i.test(trimmed)) {
     return 'Bachelor of Secondary Education major in Social Studies' + batchSuffix;
   }
-  if (/^btled[\s\-_/]+(he|homeeconomics)/i.test(trimmed)) {
-    return 'Bachelor of Technology and Livelihood Education major in Home Economics' + batchSuffix;
-  }
-  if (/^btled[\s\-_/]+ict/i.test(trimmed)) {
-    return 'Bachelor of Technology and Livelihood Education major in Information and Communications Technology' + batchSuffix;
-  }
-  if (/^btled[\s\-_/]+(ia|industrialarts)/i.test(trimmed)) {
-    return 'Bachelor of Technology and Livelihood Education major in Industrial Arts' + batchSuffix;
-  }
-  if (/^btled[\s\-_/]+(afa|agri|agrifishery)/i.test(trimmed)) {
-    return 'Bachelor of Technology and Livelihood Education major in Agri-Fishery Arts' + batchSuffix;
+  if (/^btled/i.test(trimmed)) {
+    return 'Bachelor of Technology and Livelihood Education' + batchSuffix;
   }
   if (/^bsba[\s\-_/]+(fm|finance|financial)/i.test(trimmed)) {
     return 'Bachelor of Science in Business Administration major in Financial Management' + batchSuffix;

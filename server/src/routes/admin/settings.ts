@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = {
   primary_color: '#003366',
   secondary_color: '#D4AF37',
   academic_year_start: 2014,
-  courses: ['BEEd', 'BSEd-Math', 'BTLED-HE', 'BTLED-ICT', 'BIT', 'BSIT'],
+  courses: ['BEEd', 'BSEd-Math', 'BTLED', 'BIT', 'BSIT'],
   colleges: ['College of Education', 'College of Technology'],
   employment_types: ['full-time', 'part-time', 'contract', 'freelance', 'internship'],
   industries: ['Technology', 'Education', 'Healthcare', 'Finance', 'Manufacturing', 'Retail', 'Construction', 'Government'],

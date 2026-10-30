@@ -260,8 +260,7 @@ export default function AlumniManagement() {
     if (normalized.includes('bit') || normalized.includes('bachelor in industrial technology')) return 'BIT';
     if (normalized.includes('beed') || normalized.includes('bachelor of elementary education')) return 'BEEd';
     if (normalized.includes('bsed') || normalized.includes('bachelor of secondary education')) return 'BSEd-Math';
-    if (normalized.includes('btled-he') || normalized.includes('home economics')) return 'BTLED-HE';
-    if (normalized.includes('btled-ict') || normalized.includes('information and communications technology') || normalized.includes('ict')) return 'BTLED-ICT';
+    if (normalized.includes('btled') || normalized.includes('technology and livelihood education') || normalized.includes('home economics')) return 'BTLED';
     return name;
   };
 
@@ -309,7 +308,7 @@ export default function AlumniManagement() {
         <select value={filters.course} onChange={(e) => { setFilters((f) => ({ ...f, course: e.target.value })); setPage(1); setEligPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="">All Courses</option>
-          {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED-HE', 'BTLED-ICT'].map((o) => <option key={o} value={o}>{o}</option>)}
+          {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED'].map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
         <select value={filters.year} onChange={(e) => { setFilters((f) => ({ ...f, year: e.target.value })); setPage(1); setEligPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
@@ -718,7 +717,7 @@ export default function AlumniManagement() {
                       <div><label className="text-gray-500 block mb-0.5">Course</label>
                         <select value={editForm.program} onChange={(e) => setEditForm((f: any) => ({ ...f, program: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs">
                           <option value="">Select</option>
-                          {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED-HE', 'BTLED-ICT'].map((o) => <option key={o} value={o}>{o}</option>)}
+                          {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED'].map((o) => <option key={o} value={o}>{o}</option>)}
                         </select>
                       </div>
                       <div><label className="text-gray-500 block mb-0.5">Year Graduated</label><input type="number" value={editForm.year_graduated} onChange={(e) => setEditForm((f: any) => ({ ...f, year_graduated: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" min={2014} /></div>
@@ -799,8 +798,7 @@ export default function AlumniManagement() {
                       <option value="BIT">BIT</option>
                       <option value="BEEd">BEEd</option>
                       <option value="BSEd-Math">BSEd-Math</option>
-                      <option value="BTLED-HE">BTLED-HE</option>
-                      <option value="BTLED-ICT">BTLED-ICT</option>
+                      <option value="BTLED">BTLED</option>
                     </select>
                   </div>
                   <div>
@@ -894,8 +892,7 @@ export default function AlumniManagement() {
                       <option value="BIT">BIT</option>
                       <option value="BEEd">BEEd</option>
                       <option value="BSEd-Math">BSEd-Math</option>
-                      <option value="BTLED-HE">BTLED-HE</option>
-                      <option value="BTLED-ICT">BTLED-ICT</option>
+                      <option value="BTLED">BTLED</option>
                     </select>
                   </div>
                   <div>

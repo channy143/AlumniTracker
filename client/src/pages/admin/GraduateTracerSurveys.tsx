@@ -440,7 +440,7 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
                     <select value={form.target_value} onChange={(e) => setForm({ ...form, target_value: e.target.value })}
                       className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
                       <option value="">Select course</option>
-                      {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED-HE', 'BTLED-ICT'].map((c) => <option key={c} value={c}>{c}</option>)}
+                      {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED'].map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                 )}

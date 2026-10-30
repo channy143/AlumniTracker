@@ -741,8 +741,7 @@ export default function ReportsPage() {
                   <option value="BIT">BS Industrial Technology (BIT)</option>
                   <option value="BEEd">Bachelor of Elementary Education (BEEd)</option>
                   <option value="BSEd-Math">BSEd - Mathematics</option>
-                  <option value="BTLED-HE">BTLED - Home Economics</option>
-                  <option value="BTLED-ICT">BTLED - Information &amp; Comms</option>
+                  <option value="BTLED">Bachelor of Technology and Livelihood Education (BTLED)</option>
                 </select>
 
                 {/* Graduation Batch Year Filter */}

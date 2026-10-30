@@ -15,7 +15,7 @@ function getProgram(fileName) {
   if (f.includes('BEED')) return 'BEEd';
   if (f.includes('BIT')) return 'BIT';
   if (f.includes('BSED')) return 'BSEd-Math';
-  if (f.includes('BTLED')) return 'BTLED-HE';
+  if (f.includes('BTLED')) return 'BTLED';
   return 'BSIT';
 }
 

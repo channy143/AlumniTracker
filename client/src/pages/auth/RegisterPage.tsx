@@ -179,7 +179,7 @@ export default function RegisterPage() {
           graduationDate: idy.graduationDate || identity.graduationDate,
           batchYear: idy.batchYear || idy.yearGraduated || identity.batchYear,
           yearGraduated: idy.yearGraduated || idy.batchYear || identity.batchYear,
-          program: idy.program || prev.program,
+          program: idy.program ? (/^btled/i.test(idy.program) ? 'BTLED' : idy.program) : prev.program,
         }));
         setIdentity((prev) => ({
           ...prev,
@@ -615,8 +615,7 @@ export default function RegisterPage() {
                     <option value="">Select degree</option>
                     <option value="BEEd">BEEd</option>
                     <option value="BSEd-Math">BSEd-Math</option>
-                    <option value="BTLED-HE">BTLED-HE</option>
-                    <option value="BTLED-ICT">BTLED-ICT</option>
+                    <option value="BTLED">BTLED</option>
                     <option value="BIT">BIT</option>
                     <option value="BSIT">BSIT</option>
                   </select>
