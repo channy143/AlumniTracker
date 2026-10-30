@@ -55,13 +55,44 @@ router.post('/request', authenticate, validate(connectionRequestSchema), async (
     const finalRecipientId = targetProfile ? targetProfile.id : targetParam;
     if (profile.id === finalRecipientId) throw new AppError('Cannot connect with yourself', 400);
 
-    const { data, error } = await db
+    // Check if a connection record already exists between the two profiles
+    const { data: existingConn } = await db
       .from('connections')
-      .insert({ requester_id: profile.id, recipient_id: finalRecipientId, message: message || null })
-      .select()
-      .single();
-    if (error && error.code === '23505') throw new AppError('Connection request already exists', 400);
-    if (error) throw new AppError(error.message, 500);
+      .select('id, status')
+      .or(`and(requester_id.eq.${profile.id},recipient_id.eq.${finalRecipientId}),and(requester_id.eq.${finalRecipientId},recipient_id.eq.${profile.id})`)
+      .maybeSingle();
+
+    let data: any = null;
+    if (existingConn) {
+      if (existingConn.status === 'declined') {
+        const { data: updated, error: updateErr } = await db
+          .from('connections')
+          .update({
+            requester_id: profile.id,
+            recipient_id: finalRecipientId,
+            status: 'pending',
+            message: message || null,
+            created_at: new Date().toISOString(),
+            connected_at: null,
+          })
+          .eq('id', existingConn.id)
+          .select('*, requester:profiles!connections_requester_id_fkey(id, first_name, last_name, avatar_url, headline), recipient:profiles!connections_recipient_id_fkey(id, first_name, last_name, avatar_url, headline)')
+          .single();
+        if (updateErr) throw new AppError(updateErr.message, 500);
+        data = updated;
+      } else {
+        throw new AppError('Connection request already exists', 400);
+      }
+    } else {
+      const { data: inserted, error } = await db
+        .from('connections')
+        .insert({ requester_id: profile.id, recipient_id: finalRecipientId, message: message || null })
+        .select('*, requester:profiles!connections_requester_id_fkey(id, first_name, last_name, avatar_url, headline), recipient:profiles!connections_recipient_id_fkey(id, first_name, last_name, avatar_url, headline)')
+        .single();
+      if (error && error.code === '23505') throw new AppError('Connection request already exists', 400);
+      if (error) throw new AppError(error.message, 500);
+      data = inserted;
+    }
 
     // Create notification for the added alumnus
     let targetUserId = targetProfile?.user_id;
@@ -151,17 +182,29 @@ router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res, next)
       .single();
     if (!profile) throw new AppError('Profile not found', 404);
 
-    const { data: connection } = await db
+    let { data: connection } = await db
       .from('connections')
       .select('*')
       .eq('id', req.params.id)
-      .single();
+      .maybeSingle();
+
+    // Fallback: allow canceling/removing by the other alumnus's profile ID
+    if (!connection) {
+      const { data: byPeer } = await db
+        .from('connections')
+        .select('*')
+        .or(`and(requester_id.eq.${profile.id},recipient_id.eq.${req.params.id}),and(requester_id.eq.${req.params.id},recipient_id.eq.${profile.id})`)
+        .maybeSingle();
+      connection = byPeer;
+    }
+
     if (!connection) throw new AppError('Connection not found', 404);
     if (connection.requester_id !== profile.id && connection.recipient_id !== profile.id) {
       throw new AppError('Not authorized', 403);
     }
-    await db.from('connections').delete().eq('id', req.params.id);
-    res.json({ message: 'Connection removed' });
+    const { error: deleteErr } = await db.from('connections').delete().eq('id', connection.id);
+    if (deleteErr) throw new AppError(deleteErr.message, 500);
+    res.json({ message: 'Connection removed', id: connection.id });
   } catch (err) { next(err); }
 });
 

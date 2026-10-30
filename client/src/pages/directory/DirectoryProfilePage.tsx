@@ -15,9 +15,13 @@ import {
   UserGroupIcon,
   DocumentTextIcon,
   ChatBubbleLeftRightIcon,
+  UserPlusIcon,
+  CheckIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { directoryApi, feedApi } from '@/services/api';
+import { directoryApi, feedApi, connectionsApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { useChatStore } from '@/store/chatStore';
 import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
@@ -80,6 +84,83 @@ export default function DirectoryProfilePage() {
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [postsLoaded, setPostsLoaded] = useState(false);
+  const [connectionLoading, setConnectionLoading] = useState(false);
+
+  const handleConnect = async () => {
+    if (!profile?.id || connectionLoading) return;
+    setConnectionLoading(true);
+    try {
+      const created = await connectionsApi.request(profile.id);
+      setProfile((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              connection_status: 'pending',
+              connection_id: created?.id || prev.id,
+              connection_is_requester: true,
+            }
+          : prev
+      );
+    } catch (err: any) {
+      alert(err.message || 'Connection request failed or already exists.');
+    } finally {
+      setConnectionLoading(false);
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    if (!profile?.id || connectionLoading) return;
+    const targetId = profile.connection_id || profile.id;
+    setConnectionLoading(true);
+    try {
+      await connectionsApi.remove(targetId);
+      setProfile((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              connection_status: null,
+              connection_id: null,
+              connection_is_requester: false,
+            }
+          : prev
+      );
+    } catch (err: any) {
+      alert(err.message || 'Failed to cancel connection request.');
+    } finally {
+      setConnectionLoading(false);
+    }
+  };
+
+  const handleRespondRequest = async (status: 'accepted' | 'declined') => {
+    if (!profile?.connection_id || connectionLoading) return;
+    setConnectionLoading(true);
+    try {
+      await connectionsApi.respond(profile.connection_id, status);
+      setProfile((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              connection_status: status === 'accepted' ? 'accepted' : null,
+              connection_id: status === 'accepted' ? prev.connection_id : null,
+            }
+          : prev
+      );
+    } catch (err: any) {
+      alert(err.message || 'Failed to respond to connection request.');
+    } finally {
+      setConnectionLoading(false);
+    }
+  };
+
+  const handleMessage = () => {
+    if (!profile?.id) return;
+    useChatStore.getState().openChat({
+      profileId: profile.id,
+      name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Alumnus',
+      avatar: profile.avatar_url,
+      headline: profile.headline,
+    });
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -240,13 +321,72 @@ export default function DirectoryProfilePage() {
               </a>
             )}
             {currentUser?.id !== profile.user_id && (
-              <button
-                onClick={() => navigate('/connections')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer"
-              >
-                <ChatBubbleLeftRightIcon className="w-4 h-4 text-gray-500" />
-                Connect & Message
-              </button>
+              <>
+                {profile.connection_status === 'accepted' ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold shadow-xs">
+                      <CheckIcon className="w-4 h-4 text-emerald-600" />
+                      Connected
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleMessage}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+                    >
+                      <ChatBubbleLeftRightIcon className="w-4 h-4 text-blue-600" />
+                      Message
+                    </button>
+                  </>
+                ) : profile.connection_status === 'pending' ? (
+                  profile.connection_is_requester === false ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleRespondRequest('accepted')}
+                        disabled={connectionLoading}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                      >
+                        <CheckIcon className="w-4 h-4" />
+                        Confirm Request
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRespondRequest('declined')}
+                        disabled={connectionLoading}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        Decline
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-semibold">
+                        <ClockIcon className="w-4 h-4" />
+                        Requested
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCancelRequest}
+                        disabled={connectionLoading}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                        {connectionLoading ? 'Canceling...' : 'Cancel Request'}
+                      </button>
+                    </>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleConnect}
+                    disabled={connectionLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <UserPlusIcon className="w-4 h-4" />
+                    {connectionLoading ? 'Connecting...' : 'Add Connection'}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

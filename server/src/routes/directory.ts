@@ -355,11 +355,12 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       const sanitizedId = sanitizeFilterInput(req.params.id);
       const { data: connectionStatus } = await db
         .from('connections')
-        .select('id, status')
+        .select('id, status, requester_id, recipient_id')
         .or(`and(requester_id.eq.${currentProfile.id},recipient_id.eq.${sanitizedId}),and(requester_id.eq.${sanitizedId},recipient_id.eq.${currentProfile.id})`)
         .maybeSingle();
       result.connection_status = connectionStatus?.status || null;
       result.connection_id = connectionStatus?.id || null;
+      result.connection_is_requester = connectionStatus ? connectionStatus.requester_id === currentProfile.id : false;
     }
 
     res.json(result);

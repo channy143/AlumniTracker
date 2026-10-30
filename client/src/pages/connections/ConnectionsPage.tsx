@@ -124,7 +124,8 @@ export default function ConnectionsPage() {
     setActionLoadingMap((prev) => ({ ...prev, [recipientId]: true }));
     try {
       await connectionsApi.request(recipientId);
-      await fetchConnections();
+      const connData = await connectionsApi.list();
+      setConnections(connData || []);
     } catch (err: any) {
       alert(err.message || 'Connection request failed or already exists.');
     } finally {
@@ -659,8 +660,8 @@ export default function ConnectionsPage() {
                 {suggestions.slice(0, 6).map((s) => {
                   const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Alumnus';
                   const initials = ((s.first_name?.[0] || '') + (s.last_name?.[0] || '')) || 'A';
-                  const isBusy = !!actionLoadingMap[s.id];
-                  const alreadySent = sentRequests.some((c) => c.recipient_id === s.id);
+                  const sentReq = sentRequests.find((c) => c.recipient_id === s.id);
+                  const isBusy = !!(actionLoadingMap[s.id] || (sentReq && actionLoadingMap[sentReq.id]));
 
                   return (
                     <div key={s.id} className="flex items-center justify-between gap-2.5">
@@ -684,10 +685,15 @@ export default function ConnectionsPage() {
                         </div>
                       </div>
 
-                      {alreadySent ? (
-                        <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md shrink-0">
-                          Sent
-                        </span>
+                      {sentReq ? (
+                        <button
+                          onClick={() => handleCancelOrRemove(sentReq.id)}
+                          disabled={isBusy}
+                          className="px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-all shrink-0 cursor-pointer disabled:opacity-50"
+                          title="Cancel connection request"
+                        >
+                          {isBusy ? 'Canceling...' : 'Cancel Request'}
+                        </button>
                       ) : (
                         <button
                           onClick={() => handleConnect(s.id)}

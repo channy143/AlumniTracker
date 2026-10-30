@@ -756,7 +756,7 @@ export default function DockedChatBox() {
           ) : (
             /* VIEW: Message List */
             <>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gradient-to-b from-gray-50/50 to-white">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2 bg-gradient-to-b from-gray-50/50 to-white">
                 {messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-4">
                     <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-xl font-bold mb-2 shadow-inner">
@@ -802,7 +802,7 @@ export default function DockedChatBox() {
                           key={m.id}
                           className={`w-full flex justify-end transition-opacity duration-150 ${isPending ? 'opacity-90' : 'opacity-100'}`}
                         >
-                          <div className="flex flex-col items-end max-w-[80%]">
+                          <div className="flex flex-col items-end max-w-[80%] min-w-0">
                             {emojiOnly ? (
                               <div
                                 className="text-3xl sm:text-4xl py-0.5 px-1 select-none animate-emoji-pop text-right"
@@ -812,7 +812,7 @@ export default function DockedChatBox() {
                               </div>
                             ) : (
                               <div
-                                className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed break-words bg-orange-600 text-white rounded-br-xs shadow-xs ${
+                                className={`max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed break-words [overflow-wrap:anywhere] whitespace-pre-wrap bg-orange-600 text-white rounded-br-xs shadow-xs ${
                                   isFailed ? 'border border-red-400 bg-red-600 text-white' : ''
                                 }`}
                               >
@@ -840,7 +840,7 @@ export default function DockedChatBox() {
                         key={m.id}
                         className="w-full flex justify-start transition-opacity duration-150"
                       >
-                        <div className="flex items-start gap-2 max-w-[85%]">
+                        <div className="flex items-start gap-2 max-w-[85%] min-w-0">
                           {/* Profile Picture Icon */}
                           <div className="relative shrink-0 mt-0.5" title={senderName}>
                             {senderAvatar ? (
@@ -857,9 +857,9 @@ export default function DockedChatBox() {
                           </div>
 
                           {/* Message Content & Sender Info */}
-                          <div className="flex flex-col items-start min-w-0">
+                          <div className="flex flex-col items-start min-w-0 max-w-full">
                             {/* Sender Name */}
-                            <span className="text-[11px] font-semibold text-gray-700 mb-0.5 ml-1 select-none">
+                            <span className="text-[11px] font-semibold text-gray-700 mb-0.5 ml-1 select-none truncate max-w-full">
                               {senderName}
                             </span>
 
@@ -872,7 +872,7 @@ export default function DockedChatBox() {
                                 {m.body}
                               </div>
                             ) : (
-                              <div className="px-3.5 py-2 rounded-2xl text-sm leading-relaxed bg-gray-200/90 text-gray-900 rounded-tl-xs break-words shadow-2xs">
+                              <div className="max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed bg-gray-200/90 text-gray-900 rounded-tl-xs break-words [overflow-wrap:anywhere] whitespace-pre-wrap shadow-2xs">
                                 {m.body}
                               </div>
                             )}

@@ -8,6 +8,8 @@ import {
   ChevronDownIcon,
   UserPlusIcon,
   CheckIcon,
+  ClockIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { directoryApi, connectionsApi, profileApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
@@ -112,7 +114,9 @@ export default function DirectoryPage() {
   const [batchOptions, setBatchOptions] = useState<string[]>([]);
   const employmentStatusOptions = ['Employed', 'Self-employed', 'Unemployed', 'Seeking Opportunities', 'Retired'];
 
-  const [connectionsMap, setConnectionsMap] = useState<Record<string, 'pending' | 'accepted'>>({});
+  const [connectionsMap, setConnectionsMap] = useState<
+    Record<string, { id: string; status: 'pending' | 'accepted' | 'declined'; requester_id: string; recipient_id: string }>
+  >({});
   const [requestingMap, setRequestingMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -121,12 +125,19 @@ export default function DirectoryPage() {
     directoryApi.programs().then(setProgramOptions).catch(() => {});
     connectionsApi.list().then((conns: any[]) => {
       if (Array.isArray(conns)) {
-        const map: Record<string, 'pending' | 'accepted'> = {};
+        const map: Record<string, { id: string; status: 'pending' | 'accepted' | 'declined'; requester_id: string; recipient_id: string }> = {};
         conns.forEach((c) => {
-          if (c.recipient_id) map[c.recipient_id] = c.status;
-          if (c.requester_id) map[c.requester_id] = c.status;
-          if (c.recipient?.id) map[c.recipient.id] = c.status;
-          if (c.requester?.id) map[c.requester.id] = c.status;
+          if (c.status === 'declined') return;
+          const entry = {
+            id: c.id,
+            status: c.status,
+            requester_id: c.requester_id || c.requester?.id,
+            recipient_id: c.recipient_id || c.recipient?.id,
+          };
+          if (c.recipient_id) map[c.recipient_id] = entry;
+          if (c.requester_id) map[c.requester_id] = entry;
+          if (c.recipient?.id) map[c.recipient.id] = entry;
+          if (c.requester?.id) map[c.requester.id] = entry;
         });
         setConnectionsMap(map);
       }
@@ -136,10 +147,58 @@ export default function DirectoryPage() {
   const handleConnect = async (profileId: string) => {
     setRequestingMap((prev) => ({ ...prev, [profileId]: true }));
     try {
-      await connectionsApi.request(profileId);
-      setConnectionsMap((prev) => ({ ...prev, [profileId]: 'pending' }));
+      const created = await connectionsApi.request(profileId);
+      setConnectionsMap((prev) => ({
+        ...prev,
+        [profileId]: {
+          id: created?.id || profileId,
+          status: 'pending',
+          requester_id: created?.requester_id || currentProfileId || '',
+          recipient_id: profileId,
+        },
+      }));
     } catch (err: any) {
       alert(err.message || 'Connection request already exists or failed.');
+    } finally {
+      setRequestingMap((prev) => ({ ...prev, [profileId]: false }));
+    }
+  };
+
+  const handleCancelRequest = async (profileId: string) => {
+    const conn = connectionsMap[profileId];
+    const targetId = conn?.id || profileId;
+    setRequestingMap((prev) => ({ ...prev, [profileId]: true }));
+    try {
+      await connectionsApi.remove(targetId);
+      setConnectionsMap((prev) => {
+        const next = { ...prev };
+        delete next[profileId];
+        return next;
+      });
+    } catch (err: any) {
+      alert(err.message || 'Failed to cancel connection request.');
+    } finally {
+      setRequestingMap((prev) => ({ ...prev, [profileId]: false }));
+    }
+  };
+
+  const handleRespondRequest = async (profileId: string, status: 'accepted' | 'declined') => {
+    const conn = connectionsMap[profileId];
+    if (!conn?.id) return;
+    setRequestingMap((prev) => ({ ...prev, [profileId]: true }));
+    try {
+      await connectionsApi.respond(conn.id, status);
+      setConnectionsMap((prev) => {
+        const next = { ...prev };
+        if (status === 'accepted') {
+          next[profileId] = { ...conn, status: 'accepted' };
+        } else {
+          delete next[profileId];
+        }
+        return next;
+      });
+    } catch (err: any) {
+      alert(err.message || 'Failed to respond to connection request.');
     } finally {
       setRequestingMap((prev) => ({ ...prev, [profileId]: false }));
     }
@@ -308,44 +367,76 @@ export default function DirectoryPage() {
                 </div>
               </div>
 
-              {/* Action Button: Add Connection (only for other alumni) */}
+              {/* Action Button: Add / Cancel Connection (only for other alumni) */}
               {!isMe && (
                 <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    onClick={() => handleConnect(profile.id)}
-                    disabled={!!connectionsMap[profile.id] || requestingMap[profile.id]}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs ${
-                      connectionsMap[profile.id] === 'accepted'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                        : connectionsMap[profile.id] === 'pending'
-                        ? 'bg-gray-100 text-gray-600 border border-gray-200 cursor-default'
-                        : 'bg-orange-500 hover:bg-orange-600 text-white cursor-pointer active:scale-95'
-                    }`}
-                    title={connectionsMap[profile.id] === 'accepted' ? 'Already connected' : connectionsMap[profile.id] === 'pending' ? 'Connection request pending' : 'Add Connection'}
-                  >
-                    {connectionsMap[profile.id] === 'accepted' ? (
-                      <>
-                        <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Connected</span>
-                      </>
-                    ) : connectionsMap[profile.id] === 'pending' ? (
-                      <>
-                        <CheckIcon className="w-3.5 h-3.5 text-gray-500" />
-                        <span>Requested</span>
-                      </>
-                    ) : requestingMap[profile.id] ? (
-                      <>
-                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Connecting...</span>
-                      </>
+                  {connectionsMap[profile.id]?.status === 'accepted' ? (
+                    <span
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-xs"
+                      title="Already connected"
+                    >
+                      <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Connected</span>
+                    </span>
+                  ) : connectionsMap[profile.id]?.status === 'pending' ? (
+                    currentProfileId && connectionsMap[profile.id]?.recipient_id === currentProfileId ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleRespondRequest(profile.id, 'accepted')}
+                          disabled={requestingMap[profile.id]}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRespondRequest(profile.id, 'declined')}
+                          disabled={requestingMap[profile.id]}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Decline
+                        </button>
+                      </div>
                     ) : (
-                      <>
-                        <UserPlusIcon className="w-3.5 h-3.5" />
-                        <span>Add Connection</span>
-                      </>
-                    )}
-                  </button>
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                          <ClockIcon className="w-3.5 h-3.5" />
+                          <span>Requested</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCancelRequest(profile.id)}
+                          disabled={requestingMap[profile.id]}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 border border-red-200 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          title="Cancel connection request"
+                        >
+                          <XMarkIcon className="w-3.5 h-3.5" />
+                          <span>{requestingMap[profile.id] ? 'Canceling...' : 'Cancel Request'}</span>
+                        </button>
+                      </div>
+                    )
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleConnect(profile.id)}
+                      disabled={requestingMap[profile.id]}
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs bg-orange-500 hover:bg-orange-600 text-white cursor-pointer active:scale-95 disabled:opacity-50"
+                      title="Add Connection"
+                    >
+                      {requestingMap[profile.id] ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Connecting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserPlusIcon className="w-3.5 h-3.5" />
+                          <span>Add Connection</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
