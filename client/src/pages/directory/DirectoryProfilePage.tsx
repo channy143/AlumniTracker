@@ -317,9 +317,9 @@ export default function DirectoryProfilePage() {
                 href={profile.resume_url.startsWith('http') ? profile.resume_url : `/api/directory/${profile.id}/resume`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100 rounded-lg text-xs font-semibold transition-colors shadow-xs"
+                className="h-8 px-3.5 inline-flex items-center justify-center gap-1.5 bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100 rounded-lg text-xs font-semibold transition-colors shadow-xs whitespace-nowrap"
               >
-                <DocumentTextIcon className="w-4 h-4 text-orange-600" />
+                <DocumentTextIcon className="w-4 h-4 text-orange-600 shrink-0" />
                 View Resume / CV
               </a>
             )}
@@ -332,12 +332,12 @@ export default function DirectoryProfilePage() {
                         type="button"
                         onClick={() => setShowUnfriendMenu((v) => !v)}
                         disabled={connectionLoading}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                        className="w-36 h-8 px-3 inline-flex items-center justify-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50 whitespace-nowrap"
                         title="Click to manage connection"
                       >
-                        <CheckIcon className="w-4 h-4 text-emerald-600" />
+                        <CheckIcon className="w-4 h-4 text-emerald-600 shrink-0" />
                         <span>{connectionLoading ? 'Removing...' : 'Connected'}</span>
-                        <ChevronDownIcon className="w-3.5 h-3.5 text-emerald-600" />
+                        <ChevronDownIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       </button>
 
                       {showUnfriendMenu && (
@@ -346,7 +346,7 @@ export default function DirectoryProfilePage() {
                             className="fixed inset-0 z-30"
                             onClick={() => setShowUnfriendMenu(false)}
                           />
-                          <div className="absolute right-0 mt-1.5 w-44 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-40">
+                          <div className="absolute right-0 mt-1.5 w-36 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-40">
                             <button
                               type="button"
                               onClick={() => {
@@ -366,9 +366,9 @@ export default function DirectoryProfilePage() {
                     <button
                       type="button"
                       onClick={handleMessage}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+                      className="h-8 px-3.5 inline-flex items-center justify-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer whitespace-nowrap"
                     >
-                      <ChatBubbleLeftRightIcon className="w-4 h-4 text-blue-600" />
+                      <ChatBubbleLeftRightIcon className="w-4 h-4 text-blue-600 shrink-0" />
                       Message
                     </button>
                   </>
@@ -379,33 +379,33 @@ export default function DirectoryProfilePage() {
                         type="button"
                         onClick={() => handleRespondRequest('accepted')}
                         disabled={connectionLoading}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                        className="h-8 px-3.5 inline-flex items-center justify-center gap-1.5 bg-orange-500 hover:bg-orange-600 border border-orange-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50 whitespace-nowrap"
                       >
-                        <CheckIcon className="w-4 h-4" />
+                        <CheckIcon className="w-4 h-4 shrink-0" />
                         Confirm Request
                       </button>
                       <button
                         type="button"
                         onClick={() => handleRespondRequest('declined')}
                         disabled={connectionLoading}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+                        className="h-8 px-3.5 inline-flex items-center justify-center gap-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
                       >
                         Decline
                       </button>
                     </>
                   ) : (
                     <>
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-semibold">
-                        <ClockIcon className="w-4 h-4" />
+                      <span className="h-8 px-3 inline-flex items-center justify-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-semibold whitespace-nowrap">
+                        <ClockIcon className="w-4 h-4 shrink-0" />
                         Requested
                       </span>
                       <button
                         type="button"
                         onClick={handleCancelRequest}
                         disabled={connectionLoading}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                        className="w-36 h-8 px-3 inline-flex items-center justify-center gap-1.5 bg-white hover:bg-red-50 border border-red-200 text-red-600 rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50 whitespace-nowrap"
                       >
-                        <XMarkIcon className="w-4 h-4" />
+                        <XMarkIcon className="w-4 h-4 shrink-0" />
                         {connectionLoading ? 'Canceling...' : 'Cancel Request'}
                       </button>
                     </>
@@ -415,9 +415,9 @@ export default function DirectoryProfilePage() {
                     type="button"
                     onClick={handleConnect}
                     disabled={connectionLoading}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                    className="w-36 h-8 px-3 inline-flex items-center justify-center gap-1.5 bg-orange-500 hover:bg-orange-600 border border-orange-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:opacity-50 whitespace-nowrap"
                   >
-                    <UserPlusIcon className="w-4 h-4" />
+                    <UserPlusIcon className="w-4 h-4 shrink-0" />
                     {connectionLoading ? 'Connecting...' : 'Add Connection'}
                   </button>
                 )}

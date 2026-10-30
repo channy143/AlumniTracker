@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { messagesApi, connectionsApi, profileApi } from '@/services/api';
 import { useChatStore, ChatContact } from '@/store/chatStore';
-import { playTing } from '@/utils/helpers';
+import { playTing, setBackgroundInterval } from '@/utils/helpers';
 
 interface ConversationItem {
   profile_id: string;
@@ -148,12 +148,7 @@ export default function ChatDropdown() {
     };
 
     fetchUnread();
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchUnread();
-      }
-    }, 8000);
-    return () => clearInterval(interval);
+    return setBackgroundInterval(fetchUnread, 4000);
   }, [setUnreadCount]);
 
   // Load conversations, groups, and connected alumni when dropdown is opened
@@ -234,12 +229,11 @@ export default function ChatDropdown() {
     }
   }, [isHeaderDropdownOpen, myProfileId, setGroups]);
 
-  // Presence polling: refresh conversations & connection presence every 8s while popover is open
+  // Presence polling: refresh conversations & connection presence while popover is open (even in background)
   useEffect(() => {
     if (!isHeaderDropdownOpen) return;
 
     const refreshActivePresence = async () => {
-      if (document.visibilityState !== 'visible') return;
       try {
         const updatedConvs = await messagesApi.conversations();
         if (updatedConvs) setConversations(updatedConvs);
@@ -266,8 +260,7 @@ export default function ChatDropdown() {
       }
     };
 
-    const interval = setInterval(refreshActivePresence, 8000);
-    return () => clearInterval(interval);
+    return setBackgroundInterval(refreshActivePresence, 5000);
   }, [isHeaderDropdownOpen, connectedAlumni.length, activeTab, setGroups]);
 
   // Filter conversations by search

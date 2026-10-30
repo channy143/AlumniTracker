@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { getInitials, playTing } from '@/utils/helpers';
+import { getInitials, playTing, setBackgroundInterval } from '@/utils/helpers';
 import { profileApi, notificationsApi } from '@/services/api';
 import {
   Bars3Icon,
@@ -187,12 +187,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchNotifications();
-      }
-    }, 10000);
-    return () => clearInterval(interval);
+    return setBackgroundInterval(fetchNotifications, 6000);
   }, [fetchNotifications]);
 
   const dropdownRef = useRef<HTMLDivElement>(null);

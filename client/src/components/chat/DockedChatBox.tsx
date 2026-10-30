@@ -15,7 +15,7 @@ import {
 import { useChatStore } from '@/store/chatStore';
 import { messagesApi, profileApi, connectionsApi } from '@/services/api';
 import EmojiPicker from '@/components/ui/EmojiPicker';
-import { playTing } from '@/utils/helpers';
+import { playTing, setBackgroundInterval } from '@/utils/helpers';
 
 const MESSENGER_REACTIONS = [
   { emoji: '❤️', label: 'Love' },
@@ -226,13 +226,10 @@ export default function DockedChatBox() {
       loadMessages(true);
       if (!activeChat.isGroup) refreshPresence();
 
-      const interval = setInterval(() => {
-        if (document.visibilityState === 'visible') {
-          loadMessages(false);
-          if (!activeChat.isGroup) refreshPresence();
-        }
-      }, 5000);
-      return () => clearInterval(interval);
+      return setBackgroundInterval(() => {
+        loadMessages(false);
+        if (!activeChat.isGroup) refreshPresence();
+      }, 3500);
     }
   }, [activeChat?.profileId, isOpen]);
 

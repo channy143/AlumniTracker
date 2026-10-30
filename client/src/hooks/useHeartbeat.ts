@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { messagesApi } from '@/services/api';
+import { setBackgroundInterval } from '@/utils/helpers';
 
 export function useHeartbeat() {
   const token = useAuthStore((state) => state.token);
@@ -27,9 +28,9 @@ export function useHeartbeat() {
     // Immediate initial heartbeat upon mount/auth
     sendHeartbeat();
 
-    // Regular pulse interval: every 20 seconds while page is open & visible
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible' && navigator.onLine) {
+    // Regular pulse interval: every 20 seconds even when window is in background
+    const stopInterval = setBackgroundInterval(() => {
+      if (navigator.onLine) {
         sendHeartbeat();
       }
     }, 20000);
@@ -74,7 +75,7 @@ export function useHeartbeat() {
     window.addEventListener('pagehide', handlePageUnload);
 
     return () => {
-      clearInterval(interval);
+      stopInterval();
       interactionEvents.forEach((ev) => window.removeEventListener(ev, handleUserInteraction));
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       window.removeEventListener('focus', handleVisibilityOrFocus);
