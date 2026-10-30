@@ -273,6 +273,7 @@ export default function ChatDropdown() {
   // Filter conversations by search
   const filteredConversations = useMemo(() => {
     return conversations.filter((c) => {
+      if (!c.profile_id || (!c.first_name && !c.last_name)) return false;
       const fullName = `${c.first_name || ''} ${c.last_name || ''}`.toLowerCase();
       const matchesSearch =
         !searchQuery.trim() ||
@@ -340,17 +341,20 @@ export default function ChatDropdown() {
 
   // Filter connected alumni in compose/group create mode
   const filteredConnectedAlumni = connectedAlumni.filter((a) => {
+    if (!a.id || (!a.first_name && !a.last_name)) return false;
     if (!composeSearch.trim()) return true;
-    const name = `${a.first_name} ${a.last_name}`.toLowerCase();
+    const name = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase();
     const headline = (a.headline || '').toLowerCase();
     const query = composeSearch.toLowerCase().trim();
     return name.includes(query) || headline.includes(query);
   });
 
   const handleSelectConversation = (conv: ConversationItem) => {
+    const contactName = `${conv.first_name || ''} ${conv.last_name || ''}`.trim();
+    if (!conv.profile_id || !contactName) return;
     openChat({
       profileId: conv.profile_id,
-      name: `${conv.first_name} ${conv.last_name}`.trim() || 'Alumni Contact',
+      name: contactName,
       avatar: conv.avatar_url,
       isOnline: conv.is_online,
       lastActiveAt: conv.last_active_at,
@@ -373,9 +377,11 @@ export default function ChatDropdown() {
   };
 
   const handleSelectConnectedAlumni = (alumni: ConnectedAlumni) => {
+    const contactName = `${alumni.first_name || ''} ${alumni.last_name || ''}`.trim();
+    if (!alumni.id || !contactName) return;
     openChat({
       profileId: alumni.id,
-      name: `${alumni.first_name} ${alumni.last_name}`.trim() || 'Alumni Contact',
+      name: contactName,
       avatar: alumni.avatar_url,
       headline: alumni.headline,
       isOnline: alumni.is_online,
@@ -628,7 +634,7 @@ export default function ChatDropdown() {
                     </div>
                     {filteredConnectedAlumni.map((alumni) => {
                       const isSelected = selectedMemberIds.includes(alumni.id);
-                      const fullName = `${alumni.first_name} ${alumni.last_name}`.trim();
+                      const fullName = `${alumni.first_name || ''} ${alumni.last_name || ''}`.trim();
                       const initials = (alumni.first_name?.[0] || 'A') + (alumni.last_name?.[0] || '');
 
                       return (
@@ -758,7 +764,7 @@ export default function ChatDropdown() {
                       Connected Alumni ({filteredConnectedAlumni.length})
                     </p>
                     {filteredConnectedAlumni.map((alumni) => {
-                      const fullName = `${alumni.first_name} ${alumni.last_name}`.trim() || 'Alumni Contact';
+                      const fullName = `${alumni.first_name || ''} ${alumni.last_name || ''}`.trim() || 'Alumni Contact';
                       const initials = (alumni.first_name?.[0] || 'A') + (alumni.last_name?.[0] || '');
 
                       return (

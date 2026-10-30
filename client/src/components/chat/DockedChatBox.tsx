@@ -10,11 +10,21 @@ import {
   ShieldCheckIcon,
   ArrowRightOnRectangleIcon,
   UserPlusIcon,
+  ArrowUturnLeftIcon,
 } from '@heroicons/react/24/outline';
 import { useChatStore } from '@/store/chatStore';
 import { messagesApi, profileApi, connectionsApi } from '@/services/api';
 import EmojiPicker from '@/components/ui/EmojiPicker';
 import { playTing } from '@/utils/helpers';
+
+const MESSENGER_REACTIONS = [
+  { emoji: '❤️', label: 'Love' },
+  { emoji: '😂', label: 'Haha' },
+  { emoji: '😮', label: 'Wow' },
+  { emoji: '😢', label: 'Sad' },
+  { emoji: '😡', label: 'Angry' },
+  { emoji: '👍', label: 'Like' },
+];
 
 function isOnlyEmojis(text: string): boolean {
   if (!text) return false;
@@ -23,6 +33,13 @@ function isOnlyEmojis(text: string): boolean {
   const emojiRegex = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff]|\uFE0F|\u200D)+/g;
   const stripped = trimmed.replace(emojiRegex, '').replace(/\s+/g, '');
   return stripped.length === 0;
+}
+
+interface ReplyPreviewData {
+  id: string;
+  sender_id?: string;
+  sender_name: string;
+  body: string;
 }
 
 interface MessageItem {
@@ -34,6 +51,9 @@ interface MessageItem {
   failed?: boolean;
   sender_name?: string;
   sender_avatar?: string;
+  reply_to_id?: string | null;
+  reply_preview?: ReplyPreviewData | null;
+  reactions?: Record<string, { emoji: string; name?: string; updated_at?: string } | string>;
 }
 
 function formatLastActive(dateStr?: string | null): string {
@@ -55,6 +75,7 @@ function formatLastActive(dateStr?: string | null): string {
 }
 
 let cachedProfileId: string | null = null;
+let cachedProfileName: string | null = null;
 
 export default function DockedChatBox() {
   const {
@@ -70,6 +91,8 @@ export default function DockedChatBox() {
     updateGroupMembers,
     removeMemberFromGroup,
     leaveGroup,
+    replyingTo,
+    setReplyingTo,
   } = useChatStore();
 
   const [overflowHovered, setOverflowHovered] = useState(false);
@@ -77,22 +100,32 @@ export default function DockedChatBox() {
   const [inputText, setInputText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(cachedProfileId);
+  const [currentProfileName, setCurrentProfileName] = useState<string>(cachedProfileName || 'You');
   const [loadingChat, setLoadingChat] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showAddAlumni, setShowAddAlumni] = useState(false);
   const [connectedAlumni, setConnectedAlumni] = useState<any[]>([]);
   const [alumniSearch, setAlumniSearch] = useState('');
   const [groupActionLoading, setGroupActionLoading] = useState(false);
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  const prevMsgCountRef = useRef<number>(0);
 
-  // Fetch current user's profile ID
+  // Fetch current user's profile ID and name
   useEffect(() => {
     profileApi.get()
       .then((p) => {
         if (p?.id) {
           cachedProfileId = p.id;
           setCurrentProfileId(p.id);
+        }
+        const fullName = `${p?.first_name || ''} ${p?.last_name || ''}`.trim();
+        if (fullName) {
+          cachedProfileName = fullName;
+          setCurrentProfileName(fullName);
         }
       })
       .catch(() => {});
@@ -186,6 +219,9 @@ export default function DockedChatBox() {
       setInputText('');
       setShowGroupInfo(false);
       setShowAddAlumni(false);
+      setActiveReactionMsgId(null);
+      setReplyingTo(null);
+      prevMsgCountRef.current = 0;
       knownMessageIdsRef.current.clear();
       loadMessages(true);
       if (!activeChat.isGroup) refreshPresence();
@@ -215,12 +251,79 @@ export default function DockedChatBox() {
     }
   }, [showAddAlumni, activeChat?.isGroup, currentProfileId]);
 
-  // Scroll to bottom when messages update
+  // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (isOpen && !showGroupInfo) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (messages.length > prevMsgCountRef.current) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+      prevMsgCountRef.current = messages.length;
     }
   }, [messages, isOpen, showGroupInfo]);
+
+  const scrollToMessage = (targetMsgId?: string | null) => {
+    if (!targetMsgId) return;
+    const el = document.getElementById(`chat-msg-${targetMsgId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMsgId(targetMsgId);
+      setTimeout(() => {
+        setHighlightedMsgId((prev) => (prev === targetMsgId ? null : prev));
+      }, 1800);
+    }
+  };
+
+  const handleToggleReaction = async (msg: MessageItem, emoji: string) => {
+    if (!activeChat?.profileId || msg.id.startsWith('temp-')) return;
+    setActiveReactionMsgId(null);
+
+    const myKey = currentProfileId || 'me';
+    const currentReactions = { ...(msg.reactions || {}) };
+    const existing = currentReactions[myKey];
+    const existingEmoji = typeof existing === 'string' ? existing : existing?.emoji;
+
+    if (existingEmoji === emoji) {
+      delete currentReactions[myKey];
+    } else {
+      currentReactions[myKey] = {
+        emoji,
+        name: currentProfileName,
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    // Optimistic update
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msg.id ? { ...m, reactions: currentReactions } : m))
+    );
+
+    try {
+      const res = activeChat.isGroup
+        ? await messagesApi.reactGroupMessage(activeChat.profileId, msg.id, emoji)
+        : await messagesApi.react(msg.id, emoji);
+      if (res?.reactions) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msg.id ? { ...m, reactions: res.reactions } : m))
+        );
+      }
+    } catch {
+      // Reload on hiccup
+      loadMessages(false);
+    }
+  };
+
+  const handleStartReply = (msg: MessageItem, senderDisplayName: string, isMe: boolean) => {
+    setActiveReactionMsgId(null);
+    setReplyingTo({
+      id: msg.id,
+      senderId: msg.sender_id,
+      senderName: isMe ? currentProfileName : senderDisplayName,
+      body: msg.body,
+    });
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 20);
+  };
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
@@ -230,6 +333,20 @@ export default function DockedChatBox() {
       setInputText('');
     }
 
+    const currentReply = replyingTo;
+    if (currentReply) {
+      setReplyingTo(null);
+    }
+
+    const replyPreview: ReplyPreviewData | null = currentReply
+      ? {
+          id: currentReply.id,
+          sender_id: currentReply.senderId,
+          sender_name: currentReply.senderName,
+          body: currentReply.body,
+        }
+      : null;
+
     const targetProfileId = activeChat.profileId;
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const optimisticMsg: MessageItem = {
@@ -238,6 +355,9 @@ export default function DockedChatBox() {
       receiver_id: targetProfileId,
       body: text,
       created_at: new Date().toISOString(),
+      reply_to_id: currentReply?.id || null,
+      reply_preview: replyPreview,
+      reactions: {},
     };
 
     setMessages((prev) => [...prev, optimisticMsg]);
@@ -248,8 +368,20 @@ export default function DockedChatBox() {
 
     try {
       const realMsg = activeChat.isGroup
-        ? await messagesApi.sendGroupMessage(targetProfileId, text)
-        : await messagesApi.send(targetProfileId, text);
+        ? await messagesApi.sendGroupMessage(
+            targetProfileId,
+            text,
+            currentReply?.id || null,
+            replyPreview
+          )
+        : await messagesApi.send(
+            targetProfileId,
+            text,
+            undefined,
+            undefined,
+            currentReply?.id || null,
+            replyPreview
+          );
 
       if (realMsg?.id) {
         setMessages((prev) =>
@@ -262,6 +394,9 @@ export default function DockedChatBox() {
                   sender_id: realMsg.sender_id || m.sender_id,
                   sender_name: realMsg.sender_name || m.sender_name,
                   sender_avatar: realMsg.sender_avatar || m.sender_avatar,
+                  reply_to_id: realMsg.reply_to_id ?? m.reply_to_id,
+                  reply_preview: realMsg.reply_preview ?? m.reply_preview,
+                  reactions: realMsg.reactions ?? m.reactions,
                 }
               : m
           )
@@ -276,6 +411,11 @@ export default function DockedChatBox() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape' && replyingTo) {
+      e.preventDefault();
+      setReplyingTo(null);
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -756,7 +896,10 @@ export default function DockedChatBox() {
           ) : (
             /* VIEW: Message List */
             <>
-              <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2 bg-gradient-to-b from-gray-50/50 to-white">
+              <div
+                onClick={() => setActiveReactionMsgId(null)}
+                className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2.5 bg-gradient-to-b from-gray-50/50 to-white"
+              >
                 {messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-4">
                     <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-xl font-bold mb-2 shadow-inner">
@@ -774,7 +917,9 @@ export default function DockedChatBox() {
                   </div>
                 ) : (
                   messages.map((m) => {
-                    const isMe = m.id.startsWith('temp-') || (currentProfileId ? m.sender_id === currentProfileId : m.sender_id !== activeChat.profileId);
+                    const isMe =
+                      m.id.startsWith('temp-') ||
+                      (currentProfileId ? m.sender_id === currentProfileId : m.sender_id !== activeChat.profileId);
                     const emojiOnly = isOnlyEmojis(m.body);
                     const isPending = m.id.startsWith('temp-');
                     const isFailed = m.failed;
@@ -796,29 +941,223 @@ export default function DockedChatBox() {
                       }
                     }
 
+                    // Resolve replied-to message details
+                    const fallbackReplied = m.reply_to_id
+                      ? messages.find((orig) => orig.id === m.reply_to_id)
+                      : null;
+                    const replyInfo: ReplyPreviewData | null =
+                      m.reply_preview ||
+                      (fallbackReplied
+                        ? {
+                            id: fallbackReplied.id,
+                            sender_id: fallbackReplied.sender_id,
+                            sender_name:
+                              fallbackReplied.sender_id === currentProfileId
+                                ? currentProfileName
+                                : fallbackReplied.sender_name || activeChat.name || 'Alumni',
+                            body: fallbackReplied.body,
+                          }
+                        : null);
+
+                    let replyHeaderText = '';
+                    if (replyInfo) {
+                      const repliedToMe =
+                        Boolean(currentProfileId && replyInfo.sender_id === currentProfileId) ||
+                        replyInfo.sender_name === currentProfileName;
+                      const repliedToSelf = replyInfo.sender_id && replyInfo.sender_id === m.sender_id;
+
+                      if (isMe) {
+                        replyHeaderText = repliedToMe
+                          ? 'You replied to yourself'
+                          : `You replied to ${replyInfo.sender_name}`;
+                      } else {
+                        replyHeaderText = repliedToMe
+                          ? `${senderName} replied to you`
+                          : repliedToSelf
+                            ? `${senderName} replied to themselves`
+                            : `${senderName} replied to ${replyInfo.sender_name}`;
+                      }
+                    }
+
+                    // Resolve reactions summary
+                    const rawReactions = m.reactions || {};
+                    const reactionList = Object.entries(rawReactions)
+                      .map(([pid, val]) => {
+                        const emoji = typeof val === 'string' ? val : val?.emoji;
+                        const name =
+                          pid === currentProfileId || pid === 'me'
+                            ? 'You'
+                            : (typeof val === 'object' && val?.name) || activeChat.name || 'Alumnus';
+                        return emoji ? { profileId: pid, emoji, name } : null;
+                      })
+                      .filter(Boolean) as Array<{ profileId: string; emoji: string; name: string }>;
+
+                    const myReactionObj = reactionList.find(
+                      (r) => r.profileId === currentProfileId || r.profileId === 'me'
+                    );
+                    const myReactionEmoji = myReactionObj?.emoji || null;
+
+                    const emojiCounts = new Map<string, number>();
+                    reactionList.forEach((r) => {
+                      emojiCounts.set(r.emoji, (emojiCounts.get(r.emoji) || 0) + 1);
+                    });
+                    const distinctEmojis = Array.from(emojiCounts.entries())
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([em]) => em)
+                      .slice(0, 3);
+                    const totalReactions = reactionList.length;
+                    const reactionTooltip = reactionList.map((r) => `${r.emoji} ${r.name}`).join(', ');
+                    const showReactionPopup = activeReactionMsgId === m.id;
+                    const isHighlighted = highlightedMsgId === m.id;
+
+                    // Messenger floating reaction picker popover
+                    const reactionPickerPopover = showReactionPopup && !isPending && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className={`absolute bottom-full mb-1.5 z-30 bg-white border border-gray-200/90 rounded-full shadow-xl px-2 py-1 flex items-center gap-1 animate-fade-in ${
+                          isMe ? 'right-0' : 'left-0'
+                        }`}
+                      >
+                        {MESSENGER_REACTIONS.map((r) => {
+                          const isSelected = myReactionEmoji === r.emoji;
+                          return (
+                            <button
+                              key={r.emoji}
+                              type="button"
+                              onClick={() => handleToggleReaction(m, r.emoji)}
+                              title={r.label}
+                              className={`relative text-lg leading-none p-1 rounded-full hover:scale-130 active:scale-95 transition-transform cursor-pointer ${
+                                isSelected ? 'bg-orange-100 ring-1 ring-orange-400' : 'hover:bg-gray-100'
+                              }`}
+                            >
+                              <span>{r.emoji}</span>
+                              {isSelected && (
+                                <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-600" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+
+                    // Hover action buttons (React + Reply) like Messenger
+                    const messageActionButtons = !isPending && !isFailed && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className={`flex items-center gap-0.5 self-center shrink-0 transition-opacity duration-150 ${
+                          showReactionPopup ? 'opacity-100' : 'opacity-0 group-hover/msg:opacity-100'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveReactionMsgId((prev) => (prev === m.id ? null : m.id))
+                          }
+                          className={`p-1 rounded-full transition-colors cursor-pointer ${
+                            showReactionPopup || myReactionEmoji
+                              ? 'text-orange-600 bg-orange-50 hover:bg-orange-100'
+                              : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+                          }`}
+                          title="React to message"
+                        >
+                          <FaceSmileIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStartReply(m, senderName, isMe)}
+                          className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                          title="Reply to message"
+                        >
+                          <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+
+                    // Reaction pill badge anchored to bottom corner of message bubble
+                    const reactionBadge = totalReactions > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveReactionMsgId((prev) => (prev === m.id ? null : m.id));
+                        }}
+                        title={reactionTooltip}
+                        className={`absolute -bottom-2.5 ${
+                          isMe ? 'right-2' : 'left-2'
+                        } z-10 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white border ${
+                          myReactionEmoji ? 'border-orange-300 bg-orange-50/40' : 'border-gray-200'
+                        } shadow-sm text-[11px] leading-none hover:scale-105 transition-transform cursor-pointer`}
+                      >
+                        <span className="flex items-center -space-x-0.5">
+                          {distinctEmojis.map((em) => (
+                            <span key={em}>{em}</span>
+                          ))}
+                        </span>
+                        {totalReactions > 1 && (
+                          <span className="text-[10px] font-bold text-gray-700 pl-0.5">
+                            {totalReactions}
+                          </span>
+                        )}
+                      </button>
+                    );
+
                     if (isMe) {
                       return (
                         <div
+                          id={`chat-msg-${m.id}`}
                           key={m.id}
-                          className={`w-full flex justify-end transition-opacity duration-150 ${isPending ? 'opacity-90' : 'opacity-100'}`}
+                          className={`group/msg w-full flex justify-end transition-all duration-300 rounded-xl ${
+                            isPending ? 'opacity-90' : 'opacity-100'
+                          } ${isHighlighted ? 'bg-orange-100/70 ring-2 ring-orange-300 p-1' : ''}`}
                         >
-                          <div className="flex flex-col items-end max-w-[80%] min-w-0">
-                            {emojiOnly ? (
-                              <div
-                                className="text-3xl sm:text-4xl py-0.5 px-1 select-none animate-emoji-pop text-right"
-                                title={m.body}
-                              >
-                                {m.body}
-                              </div>
-                            ) : (
-                              <div
-                                className={`max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed break-words [overflow-wrap:anywhere] whitespace-pre-wrap bg-orange-600 text-white rounded-br-xs shadow-xs ${
-                                  isFailed ? 'border border-red-400 bg-red-600 text-white' : ''
-                                }`}
-                              >
-                                {m.body}
+                          <div className="flex flex-col items-end max-w-[85%] min-w-0">
+                            {/* Replied-to Quote Header & Bubble */}
+                            {replyInfo && (
+                              <div className="flex flex-col items-end max-w-full mb-0.5">
+                                <span className="text-[10px] text-gray-400 flex items-center gap-1 mr-1 mb-0.5">
+                                  <ArrowUturnLeftIcon className="w-2.5 h-2.5" />
+                                  {replyHeaderText}
+                                </span>
+                                <div
+                                  onClick={() => scrollToMessage(replyInfo.id)}
+                                  className="px-3 py-1.5 rounded-2xl rounded-br-xs text-xs bg-gray-100 text-gray-600 border-r-2 border-orange-400 max-w-full break-words [overflow-wrap:anywhere] line-clamp-2 cursor-pointer hover:bg-gray-200/80 transition-colors"
+                                  title="Click to view original message"
+                                >
+                                  {replyInfo.body}
+                                </div>
                               </div>
                             )}
+
+                            {/* Message Row with Left Hover Actions */}
+                            <div
+                              className={`relative flex items-center justify-end gap-1.5 max-w-full min-w-0 ${
+                                totalReactions > 0 ? 'mb-2.5' : ''
+                              }`}
+                            >
+                              {reactionPickerPopover}
+                              {messageActionButtons}
+
+                              <div className="relative max-w-full min-w-0">
+                                {emojiOnly ? (
+                                  <div
+                                    className="text-3xl sm:text-4xl py-0.5 px-1 select-none animate-emoji-pop text-right"
+                                    title={m.body}
+                                  >
+                                    {m.body}
+                                  </div>
+                                ) : (
+                                  <div
+                                    className={`max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed break-words [overflow-wrap:anywhere] whitespace-pre-wrap bg-orange-600 text-white rounded-br-xs shadow-xs ${
+                                      isFailed ? 'border border-red-400 bg-red-600 text-white' : ''
+                                    }`}
+                                  >
+                                    {m.body}
+                                  </div>
+                                )}
+                                {reactionBadge}
+                              </div>
+                            </div>
+
                             <div className="flex items-center gap-1 px-1 mt-0.5">
                               <span className="text-[9px] text-gray-400">
                                 {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -837,10 +1176,13 @@ export default function DockedChatBox() {
 
                     return (
                       <div
+                        id={`chat-msg-${m.id}`}
                         key={m.id}
-                        className="w-full flex justify-start transition-opacity duration-150"
+                        className={`group/msg w-full flex justify-start transition-all duration-300 rounded-xl ${
+                          isHighlighted ? 'bg-orange-100/70 ring-2 ring-orange-300 p-1' : ''
+                        }`}
                       >
-                        <div className="flex items-start gap-2 max-w-[85%] min-w-0">
+                        <div className="flex items-start gap-2 max-w-[88%] min-w-0">
                           {/* Profile Picture Icon */}
                           <div className="relative shrink-0 mt-0.5" title={senderName}>
                             {senderAvatar ? (
@@ -863,19 +1205,49 @@ export default function DockedChatBox() {
                               {senderName}
                             </span>
 
-                            {/* Message Bubble or Emoji */}
-                            {emojiOnly ? (
-                              <div
-                                className="text-3xl sm:text-4xl py-0.5 px-1 select-none animate-emoji-pop text-left"
-                                title={m.body}
-                              >
-                                {m.body}
-                              </div>
-                            ) : (
-                              <div className="max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed bg-gray-200/90 text-gray-900 rounded-tl-xs break-words [overflow-wrap:anywhere] whitespace-pre-wrap shadow-2xs">
-                                {m.body}
+                            {/* Replied-to Quote Header & Bubble */}
+                            {replyInfo && (
+                              <div className="flex flex-col items-start max-w-full mb-0.5">
+                                <span className="text-[10px] text-gray-400 flex items-center gap-1 ml-1 mb-0.5">
+                                  <ArrowUturnLeftIcon className="w-2.5 h-2.5" />
+                                  {replyHeaderText}
+                                </span>
+                                <div
+                                  onClick={() => scrollToMessage(replyInfo.id)}
+                                  className="px-3 py-1.5 rounded-2xl rounded-bl-xs text-xs bg-gray-100 text-gray-600 border-l-2 border-orange-400 max-w-full break-words [overflow-wrap:anywhere] line-clamp-2 cursor-pointer hover:bg-gray-200/80 transition-colors"
+                                  title="Click to view original message"
+                                >
+                                  {replyInfo.body}
+                                </div>
                               </div>
                             )}
+
+                            {/* Message Bubble + Right Hover Actions */}
+                            <div
+                              className={`relative flex items-center justify-start gap-1.5 max-w-full min-w-0 ${
+                                totalReactions > 0 ? 'mb-2.5' : ''
+                              }`}
+                            >
+                              {reactionPickerPopover}
+
+                              <div className="relative max-w-full min-w-0">
+                                {emojiOnly ? (
+                                  <div
+                                    className="text-3xl sm:text-4xl py-0.5 px-1 select-none animate-emoji-pop text-left"
+                                    title={m.body}
+                                  >
+                                    {m.body}
+                                  </div>
+                                ) : (
+                                  <div className="max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed bg-gray-200/90 text-gray-900 rounded-tl-xs break-words [overflow-wrap:anywhere] whitespace-pre-wrap shadow-2xs">
+                                    {m.body}
+                                  </div>
+                                )}
+                                {reactionBadge}
+                              </div>
+
+                              {messageActionButtons}
+                            </div>
 
                             {/* Timestamp */}
                             <div className="flex items-center gap-1 px-1 mt-0.5">
@@ -891,6 +1263,34 @@ export default function DockedChatBox() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
+
+              {/* Replying-to Preview Banner (Messenger style) */}
+              {replyingTo && (
+                <div className="px-3 py-2 bg-orange-50/90 border-t border-orange-200/80 flex items-center justify-between gap-2 shrink-0">
+                  <div className="min-w-0 flex-1 border-l-2 border-orange-500 pl-2">
+                    <p className="text-[11px] font-bold text-gray-800 flex items-center gap-1 truncate">
+                      <ArrowUturnLeftIcon className="w-3 h-3 text-orange-600 shrink-0" />
+                      <span>
+                        Replying to{' '}
+                        {replyingTo.senderId && replyingTo.senderId === currentProfileId
+                          ? 'yourself'
+                          : replyingTo.senderName}
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-gray-500 truncate">
+                      {replyingTo.body}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(null)}
+                    className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-orange-100 transition-colors cursor-pointer shrink-0"
+                    title="Cancel reply"
+                  >
+                    <XMarkIcon className="w-4 h-4 stroke-2" />
+                  </button>
+                </div>
+              )}
 
               {/* Quick Emoji Reaction Strip */}
               <div className="px-3 py-1 bg-gray-50/90 border-t border-gray-100 flex items-center justify-between text-xs shrink-0">
@@ -937,11 +1337,18 @@ export default function DockedChatBox() {
                 </button>
 
                 <input
+                  ref={inputRef}
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={activeChat.isGroup ? 'Message group...' : 'Write a message...'}
+                  placeholder={
+                    replyingTo
+                      ? `Reply to ${replyingTo.senderId === currentProfileId ? 'yourself' : replyingTo.senderName}...`
+                      : activeChat.isGroup
+                        ? 'Message group...'
+                        : 'Write a message...'
+                  }
                   className="flex-1 bg-gray-100 hover:bg-gray-200/60 focus:bg-white focus:ring-1 focus:ring-orange-500 border border-transparent focus:border-orange-400 rounded-full px-3.5 py-1.5 text-sm text-gray-800 placeholder-gray-500 outline-none transition-all"
                 />
 

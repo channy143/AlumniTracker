@@ -29,6 +29,7 @@ export interface ChatContact {
 
 export interface ReplyTarget {
   id: string;
+  senderId?: string;
   senderName: string;
   body: string;
 }
@@ -81,12 +82,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   openChat: (contact) =>
     set((state) => {
-      // Remove contact from minimized list if present
-      const filtered = state.minimizedChats.filter((c) => c.profileId !== contact.profileId);
+      if (!contact?.profileId || !contact.name || contact.name === 'undefined undefined') {
+        return state;
+      }
+
+      // Remove contact from minimized list if present (and drop any invalid stale entries)
+      const filtered = state.minimizedChats.filter(
+        (c) => c.profileId && c.name && c.name !== 'undefined undefined' && c.profileId !== contact.profileId
+      );
       let updatedMinimized = filtered;
 
       // If there was an active open chat different from target, auto-minimize previous
-      if (state.isOpen && state.activeChat && state.activeChat.profileId !== contact.profileId) {
+      if (
+        state.isOpen &&
+        state.activeChat &&
+        state.activeChat.profileId &&
+        state.activeChat.name !== 'undefined undefined' &&
+        state.activeChat.profileId !== contact.profileId
+      ) {
         if (!updatedMinimized.some((c) => c.profileId === state.activeChat!.profileId)) {
           updatedMinimized = [...updatedMinimized, state.activeChat];
         }

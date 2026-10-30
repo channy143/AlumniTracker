@@ -454,8 +454,24 @@ export const connectionsApi = {
 };
 
 export const messagesApi = {
-  send: (receiverId: string, body: string, subject?: string, connectionId?: string) =>
-    api.post<any>('/messages', { receiver_id: receiverId, body, subject, connection_id: connectionId }),
+  send: (
+    receiverId: string,
+    body: string,
+    subject?: string,
+    connectionId?: string,
+    replyToId?: string | null,
+    replyPreview?: { id: string; sender_id?: string; sender_name: string; body: string } | null
+  ) =>
+    api.post<any>('/messages', {
+      receiver_id: receiverId,
+      body,
+      subject,
+      connection_id: connectionId,
+      ...(replyToId ? { reply_to_id: replyToId } : {}),
+      ...(replyPreview ? { reply_preview: replyPreview } : {}),
+    }),
+  react: (messageId: string, emoji: string) =>
+    api.post<{ id: string; reactions: Record<string, any> }>(`/messages/${messageId}/reactions`, { emoji }),
   conversations: () => api.get<any[]>('/messages/conversations'),
   getConversation: (profileId: string) => api.get<any[]>(`/messages/${profileId}`),
   unreadCount: () => api.get<{ count: number }>('/messages/unread/count'),
@@ -482,8 +498,22 @@ export const messagesApi = {
   createGroup: (data: { name: string; description?: string; member_ids?: string[] }) =>
     api.post<any>('/messages/groups', data),
   getGroupMessages: (groupId: string) => api.get<any[]>(`/messages/groups/${groupId}/messages`),
-  sendGroupMessage: (groupId: string, body: string) =>
-    api.post<any>(`/messages/groups/${groupId}/messages`, { body }),
+  sendGroupMessage: (
+    groupId: string,
+    body: string,
+    replyToId?: string | null,
+    replyPreview?: { id: string; sender_id?: string; sender_name: string; body: string } | null
+  ) =>
+    api.post<any>(`/messages/groups/${groupId}/messages`, {
+      body,
+      ...(replyToId ? { reply_to_id: replyToId } : {}),
+      ...(replyPreview ? { reply_preview: replyPreview } : {}),
+    }),
+  reactGroupMessage: (groupId: string, messageId: string, emoji: string) =>
+    api.post<{ id: string; reactions: Record<string, any> }>(
+      `/messages/groups/${groupId}/messages/${messageId}/reactions`,
+      { emoji }
+    ),
   addGroupMembers: (groupId: string, memberIds: string[]) =>
     api.post<any>(`/messages/groups/${groupId}/members`, { member_ids: memberIds }),
   removeGroupMember: (groupId: string, profileId: string) =>

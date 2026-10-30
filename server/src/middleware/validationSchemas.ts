@@ -202,6 +202,16 @@ export const sendMessageSchema = z.object({
   subject: z.string().max(300).optional().nullable(),
   body: z.string().min(1, 'Message body is required').max(10000),
   connection_id: z.string().max(64).optional().nullable(),
+  reply_to_id: z.string().max(64).optional().nullable(),
+  reply_preview: z
+    .object({
+      id: z.string().max(64),
+      sender_id: z.string().max(64).optional(),
+      sender_name: z.string().max(200),
+      body: z.string().max(2000),
+    })
+    .optional()
+    .nullable(),
 }).strict();
 
 // -----------------------------------------------------------------------------

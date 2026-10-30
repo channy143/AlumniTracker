@@ -160,6 +160,7 @@ router.get('/conversations', authenticate, async (req: AuthenticatedRequest, res
     const { data: sent } = await db
       .from('messages')
       .select(`
+        sender_id,
         receiver_id,
         receiver:profiles!messages_receiver_id_fkey(id, first_name, last_name, avatar_url, last_active_at),
         body, created_at, is_read
@@ -171,6 +172,7 @@ router.get('/conversations', authenticate, async (req: AuthenticatedRequest, res
       .from('messages')
       .select(`
         sender_id,
+        receiver_id,
         sender:profiles!messages_sender_id_fkey(id, first_name, last_name, avatar_url, last_active_at),
         body, created_at, is_read
       `)
@@ -178,22 +180,25 @@ router.get('/conversations', authenticate, async (req: AuthenticatedRequest, res
       .order('created_at', { ascending: false });
 
     const conversationMap = new Map<string, any>();
-    [...(sent || []), ...(received || [])].forEach((msg: any) => {
-      const otherId = msg.sender_id === profile.id ? msg.receiver_id : msg.sender_id;
-      const other = msg.sender_id === profile.id ? msg.receiver : msg.sender;
+    const processMessage = (msg: any, otherId: string | undefined, rawOther: any, isReceived: boolean) => {
+      const other = Array.isArray(rawOther) ? rawOther[0] : rawOther;
+      if (!otherId || !other?.id || (!other.first_name && !other.last_name)) return;
       if (!conversationMap.has(otherId) || new Date(msg.created_at) > new Date(conversationMap.get(otherId).lastMessageAt)) {
         conversationMap.set(otherId, {
           profile_id: otherId,
-          first_name: other?.first_name,
-          last_name: other?.last_name,
-          avatar_url: other?.avatar_url,
+          first_name: other.first_name,
+          last_name: other.last_name,
+          avatar_url: other.avatar_url,
           lastMessage: msg.body,
           lastMessageAt: msg.created_at,
-          last_active_at: other?.last_active_at || null,
-          unread: msg.sender_id !== profile.id && !msg.is_read ? 1 : 0,
+          last_active_at: other.last_active_at || null,
+          unread: isReceived && !msg.is_read ? 1 : 0,
         });
       }
-    });
+    };
+
+    (sent || []).forEach((msg: any) => processMessage(msg, msg.receiver_id, msg.receiver, false));
+    (received || []).forEach((msg: any) => processMessage(msg, msg.sender_id, msg.sender, true));
 
     const unreadCounts: Record<string, number> = {};
     received?.forEach((msg: any) => {
@@ -418,7 +423,7 @@ router.get('/groups/:groupId/messages', authenticate, async (req: AuthenticatedR
     const { data: messages, error } = await supabase
       .from('chat_group_messages')
       .select(`
-        id, group_id, sender_id, body, created_at,
+        id, group_id, sender_id, body, created_at, reply_to_id, reply_preview, reactions,
         sender:profiles(id, first_name, last_name, avatar_url)
       `)
       .eq('group_id', groupId)
@@ -426,8 +431,20 @@ router.get('/groups/:groupId/messages', authenticate, async (req: AuthenticatedR
 
     if (error) throw new AppError(error.message, 500);
 
+    const msgById = new Map<string, any>();
+    (messages || []).forEach((m: any) => {
+      const senderObj: any = Array.isArray(m.sender) ? m.sender[0] : m.sender;
+      msgById.set(m.id, {
+        id: m.id,
+        sender_id: m.sender_id,
+        sender_name: `${senderObj?.first_name || ''} ${senderObj?.last_name || ''}`.trim() || 'Alumnus',
+        body: m.body,
+      });
+    });
+
     const formatted = (messages || []).map((m: any) => {
       const senderObj: any = Array.isArray(m.sender) ? m.sender[0] : m.sender;
+      const resolvedReply = m.reply_preview || (m.reply_to_id ? msgById.get(m.reply_to_id) || null : null);
       return {
         id: m.id,
         group_id: m.group_id,
@@ -437,6 +454,9 @@ router.get('/groups/:groupId/messages', authenticate, async (req: AuthenticatedR
         created_at: m.created_at,
         sender_name: `${senderObj?.first_name || ''} ${senderObj?.last_name || ''}`.trim() || 'Alumnus',
         sender_avatar: senderObj?.avatar_url || null,
+        reply_to_id: m.reply_to_id || null,
+        reply_preview: resolvedReply,
+        reactions: m.reactions || {},
       };
     });
 
@@ -448,7 +468,7 @@ router.get('/groups/:groupId/messages', authenticate, async (req: AuthenticatedR
 router.post('/groups/:groupId/messages', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const groupId = req.params.groupId;
-    const { body } = req.body;
+    const { body, reply_to_id, reply_preview } = req.body;
     if (!body || !body.trim()) {
       throw new AppError('Message body is required', 400);
     }
@@ -467,15 +487,38 @@ router.post('/groups/:groupId/messages', authenticate, async (req: Authenticated
       throw new AppError('You are not a member of this group chat', 403);
     }
 
+    const isUuid = typeof reply_to_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reply_to_id);
+    const validReplyId = isUuid ? reply_to_id : null;
+    let finalReplyPreview = reply_preview || null;
+
+    if (validReplyId && !finalReplyPreview) {
+      const { data: targetMsg } = await supabase
+        .from('chat_group_messages')
+        .select('id, sender_id, body, sender:profiles(first_name, last_name)')
+        .eq('id', validReplyId)
+        .maybeSingle();
+      if (targetMsg) {
+        const sObj: any = Array.isArray((targetMsg as any).sender) ? (targetMsg as any).sender[0] : (targetMsg as any).sender;
+        finalReplyPreview = {
+          id: targetMsg.id,
+          sender_id: targetMsg.sender_id,
+          sender_name: `${sObj?.first_name || ''} ${sObj?.last_name || ''}`.trim() || 'Alumnus',
+          body: targetMsg.body,
+        };
+      }
+    }
+
     const { data: msg, error } = await supabase
       .from('chat_group_messages')
       .insert({
         group_id: groupId,
         sender_id: myProfileId,
         body: body.trim(),
+        reply_to_id: validReplyId,
+        reply_preview: finalReplyPreview,
       })
       .select(`
-        id, group_id, sender_id, body, created_at,
+        id, group_id, sender_id, body, created_at, reply_to_id, reply_preview, reactions,
         sender:profiles(id, first_name, last_name, avatar_url)
       `)
       .single();
@@ -499,7 +542,72 @@ router.post('/groups/:groupId/messages', authenticate, async (req: Authenticated
       created_at: msg.created_at,
       sender_name: `${senderObj?.first_name || ''} ${senderObj?.last_name || ''}`.trim() || 'Alumnus',
       sender_avatar: senderObj?.avatar_url || null,
+      reply_to_id: (msg as any).reply_to_id || null,
+      reply_preview: (msg as any).reply_preview || finalReplyPreview || null,
+      reactions: (msg as any).reactions || {},
     });
+  } catch (err) { next(err); }
+});
+
+// POST /api/messages/groups/:groupId/messages/:messageId/reactions - toggle reaction on a group message
+router.post('/groups/:groupId/messages/:messageId/reactions', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { groupId, messageId } = req.params;
+    const emoji = typeof req.body?.emoji === 'string' ? req.body.emoji.trim() : '';
+
+    const { data: myProfile } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .eq('user_id', req.user!.userId)
+      .maybeSingle();
+
+    if (!myProfile) throw new AppError('Profile not found', 404);
+    const myProfileId = myProfile.id;
+    const myFullName = `${myProfile.first_name || ''} ${myProfile.last_name || ''}`.trim() || 'Alumnus';
+
+    const { data: member } = await supabase
+      .from('chat_group_members')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('profile_id', myProfileId)
+      .maybeSingle();
+
+    if (!member) {
+      throw new AppError('You are not a member of this group chat', 403);
+    }
+
+    const { data: msg, error: fetchErr } = await supabase
+      .from('chat_group_messages')
+      .select('id, group_id, reactions')
+      .eq('id', messageId)
+      .eq('group_id', groupId)
+      .maybeSingle();
+
+    if (fetchErr || !msg) throw new AppError('Message not found', 404);
+
+    const currentReactions: Record<string, any> = { ...(msg.reactions || {}) };
+    const existing = currentReactions[myProfileId];
+    const existingEmoji = typeof existing === 'string' ? existing : existing?.emoji;
+
+    if (!emoji || existingEmoji === emoji) {
+      delete currentReactions[myProfileId];
+    } else {
+      currentReactions[myProfileId] = {
+        emoji,
+        name: myFullName,
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    const { error: updateErr } = await supabase
+      .from('chat_group_messages')
+      .update({ reactions: currentReactions })
+      .eq('id', messageId)
+      .eq('group_id', groupId);
+
+    if (updateErr) throw new AppError(updateErr.message, 500);
+
+    res.json({ id: messageId, reactions: currentReactions });
   } catch (err) { next(err); }
 });
 
@@ -664,6 +772,57 @@ router.post('/groups/:groupId/leave', authenticate, async (req: AuthenticatedReq
   } catch (err) { next(err); }
 });
 
+router.post('/:messageId/reactions', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const emoji = typeof req.body?.emoji === 'string' ? req.body.emoji.trim() : '';
+
+    const { data: myProfile } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .eq('user_id', req.user!.userId)
+      .maybeSingle();
+
+    if (!myProfile) throw new AppError('Profile not found', 404);
+    const myProfileId = myProfile.id;
+    const myFullName = `${myProfile.first_name || ''} ${myProfile.last_name || ''}`.trim() || 'Alumnus';
+
+    const { data: msg, error: fetchErr } = await supabase
+      .from('messages')
+      .select('id, sender_id, receiver_id, reactions')
+      .eq('id', messageId)
+      .maybeSingle();
+
+    if (fetchErr || !msg) throw new AppError('Message not found', 404);
+    if (msg.sender_id !== myProfileId && msg.receiver_id !== myProfileId) {
+      throw new AppError('Not authorized to react to this message', 403);
+    }
+
+    const currentReactions: Record<string, any> = { ...(msg.reactions || {}) };
+    const existing = currentReactions[myProfileId];
+    const existingEmoji = typeof existing === 'string' ? existing : existing?.emoji;
+
+    if (!emoji || existingEmoji === emoji) {
+      delete currentReactions[myProfileId];
+    } else {
+      currentReactions[myProfileId] = {
+        emoji,
+        name: myFullName,
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    const { error: updateErr } = await supabase
+      .from('messages')
+      .update({ reactions: currentReactions })
+      .eq('id', messageId);
+
+    if (updateErr) throw new AppError(updateErr.message, 500);
+
+    res.json({ id: messageId, reactions: currentReactions });
+  } catch (err) { next(err); }
+});
+
 router.get('/:profileId', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const senderProfileId = await getProfileIdForUser(req.user!.userId);
@@ -689,13 +848,31 @@ router.get('/:profileId', authenticate, async (req: AuthenticatedRequest, res, n
         .eq('is_read', false)
     ).catch(() => {});
 
-    res.json(data || []);
+    const msgById = new Map<string, any>();
+    (data || []).forEach((m: any) => {
+      const sObj: any = Array.isArray(m.sender) ? m.sender[0] : m.sender;
+      msgById.set(m.id, {
+        id: m.id,
+        sender_id: m.sender_id,
+        sender_name: `${sObj?.first_name || ''} ${sObj?.last_name || ''}`.trim() || 'Alumni Contact',
+        body: m.body,
+      });
+    });
+
+    const enriched = (data || []).map((m: any) => ({
+      ...m,
+      reply_to_id: m.reply_to_id || null,
+      reply_preview: m.reply_preview || (m.reply_to_id ? msgById.get(m.reply_to_id) || null : null),
+      reactions: m.reactions || {},
+    }));
+
+    res.json(enriched);
   } catch (err) { next(err); }
 });
 
 router.post('/', authenticate, validate(sendMessageSchema), async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { receiver_id, subject, body, connection_id } = req.body;
+    const { receiver_id, subject, body, connection_id, reply_to_id, reply_preview } = req.body;
     if (!receiver_id || !body) throw new AppError('Receiver and message body are required', 400);
 
     // Fast profile resolution using RAM cache
@@ -704,6 +881,27 @@ router.post('/', authenticate, validate(sendMessageSchema), async (req: Authenti
 
     const targetParam = sanitizeFilterInput(receiver_id);
     const finalReceiverId = await resolveReceiverProfileId(targetParam);
+
+    const isUuid = typeof reply_to_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reply_to_id);
+    const validReplyId = isUuid ? reply_to_id : null;
+    let finalReplyPreview = reply_preview || null;
+
+    if (validReplyId && !finalReplyPreview) {
+      const { data: targetMsg } = await supabase
+        .from('messages')
+        .select('id, sender_id, body, sender:profiles!messages_sender_id_fkey(first_name, last_name)')
+        .eq('id', validReplyId)
+        .maybeSingle();
+      if (targetMsg) {
+        const sObj: any = Array.isArray((targetMsg as any).sender) ? (targetMsg as any).sender[0] : (targetMsg as any).sender;
+        finalReplyPreview = {
+          id: targetMsg.id,
+          sender_id: targetMsg.sender_id,
+          sender_name: `${sObj?.first_name || ''} ${sObj?.last_name || ''}`.trim() || 'Alumni Contact',
+          body: targetMsg.body,
+        };
+      }
+    }
 
     const db = createUserScopedClient(req.token!);
     const { data, error } = await db
@@ -714,6 +912,8 @@ router.post('/', authenticate, validate(sendMessageSchema), async (req: Authenti
         subject: subject || null,
         body,
         connection_id: connection_id || null,
+        reply_to_id: validReplyId,
+        reply_preview: finalReplyPreview,
       })
       .select()
       .single();
@@ -722,7 +922,12 @@ router.post('/', authenticate, validate(sendMessageSchema), async (req: Authenti
     // Mark user active without blocking
     markUserActive(req.user!.userId, senderProfileId).catch(() => {});
 
-    res.status(201).json(data);
+    res.status(201).json({
+      ...data,
+      reply_to_id: data.reply_to_id || validReplyId,
+      reply_preview: data.reply_preview || finalReplyPreview,
+      reactions: data.reactions || {},
+    });
   } catch (err) { next(err); }
 });
 
