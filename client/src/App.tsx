@@ -27,6 +27,7 @@ import AlumniOnboardingSurveyPage from '@/pages/survey/AlumniOnboardingSurveyPag
 import EmployerDashboard from '@/pages/employer/EmployerDashboard';
 import NotificationsPage from '@/pages/notifications/NotificationsPage';
 import ConnectionsPage from '@/pages/connections/ConnectionsPage';
+import CommunityPage from '@/pages/community/CommunityPage';
 
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AlumniManagement from '@/pages/admin/AlumniManagement';
@@ -134,6 +135,8 @@ export default function App() {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="connections" element={<ConnectionsPage />} />
         <Route path="network" element={<Navigate to="/connections" replace />} />
+        <Route path="community" element={<CommunityPage />} />
+        <Route path="forum" element={<Navigate to="/community" replace />} />
 
       </Route>
 

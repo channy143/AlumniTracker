@@ -497,7 +497,7 @@ export default function DockedChatBox() {
     <>
       {/* 1. Minimized State: Floating Avatars Stack */}
       {minimizedChats.length > 0 && (
-        <div className="fixed right-[11px] bottom-12 z-40 flex flex-col items-end gap-2.5">
+        <div className="fixed right-[11px] bottom-16 sm:bottom-12 z-40 flex flex-col items-end gap-2.5">
           {visibleChats.map((c) => {
             const initials = getInitials(c.name);
             return (
@@ -615,7 +615,7 @@ export default function DockedChatBox() {
         <div
           onMouseDown={closeHeaderDropdown}
           onClick={closeHeaderDropdown}
-          className="fixed bottom-0 right-4 sm:right-12 md:right-20 w-[350px] sm:w-[375px] h-[480px] max-h-[85vh] bg-white rounded-t-2xl shadow-2xl border border-gray-300 z-40 flex flex-col overflow-hidden"
+          className="fixed inset-x-2 bottom-14 sm:bottom-0 sm:left-auto sm:right-12 md:right-20 w-auto sm:w-[375px] h-[72vh] sm:h-[480px] max-h-[85vh] bg-white rounded-2xl sm:rounded-b-none sm:rounded-t-2xl shadow-2xl border border-gray-300 z-40 flex flex-col overflow-hidden"
         >
           {/* Top Title Bar */}
           <div className="px-3.5 py-2.5 bg-white border-b border-gray-200 flex items-center justify-between shadow-xs">
@@ -1042,7 +1042,7 @@ export default function DockedChatBox() {
                       <div
                         onClick={(e) => e.stopPropagation()}
                         className={`flex items-center gap-0.5 self-center shrink-0 transition-opacity duration-150 ${
-                          showReactionPopup ? 'opacity-100' : 'opacity-0 group-hover/msg:opacity-100'
+                          showReactionPopup ? 'opacity-100' : 'opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100'
                         }`}
                       >
                         <button

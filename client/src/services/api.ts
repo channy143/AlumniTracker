@@ -237,9 +237,20 @@ export const mentorshipApi = {
 
 export const communityApi = {
   groups: () => api.get<any[]>('/community/groups'),
+  createGroup: (data: { name: string; description?: string; category?: string }) =>
+    api.post<any>('/community/groups', data),
+  toggleJoinGroup: (groupId: string) =>
+    api.post<{ joined: boolean; member_count: number }>(`/community/groups/${groupId}/join`, {}),
+  allPosts: () => api.get<any[]>('/community/posts'),
   forums: (groupId: string) =>
-    api.get<any[]>(`/community/groups/${groupId}/posts`),
-  createPost: (data: any) => api.post<any>('/community/posts', data),
+    api.get<any[]>(groupId === 'all' ? '/community/posts' : `/community/groups/${groupId}/posts`),
+  createPost: (data: { group_id: string; title: string; content: string; tags?: string[] }) =>
+    api.post<any>('/community/posts', data),
+  likePost: (postId: string) =>
+    api.post<{ id: string; liked: boolean; like_count: number }>(`/community/posts/${postId}/like`, {}),
+  addComment: (postId: string, content: string) =>
+    api.post<{ comment: any; comments: any[]; comment_count: number }>(`/community/posts/${postId}/comments`, { content }),
+  deletePost: (postId: string) => api.delete<{ success: boolean; id: string }>(`/community/posts/${postId}`),
 };
 
 export const jobsApi = {

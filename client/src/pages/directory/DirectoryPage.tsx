@@ -261,7 +261,7 @@ export default function DirectoryPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         {[
           { label: 'Total Alumni', value: stats?.totalAlumni?.toLocaleString() || '—', color: 'text-ctu-blue' },
           { label: 'Currently Employed', value: stats?.currentlyEmployed?.toLocaleString() || '—', color: 'text-emerald-600' },
@@ -325,7 +325,7 @@ export default function DirectoryPage() {
             <div
               key={profile.id}
               onClick={() => handleView(profile)}
-              className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-3 cursor-pointer hover:border-orange-200 hover:shadow-sm transition-all"
+              className="bg-white border border-gray-200 rounded-lg px-3.5 sm:px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-3 cursor-pointer hover:border-orange-200 hover:shadow-sm transition-all"
             >
               <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-sm font-bold text-white shrink-0 overflow-hidden">
                 {profile.avatar_url ? (

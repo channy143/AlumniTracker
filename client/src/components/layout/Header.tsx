@@ -326,7 +326,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                 )}
               </button>
               {notifDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                <div className="fixed sm:absolute inset-x-2 sm:inset-x-auto sm:right-0 top-13 sm:top-full sm:mt-1 w-auto sm:w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-[70vh] sm:max-h-96 overflow-y-auto">
                   <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800">Notifications</p>
                     {unreadCount > 0 && (

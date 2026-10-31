@@ -457,7 +457,7 @@ export default function ChatDropdown() {
 
       {/* Dropdown Menu */}
       {isHeaderDropdownOpen && (
-        <div className="absolute right-0 top-full mt-2 w-[360px] sm:w-[390px] bg-white border border-gray-200/90 rounded-2xl shadow-2xl z-[70] overflow-hidden flex flex-col max-h-[580px]">
+        <div className="fixed sm:absolute inset-x-2 sm:inset-x-auto sm:right-0 top-13 sm:top-full sm:mt-2 w-auto sm:w-[390px] bg-white border border-gray-200/90 rounded-2xl shadow-2xl z-[70] overflow-hidden flex flex-col max-h-[75vh] sm:max-h-[580px]">
 
           {/* Header Bar */}
           {isCreatingGroup ? (
