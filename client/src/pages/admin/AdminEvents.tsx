@@ -97,7 +97,7 @@ export default function AdminEvents() {
         <p className="text-xs text-gray-500">Manage alumni events, career fairs, and deadlines.</p>
       </div>
 
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">{['upcoming', 'past'].map((f) => (
           <button key={f} onClick={() => setFilter(f as 'upcoming' | 'past')}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
@@ -127,18 +127,18 @@ export default function AdminEvents() {
         ) : filteredEvents.length === 0 ? (
           <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">No {filter} events for now.</div>
         ) : filteredEvents.slice(0, 10).map((e: any) => (
-          <div key={e.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div key={e.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-lg bg-orange-50 flex flex-col items-center justify-center shrink-0">
                 <span className="text-xs font-bold text-orange-600 leading-none">{dateParts(e.date).day}</span>
                 <span className="text-[9px] text-orange-400">{dateParts(e.date).month}</span>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900">{e.name}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{e.name}</p>
                 <p className="text-xs text-gray-500">{formatDate(e.date)}{e.time ? ` · ${e.time}` : ''}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button onClick={() => { setEditId(e.id); setForm({ name: e.name, description: e.description || '', date: e.date || '', time: e.time || '', location: e.location || '' }); setShowForm(true); }}
                 className="text-xs text-orange-600 hover:text-orange-700">Edit</button>
               <button onClick={() => handleDelete(e.id)} className="text-xs text-red-500 hover:text-red-700">Delete</button>
@@ -150,7 +150,7 @@ export default function AdminEvents() {
       {showForm && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150" onClick={() => setShowForm(false)}>
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
                   <CalendarDaysIcon className="w-5 h-5 text-white" />
@@ -170,7 +170,7 @@ export default function AdminEvents() {
             </div>
 
             <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Event Name *</label>
                   <input required placeholder="e.g. Annual Grand Alumni Homecoming 2026" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -181,7 +181,7 @@ export default function AdminEvents() {
                   <textarea placeholder="Provide details about the event schedule, program, and attendees..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
                     className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" rows={3} />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Date *</label>
                     <input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}

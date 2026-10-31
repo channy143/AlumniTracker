@@ -131,7 +131,7 @@ export default function CareerInsightsPage() {
         )}
 
         {data.mostCommonCourse && (
-          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs">
+          <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
             <AcademicCapIcon className="w-4 h-4 text-orange-500 shrink-0" />
             <span className="text-gray-500">Most Common Course:</span>
             <span className="font-semibold text-gray-800">{formatProgramLongName(data.mostCommonCourse)}</span>
@@ -140,8 +140,8 @@ export default function CareerInsightsPage() {
       </div>
 
       {/* Main Content Layout: Left Insights Column + Conditional Right Nav (placed under Career Overview) */}
-      <div className="flex flex-col lg:flex-row gap-4 items-stretch">
-        <div className="flex-1 min-w-0 w-full space-y-4">
+      <div className="flex flex-col lg:flex-row gap-4 lg:items-stretch">
+        <div className="w-full lg:flex-1 min-w-0 space-y-4">
 
           {/* Where They Work: Top Employers & Alumni */}
           {(data.topEmployers?.length > 0 || data.recentAlumni?.length > 0) && (
@@ -178,7 +178,7 @@ export default function CareerInsightsPage() {
                     </h4>
                     <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 flex-1">
                       {data.recentAlumni.slice(0, 10).map((alumni: any) => (
-                        <div key={alumni.id} className="flex items-center justify-between gap-3 text-xs p-2 rounded-lg hover:bg-gray-50 border border-gray-50 transition-colors">
+                        <div key={alumni.id} className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-3 text-xs p-2 rounded-lg hover:bg-gray-50 border border-gray-50 transition-colors">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-[10px] font-bold text-orange-600 shrink-0">
                               {alumni.name?.charAt(0) || 'A'}

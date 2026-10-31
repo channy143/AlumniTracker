@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
   BriefcaseIcon,
-  ChatBubbleLeftRightIcon,
+  GlobeAltIcon,
   BookOpenIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
@@ -15,7 +15,7 @@ import DockedChatBox from '@/components/chat/DockedChatBox';
 const mobileNavItems = [
   { name: 'Home', href: '/', icon: HomeIcon, end: true },
   { name: 'Jobs', href: '/jobs', icon: BriefcaseIcon },
-  { name: 'Forum', href: '/community', icon: ChatBubbleLeftRightIcon },
+  { name: 'Forum', href: '/community', icon: GlobeAltIcon },
   { name: 'Directory', href: '/directory', icon: BookOpenIcon },
   { name: 'Network', href: '/connections', icon: UsersIcon },
 ];

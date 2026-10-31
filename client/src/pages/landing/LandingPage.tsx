@@ -63,12 +63,7 @@ const values = [
   { title: 'Legacy', desc: 'Your success inspires the next generation. Give back, mentor, and build a lasting impact.', icon: GlobeAltIcon, color: 'from-ctu-gold to-yellow-700' },
 ];
 
-const statConfig = [
-  { value: 2450, label: 'Alumni Network', suffix: '+', max: 3000 },
-  { value: 87, label: 'Employment Rate', suffix: '%', max: 100 },
-  { value: 156, label: 'Mentorship Matches', suffix: '', max: 200 },
-  { value: 18, label: 'Programs Tracked', suffix: '+', max: 30 },
-];
+
 
 /* ─── Animations ─── */
 
@@ -282,7 +277,7 @@ function ValueCard({ value, index, revealed }: { value: (typeof values)[0]; inde
       transition={{ duration: 0.6, delay: 0.2 + index * 0.15 }}
       className="group"
     >
-      <TiltCard className="relative overflow-hidden rounded-2xl bg-white shadow-[0_0_0_1px_rgba(229,231,235,1)] p-8 md:p-10 hover:shadow-[0_0_0_1px_rgba(229,231,235,1),0_25px_50px_rgba(0,0,0,0.15)] transition-shadow duration-500 h-full">
+      <TiltCard className="relative overflow-hidden rounded-2xl bg-white shadow-[0_0_0_1px_rgba(229,231,235,1)] p-6 sm:p-8 md:p-10 hover:shadow-[0_0_0_1px_rgba(229,231,235,1),0_25px_50px_rgba(0,0,0,0.15)] transition-shadow duration-500 h-full">
         <div className={`absolute inset-0 bg-gradient-to-br ${value.color} opacity-[0.03] group-hover:opacity-[0.06] transition-opacity duration-500`} />
         <div className="relative z-10">
           <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${value.color} flex items-center justify-center shadow-lg`}>
@@ -490,9 +485,9 @@ export default function LandingPage() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-            className="fixed inset-0 z-40 bg-white/98 backdrop-blur-xl pt-24 lg:hidden"
+            className="fixed inset-0 z-40 bg-white/98 backdrop-blur-xl pt-20 lg:hidden overflow-y-auto"
           >
-            <div className="flex flex-col items-center justify-center h-full gap-6 px-6 pb-24">
+            <div className="flex flex-col items-center justify-center min-h-full gap-5 sm:gap-6 px-6 pb-16">
               {NAV_SECTIONS.map((section) => (
                 <button
                   key={section.id}
@@ -659,7 +654,7 @@ export default function LandingPage() {
           initial={false}
           animate={manifestoRevealed ? { opacity: 1, x: 0 } : { opacity: 0, x: -60 }}
           transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
-          className="flex-1 flex items-center justify-center p-8 sm:p-12 lg:p-20 bg-white relative overflow-hidden"
+          className="flex-1 flex items-center justify-center p-6 sm:p-12 lg:p-20 bg-white relative overflow-hidden"
         >
           <div className="max-w-lg relative z-10">
             <span className="text-ctu-marigold text-xs uppercase tracking-[0.25em] font-semibold flex items-center gap-3">
@@ -686,7 +681,7 @@ export default function LandingPage() {
           initial={false}
           animate={manifestoRevealed ? { opacity: 1, x: 0 } : { opacity: 0, x: 60 }}
           transition={{ duration: 0.7, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-          className="flex-1 gradient-header flex items-center p-8 sm:p-12 lg:p-20 relative overflow-hidden"
+          className="flex-1 gradient-header flex items-center p-6 sm:p-12 lg:p-20 relative overflow-hidden"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-ctu-blue via-blue-800 to-blue-950" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(232,160,80,0.06),transparent_50%)]" />
@@ -860,11 +855,11 @@ export default function LandingPage() {
               <span className="w-8 h-px bg-ctu-gold/60" />
               Join the Movement
             </span>
-            <h2 className="text-5xl md:text-7xl font-bold font-display text-white mt-2 leading-[1.05] tracking-tight">
+            <h2 className="text-3xl sm:text-5xl md:text-7xl font-bold font-display text-white mt-2 leading-[1.05] tracking-tight">
               Ready to{' '}
               <span className="text-ctu-marigold">Reconnect</span>?
             </h2>
-            <p className="text-white/60 text-lg mt-6 max-w-xl mx-auto leading-relaxed font-light">
+            <p className="text-white/60 text-base sm:text-lg mt-6 max-w-xl mx-auto leading-relaxed font-light">
               Join fellow CTU-Naga alumni who are staying connected, growing
               together, and building a legacy that spans generations.
             </p>
@@ -878,14 +873,14 @@ export default function LandingPage() {
           >
             <Link
               to="/auth/register"
-              className="group text-base px-10 py-4 rounded-xl font-medium inline-flex items-center gap-2 transition-all text-white bg-ctu-marigold hover:bg-[#d4893a] hover:shadow-2xl hover:shadow-ctu-marigold/20 hover:scale-[1.03] active:scale-[0.97]"
+              className="group text-base px-6 sm:px-10 py-3 sm:py-4 w-full sm:w-auto justify-center rounded-xl font-medium inline-flex items-center gap-2 transition-all text-white bg-ctu-marigold hover:bg-[#d4893a] hover:shadow-2xl hover:shadow-ctu-marigold/20 hover:scale-[1.03] active:scale-[0.97]"
             >
               Create Your Profile
               <ArrowRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </Link>
             <Link
               to="/auth/login"
-              className="text-base px-10 py-4 rounded-xl font-medium transition-all text-white/70 border border-white/20 hover:bg-white/10 hover:text-white hover:border-white/40 backdrop-blur-sm"
+              className="text-base px-6 sm:px-10 py-3 sm:py-4 w-full sm:w-auto text-center rounded-xl font-medium transition-all text-white/70 border border-white/20 hover:bg-white/10 hover:text-white hover:border-white/40 backdrop-blur-sm"
             >
               Sign In
             </Link>

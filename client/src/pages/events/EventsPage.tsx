@@ -176,16 +176,16 @@ export default function EventsPage() {
         <p className="text-xs text-gray-500">Complete event history for CTU-Naga alumni.</p>
       </div>
 
-      <div className="flex items-center gap-2 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
         <CalendarDaysIcon className="w-4 h-4 text-gray-400 shrink-0" />
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
           {(['all', 'upcoming', 'past'] as const).map((option) => {
             const count = option === 'all' ? events.length : (option === 'upcoming' ? upcomingCount : pastCount);
             return (
               <button
                 key={option}
                 onClick={() => setFilter(option)}
-                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors flex items-center gap-1.5 ${
+                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors flex items-center gap-1.5 shrink-0 ${
                   filter === option
                     ? 'bg-orange-500 text-white shadow-sm'
                     : 'text-gray-500 hover:bg-gray-100'
@@ -199,7 +199,7 @@ export default function EventsPage() {
             );
           })}
         </div>
-        <span className="text-xs text-gray-400 ml-auto">{filtered.length} event{filtered.length !== 1 ? 's' : ''}</span>
+        <span className="text-xs text-gray-400 ml-auto shrink-0">{filtered.length} event{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
       {loading ? (

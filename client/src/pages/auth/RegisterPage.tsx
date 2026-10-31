@@ -745,18 +745,18 @@ export default function RegisterPage() {
             transition={{ duration: 0.25 }}
           >
             <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
                 <ShieldCheckIcon className="w-5 h-5 text-blue-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-xl font-bold text-ctu-charcoal">Security Check</h2>
-                <p className="text-sm text-gray-500">{formData.email}</p>
+                <p className="text-sm text-gray-500 truncate">{formData.email}</p>
               </div>
             </div>
             <p className="text-gray-400 text-sm mt-4 mb-6">Please complete the security check to continue with registration.</p>
 
             <div className="space-y-5">
-              <div className="flex justify-center" ref={captchaContainerRef} />
+              <div className="flex justify-center overflow-x-auto max-w-full" ref={captchaContainerRef} />
               {!widgetRendered && (
                 <p className="text-xs text-gray-400 text-center">Loading security check...</p>
               )}
@@ -795,12 +795,12 @@ export default function RegisterPage() {
             transition={{ duration: 0.25 }}
           >
             <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
                 <CheckIcon className="w-5 h-5 text-green-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-xl font-bold text-ctu-charcoal">Verify Your Email</h2>
-                <p className="text-sm text-gray-500">{formData.email}</p>
+                <p className="text-sm text-gray-500 truncate">{formData.email}</p>
               </div>
             </div>
             <p className="text-gray-400 text-sm mt-4 mb-8">
@@ -819,7 +819,7 @@ export default function RegisterPage() {
                     setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
                     if (otpError) setOtpError(null);
                   }}
-                  className={`input-field text-center text-3xl tracking-[0.5em] font-mono ${
+                  className={`input-field text-center text-2xl sm:text-3xl tracking-[0.3em] sm:tracking-[0.5em] font-mono ${
                     otpError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''
                   }`}
                   placeholder="000000"

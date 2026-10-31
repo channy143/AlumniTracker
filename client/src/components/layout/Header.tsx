@@ -253,21 +253,21 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
   return (
     <>
-      <header className="sticky top-0 z-[60] bg-white border-b border-gray-200 h-12 flex items-center pr-4">
+      <header className="sticky top-0 z-[60] bg-white border-b border-gray-200 h-12 flex items-center px-2 sm:px-4">
 
-        <div className="w-full grid grid-cols-3 items-center">
-          <div className="flex items-center gap-2">
-            <button onClick={onMenuClick} className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded">
+        <div className="w-full flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <button onClick={onMenuClick} className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg">
               <Bars3Icon className="w-5 h-5" />
             </button>
             <div className="flex lg:hidden items-center gap-2">
-              <img src="/logo.png" alt="CTU-Naga Alumni" className="w-8 h-8 rounded-lg object-contain shadow-xs shrink-0" />
+              <img src="/logo.png" alt="CTU-Naga Alumni" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-contain shadow-xs shrink-0" />
               <span className="hidden sm:block text-sm font-semibold text-gray-800">CTU-Naga</span>
             </div>
           </div>
 
-          <div className="flex justify-center">
-            <div className="w-full max-w-xl">
+          <div className="flex-1 flex justify-center max-w-xl mx-1 sm:mx-4 min-w-0">
+            <div className="w-full">
               <form onSubmit={handleSearchSubmit} className="relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <input
@@ -275,7 +275,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                   placeholder={placeholder}
-                  className="w-full h-9 pl-9 pr-8 bg-gray-50 border border-gray-200 rounded-full text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all"
+                  className="w-full h-9 pl-9 pr-8 bg-gray-50 border border-gray-200 rounded-full text-xs sm:text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all"
                 />
                 {searchValue && (
                   <button
@@ -403,7 +403,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               </button>
 
               {dropdownOpen && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-100 rounded-xl shadow-xl py-1.5 z-50 animate-in fade-in duration-150">
+                <div className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-1rem)] bg-white border border-gray-100 rounded-xl shadow-xl py-1.5 z-50 animate-in fade-in duration-150">
                   {user?.role !== 'admin' && (
                     <button
                       onClick={() => { setDropdownOpen(false); navigate('/profile'); }}
@@ -459,7 +459,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               <span className="text-xs text-orange-950 font-medium">Session ending in</span>
               <p className="text-2xl font-black text-orange-600 font-mono mt-0.5">{secondsRemaining}s</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
                 onClick={resetActivity}

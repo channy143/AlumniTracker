@@ -100,7 +100,7 @@ export default function CareerCardInsightsPanel({
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+      <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onBack}
@@ -209,9 +209,9 @@ export default function CareerCardInsightsPanel({
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
                             <p className="font-bold text-gray-900 text-sm truncate leading-snug">{a.name}</p>
-                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:justify-end">
                               {a.hiredViaJob && (
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 flex items-center gap-1">
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
@@ -243,7 +243,7 @@ export default function CareerCardInsightsPanel({
                                 title={`${formatProgramLongName(a.program) || a.program || ''}${a.batch ? ` (Batch ${a.batch})` : ''}`}
                               >
                                 <AcademicCapIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                <span className="max-w-[340px] sm:max-w-none truncate sm:whitespace-normal font-medium">
+                                <span className="max-w-full sm:max-w-none truncate sm:whitespace-normal font-medium">
                                   {formatProgramLongName(a.program) || a.program}
                                   {a.batch ? ` (Batch ${a.batch})` : ''}
                                 </span>

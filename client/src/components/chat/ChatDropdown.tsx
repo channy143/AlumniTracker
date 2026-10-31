@@ -81,9 +81,11 @@ export default function ChatDropdown() {
     closeHeaderDropdown,
     groups,
     setGroups,
+    conversationsCache,
+    setConversationsCache,
   } = useChatStore();
 
-  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [conversations, setConversations] = useState<ConversationItem[]>(() => conversationsCache || []);
   const [connectedAlumni, setConnectedAlumni] = useState<ConnectedAlumni[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [composeSearch, setComposeSearch] = useState('');
@@ -119,14 +121,30 @@ export default function ChatDropdown() {
     };
   }, [isHeaderDropdownOpen, closeHeaderDropdown]);
 
-  // Fetch current user's profile ID
+  // Fetch current user's profile ID and warm up conversation + group caches in background
   useEffect(() => {
     profileApi.get()
       .then((p) => {
         if (p?.id) setMyProfileId(p.id);
       })
       .catch(() => {});
-  }, []);
+
+    // Preload conversations and group messages into chatStore so opening any conversation is instant
+    messagesApi.conversations()
+      .then((convData) => {
+        if (Array.isArray(convData)) {
+          setConversations(convData);
+          setConversationsCache(convData);
+        }
+      })
+      .catch(() => {});
+
+    messagesApi.groups()
+      .then((grpData) => {
+        if (Array.isArray(grpData)) setGroups(grpData);
+      })
+      .catch(() => {});
+  }, [setConversationsCache, setGroups]);
 
   // Fetch unread count periodically and trigger notification chime when new messages arrive
   useEffect(() => {
@@ -154,15 +172,19 @@ export default function ChatDropdown() {
   // Load conversations, groups, and connected alumni when dropdown is opened
   useEffect(() => {
     if (isHeaderDropdownOpen) {
-      setLoading(true);
-      setLoadingConnections(true);
+      if (conversations.length === 0) setLoading(true);
+      if (connectedAlumni.length === 0) setLoadingConnections(true);
 
       // 1. Fetch conversations
       messagesApi.conversations()
         .then((convData) => {
-          setConversations(convData || []);
+          const list = convData || [];
+          setConversations(list);
+          setConversationsCache(list);
         })
-        .catch(() => setConversations([]))
+        .catch(() => {
+          if (conversations.length === 0) setConversations([]);
+        })
         .finally(() => setLoading(false));
 
       // 2. Fetch groups
@@ -236,7 +258,10 @@ export default function ChatDropdown() {
     const refreshActivePresence = async () => {
       try {
         const updatedConvs = await messagesApi.conversations();
-        if (updatedConvs) setConversations(updatedConvs);
+        if (updatedConvs) {
+          setConversations(updatedConvs);
+          setConversationsCache(updatedConvs);
+        }
 
         if (activeTab === 'groups' || activeTab === 'all') {
           const updatedGrps = await messagesApi.groups();

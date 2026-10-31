@@ -57,31 +57,31 @@ export const ReportSuspiciousActivityModal: React.FC<ReportSuspiciousActivityMod
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div
-        className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-lg w-full overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-red-50/40">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-600">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-100 bg-red-50/40 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-600 shrink-0">
               <ShieldExclamationIcon className="w-5 h-5" />
             </div>
-            <div>
-              <h2 className="text-sm font-bold text-gray-900">Report Suspicious Activity</h2>
-              <p className="text-[11px] text-gray-500">
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-gray-900 truncate">Report Suspicious Activity</h2>
+              <p className="text-[11px] text-gray-500 truncate">
                 Account Protection &bull; Direct Administrator Alert
               </p>
             </div>
           </div>
           <button
             onClick={handleResetAndClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
         {submitted ? (
-          <div className="p-6 text-center space-y-4">
+          <div className="p-5 sm:p-6 text-center space-y-4 overflow-y-auto">
             <div className="w-12 h-12 mx-auto rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
               <CheckCircleIcon className="w-7 h-7" />
             </div>
@@ -101,7 +101,7 @@ export const ReportSuspiciousActivityModal: React.FC<ReportSuspiciousActivityMod
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Type of Suspicious Activity

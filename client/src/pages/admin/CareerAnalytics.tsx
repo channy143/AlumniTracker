@@ -360,7 +360,7 @@ export default function CareerAnalytics() {
           <p className="text-xs text-gray-500">Analyze graduate employment outcomes and workforce trends using Graduate Tracer Survey data.</p>
         </div>
         {data && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={handleExportPDF} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-orange-300">
               <ArrowDownTrayIcon className="w-3.5 h-3.5" /> PDF
             </button>
@@ -656,7 +656,7 @@ export default function CareerAnalytics() {
                           return (
                             <div key={c.name}>
                               <div className="flex justify-between text-[11px] mb-0.5">
-                                <span className="text-gray-700 truncate max-w-[190px]">{c.name}</span>
+                                <span className="text-gray-700 truncate max-w-[140px] sm:max-w-[190px]">{c.name}</span>
                                 <span className="text-gray-500 font-medium">{c.count} ({pct}%)</span>
                               </div>
                               <div className="w-full bg-gray-200/80 h-1.5 rounded-full overflow-hidden">
@@ -683,7 +683,7 @@ export default function CareerAnalytics() {
                           return (
                             <div key={r.name}>
                               <div className="flex justify-between text-[11px] mb-0.5">
-                                <span className="text-gray-700 truncate max-w-[190px]">{r.name}</span>
+                                <span className="text-gray-700 truncate max-w-[140px] sm:max-w-[190px]">{r.name}</span>
                                 <span className="text-gray-500 font-medium">{r.count} ({pct}%)</span>
                               </div>
                               <div className="w-full bg-gray-200/80 h-1.5 rounded-full overflow-hidden">
@@ -731,7 +731,7 @@ export default function CareerAnalytics() {
                 {onboardingSurvey && onboardingSurvey.totalResponses > 0 ? (
                   <div className="space-y-3">
                     {/* Overall score banner */}
-                    <div className="bg-gradient-to-br from-orange-50 to-amber-50/50 rounded-lg p-3 border border-orange-100 flex items-center justify-between">
+                    <div className="bg-gradient-to-br from-orange-50 to-amber-50/50 rounded-lg p-3 border border-orange-100 flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Overall Satisfaction</p>
                         <div className="flex items-baseline gap-1 mt-0.5">

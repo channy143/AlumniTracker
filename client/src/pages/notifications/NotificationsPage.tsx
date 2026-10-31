@@ -225,8 +225,8 @@ export default function NotificationsPage() {
     <div className="max-w-5xl mx-auto space-y-6 pb-16 animate-in fade-in duration-150">
       {/* Toast */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-gray-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
-          <CheckCircleIcon className="w-4 h-4 text-emerald-400" />
+        <div className="fixed bottom-5 left-4 right-4 sm:left-auto sm:right-5 z-50 bg-gray-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -254,7 +254,7 @@ export default function NotificationsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               onClick={handleMarkAllRead}
               disabled={unreadCount === 0}

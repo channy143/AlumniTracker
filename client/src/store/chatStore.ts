@@ -40,6 +40,8 @@ interface ChatState {
   activeChat: ChatContact | null;
   minimizedChats: ChatContact[];
   groups: ChatContact[];
+  conversationsCache: any[];
+  messagesByChat: Record<string, any[]>;
   unreadCount: number;
   isHeaderDropdownOpen: boolean;
   replyingTo: ReplyTarget | null;
@@ -58,6 +60,11 @@ interface ChatState {
   toggleHeaderDropdown: () => void;
   closeHeaderDropdown: () => void;
 
+  // Message & Conversation Cache Actions
+  setChatMessages: (profileId: string, messages: any[]) => void;
+  seedMessagesBulk: (map: Record<string, any[]>) => void;
+  setConversationsCache: (convs: any[]) => void;
+
   // Group Conversation Actions
   setGroups: (groups: ChatContact[]) => void;
   updateGroupMembers: (groupId: string, members: GroupMember[]) => void;
@@ -70,12 +77,14 @@ interface ChatState {
   setReplyingTo: (reply: ReplyTarget | null) => void;
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>((set) => ({
   isOpen: false,
   isMinimized: false,
   activeChat: null,
   minimizedChats: [],
   groups: [],
+  conversationsCache: [],
+  messagesByChat: {},
   unreadCount: 0,
   isHeaderDropdownOpen: false,
   replyingTo: null,
@@ -249,8 +258,77 @@ export const useChatStore = create<ChatState>((set, get) => ({
   toggleHeaderDropdown: () => set((state) => ({ isHeaderDropdownOpen: !state.isHeaderDropdownOpen })),
   closeHeaderDropdown: () => set({ isHeaderDropdownOpen: false }),
 
+  // Message & Conversation Cache Handlers
+  setChatMessages: (profileId, messages) =>
+    set((state) => {
+      if (!profileId) return state;
+      return {
+        messagesByChat: {
+          ...state.messagesByChat,
+          [profileId]: messages,
+        },
+      };
+    }),
+
+  seedMessagesBulk: (map) =>
+    set((state) => {
+      const updated = { ...state.messagesByChat };
+      Object.entries(map).forEach(([id, msgs]) => {
+        if (id && Array.isArray(msgs)) {
+          // Keep any pending temp- messages if already present in active state
+          const existing = updated[id] || [];
+          const pending = existing.filter(
+            (p: any) =>
+              typeof p?.id === 'string' &&
+              p.id.startsWith('temp-') &&
+              !msgs.some((m: any) => m.id === p.id || m.body === p.body)
+          );
+          updated[id] = [...msgs, ...pending];
+        }
+      });
+      return { messagesByChat: updated };
+    }),
+
+  setConversationsCache: (convs) =>
+    set((state) => {
+      const updatedMsgs = { ...state.messagesByChat };
+      (convs || []).forEach((c: any) => {
+        if (c?.profile_id && Array.isArray(c.messages)) {
+          const existing = updatedMsgs[c.profile_id] || [];
+          const pending = existing.filter(
+            (p: any) =>
+              typeof p?.id === 'string' &&
+              p.id.startsWith('temp-') &&
+              !c.messages.some((m: any) => m.id === p.id || m.body === p.body)
+          );
+          updatedMsgs[c.profile_id] = [...c.messages, ...pending];
+        }
+      });
+      return {
+        conversationsCache: convs || [],
+        messagesByChat: updatedMsgs,
+      };
+    }),
+
   // Group Conversation Handlers
-  setGroups: (groups) => set({ groups }),
+  setGroups: (groups) =>
+    set((state) => {
+      const updatedMsgs = { ...state.messagesByChat };
+      (groups || []).forEach((g: any) => {
+        const gid = g?.profileId || g?.id;
+        if (gid && Array.isArray(g.messages)) {
+          const existing = updatedMsgs[gid] || [];
+          const pending = existing.filter(
+            (p: any) =>
+              typeof p?.id === 'string' &&
+              p.id.startsWith('temp-') &&
+              !g.messages.some((m: any) => m.id === p.id || m.body === p.body)
+          );
+          updatedMsgs[gid] = [...g.messages, ...pending];
+        }
+      });
+      return { groups, messagesByChat: updatedMsgs };
+    }),
 
   updateGroupMembers: (groupId, members) =>
     set((state) => ({

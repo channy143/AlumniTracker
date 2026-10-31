@@ -599,7 +599,7 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Master All-in-One Export Button */}
           <button
             onClick={handleExportMasterWorkbook}
@@ -611,7 +611,7 @@ export default function ReportsPage() {
             {generating === 'master-workbook' ? 'Compiling Workbook...' : 'Master Excel (All Datasets)'}
           </button>
 
-          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+          <div className="flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-xl">
             <button
               onClick={() => setActiveTab('reports')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -951,15 +951,15 @@ export default function ReportsPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-initial">
                 <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />
                 <input
                   type="text"
                   placeholder="Search report, admin..."
                   value={historySearch}
                   onChange={(e) => setHistorySearch(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-orange-500 w-48"
+                  className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-orange-500 w-full sm:w-48"
                 />
               </div>
 
@@ -1051,12 +1051,12 @@ export default function ReportsPage() {
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-gray-200 overflow-hidden animate-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-orange-50 via-white to-amber-50 shrink-0">
-              <div className="flex items-center gap-3">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-orange-50 via-white to-amber-50 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
                   <TableCellsIcon className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-base font-bold text-gray-900 leading-tight">
                     {previewModal.title} — Live Preview
                   </h3>
@@ -1066,7 +1066,7 @@ export default function ReportsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => exportAsExcel(previewModal.data, `${previewModal.reportId}-preview.xlsx`, previewModal.title)}
                   className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer"
@@ -1091,8 +1091,8 @@ export default function ReportsPage() {
             </div>
 
             {/* Search Filter Bar */}
-            <div className="px-6 py-2.5 border-b border-gray-100 bg-gray-50/70 flex items-center justify-between shrink-0">
-              <div className="relative w-72">
+            <div className="px-4 sm:px-6 py-2.5 border-b border-gray-100 bg-gray-50/70 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="relative w-full sm:w-72">
                 <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />
                 <input
                   type="text"
@@ -1108,7 +1108,7 @@ export default function ReportsPage() {
             </div>
 
             {/* Table Content */}
-            <div className="flex-1 overflow-auto p-6">
+            <div className="flex-1 overflow-auto p-4 sm:p-6">
               {previewRows.length === 0 ? (
                 <div className="text-center py-16 text-gray-400 text-xs">
                   No records match your search criteria.
@@ -1152,7 +1152,7 @@ export default function ReportsPage() {
       {/* --------------------------------------------------------------------- */}
       {pendingExport && (
         <div className="fixed inset-0 z-[170] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-purple-200 animate-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-purple-200 animate-in zoom-in-95 duration-150">
             <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mb-3">
               <ScaleIcon className="w-6 h-6" />
             </div>
@@ -1176,7 +1176,7 @@ export default function ReportsPage() {
               </ul>
             </div>
 
-            <div className="flex gap-2.5">
+            <div className="flex flex-col sm:flex-row gap-2.5">
               <button
                 type="button"
                 onClick={() => setPendingExport(null)}

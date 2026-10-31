@@ -218,7 +218,7 @@ export default function LoginPage() {
                 setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
                 if (mfaError) setMfaError(null);
               }}
-              className={`input-field text-center text-3xl tracking-[0.5em] font-mono ${
+              className={`input-field text-center text-2xl sm:text-3xl tracking-[0.3em] sm:tracking-[0.5em] font-mono ${
                 mfaError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''
               }`}
               placeholder="000000"
@@ -347,7 +347,7 @@ export default function LoginPage() {
           )}
         </div>
 
-        <div className="flex items-center justify-between -mt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 -mt-3">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"

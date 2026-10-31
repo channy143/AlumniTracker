@@ -149,37 +149,37 @@ router.get('/presence', authenticate, async (req: AuthenticatedRequest, res, nex
 
 router.get('/conversations', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const db = createUserScopedClient(req.token!);
-    const { data: profile } = await db
-      .from('profiles')
-      .select('id')
-      .eq('user_id', req.user!.userId)
-      .single();
-    if (!profile) throw new AppError('Profile not found', 404);
+    const profileId = await getProfileIdForUser(req.user!.userId);
+    if (!profileId) throw new AppError('Profile not found', 404);
 
-    const { data: sent } = await db
-      .from('messages')
-      .select(`
-        sender_id,
-        receiver_id,
-        receiver:profiles!messages_receiver_id_fkey(id, first_name, last_name, avatar_url, last_active_at),
-        body, created_at, is_read
-      `)
-      .eq('sender_id', profile.id)
-      .order('created_at', { ascending: false });
-
-    const { data: received } = await db
-      .from('messages')
-      .select(`
-        sender_id,
-        receiver_id,
-        sender:profiles!messages_sender_id_fkey(id, first_name, last_name, avatar_url, last_active_at),
-        body, created_at, is_read
-      `)
-      .eq('receiver_id', profile.id)
-      .order('created_at', { ascending: false });
+    const [{ data: sent }, { data: received }] = await Promise.all([
+      supabase
+        .from('messages')
+        .select(`
+          id,
+          sender_id,
+          receiver_id,
+          receiver:profiles!messages_receiver_id_fkey(id, first_name, last_name, avatar_url, last_active_at),
+          body, created_at, is_read, reply_to_id, reply_preview, reactions
+        `)
+        .eq('sender_id', profileId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('messages')
+        .select(`
+          id,
+          sender_id,
+          receiver_id,
+          sender:profiles!messages_sender_id_fkey(id, first_name, last_name, avatar_url, last_active_at),
+          body, created_at, is_read, reply_to_id, reply_preview, reactions
+        `)
+        .eq('receiver_id', profileId)
+        .order('created_at', { ascending: false }),
+    ]);
 
     const conversationMap = new Map<string, any>();
+    const messagesByPartner = new Map<string, any[]>();
+
     const processMessage = (msg: any, otherId: string | undefined, rawOther: any, isReceived: boolean) => {
       const other = Array.isArray(rawOther) ? rawOther[0] : rawOther;
       if (!otherId || !other?.id || (!other.first_name && !other.last_name)) return;
@@ -195,6 +195,24 @@ router.get('/conversations', authenticate, async (req: AuthenticatedRequest, res
           unread: isReceived && !msg.is_read ? 1 : 0,
         });
       }
+
+      if (!messagesByPartner.has(otherId)) {
+        messagesByPartner.set(otherId, []);
+      }
+      const otherFullName = `${other.first_name || ''} ${other.last_name || ''}`.trim() || 'Alumni Contact';
+      messagesByPartner.get(otherId)!.push({
+        id: msg.id,
+        sender_id: msg.sender_id,
+        receiver_id: msg.receiver_id,
+        body: msg.body,
+        created_at: msg.created_at,
+        is_read: msg.is_read,
+        sender_name: isReceived ? otherFullName : undefined,
+        sender_avatar: isReceived ? other.avatar_url : undefined,
+        reply_to_id: msg.reply_to_id || null,
+        reply_preview: msg.reply_preview || null,
+        reactions: msg.reactions || {},
+      });
     };
 
     (sent || []).forEach((msg: any) => processMessage(msg, msg.receiver_id, msg.receiver, false));
@@ -212,6 +230,22 @@ router.get('/conversations', authenticate, async (req: AuthenticatedRequest, res
       const presence = checkIsOnline(id, conv.last_active_at);
       conv.is_online = presence.isOnline;
       conv.last_active_at = presence.lastActiveAt;
+
+      const rawMsgs = messagesByPartner.get(id) || [];
+      rawMsgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      const msgById = new Map<string, any>();
+      rawMsgs.forEach((m) => {
+        msgById.set(m.id, {
+          id: m.id,
+          sender_id: m.sender_id,
+          sender_name: m.sender_name || 'You',
+          body: m.body,
+        });
+      });
+      conv.messages = rawMsgs.slice(-60).map((m) => ({
+        ...m,
+        reply_preview: m.reply_preview || (m.reply_to_id ? msgById.get(m.reply_to_id) || null : null),
+      }));
     });
 
     res.json(Array.from(conversationMap.values()).sort(
@@ -244,40 +278,52 @@ router.get('/groups', authenticate, async (req: AuthenticatedRequest, res, next)
     const myRoleMap = new Map<string, string>();
     memberships.forEach((m: any) => myRoleMap.set(m.group_id, m.role || 'member'));
 
-    const { data: groups, error: grpErr } = await supabase
-      .from('chat_groups')
-      .select('*')
-      .in('id', groupIds)
-      .order('updated_at', { ascending: false });
+    const [
+      { data: groups, error: grpErr },
+      { data: allMembers, error: allMemErr },
+      { data: latestMessages },
+    ] = await Promise.all([
+      supabase
+        .from('chat_groups')
+        .select('*')
+        .in('id', groupIds)
+        .order('updated_at', { ascending: false }),
+      supabase
+        .from('chat_group_members')
+        .select(`
+          id, group_id, profile_id, role, joined_at,
+          profile:profiles(id, first_name, last_name, avatar_url)
+        `)
+        .in('group_id', groupIds),
+      supabase
+        .from('chat_group_messages')
+        .select('id, group_id, body, created_at, sender_id, reply_to_id, reply_preview, reactions')
+        .in('group_id', groupIds)
+        .order('created_at', { ascending: false }),
+    ]);
 
     if (grpErr) throw new AppError(grpErr.message, 500);
-
-    const { data: allMembers, error: allMemErr } = await supabase
-      .from('chat_group_members')
-      .select(`
-        id, group_id, profile_id, role, joined_at,
-        profile:profiles(id, first_name, last_name, avatar_url)
-      `)
-      .in('group_id', groupIds);
-
     if (allMemErr) throw new AppError(allMemErr.message, 500);
 
-    const { data: latestMessages } = await supabase
-      .from('chat_group_messages')
-      .select('group_id, body, created_at, sender_id')
-      .in('group_id', groupIds)
-      .order('created_at', { ascending: false });
-
     const lastMsgMap = new Map<string, any>();
+    const groupMsgsMap = new Map<string, any[]>();
     (latestMessages || []).forEach((m: any) => {
       if (!lastMsgMap.has(m.group_id)) {
         lastMsgMap.set(m.group_id, m);
       }
+      if (!groupMsgsMap.has(m.group_id)) {
+        groupMsgsMap.set(m.group_id, []);
+      }
+      groupMsgsMap.get(m.group_id)!.push(m);
     });
 
     const membersByGroup = new Map<string, any[]>();
+    const profileLookup = new Map<string, { name: string; avatar: string | null }>();
     (allMembers || []).forEach((m: any) => {
       if (!membersByGroup.has(m.group_id)) membersByGroup.set(m.group_id, []);
+      const memberName = `${m.profile?.first_name || ''} ${m.profile?.last_name || ''}`.trim() || 'Alumnus';
+      const memberAvatar = m.profile?.avatar_url || null;
+      profileLookup.set(m.profile_id, { name: memberName, avatar: memberAvatar });
       membersByGroup.get(m.group_id)!.push({
         id: m.id,
         profile_id: m.profile_id,
@@ -285,8 +331,8 @@ router.get('/groups', authenticate, async (req: AuthenticatedRequest, res, next)
         joined_at: m.joined_at,
         first_name: m.profile?.first_name || '',
         last_name: m.profile?.last_name || '',
-        avatar_url: m.profile?.avatar_url || null,
-        name: `${m.profile?.first_name || ''} ${m.profile?.last_name || ''}`.trim() || 'Alumnus',
+        avatar_url: memberAvatar,
+        name: memberName,
       });
     });
 
@@ -294,6 +340,35 @@ router.get('/groups', authenticate, async (req: AuthenticatedRequest, res, next)
       const gMembers = membersByGroup.get(g.id) || [];
       const lastMsg = lastMsgMap.get(g.id);
       const myRole = myRoleMap.get(g.id) || 'member';
+
+      const rawGroupMsgs = (groupMsgsMap.get(g.id) || []).slice(0, 60).reverse();
+      const msgById = new Map<string, any>();
+      rawGroupMsgs.forEach((m: any) => {
+        const senderInfo = profileLookup.get(m.sender_id);
+        msgById.set(m.id, {
+          id: m.id,
+          sender_id: m.sender_id,
+          sender_name: senderInfo?.name || 'Alumnus',
+          body: m.body,
+        });
+      });
+
+      const formattedGroupMsgs = rawGroupMsgs.map((m: any) => {
+        const senderInfo = profileLookup.get(m.sender_id);
+        return {
+          id: m.id,
+          group_id: m.group_id,
+          sender_id: m.sender_id,
+          receiver_id: m.group_id,
+          body: m.body,
+          created_at: m.created_at,
+          sender_name: senderInfo?.name || 'Alumnus',
+          sender_avatar: senderInfo?.avatar || null,
+          reply_to_id: m.reply_to_id || null,
+          reply_preview: m.reply_preview || (m.reply_to_id ? msgById.get(m.reply_to_id) || null : null),
+          reactions: m.reactions || {},
+        };
+      });
 
       return {
         id: g.id,
@@ -310,6 +385,7 @@ router.get('/groups', authenticate, async (req: AuthenticatedRequest, res, next)
         lastMessage: lastMsg?.body || null,
         lastMessageAt: lastMsg?.created_at || g.updated_at || g.created_at,
         unread: 0,
+        messages: formattedGroupMsgs,
       };
     });
 
@@ -409,25 +485,26 @@ router.get('/groups/:groupId/messages', authenticate, async (req: AuthenticatedR
     const myProfileId = await getProfileIdForUser(req.user!.userId);
     if (!myProfileId) throw new AppError('Profile not found', 404);
 
-    const { data: member } = await supabase
-      .from('chat_group_members')
-      .select('id')
-      .eq('group_id', groupId)
-      .eq('profile_id', myProfileId)
-      .maybeSingle();
+    const [{ data: member }, { data: messages, error }] = await Promise.all([
+      supabase
+        .from('chat_group_members')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('profile_id', myProfileId)
+        .maybeSingle(),
+      supabase
+        .from('chat_group_messages')
+        .select(`
+          id, group_id, sender_id, body, created_at, reply_to_id, reply_preview, reactions,
+          sender:profiles(id, first_name, last_name, avatar_url)
+        `)
+        .eq('group_id', groupId)
+        .order('created_at', { ascending: true }),
+    ]);
 
     if (!member) {
       throw new AppError('You are not a member of this group chat', 403);
     }
-
-    const { data: messages, error } = await supabase
-      .from('chat_group_messages')
-      .select(`
-        id, group_id, sender_id, body, created_at, reply_to_id, reply_preview, reactions,
-        sender:profiles(id, first_name, last_name, avatar_url)
-      `)
-      .eq('group_id', groupId)
-      .order('created_at', { ascending: true });
 
     if (error) throw new AppError(error.message, 500);
 
@@ -825,23 +902,23 @@ router.post('/:messageId/reactions', authenticate, async (req: AuthenticatedRequ
 
 router.get('/:profileId', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const senderProfileId = await getProfileIdForUser(req.user!.userId);
+    const targetParam = sanitizeFilterInput(req.params.profileId);
+    const [senderProfileId, targetProfileId] = await Promise.all([
+      getProfileIdForUser(req.user!.userId),
+      resolveReceiverProfileId(targetParam),
+    ]);
     if (!senderProfileId) throw new AppError('Profile not found', 404);
 
-    const targetParam = sanitizeFilterInput(req.params.profileId);
-    const targetProfileId = await resolveReceiverProfileId(targetParam);
-
-    const db = createUserScopedClient(req.token!);
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from('messages')
-      .select('*, sender:profiles!messages_sender_id_fkey(id, first_name, last_name, avatar_url), receiver:profiles!messages_receiver_id_fkey(id, first_name, last_name, avatar_url)')
+      .select('id, sender_id, receiver_id, body, created_at, is_read, reply_to_id, reply_preview, reactions, sender:profiles!messages_sender_id_fkey(id, first_name, last_name, avatar_url)')
       .or(`and(sender_id.eq.${senderProfileId},receiver_id.eq.${targetProfileId}),and(sender_id.eq.${targetProfileId},receiver_id.eq.${senderProfileId})`)
       .order('created_at', { ascending: true });
     if (error) throw new AppError(error.message, 500);
 
     // Asynchronously mark messages as read in background without delaying response
     Promise.resolve(
-      db.from('messages')
+      supabase.from('messages')
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('receiver_id', senderProfileId)
         .eq('sender_id', targetProfileId)
@@ -934,18 +1011,13 @@ router.post('/', authenticate, validate(sendMessageSchema), async (req: Authenti
 
 router.get('/unread/count', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const db = createUserScopedClient(req.token!);
-    const { data: profile } = await db
-      .from('profiles')
-      .select('id')
-      .eq('user_id', req.user!.userId)
-      .single();
-    if (!profile) throw new AppError('Profile not found', 404);
+    const profileId = await getProfileIdForUser(req.user!.userId);
+    if (!profileId) throw new AppError('Profile not found', 404);
 
-    const { count, error } = await db
+    const { count, error } = await supabase
       .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('receiver_id', profile.id)
+      .select('id', { count: 'exact', head: true })
+      .eq('receiver_id', profileId)
       .eq('is_read', false);
     if (error) throw new AppError(error.message, 500);
     res.json({ count: count || 0 });

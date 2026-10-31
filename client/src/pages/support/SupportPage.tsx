@@ -222,13 +222,13 @@ export default function SupportPage() {
         </div>
       </div>
 
-      <div className="flex gap-4">
-        <div className="flex-1 min-w-0 space-y-3">
+      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+        <div className="w-full lg:flex-1 min-w-0 space-y-3">
           <FAQSection />
         </div>
 
-        <aside className="hidden lg:block w-80 shrink-0">
-          <div className="sticky top-16 max-h-[calc(100vh-4rem)] scrollbar-hover">
+        <aside className="w-full lg:w-80 shrink-0">
+          <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-4rem)] scrollbar-hover">
             <div className="pr-1">
               <RightSidebar />
             </div>

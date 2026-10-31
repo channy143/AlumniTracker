@@ -201,9 +201,9 @@ export default function ConnectionsPage() {
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-5">
+      <div className="flex flex-col lg:flex-row lg:items-start gap-5">
         {/* Main Content Area */}
-        <div className="flex-1 min-w-0 space-y-4">
+        <div className="w-full lg:flex-1 min-w-0 space-y-4">
           {query ? (
             /* Search Query Active */
             searching ? (
@@ -249,7 +249,7 @@ export default function ConnectionsPage() {
                         key={profile.id}
                         className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-shadow"
                       >
-                        <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="flex items-center gap-3.5 min-w-0">
                             <div className="relative shrink-0">
                               {profile.avatar_url ? (
@@ -287,7 +287,7 @@ export default function ConnectionsPage() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          <div className="flex items-center gap-2 shrink-0 sm:self-center">
                             {existingFriend ? (
                               <div className="flex items-center gap-1.5">
                                 <div className="relative">
@@ -446,10 +446,10 @@ export default function ConnectionsPage() {
             /* Connections Tabs */
             <>
               {/* Segmented Tabs */}
-              <div className="bg-white border border-gray-200 rounded-xl p-1.5 flex items-center gap-1 shadow-2xs">
+              <div className="bg-white border border-gray-200 rounded-xl p-1.5 flex items-center gap-1 shadow-2xs overflow-x-auto scrollbar-none">
                 <button
                   onClick={() => setActiveTab('friends')}
-                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-2 px-2.5 sm:px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
                     activeTab === 'friends'
                       ? 'bg-orange-500 text-white shadow-2xs'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -467,7 +467,7 @@ export default function ConnectionsPage() {
 
                 <button
                   onClick={() => setActiveTab('received')}
-                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-2 px-2.5 sm:px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
                     activeTab === 'received'
                       ? 'bg-orange-500 text-white shadow-2xs'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -489,7 +489,7 @@ export default function ConnectionsPage() {
 
                 <button
                   onClick={() => setActiveTab('sent')}
-                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-2 px-2.5 sm:px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
                     activeTab === 'sent'
                       ? 'bg-orange-500 text-white shadow-2xs'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -564,7 +564,7 @@ export default function ConnectionsPage() {
                         key={conn.id}
                         className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-shadow"
                       >
-                        <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="flex items-center gap-3.5 min-w-0">
                             <div className="relative shrink-0">
                               {otherProfile?.avatar_url ? (
@@ -599,7 +599,7 @@ export default function ConnectionsPage() {
                           </div>
 
                           {/* Action Buttons depending on tab */}
-                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          <div className="flex items-center gap-2 shrink-0 sm:self-center">
                             {activeTab === 'received' ? (
                               /* Confirm Request vs Delete Request */
                               <>
@@ -712,7 +712,7 @@ export default function ConnectionsPage() {
 
         {/* Right Sidebar: Suggested Connections */}
         <aside className="w-full lg:w-80 shrink-0">
-          <div className="sticky top-16 bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-3">
+          <div className="lg:sticky lg:top-16 bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
                 <UserPlusIcon className="w-4 h-4 text-orange-500" />

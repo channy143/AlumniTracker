@@ -436,7 +436,7 @@ export default function DirectoryProfilePage() {
       {/* Main 2-Column Split: Left (Timeline + Employment History OR Alumni Posts) & Right Nav (Summary, Education, Certifications, Achievements, Links, Skills) */}
       <div className="flex flex-col lg:flex-row gap-4 lg:items-stretch">
         {/* Left Primary Column */}
-        <div className="flex-1 min-w-0 w-full flex flex-col gap-4">
+        <div className="w-full lg:flex-1 min-w-0 flex flex-col gap-4">
           {/* Segmented View Selector */}
           <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
             <button

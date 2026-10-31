@@ -143,7 +143,7 @@ export default function GraduateTracerSurveys() {
           </span>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-gray-600 mb-3">
+        <div className="grid grid-cols-2 sm:flex items-center gap-2 sm:gap-3 text-xs text-gray-600 mb-3">
           <div className="flex-1 bg-gray-50 rounded-lg p-2 text-center">
             <p className="text-xs font-bold text-gray-900">{survey.responseCount || 0}</p>            <p className="text-[10px] text-gray-500">Responses</p>
           </div>
@@ -211,7 +211,7 @@ export default function GraduateTracerSurveys() {
             </div>
             {survey.description && <p className="text-xs text-gray-500 mt-2">{survey.description}</p>}
 
-            <div className="flex items-center gap-1 border-b border-gray-200 mt-4 pb-0">
+            <div className="flex items-center gap-1 border-b border-gray-200 mt-4 pb-0 overflow-x-auto scrollbar-none whitespace-nowrap">
               {[
                 { key: 'overview', label: 'Overview' },
                 { key: 'questions', label: 'Questions & CHED Requirements' },
@@ -220,7 +220,7 @@ export default function GraduateTracerSurveys() {
                 { key: 'settings', label: 'Settings' },
               ].map(({ key, label }) => (
                 <button key={key} onClick={() => setDetailTab(key as any)}
-                  className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${detailTab === key ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors shrink-0 ${detailTab === key ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                   {label}
                 </button>
               ))}
@@ -252,7 +252,7 @@ export default function GraduateTracerSurveys() {
           <h1 className="text-base font-bold text-gray-900">Graduate Tracer Surveys</h1>
           <p className="text-xs text-gray-500">Manage annual graduate tracer studies, monitor responses and generate reports.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={handleDownloadTemplate} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Download Template</button>
           <button onClick={handleImport} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Import Responses</button>
           <button onClick={() => setShowCreate(true)} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Create Survey</button>
@@ -261,7 +261,7 @@ export default function GraduateTracerSurveys() {
 
       <div className="flex flex-wrap gap-2 mb-3">
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search..." className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-44" />
+          placeholder="Search..." className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full sm:w-44" />
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="">Status</option>
@@ -347,7 +347,7 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150" onClick={onClose}>
       <div className="bg-white w-full max-w-[900px] max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl border border-gray-100 flex flex-col animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white flex items-center justify-between shrink-0">
+          <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
                 <ClipboardDocumentCheckIcon className="w-5 h-5 text-white" />
@@ -366,7 +366,7 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
             </button>
           </div>
 
-          <div className="p-6 overflow-y-auto flex-1 text-xs">
+          <div className="p-4 sm:p-6 overflow-y-auto flex-1 text-xs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Survey Information</p>
@@ -444,7 +444,7 @@ function CreateSurveyModal({ onClose, onCreate }: { onClose: () => void; onCreat
                     </select>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Opening Date</label>
                     <input type="date" value={form.opens_at} onChange={(e) => setForm({ ...form, opens_at: e.target.value })}
@@ -667,7 +667,7 @@ function SurveyQuestionsEditor({ survey, onUpdate }: { survey: any; onUpdate: (q
             Conforms to CHED Tracer Study guidelines. Easily add, edit, or adjust questions to reflect changing CHED mandates.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleResetToStandard}
@@ -708,8 +708,8 @@ function SurveyQuestionsEditor({ survey, onUpdate }: { survey: any; onUpdate: (q
 
             if (isSection) {
               return (
-                <div key={q.id || idx} className="p-3 bg-gray-50/80 border-l-4 border-l-orange-500 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 flex-1">
+                <div key={q.id || idx} className="p-3 bg-gray-50/80 border-l-4 border-l-orange-500 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider bg-orange-100/60 px-2 py-0.5 rounded">
                       Section Header
                     </span>
@@ -932,8 +932,8 @@ function SurveyQuestionsEditor({ survey, onUpdate }: { survey: any; onUpdate: (q
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150" onClick={() => setShowAddModal(false)}>
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-100 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150" onClick={() => setShowAddModal(false)}>
+          <div className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border border-gray-100 p-4 sm:p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <h3 className="text-sm font-bold text-gray-900">Add New Survey Question / Section</h3>
               <button type="button" onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
@@ -983,7 +983,7 @@ function SurveyQuestionsEditor({ survey, onUpdate }: { survey: any; onUpdate: (q
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block font-medium text-gray-700 mb-1">Section Assignment</label>
                       <input
@@ -1268,9 +1268,9 @@ function SurveyResponses({ survey }: { survey: any }) {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex flex-wrap items-center gap-2 mb-3">
         <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Search by name, email, or course..." className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-64" />
+          placeholder="Search by name, email, or course..." className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full sm:w-64" />
         <button onClick={() => { const a = document.createElement('a'); a.href = `/admin/surveys/${survey.id}/responses/export`; a.click(); }} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 ml-auto">Export CSV</button>
       </div>
 
@@ -1620,7 +1620,7 @@ function SurveySettings({ survey, onClose, onDuplicate, onDelete, onUpdate }: {
             <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
               className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400" rows={2} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Academic Year</label>
               <input type="text" value={form.academic_year} onChange={(e) => setForm({ ...form, academic_year: e.target.value })}

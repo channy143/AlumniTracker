@@ -194,19 +194,19 @@ function PostDetailView({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Back & Close header */}
-        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-2">
+        <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={onBack}
               className="flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors cursor-pointer"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
               </svg>
               <span>Back to network feed</span>
             </button>
-            <span className="text-gray-300">|</span>
-            <span className="text-xs text-gray-500 font-medium">Alumni post details</span>
+            <span className="text-gray-300 hidden sm:inline">|</span>
+            <span className="text-xs text-gray-500 font-medium hidden sm:inline">Alumni post details</span>
           </div>
 
           <button
@@ -221,7 +221,7 @@ function PostDetailView({
 
         {/* Scrollable Modal Content */}
         <div className="overflow-y-auto flex-1 scrollbar-hover">
-          <div className="p-5">
+          <div className="p-3.5 sm:p-5">
             {/* Post Author Info */}
             <div className="flex items-center gap-2.5 text-xs text-gray-500 mb-1">
           <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden shadow-xs">
@@ -263,13 +263,13 @@ function PostDetailView({
 
         {/* Linked Survey */}
         {(post as any).linked_survey && (
-          <div className="px-3.5 py-2.5 bg-orange-50/70 border border-orange-100 rounded-xl flex items-center justify-between mb-3">
+          <div className="px-3.5 py-2.5 bg-orange-50/70 border border-orange-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
             <span className="text-xs text-orange-900 font-medium">
               Survey: {(post as any).linked_survey.title}
             </span>
             <button
               onClick={() => window.location.href = `/surveys/${(post as any).linked_survey.id}`}
-              className="text-xs bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3 py-1 rounded-lg transition-colors"
+              className="text-xs bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors self-start sm:self-auto"
             >
               Complete Survey &rarr;
             </button>
@@ -296,17 +296,18 @@ function PostDetailView({
             </div>
           </div>
 
-          <div className="flex items-center -space-x-1 select-none">
-            <span className="w-5 h-5 rounded-full bg-white ring-1 ring-gray-200 flex items-center justify-center text-xs shadow-2xs">
-              👍
-            </span>
-            <span className="w-5 h-5 rounded-full bg-white ring-1 ring-gray-200 flex items-center justify-center text-xs shadow-2xs">
-              👏
-            </span>
-            <span className="w-5 h-5 rounded-full bg-white ring-1 ring-gray-200 flex items-center justify-center text-xs shadow-2xs">
-              🎓
-            </span>
-          </div>
+          {likeCount > 0 && (
+            <div className="flex items-center -space-x-1 select-none">
+              {(post.top_reactions && post.top_reactions.length > 0 ? post.top_reactions : ['👍']).map((emoji: string, idx: number) => (
+                <span
+                  key={idx}
+                  className="w-5 h-5 rounded-full bg-white ring-1 ring-gray-200 flex items-center justify-center text-xs shadow-2xs"
+                >
+                  {emoji}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -373,7 +374,7 @@ function PostDetailView({
                   {canDelete && (
                     <button
                       onClick={() => handleDeleteComment(c.id)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition-opacity cursor-pointer"
+                      className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition-opacity cursor-pointer"
                       title="Delete comment"
                     >
                       <TrashIcon className="w-4 h-4" />
@@ -443,10 +444,10 @@ function SurveyBanner() {
         <ClipboardDocumentCheckIcon className="w-5 h-5 text-orange-600" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-gray-900">{survey.title}</h3>
-            <div className="flex items-center gap-3 mt-1 text-xs text-gray-600">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-600">
               <span><span className="font-medium">Status:</span> Open</span>
               {survey.expires_at && (
                 <span><span className="font-medium">Due Date:</span> {new Date(survey.expires_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
@@ -455,7 +456,7 @@ function SurveyBanner() {
           </div>
           <button
             onClick={() => navigate(`/surveys/${survey.id}`)}
-            className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 shrink-0"
+            className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 shrink-0 self-start"
           >
             Complete Survey
           </button>
@@ -493,7 +494,15 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
         if (!data) return;
         const ann = data.filter((p: any) => p.type === 'announcement').slice(0, 3);
         if (ann?.length) setAnnouncements(ann.map((a: any) => ({ id: a.id, title: a.title, date: a.created_at ? new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '' })));
-        const evts = data.filter((p: any) => p.type === 'event').slice(0, 3);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const evts = data
+          .filter((p: any) => {
+            if (p.type !== 'event') return false;
+            const eventTime = p.event_date ? new Date(p.event_date).getTime() : (p.created_at ? new Date(p.created_at).getTime() : 0);
+            return eventTime >= today.getTime();
+          })
+          .slice(0, 3);
         if (evts?.length) setEvents(evts.map((e: any) => ({ id: e.id, name: e.title, date: e.event_date ? new Date(e.event_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : e.created_at ? new Date(e.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '' })));
       }).catch(() => {}),
       careerTrendsApi.list().then((data: any) => {
@@ -560,7 +569,7 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
                     {event.date?.split(',')[0]?.split(' ')[1] || event.date?.split(' ')[0] || ''}
                   </span>
                   <span className="text-[8px] text-orange-400 leading-none">
-                    {event.date?.includes('2026') ? '2026' : ''}
+                    {event.date?.match(/\d{4}/)?.[0] || ''}
                   </span>
                 </div>
                 <div className="min-w-0">
@@ -645,29 +654,42 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
         </div>
       )}
 
-      {highlights.mostCommonCareer && (
+      {Boolean(
+        (highlights.mostCommonCareer && highlights.mostCommonCareer !== 'N/A') ||
+        (highlights.fastestGrowing && highlights.fastestGrowing !== 'N/A') ||
+        (highlights.topIndustry && highlights.topIndustry !== 'N/A') ||
+        (highlights.averageExperience && highlights.averageExperience !== 'N/A')
+      ) && (
         <div className="bg-white border border-gray-200 rounded-lg p-3">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <BriefcaseIcon className="w-4 h-4 text-orange-500" />
             Career Highlights
           </h3>
           <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Most Common Career</span>
-              <span className="font-medium text-gray-800">{highlights.mostCommonCareer}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Fastest Growing</span>
-              <span className="font-medium text-orange-600">{highlights.fastestGrowing}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Top Industry</span>
-              <span className="font-medium text-gray-800">{highlights.topIndustry}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Average Experience</span>
-              <span className="font-medium text-gray-800">{highlights.averageExperience}</span>
-            </div>
+            {highlights.mostCommonCareer && highlights.mostCommonCareer !== 'N/A' && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Most Common Career</span>
+                <span className="font-medium text-gray-800">{highlights.mostCommonCareer}</span>
+              </div>
+            )}
+            {highlights.fastestGrowing && highlights.fastestGrowing !== 'N/A' && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Fastest Growing</span>
+                <span className="font-medium text-orange-600">{highlights.fastestGrowing}</span>
+              </div>
+            )}
+            {highlights.topIndustry && highlights.topIndustry !== 'N/A' && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Top Industry</span>
+                <span className="font-medium text-gray-800">{highlights.topIndustry}</span>
+              </div>
+            )}
+            {highlights.averageExperience && highlights.averageExperience !== 'N/A' && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Average Experience</span>
+                <span className="font-medium text-gray-800">{highlights.averageExperience}</span>
+              </div>
+            )}
           </div>
         </div>
       )}

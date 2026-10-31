@@ -371,7 +371,7 @@ export default function CurriculumInsights() {
           <p className="text-xs text-gray-500">Analyze alumni outcomes and workforce trends to support curriculum evaluation and continuous program improvement.</p>
         </div>
         {data && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleRefresh}
               disabled={loading || refreshing}

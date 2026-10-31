@@ -124,7 +124,7 @@ export default function ForgotPasswordPage() {
                 <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">Email Address</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" placeholder="alumni@ctu.edu.ph" required />
               </div>
-              <div className="flex justify-center" ref={captchaContainerRef} />
+              <div className="flex justify-center overflow-x-auto max-w-full" ref={captchaContainerRef} />
               <button type="button" onClick={handleSendCode} disabled={loading} className="btn-primary w-full">
                 {loading ? 'Sending code...' : 'Send Reset Code'}
               </button>
@@ -133,12 +133,12 @@ export default function ForgotPasswordPage() {
         ) : step === 'otp' ? (
           <motion.div key="otp" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }}>
             <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
                 <CheckIcon className="w-5 h-5 text-green-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-xl font-bold text-ctu-charcoal">Verify Your Email</h2>
-                <p className="text-sm text-gray-500">{email}</p>
+                <p className="text-sm text-gray-500 truncate">{email}</p>
               </div>
             </div>
             <p className="text-gray-400 text-sm mt-4 mb-8">Enter the 6-digit code sent to your email.</p>
@@ -148,7 +148,7 @@ export default function ForgotPasswordPage() {
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">Reset Code</label>
-                <input type="text" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} className="input-field text-center text-2xl tracking-[0.5em] font-mono" placeholder="000000" maxLength={6} required autoFocus />
+                <input type="text" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} className="input-field text-center text-2xl sm:text-3xl tracking-[0.3em] sm:tracking-[0.5em] font-mono" placeholder="000000" maxLength={6} required autoFocus />
               </div>
               <button type="button" onClick={handleVerifyOtp} className="btn-primary w-full">
                 Verify Code
@@ -161,12 +161,12 @@ export default function ForgotPasswordPage() {
         ) : (
           <motion.div key="password" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }}>
             <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
                 <CheckIcon className="w-5 h-5 text-green-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-xl font-bold text-ctu-charcoal">Reset Your Password</h2>
-                <p className="text-sm text-gray-500">{email}</p>
+                <p className="text-sm text-gray-500 truncate">{email}</p>
               </div>
             </div>
             <p className="text-gray-400 text-sm mt-4 mb-8">Choose a new password for your account.</p>

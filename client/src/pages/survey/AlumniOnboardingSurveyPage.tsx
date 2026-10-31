@@ -300,7 +300,7 @@ export default function AlumniOnboardingSurveyPage() {
             </span>
           </div>
 
-          <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-gray-100">
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-2.5 pt-2.5 border-t border-gray-100">
             <div className="flex items-center gap-2">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div
@@ -327,12 +327,12 @@ export default function AlumniOnboardingSurveyPage() {
         {/* Content Card - Matches SurveyPage.tsx exactly, fits viewport without scrollview */}
         <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 shadow-xs flex-1 flex flex-col justify-between overflow-hidden">
           {/* Section Header */}
-          <div className="flex items-center justify-between mb-3 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-3 shrink-0">
             <h2 className="text-sm font-bold text-gray-900">
               {sectionTitles[step - 1]}
             </h2>
             {validationError && (
-              <span className="text-[11px] text-red-500 font-medium truncate max-w-xs">
+              <span className="text-[11px] text-red-500 font-medium break-words">
                 {validationError}
               </span>
             )}
@@ -472,7 +472,7 @@ export default function AlumniOnboardingSurveyPage() {
                   transition={{ duration: 0.12 }}
                   className="space-y-3"
                 >
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">First Name</label>
                       <input
@@ -610,8 +610,8 @@ export default function AlumniOnboardingSurveyPage() {
                   transition={{ duration: 0.12 }}
                   className="space-y-3"
                 >
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    <div className="col-span-2 sm:col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                    <div className="sm:col-span-2">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Degree / Program Graduated at CTU <span className="text-red-500">*</span>
                       </label>
@@ -1140,7 +1140,7 @@ export default function AlumniOnboardingSurveyPage() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white border border-gray-200 rounded-lg p-6 max-w-sm w-full text-center shadow-lg"
+              className="bg-white border border-gray-200 rounded-lg p-5 sm:p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto text-center shadow-lg"
             >
               <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
                 <CheckCircleIcon className="w-8 h-8" />

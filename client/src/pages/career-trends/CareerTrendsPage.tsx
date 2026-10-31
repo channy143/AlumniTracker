@@ -113,7 +113,7 @@ function FilterDropdown({ label, options, selected, onChange, formatLabel }: {
         <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-1 min-w-[160px] max-h-60 overflow-y-auto">
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-1 min-w-[160px] max-w-[calc(100vw-2rem)] max-h-60 overflow-y-auto">
           <button
             onClick={() => { onChange(null); setOpen(false); }}
             className={`w-full text-left px-3 py-1.5 text-xs rounded transition-colors ${!selected ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-gray-500 hover:bg-gray-50'}`}
@@ -465,7 +465,7 @@ export default function CareerTrendsPage() {
           >
             All Careers
           </button>
-          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
 
           <FilterDropdown
             label="Job Position"
@@ -473,7 +473,7 @@ export default function CareerTrendsPage() {
             selected={selectedPosition}
             onChange={setSelectedPosition}
           />
-          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
 
           <FilterDropdown
             label="Industry"
@@ -481,7 +481,7 @@ export default function CareerTrendsPage() {
             selected={selectedIndustry}
             onChange={setSelectedIndustry}
           />
-          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
 
           <FilterDropdown
             label="Employment Type"
@@ -490,7 +490,7 @@ export default function CareerTrendsPage() {
             onChange={setSelectedEmploymentType}
             formatLabel={(v) => JOB_TYPE_LABELS[v] || v}
           />
-          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
 
           <FilterDropdown
             label="Batch"
@@ -498,7 +498,7 @@ export default function CareerTrendsPage() {
             selected={selectedBatch}
             onChange={setSelectedBatch}
           />
-          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
 
           <FilterDropdown
             label="Experience"
@@ -507,7 +507,7 @@ export default function CareerTrendsPage() {
             onChange={setSelectedExperience}
             formatLabel={(v) => EXPERIENCE_RANGES.find((r) => r.value === v)?.label || v}
           />
-          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
 
           <FilterDropdown
             label="Location"
@@ -515,7 +515,7 @@ export default function CareerTrendsPage() {
             selected={selectedLocation}
             onChange={setSelectedLocation}
           />
-          <span className="w-px h-4 bg-gray-300 mx-0.5" />
+          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
 
           <FilterDropdown
             label="Sort"
@@ -541,8 +541,8 @@ export default function CareerTrendsPage() {
         </div>
       )}
 
-      <div className="flex gap-4">
-        <div className="flex-1 min-w-0 space-y-3">
+      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+        <div className="w-full lg:flex-1 min-w-0 space-y-3">
           {selectedCard ? (
             <CareerCardInsightsPanel
               card={selectedCard}
@@ -557,8 +557,8 @@ export default function CareerTrendsPage() {
           )}
         </div>
 
-        <aside className="hidden lg:block w-96 xl:w-[410px] shrink-0 self-stretch">
-          <div className="sticky top-16 h-[calc(100vh-4rem)]">
+        <aside className="w-full lg:w-96 xl:w-[410px] shrink-0 self-stretch">
+          <div className="lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)]">
             {activeJobsNav ? (
               <ActiveJobOpeningsNavCard
                 cardName={activeJobsNav.cardName}

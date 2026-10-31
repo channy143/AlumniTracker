@@ -88,7 +88,7 @@ export default function AnnouncementsPage() {
 
           <h1 className="text-base font-bold text-gray-900 mb-2">{selected.title}</h1>
 
-          <div className="flex items-center gap-2 text-xs text-gray-400 mb-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 mb-3">
             <span>{formatDate(selected.created_at)}</span>
             <span>&middot;</span>
             <span>{selected.created_by || 'Admin'}</span>
@@ -115,14 +115,14 @@ export default function AnnouncementsPage() {
           )}
 
           {selected.linked_survey && (
-            <div className="mt-4 p-3.5 bg-orange-50/70 border border-orange-200 rounded-xl flex items-center justify-between gap-3">
+            <div className="mt-4 p-3.5 bg-orange-50/70 border border-orange-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-orange-950">{selected.linked_survey.title || 'Linked Tracer Survey'}</p>
                 <p className="text-[11px] text-orange-800 mt-0.5">Please take a moment to answer this tracer survey for institutional data.</p>
               </div>
               <a
                 href={`/surveys/${selected.linked_survey.id}`}
-                className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold shrink-0 transition-colors"
+                className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold shrink-0 transition-colors text-center"
               >
                 Take Survey
               </a>
@@ -182,7 +182,7 @@ export default function AnnouncementsPage() {
               </div>
               <h3 className="text-sm font-semibold text-gray-900 mb-1">{a.title}</h3>
               <p className="text-xs text-gray-600 leading-relaxed mb-1 line-clamp-3">{a.content}</p>
-              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px] text-gray-400">
                 <span>{formatDate(a.created_at)}</span>
                 <span>&middot;</span>
                 <span>{a.created_by || 'Admin'}</span>
@@ -198,7 +198,7 @@ export default function AnnouncementsPage() {
             <div key={a.id} className="bg-white border border-gray-200 rounded-lg px-4 py-3">
               <h3 className="text-sm font-semibold text-gray-900 mb-1">{a.title}</h3>
               <p className="text-xs text-gray-600 leading-relaxed mb-1 line-clamp-3">{a.content}</p>
-              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px] text-gray-400">
                 <span>{formatDate(a.created_at)}</span>
                 <span>&middot;</span>
                 <span>{a.created_by || 'Admin'}</span>

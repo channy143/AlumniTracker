@@ -286,7 +286,7 @@ export default function AlumniManagement() {
           <h1 className="text-base font-bold text-gray-900">Alumni Management</h1>
           <p className="text-xs text-gray-500">{tab === 'registered' ? `${total} registered alumni` : `${eligible.length} eligible (unclaimed) alumni`}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {tab === 'registered' && <button onClick={handleExport} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Export CSV</button>}
           <button onClick={() => { setShowForm(true); setError(''); }} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Add Alumni</button>
           <button onClick={openEligibleForm} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Eligible Alumni</button>
@@ -304,7 +304,7 @@ export default function AlumniManagement() {
 
       <div className="flex flex-wrap gap-2 mb-3">
         <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); setEligPage(1); }}
-          placeholder={tab === 'eligible' ? "Search eligible by name or student ID..." : "Search by name, email, or ID..."} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-56" />
+          placeholder={tab === 'eligible' ? "Search eligible by name or student ID..." : "Search by name, email, or ID..."} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full sm:w-56" />
         <select value={filters.course} onChange={(e) => { setFilters((f) => ({ ...f, course: e.target.value })); setPage(1); setEligPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="">All Courses</option>
@@ -428,7 +428,7 @@ export default function AlumniManagement() {
             })}
           </div>
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-3 px-3 py-2.5 bg-white border border-gray-200 rounded-lg">
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 px-3 py-2.5 bg-white border border-gray-200 rounded-lg">
               <span className="text-xs text-gray-400">Page {page} of {totalPages}</span>
               <div className="flex gap-1">
                 <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40">Prev</button>
@@ -494,7 +494,7 @@ export default function AlumniManagement() {
               ))}
             </div>
             {totalEligPages > 1 && (
-              <div className="flex items-center justify-between mt-3 px-3 py-2.5 bg-white border border-gray-200 rounded-lg">
+              <div className="flex flex-wrap items-center justify-between gap-2 mt-3 px-3 py-2.5 bg-white border border-gray-200 rounded-lg">
                 <span className="text-xs text-gray-400">Page {eligPage} of {totalEligPages} ({eligibleCards.length} eligible)</span>
                 <div className="flex gap-1">
                   <button disabled={eligPage <= 1} onClick={() => setEligPage((p) => p - 1)} className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40">Prev</button>
@@ -508,23 +508,23 @@ export default function AlumniManagement() {
 
       {showDetail && detailData && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setShowDetail(false)}>
-          <div className="bg-white max-w-5xl w-full flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150" style={{ height: '84vh' }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white max-w-5xl w-full flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150" style={{ height: '88vh' }} onClick={(e) => e.stopPropagation()}>
             {/* Header bar */}
-            <div className="flex items-center justify-between px-6 py-4 shrink-0 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white sticky top-0 z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-3.5 sm:py-4 shrink-0 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white sticky top-0 z-10">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
                   <UserIcon className="w-5 h-5 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-base font-bold text-white leading-tight">
+                <div className="min-w-0">
+                  <h2 className="text-sm sm:text-base font-bold text-white leading-tight truncate">
                     {detailData.profile?.first_name} {detailData.profile?.last_name}
                   </h2>
-                  <p className="text-xs text-orange-100 mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-orange-100 mt-0.5 truncate">
                     {detailData.profile?.student_id ? `ID: ${detailData.profile.student_id} · ` : ''}Alumni Profile & Records
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {!editingDetail ? (
                   <button onClick={handleEditDetail} className="px-3.5 py-1.5 text-xs font-semibold bg-white text-orange-700 hover:bg-orange-50 rounded-xl shadow-xs transition-colors cursor-pointer">Edit Profile</button>
                 ) : (
@@ -539,18 +539,18 @@ export default function AlumniManagement() {
               </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-col md:flex-row flex-1 overflow-y-auto md:overflow-hidden">
               {/* Left panel - 70% - scrollable */}
-              <div className="w-full md:w-[70%] p-6 border-r border-gray-200 overflow-y-auto">
+              <div className="w-full md:w-[70%] p-4 sm:p-6 border-b md:border-b-0 md:border-r border-gray-200 md:overflow-y-auto">
                 {/* Quick summary */}
                 <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
                   <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-600 shrink-0">
                     {((detailData.profile?.first_name?.[0] || '') + (detailData.profile?.last_name?.[0] || '')).toUpperCase()}
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{detailData.profile?.first_name} {detailData.profile?.last_name}</p>
-                    <p className="text-xs text-gray-500">{detailData.email}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{detailData.profile?.first_name} {detailData.profile?.last_name}</p>
+                    <p className="text-xs text-gray-500 truncate">{detailData.email}</p>
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
                       <span className={`text-[10px] px-1.5 py-0.5 font-medium ${detailData.is_verified ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{detailData.is_verified ? 'Verified' : 'Unverified'}</span>
                       <span className={`text-[10px] px-1.5 py-0.5 font-medium ${detailData.is_active !== false ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>{detailData.is_active !== false ? 'Active' : 'Inactive'}</span>
                       <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 font-medium capitalize">{detailData.role}</span>
@@ -561,7 +561,7 @@ export default function AlumniManagement() {
                 {/* Career Summary */}
                 <div className="mb-4">
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Career Summary</h3>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                     {[
                       { label: 'Employment Status', value: detailData.profile?.employment_status, badge: detailData.profile?.employment_status },
                       { label: 'Industry', value: detailData.profile?.industry },
@@ -690,7 +690,7 @@ export default function AlumniManagement() {
               </div>
 
               {/* Right panel - 30% */}
-              <div className="w-full md:w-[30%] p-6 bg-gray-50">
+              <div className="w-full md:w-[30%] p-4 sm:p-6 bg-gray-50 md:overflow-y-auto">
                 {/* Avatar */}
                 <div className="flex flex-col items-center mb-4">
                   <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center text-xl font-bold text-orange-600 mb-2">
@@ -770,8 +770,8 @@ export default function AlumniManagement() {
             </div>
 
             <form onSubmit={handleCreate} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
-                <div className="grid grid-cols-2 gap-2.5">
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">First Name *</label>
                     <input type="text" value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" required />
@@ -789,7 +789,7 @@ export default function AlumniManagement() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">ID Number</label>
                   <input type="text" value={form.idNumber} onChange={(e) => setForm((f) => ({ ...f, idNumber: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" placeholder="e.g. CTU-2020-0001" />
                 </div>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Program / Course</label>
                     <select value={form.program} onChange={(e) => setForm((f) => ({ ...f, program: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">
@@ -846,8 +846,8 @@ export default function AlumniManagement() {
             </div>
 
             <form onSubmit={handleCreateEligible} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
-                <div className="grid grid-cols-2 gap-2.5">
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Last Name *</label>
                     <input type="text" value={eligibleForm.last_name} onChange={(e) => setEligibleForm((f: any) => ({ ...f, last_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" placeholder="e.g. Dela Cruz" required />
@@ -858,7 +858,7 @@ export default function AlumniManagement() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Middle Name (Optional)</label>
                     <input type="text" value={eligibleForm.middle_name || ''} onChange={(e) => setEligibleForm((f: any) => ({ ...f, middle_name: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500" placeholder="e.g. Santos" />
@@ -869,7 +869,7 @@ export default function AlumniManagement() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Graduation Day (Date)</label>
                     <input type="date" value={eligibleForm.graduation_date || ''} onChange={(e) => setEligibleForm((f: any) => ({ ...f, graduation_date: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white" />
@@ -883,7 +883,7 @@ export default function AlumniManagement() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Program / Course</label>
                     <select value={eligibleForm.program} onChange={(e) => setEligibleForm((f: any) => ({ ...f, program: e.target.value }))} className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white">

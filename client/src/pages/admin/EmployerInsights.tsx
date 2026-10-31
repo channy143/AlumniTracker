@@ -278,7 +278,7 @@ function EmployerDirectoryModal({ open, onClose, directory, filteredDirectory, d
             />
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-5">
+        <div className="flex-1 overflow-y-auto overflow-x-auto px-4 sm:px-5 pb-5">
           {filteredDirectory.length > 0 ? (
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-white">
@@ -475,7 +475,7 @@ export default function EmployerInsights() {
           <p className="text-xs text-gray-500">Analyze employer networks, industry engagement, and hiring trends based on Graduate Tracer Survey data.</p>
         </div>
         {data && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={openDirectory} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-orange-500 text-white hover:bg-orange-600">
               <BuildingOfficeIcon className="w-3.5 h-3.5" /> View Employer Directory
             </button>
@@ -608,7 +608,7 @@ export default function EmployerInsights() {
                   <Card title="Top Hiring Companies">
                     {topHiringCompanies.length > 0 ? (
                       <>
-                        <div className="flex items-center gap-1 mb-3">
+                        <div className="flex flex-wrap items-center gap-1 mb-3">
                           {([
                             { key: 'alumni', label: 'Most Alumni' },
                             { key: 'recent', label: 'Recently Added' },

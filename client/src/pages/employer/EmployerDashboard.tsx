@@ -134,12 +134,12 @@ export default function EmployerDashboard() {
       {/* Filter / Selector Bar */}
       {jobs.length > 0 && (
         <div className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-gray-600">Filter by Position:</span>
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+            <span className="text-xs font-medium text-gray-600 shrink-0">Filter by Position:</span>
             <select
               value={selectedJobId}
               onChange={(e) => setSelectedJobId(e.target.value)}
-              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white min-w-0 flex-1 sm:flex-initial"
             >
               <option value="all">All Jobs ({allCandidates.length} shortlisted)</option>
               {jobs.map((job) => (
@@ -178,18 +178,18 @@ export default function EmployerDashboard() {
             return (
               <div key={c.id} className="bg-white border border-gray-200 rounded-lg p-4 transition-all hover:border-orange-200 hover:shadow-sm">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
                       {(c.candidate_name || 'A').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-sm font-bold text-gray-900">{c.candidate_name}</h3>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700 capitalize">
                           {c.status?.replace('_', ' ') || 'Shortlisted'}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500">{c.candidate_email}</p>
+                      <p className="text-xs text-gray-500 break-all">{c.candidate_email}</p>
                       {(c.batch_year || c.program) && (
                         <p className="text-[11px] font-medium text-gray-600 mt-0.5">
                           {c.batch_year ? `Batch ${c.batch_year}` : ''}
@@ -240,7 +240,7 @@ export default function EmployerDashboard() {
                     </div>
 
                     {(c.skills_match_score != null || c.experience_match_score != null || c.education_match_score != null) && (
-                      <div className="grid grid-cols-3 gap-2 mt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                         <div className="bg-gray-50 p-2 rounded border border-gray-100 text-center">
                           <p className="text-[10px] text-gray-400">Skills (50%)</p>
                           <p className="text-xs font-bold text-gray-700">{c.skills_match_score ?? 0}%</p>

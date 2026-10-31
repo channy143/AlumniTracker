@@ -151,7 +151,7 @@ export default function TracerSurveyPage() {
                 Thank you for contributing to CTU-Naga&apos;s institutional assessment. Your input
                 helps ensure future students benefit from an industry-relevant curriculum.
               </p>
-              <div className="pt-2 flex items-center gap-3">
+              <div className="pt-2 flex flex-wrap items-center gap-3">
                 <Link
                   to="/"
                   className="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
@@ -172,8 +172,8 @@ export default function TracerSurveyPage() {
 
       {/* No Active Survey Cycle */}
       {!hasActiveSurvey && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 space-y-6">
-          <div className="flex items-start gap-4">
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
             <div className="w-12 h-12 rounded-full bg-blue-50 text-ctu-blue flex items-center justify-center shrink-0">
               <AcademicCapIcon className="w-7 h-7" />
             </div>
@@ -217,7 +217,7 @@ export default function TracerSurveyPage() {
             <span className="text-xs text-gray-400">
               Need to update your current job or contact details?
             </span>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <Link
                 to="/profile"
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-ctu-blue rounded-lg hover:bg-blue-900 transition-colors"

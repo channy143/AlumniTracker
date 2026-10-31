@@ -348,7 +348,7 @@ export default function CareerLeaderboardNav({
                               {c.name}
                             </span>
                             {c.industry && (
-                              <span className="inline-block text-[10px] text-white/90 font-medium truncate bg-black/15 px-1.5 py-0.2 rounded mt-0.5 max-w-[260px]">
+                              <span className="inline-block text-[10px] text-white/90 font-medium truncate bg-black/15 px-1.5 py-0.2 rounded mt-0.5 max-w-full">
                                 {c.industry}
                               </span>
                             )}
@@ -441,7 +441,7 @@ export default function CareerLeaderboardNav({
                             </span>
                             {c.topEmployer && (
                               <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-white/90 font-medium truncate">
-                                <span className="truncate bg-black/15 px-1.5 py-0.2 rounded max-w-[260px]">
+                                <span className="truncate bg-black/15 px-1.5 py-0.2 rounded max-w-full">
                                   {c.topEmployer}
                                 </span>
                               </div>
@@ -563,7 +563,7 @@ export default function CareerLeaderboardNav({
                               <span className="text-[13px] font-bold text-white truncate block drop-shadow-xs leading-snug">
                                 {c.name}
                               </span>
-                              <span className="text-[10px] text-white/90 font-medium block mt-0.5 opacity-90 truncate max-w-[260px]">
+                              <span className="text-[10px] text-white/90 font-medium block mt-0.5 opacity-90 truncate max-w-full">
                                 {c.metricLabel}
                               </span>
                             </div>
@@ -646,7 +646,7 @@ export default function CareerLeaderboardNav({
                               <span className="text-[13px] font-bold text-white truncate block drop-shadow-xs leading-snug">
                                 {c.name}
                               </span>
-                              <span className="text-[10px] text-white/90 font-medium block mt-0.5 opacity-90 truncate max-w-[260px]">
+                              <span className="text-[10px] text-white/90 font-medium block mt-0.5 opacity-90 truncate max-w-full">
                                 {c.metricLabel}
                               </span>
                             </div>

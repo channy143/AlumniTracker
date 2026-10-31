@@ -446,7 +446,7 @@ export default function CompanyManagement() {
       {/* Toast Notification */}
       {notification && (
         <div
-          className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 border transition-all animate-fade-in ${
+          className={`fixed bottom-5 left-4 right-4 sm:left-auto sm:right-5 z-50 px-4 py-3 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 border transition-all animate-fade-in ${
             notification.type === 'error'
               ? 'bg-red-50 text-red-700 border-red-200'
               : 'bg-emerald-50 text-emerald-800 border-emerald-200'
@@ -1190,7 +1190,7 @@ export default function CompanyManagement() {
                 <label className="block text-[11px] font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">
                   Partnership Status <span className="text-red-500">*</span>
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, employer_type: 'regular', partnership_status: 'non-partner' })}
@@ -1534,18 +1534,18 @@ export default function CompanyManagement() {
           onClick={() => setVerifyModalOpen(false)}
         >
           <div
-            className="bg-white border border-gray-100 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white border border-gray-100 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white">
+            <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
                   <ShieldCheckIcon className="w-5 h-5 text-white" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-base font-bold text-white">Agreement Verification</h3>
-                  <p className="text-xs text-teal-100 mt-0.5">{verifyingCompany.name}</p>
+                  <p className="text-xs text-teal-100 mt-0.5 truncate">{verifyingCompany.name}</p>
                 </div>
               </div>
               <button
@@ -1558,7 +1558,7 @@ export default function CompanyManagement() {
             </div>
 
             {/* Content */}
-            <div className="p-6 space-y-4 text-xs">
+            <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
               {/* Agreement Metadata Summary */}
               <div className="bg-gray-50 border border-gray-200/80 rounded-xl p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
@@ -1611,7 +1611,7 @@ export default function CompanyManagement() {
                 <label className="block text-[11px] font-semibold text-gray-700 mb-2 uppercase tracking-wider">
                   Verification Status <span className="text-red-500">*</span>
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setVerificationDecision('verified')}

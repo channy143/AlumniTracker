@@ -170,7 +170,7 @@ export default function EmojiPicker({
   return (
     <div
       ref={containerRef}
-      className={`absolute z-[100] w-[310px] sm:w-[330px] bg-white border border-gray-200 rounded-2xl shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-150 ${
+      className={`absolute z-[100] w-[270px] sm:w-[330px] max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-2xl shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-150 ${
         position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
       } ${className}`}
       onClick={(e) => e.stopPropagation()}
@@ -225,7 +225,7 @@ export default function EmojiPicker({
         {filteredEmojis.length === 0 ? (
           <p className="text-center py-6 text-xs text-gray-400">No emojis found</p>
         ) : (
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-6 sm:grid-cols-7 gap-1">
             {filteredEmojis.map((item, idx) => (
               <button
                 key={`${item.emoji}-${idx}`}
@@ -234,7 +234,7 @@ export default function EmojiPicker({
                   onSelect(item.emoji);
                   onClose?.();
                 }}
-                className="w-10 h-10 flex items-center justify-center text-xl rounded-xl hover:bg-orange-50 hover:scale-130 active:scale-95 transition-transform duration-150 cursor-pointer select-none"
+                className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-xl rounded-xl hover:bg-orange-50 hover:scale-130 active:scale-95 transition-transform duration-150 cursor-pointer select-none"
                 title={item.name}
               >
                 {item.emoji}

@@ -350,12 +350,12 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 relative bg-white">
+              <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-100 relative bg-white shrink-0">
                 <h3 className="text-base sm:text-lg font-bold text-gray-900 mx-auto">Share Alumni Post</h3>
                 <button
                   type="button"
                   onClick={() => setIsExpanded(false)}
-                  className="absolute right-4 top-3.5 p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                  className="absolute right-3 sm:right-4 top-3 sm:top-3.5 p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   <XMarkIcon className="w-5 h-5" />
                 </button>
@@ -786,9 +786,9 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
               )}
 
               {/* Action Toolbar */}
-              <div className="p-3 border border-gray-200 rounded-xl flex items-center justify-between bg-white shadow-2xs">
+              <div className="p-2.5 sm:p-3 border border-gray-200 rounded-xl flex flex-wrap items-center justify-between gap-2 bg-white shadow-2xs">
                 <span className="text-xs font-semibold text-gray-800">Attach to post</span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5 sm:gap-1">
                   {/* Photo / Video */}
                   <button
                     type="button"
@@ -848,7 +848,7 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
                     {showEmojiPicker && (
                       <EmojiPicker
                         position="top"
-                        className="right-0 sm:right-auto sm:left-0"
+                        className="right-0"
                         onSelect={(emoji) => {
                           setContent((prev) => prev + emoji);
                         }}
@@ -902,12 +902,12 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
       {showTagFriendsModal &&
         createPortal(
           <div
-            className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150"
+            className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150"
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)' }}
             onClick={() => setShowTagFriendsModal(false)}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150 p-5"
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150 p-4 sm:p-5 max-h-[90vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
             <div className="flex items-center justify-between mb-3">

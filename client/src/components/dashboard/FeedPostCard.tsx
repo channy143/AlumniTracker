@@ -786,13 +786,13 @@ export default function FeedPostCard({
 
       {/* Linked Survey button */}
       {currentPost.linked_survey && (
-        <div className="px-4 py-2 bg-orange-50/60 border-t border-orange-100 flex items-center justify-between">
+        <div className="px-4 py-2.5 bg-orange-50/60 border-t border-orange-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <span className="text-xs text-orange-900 font-medium">
             Survey: {currentPost.linked_survey.title}
           </span>
           <button
             onClick={() => (window.location.href = `/surveys/${currentPost.linked_survey.id}`)}
-            className="text-xs bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3 py-1 rounded-lg transition-colors cursor-pointer"
+            className="text-xs bg-orange-500 hover:bg-orange-600 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer self-start sm:self-auto"
           >
             Complete Survey &rarr;
           </button>
@@ -960,13 +960,13 @@ export default function FeedPostCard({
               <div className="w-8 h-8 rounded-full bg-orange-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
                 Me
               </div>
-              <div className="flex-1 relative flex items-center bg-white border border-gray-200 rounded-full px-3 py-1 focus-within:ring-1 focus-within:ring-orange-500 focus-within:border-orange-500 transition-all">
+              <div className="flex-1 min-w-0 relative flex items-center bg-white border border-gray-200 rounded-full px-3 py-1 focus-within:ring-1 focus-within:ring-orange-500 focus-within:border-orange-500 transition-all">
                 <input
                   type="text"
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   placeholder="Write a comment..."
-                  className="flex-1 bg-transparent text-xs text-gray-800 placeholder-gray-400 outline-none pr-1"
+                  className="flex-1 min-w-0 bg-transparent text-xs text-gray-800 placeholder-gray-400 outline-none pr-1"
                 />
                 <div className="relative shrink-0">
                   <button
@@ -1086,7 +1086,7 @@ export default function FeedPostCard({
 
                     {/* Nested Replies List */}
                     {c.replies && c.replies.length > 0 && (
-                      <div className="ml-9 pl-3 border-l-2 border-gray-200 space-y-2">
+                      <div className="ml-4 sm:ml-9 pl-3 border-l-2 border-gray-200 space-y-2">
                         {c.replies.map((reply) => {
                           const isOwnReply = currentUserId && reply.user_id && currentUserId === reply.user_id;
                           const canDeleteReply = isOwnReply || currentUserRole === 'admin';
@@ -1100,13 +1100,13 @@ export default function FeedPostCard({
                                   reply.author?.[0]?.toUpperCase() || 'U'
                                 )}
                               </div>
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <div className="bg-white p-2 rounded-xl border border-gray-200/80 shadow-2xs">
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-bold text-gray-900 text-[11px]">{reply.author}</span>
-                                    <span className="text-[9px] text-gray-400">{formatDate(reply.created_at)}</span>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-bold text-gray-900 text-[11px] truncate">{reply.author}</span>
+                                    <span className="text-[9px] text-gray-400 shrink-0">{formatDate(reply.created_at)}</span>
                                   </div>
-                                  <p className="text-gray-700 mt-0.5 text-xs">{reply.content}</p>
+                                  <p className="text-gray-700 mt-0.5 text-xs break-words">{reply.content}</p>
                                 </div>
                                 <div className="flex items-center gap-3 px-2 pt-0.5 text-[10px] text-gray-500">
                                   <button
@@ -1135,13 +1135,13 @@ export default function FeedPostCard({
 
                     {/* Inline Reply Input Box */}
                     {replyingToCommentId === c.id && (
-                      <div className="ml-9 flex items-center gap-2 pt-1 animate-in fade-in">
+                      <div className="ml-4 sm:ml-9 flex items-center gap-1.5 sm:gap-2 pt-1 animate-in fade-in">
                         <input
                           type="text"
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}
                           placeholder={`Reply to ${c.author}...`}
-                          className="flex-1 bg-white border border-gray-200 rounded-full px-3 py-1 text-xs outline-none focus:border-orange-500"
+                          className="flex-1 min-w-0 bg-white border border-gray-200 rounded-full px-3 py-1 text-xs outline-none focus:border-orange-500"
                           autoFocus
                         />
                         <button
@@ -1173,12 +1173,12 @@ export default function FeedPostCard({
       {showReactionsModal &&
         createPortal(
           <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150"
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150"
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)' }}
             onClick={() => setShowReactionsModal(false)}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150"
+              className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -1258,12 +1258,12 @@ export default function FeedPostCard({
       {showEditModal &&
         createPortal(
           <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150"
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150"
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)' }}
             onClick={() => setShowEditModal(false)}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl max-w-2xl sm:max-w-3xl w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150 p-5 flex flex-col max-h-[90vh]"
+              className="bg-white rounded-2xl shadow-2xl max-w-2xl sm:max-w-3xl w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150 p-4 sm:p-5 flex flex-col max-h-[90vh]"
               onClick={(e) => e.stopPropagation()}
             >
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
@@ -1479,7 +1479,7 @@ export default function FeedPostCard({
       {shareModalOpen &&
         createPortal(
           <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150"
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150"
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)' }}
             onClick={() => {
               setShareModalOpen(false);
@@ -1487,7 +1487,7 @@ export default function FeedPostCard({
             }}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150"
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
             {/* Modal Header */}

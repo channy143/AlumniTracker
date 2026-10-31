@@ -211,7 +211,7 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
         </div>
       </div>
 
-      <div className="relative" style={{ height: `${CARD_H + 20}px` }}>
+      <div className="relative h-[300px] sm:h-[400px]">
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
           {actions.map((action, index) => {
             const rawOffset = index - selectedIndex;
@@ -222,10 +222,8 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
             return (
               <div
                 key={action.id}
-                className="absolute cursor-pointer transition-all duration-500 ease-in-out"
+                className="absolute cursor-pointer transition-all duration-500 ease-in-out w-[calc(100%-3.5rem)] max-w-[670px] h-[280px] sm:h-[380px]"
                 style={{
-                  width: `${CARD_W}px`,
-                  height: `${CARD_H}px`,
                   borderRadius: 0,
                   transform: `translateX(${offset * CARD_GAP}px) scale(${isSelected ? 1 : 0.85})`,
                   opacity: isSelected ? 1 : (isSide ? 0.2 : 0),
@@ -239,22 +237,22 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
               >
                 <div className={`relative h-full flex bg-gradient-to-br ${action.gradient}`}>
                   <div className="absolute inset-0 bg-white/0 transition-colors duration-300 hover:bg-white/10" />
-                  <div className="w-[70%] h-full relative overflow-hidden">
+                  <div className="w-[55%] sm:w-[70%] h-full relative overflow-hidden">
                     <img src={action.image} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                     <div className="absolute inset-0 bg-black/20" />
                   </div>
-                  <div className="w-[30%] h-full relative flex flex-col justify-center px-3 py-4">
+                  <div className="w-[45%] sm:w-[30%] h-full relative flex flex-col justify-center px-3 py-4">
                     <div className="absolute top-[17px] right-3">
                       <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-white/20 border border-white/25 text-white text-[10px] font-medium backdrop-blur-sm">
                         <action.badgeIcon className="w-3 h-3" />
                         {action.badge}
                       </span>
                     </div>
-                    <div className="-mt-[150px]">
-                      <h3 className="text-sm font-bold text-white drop-shadow-md leading-tight mb-1">
+                    <div className="mt-4 sm:-mt-[150px]">
+                      <h3 className="text-xs sm:text-sm font-bold text-white drop-shadow-md leading-tight mb-1">
                         {action.title}
                       </h3>
-                      <p className="text-[10px] text-white/70 drop-shadow-sm leading-relaxed">
+                      <p className="text-[10px] text-white/70 drop-shadow-sm leading-relaxed line-clamp-4 sm:line-clamp-none">
                         {action.subtitle}. Quick access to manage and configure this feature directly from your dashboard.
                       </p>
                     </div>
@@ -267,17 +265,17 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
 
         <button
           onClick={() => goTo(selectedIndex - 1)}
-          className="absolute top-1/2 -translate-y-1/2 z-20 p-2 text-orange-500 hover:text-orange-400 transition-all duration-300 hover:drop-shadow-[0_0_10px_rgba(249,115,22,0.6)]"
-          style={{ left: `calc(50% - ${CARD_W / 2 + 50 + 16}px)`, borderRadius: 0 }}
+          className="absolute top-1/2 -translate-y-1/2 left-0 lg:left-[calc(50%-401px)] z-20 p-1 sm:p-2 text-orange-500 hover:text-orange-400 transition-all duration-300 hover:drop-shadow-[0_0_10px_rgba(249,115,22,0.6)]"
+          style={{ borderRadius: 0 }}
         >
-          <ChevronLeftIcon className="w-12 h-12" />
+          <ChevronLeftIcon className="w-8 h-8 sm:w-12 sm:h-12" />
         </button>
         <button
           onClick={() => goTo(selectedIndex + 1)}
-          className="absolute top-1/2 -translate-y-1/2 z-20 p-2 text-orange-500 hover:text-orange-400 transition-all duration-300 hover:drop-shadow-[0_0_10px_rgba(249,115,22,0.6)]"
-          style={{ left: `calc(50% + ${CARD_W / 2 + 20}px)`, borderRadius: 0 }}
+          className="absolute top-1/2 -translate-y-1/2 right-0 lg:right-auto lg:left-[calc(50%+355px)] z-20 p-1 sm:p-2 text-orange-500 hover:text-orange-400 transition-all duration-300 hover:drop-shadow-[0_0_10px_rgba(249,115,22,0.6)]"
+          style={{ borderRadius: 0 }}
         >
-          <ChevronRightIcon className="w-12 h-12" />
+          <ChevronRightIcon className="w-8 h-8 sm:w-12 sm:h-12" />
         </button>
       </div>
 

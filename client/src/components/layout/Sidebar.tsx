@@ -21,7 +21,7 @@ import {
   ClockIcon,
   BriefcaseIcon,
   ShieldCheckIcon,
-  ChatBubbleLeftRightIcon,
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 
 type NavItem = { name: string; href: string; icon: any; end?: boolean };
@@ -29,7 +29,7 @@ type NavItem = { name: string; href: string; icon: any; end?: boolean };
 const mainNav: NavItem[] = [
   { name: 'Home', href: '/', icon: HomeIcon, end: true },
   { name: 'Job Postings', href: '/jobs', icon: BriefcaseIcon },
-  { name: 'Alumni Forum', href: '/community', icon: ChatBubbleLeftRightIcon },
+  { name: 'Alumni Forum', href: '/community', icon: GlobeAltIcon },
   { name: 'Career Trends', href: '/career-trends', icon: NewspaperIcon },
   { name: 'Alumni Directory', href: '/directory', icon: BookOpenIcon },
   { name: 'My Network', href: '/connections', icon: UsersIcon },

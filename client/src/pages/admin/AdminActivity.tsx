@@ -308,7 +308,7 @@ function AuditDetailModal({ log, onClose }: { log: any; onClose: () => void }) {
                   {changedKeys.map((key) => (
                     <div key={key} className="bg-gray-50 rounded-lg p-2 text-[11px] border border-gray-100">
                       <span className="font-mono font-bold text-gray-700 block mb-1">{key}</span>
-                      <div className="grid grid-cols-2 gap-2 font-mono">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono">
                         <div className="bg-red-50/70 text-red-700 p-1.5 rounded border border-red-100 break-all">
                           <span className="text-[9px] block text-red-500 font-sans font-bold">PREVIOUS</span>
                           {JSON.stringify(oldState[key])}
@@ -613,7 +613,7 @@ export default function AdminActivity() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => (mainTab === 'incidents' ? loadIncidents() : loadData(true))}
             disabled={mainTab === 'incidents' ? loadingIncidents : refreshing}
@@ -645,10 +645,10 @@ export default function AdminActivity() {
       </div>
 
       {/* Top Main Navigation Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 pb-0">
+      <div className="flex gap-2 border-b border-gray-200 pb-0 overflow-x-auto scrollbar-none whitespace-nowrap">
         <button
           onClick={() => setMainTab('audit')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer shrink-0 ${
             mainTab === 'audit'
               ? 'border-orange-500 text-orange-600'
               : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -666,7 +666,7 @@ export default function AdminActivity() {
             setMainTab('incidents');
             loadIncidents();
           }}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer shrink-0 ${
             mainTab === 'incidents'
               ? 'border-orange-500 text-orange-600'
               : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -1207,7 +1207,7 @@ export default function AdminActivity() {
 
           {/* Pagination Footer */}
           {!loading && logs.length > 0 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-gray-100 bg-gray-50/50 text-xs">
               <span className="text-gray-500">
                 Showing <strong className="text-gray-900">{(page - 1) * limit + 1}</strong> to{' '}
                 <strong className="text-gray-900">{Math.min(page * limit, totalCount)}</strong> of{' '}
@@ -1241,7 +1241,7 @@ export default function AdminActivity() {
       {/* Incident Resolution Modal (Rule 6) */}
       {selectedIncident && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 space-y-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-gray-200 space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
                 <ShieldExclamationIcon className="w-5 h-5 text-red-600" />
@@ -1256,7 +1256,7 @@ export default function AdminActivity() {
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-gray-50 p-3 rounded-xl">
                 <div>
                   <span className="text-gray-400 block text-[10px] uppercase">Incident Type</span>
                   <span className="font-semibold text-gray-900">{selectedIncident.incident_type?.replace(/_/g, ' ')}</span>
@@ -1347,7 +1347,7 @@ export default function AdminActivity() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[200] flex items-center gap-2 bg-gray-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-xl animate-fade-in border border-gray-800">
+        <div className="fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 z-[200] flex items-center gap-2 bg-gray-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-xl animate-fade-in border border-gray-800">
           <CheckCircleIcon className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>

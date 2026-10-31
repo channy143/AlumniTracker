@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   PlusIcon,
   ChatBubbleLeftRightIcon,
+  GlobeAltIcon,
   XMarkIcon,
   MagnifyingGlassIcon,
   HeartIcon,
@@ -480,7 +481,7 @@ export default function CommunityPage() {
           ) : filteredPosts.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-xl text-center py-12 px-4 shadow-2xs">
               <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 mx-auto flex items-center justify-center mb-3">
-                <ChatBubbleLeftRightIcon className="w-6 h-6" />
+                <GlobeAltIcon className="w-6 h-6" />
               </div>
               <h3 className="text-sm font-bold text-gray-800">No discussions found</h3>
               <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
@@ -919,7 +920,7 @@ export default function CommunityPage() {
             <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0">
-                  <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                  <GlobeAltIcon className="w-5 h-5" />
                 </div>
                 <div>
                   <h2 className="text-sm sm:text-base font-bold text-white leading-tight">
@@ -1038,10 +1039,10 @@ export default function CommunityPage() {
         >
           <form
             onSubmit={handleCreateGroup}
-            className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col"
+            className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-orange-500 to-amber-600 text-white">
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 bg-gradient-to-r from-orange-500 to-amber-600 text-white shrink-0">
               <div>
                 <h2 className="text-sm font-bold">Create Forum Channel</h2>
                 <p className="text-[11px] text-orange-100">
@@ -1057,7 +1058,7 @@ export default function CommunityPage() {
               </button>
             </div>
 
-            <div className="p-5 space-y-3.5">
+            <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Channel Name

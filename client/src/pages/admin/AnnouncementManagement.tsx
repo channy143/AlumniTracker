@@ -181,9 +181,9 @@ export default function AnnouncementManagement() {
       ) : (
         <div className="space-y-2">
           {data.map((item: any, idx) => (
-            <div key={item.id} className={`bg-white border border-gray-200 rounded-lg p-3 flex items-start justify-between ${item.is_pinned ? 'ring-1 ring-orange-300' : ''}`}>
+            <div key={item.id} className={`bg-white border border-gray-200 rounded-lg p-3 flex flex-wrap sm:flex-nowrap items-start justify-between gap-2 ${item.is_pinned ? 'ring-1 ring-orange-300' : ''}`}>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                     {item.is_pinned && <span className="text-[10px] text-orange-600 font-medium uppercase">Pinned</span>}
                     <h3 className="text-sm font-semibold text-gray-900 truncate">{item.title}</h3>
                     <span className={`px-1.5 py-0.5 text-[10px] rounded-full ${item.status === 'published' ? 'bg-emerald-50 text-emerald-700' : item.status === 'draft' ? 'bg-gray-100 text-gray-600' : 'bg-amber-50 text-amber-700'}`}>
@@ -251,7 +251,7 @@ export default function AnnouncementManagement() {
             </div>
 
             <form onSubmit={handleSave} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-3.5 flex-1 text-xs">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Title *</label>
                   <input type="text" value={form.title} onChange={(e) => setForm((f: any) => ({ ...f, title: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" required />
@@ -260,7 +260,7 @@ export default function AnnouncementManagement() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">Content *</label>
                   <textarea value={form.content} onChange={(e) => setForm((f: any) => ({ ...f, content: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" rows={5} required />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Image URL</label>
                     <input type="url" value={form.image_url} onChange={(e) => setForm((f: any) => ({ ...f, image_url: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" />
@@ -270,7 +270,7 @@ export default function AnnouncementManagement() {
                     <input type="url" value={form.document_url} onChange={(e) => setForm((f: any) => ({ ...f, document_url: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Link to Survey <span className="text-gray-400 font-normal">(optional)</span></label>
                     <select value={form.linked_survey_id} onChange={(e) => setForm((f: any) => ({ ...f, linked_survey_id: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 bg-white w-full">
@@ -286,7 +286,7 @@ export default function AnnouncementManagement() {
                     </select>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 pt-1">
+                <div className="flex flex-wrap items-center gap-4 pt-1">
                   <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.is_pinned} onChange={(e) => setForm((f: any) => ({ ...f, is_pinned: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500 rounded" /> Pin Announcement</label>
                   <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.send_to_all} onChange={(e) => setForm((f: any) => ({ ...f, send_to_all: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500 rounded" /> Send to All</label>
                 </div>
