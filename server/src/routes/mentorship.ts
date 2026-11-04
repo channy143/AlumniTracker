@@ -71,7 +71,7 @@ router.post('/apply', authenticate, validate(mentorshipApplySchema), async (req:
           type: 'mentorship',
           title: '🤝 New Mentorship Request',
           message: `${applicantName} has requested you as a mentor. Check your mentorship dashboard to review.`,
-          link: '/mentorship',
+          link: '/connections?tab=received',
         });
       }
     } catch (notifErr) {
@@ -135,7 +135,7 @@ router.put('/:id', authenticate, validate(mentorshipUpdateSchema), async (req: A
           type: 'mentorship',
           title,
           message,
-          link: '/mentorship',
+          link: '/connections?tab=friends',
         });
       }
     } catch (notifErr) {

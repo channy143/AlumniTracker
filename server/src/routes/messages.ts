@@ -1,4 +1,6 @@
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
+import crypto from 'crypto';
 import { supabase, createUserScopedClient } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
@@ -9,6 +11,7 @@ import { sendMessageSchema } from '../middleware/validationSchemas';
 
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '../middleware/auth';
+import { createNotification } from './notifications';
 import {
   userPresenceMap,
   markUserActive,
@@ -23,6 +26,50 @@ import {
 export { userPresenceMap };
 
 const router = Router();
+
+const uploadChatMedia = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
+// POST /api/messages/upload - upload picture for a group conversation or message attachment
+router.post('/upload', authenticate, uploadChatMedia.single('file'), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.file) throw new AppError('No file uploaded', 400);
+
+    const isImage = req.file.mimetype.startsWith('image/');
+    if (!isImage) throw new AppError('Only image files (JPG, PNG, GIF, WebP) are allowed.', 400);
+
+    const originalExt = req.file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
+    const ext = originalExt.replace(/[^a-z0-9]/gi, '') || 'jpg';
+    const randomHex = crypto.randomBytes(8).toString('hex');
+    const fileName = `chat/${req.user!.userId}_${Date.now()}_${randomHex}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('feed-media')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('[Chat Media Upload] Error:', uploadError);
+      throw new AppError(`Image upload failed: ${uploadError.message}`, 500);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('feed-media')
+      .getPublicUrl(fileName);
+
+    return res.json({
+      url: urlData.publicUrl,
+      file_name: req.file.originalname,
+      size: req.file.size,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
@@ -396,7 +443,7 @@ router.get('/groups', authenticate, async (req: AuthenticatedRequest, res, next)
 // POST /api/messages/groups - create a new group chat
 router.post('/groups', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { name, description, member_ids } = req.body;
+    const { name, description, member_ids, avatar_url } = req.body;
     if (!name || !name.trim()) {
       throw new AppError('Group name is required', 400);
     }
@@ -409,6 +456,7 @@ router.post('/groups', authenticate, async (req: AuthenticatedRequest, res, next
       .insert({
         name: name.trim(),
         description: description?.trim() || null,
+        avatar_url: avatar_url?.trim() || null,
         creator_id: myProfileId,
         admin_id: myProfileId,
       })
@@ -465,6 +513,8 @@ router.post('/groups', authenticate, async (req: AuthenticatedRequest, res, next
       profileId: newGroup.id,
       name: newGroup.name,
       description: newGroup.description,
+      avatar: newGroup.avatar_url,
+      avatar_url: newGroup.avatar_url,
       creator_id: newGroup.creator_id,
       admin_id: newGroup.admin_id,
       isAdmin: true,
@@ -474,6 +524,53 @@ router.post('/groups', authenticate, async (req: AuthenticatedRequest, res, next
       lastMessage: null,
       lastMessageAt: newGroup.created_at,
       unread: 0,
+    });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/messages/groups/:groupId - update group info (name, description, avatar_url)
+router.put('/groups/:groupId', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const groupId = req.params.groupId;
+    const { name, description, avatar_url } = req.body;
+    const myProfileId = await getProfileIdForUser(req.user!.userId);
+    if (!myProfileId) throw new AppError('Profile not found', 404);
+
+    const { data: member } = await supabase
+      .from('chat_group_members')
+      .select('id, role')
+      .eq('group_id', groupId)
+      .eq('profile_id', myProfileId)
+      .maybeSingle();
+
+    if (!member) {
+      throw new AppError('You are not a member of this group', 403);
+    }
+
+    const updates: any = { updated_at: new Date().toISOString() };
+    if (typeof name === 'string' && name.trim()) updates.name = name.trim();
+    if (typeof description !== 'undefined') updates.description = description ? description.trim() : null;
+    if (typeof avatar_url !== 'undefined') updates.avatar_url = avatar_url ? avatar_url.trim() : null;
+
+    const { data: updatedGroup, error } = await supabase
+      .from('chat_groups')
+      .update(updates)
+      .eq('id', groupId)
+      .select()
+      .single();
+
+    if (error || !updatedGroup) throw new AppError(error?.message || 'Failed to update group', 500);
+
+    res.json({
+      id: updatedGroup.id,
+      profileId: updatedGroup.id,
+      name: updatedGroup.name,
+      description: updatedGroup.description,
+      avatar: updatedGroup.avatar_url,
+      avatar_url: updatedGroup.avatar_url,
+      creator_id: updatedGroup.creator_id,
+      admin_id: updatedGroup.admin_id,
+      updated_at: updatedGroup.updated_at,
     });
   } catch (err) { next(err); }
 });
@@ -609,6 +706,57 @@ router.post('/groups/:groupId/messages', authenticate, async (req: Authenticated
 
     markUserActive(req.user!.userId, myProfileId).catch(() => {});
 
+    // Notify mentioned group members asynchronously
+    (async () => {
+      try {
+        const { data: grp } = await supabase
+          .from('chat_groups')
+          .select('id, name')
+          .eq('id', groupId)
+          .maybeSingle();
+
+        const { data: allMembers } = await supabase
+          .from('chat_group_members')
+          .select(`
+            profile_id,
+            profile:profiles(id, user_id, first_name, last_name)
+          `)
+          .eq('group_id', groupId);
+
+        if (allMembers && allMembers.length > 0) {
+          const bodyLower = body.toLowerCase();
+          const hasEveryone = bodyLower.includes('@everyone') || bodyLower.includes('@all');
+          const senderFullName = `${(req.user as any)?.firstName || ''} ${(req.user as any)?.lastName || ''}`.trim() || 'A member';
+
+          for (const m of allMembers) {
+            if (m.profile_id === myProfileId) continue;
+            const p: any = Array.isArray(m.profile) ? m.profile[0] : m.profile;
+            if (!p || !p.user_id) continue;
+
+            const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim().toLowerCase();
+            const firstName = (p.first_name || '').trim().toLowerCase();
+
+            const isMentioned =
+              hasEveryone ||
+              (fullName && bodyLower.includes(`@${fullName}`)) ||
+              (firstName && bodyLower.includes(`@${firstName}`));
+
+            if (isMentioned) {
+              await createNotification({
+                userId: p.user_id,
+                type: 'group_mention',
+                title: `${senderFullName} mentioned you in ${grp?.name || 'group chat'}`,
+                message: body.slice(0, 140),
+                link: `/messages?group=${groupId}`,
+              });
+            }
+          }
+        }
+      } catch (notifErr) {
+        console.warn('Failed to send mention notifications:', notifErr);
+      }
+    })();
+
     const senderObj: any = Array.isArray((msg as any).sender) ? (msg as any).sender[0] : (msg as any).sender;
     res.status(201).json({
       id: msg.id,
@@ -685,6 +833,47 @@ router.post('/groups/:groupId/messages/:messageId/reactions', authenticate, asyn
     if (updateErr) throw new AppError(updateErr.message, 500);
 
     res.json({ id: messageId, reactions: currentReactions });
+  } catch (err) { next(err); }
+});
+
+// GET /api/messages/groups/:groupId/members - list group members
+router.get('/groups/:groupId/members', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const groupId = req.params.groupId;
+    const myProfileId = await getProfileIdForUser(req.user!.userId);
+    if (!myProfileId) throw new AppError('Profile not found', 404);
+
+    const { data: member } = await supabase
+      .from('chat_group_members')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('profile_id', myProfileId)
+      .maybeSingle();
+
+    if (!member) {
+      throw new AppError('You are not a member of this group chat', 403);
+    }
+
+    const { data: groupMembers, error } = await supabase
+      .from('chat_group_members')
+      .select(`
+        id, group_id, profile_id, role, joined_at,
+        profile:profiles(id, first_name, last_name, avatar_url)
+      `)
+      .eq('group_id', groupId);
+
+    if (error) throw new AppError(error.message, 500);
+
+    const formatted = (groupMembers || []).map((m: any) => ({
+      id: m.id,
+      profile_id: m.profile_id,
+      role: m.role || 'member',
+      joined_at: m.joined_at,
+      name: `${m.profile?.first_name || ''} ${m.profile?.last_name || ''}`.trim() || 'Alumnus',
+      avatar: m.profile?.avatar_url,
+    }));
+
+    res.json({ members: formatted });
   } catch (err) { next(err); }
 });
 

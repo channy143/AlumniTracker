@@ -116,12 +116,20 @@ export default function ConnectionsPage() {
     return connections.filter((c) => c.status === 'pending' && c.requester_id === myProfileId);
   }, [connections, myProfileId]);
 
+  const tabParam = searchParams.get('tab');
+
+  useEffect(() => {
+    if (tabParam === 'received' || tabParam === 'sent' || tabParam === 'friends') {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
   // If there are pending received requests, open received tab if not already on a populated tab
   useEffect(() => {
-    if (receivedRequests.length > 0 && friendsList.length === 0 && activeTab === 'friends') {
+    if (!tabParam && receivedRequests.length > 0 && friendsList.length === 0 && activeTab === 'friends') {
       setActiveTab('received');
     }
-  }, [receivedRequests.length, friendsList.length, activeTab]);
+  }, [receivedRequests.length, friendsList.length, activeTab, tabParam]);
 
   const handleConnect = async (recipientId: string) => {
     setActionLoadingMap((prev) => ({ ...prev, [recipientId]: true }));

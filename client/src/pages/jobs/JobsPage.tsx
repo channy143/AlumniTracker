@@ -1243,6 +1243,25 @@ export default function JobsPage() {
     }
   }, [myApplications, selectedJob, application]);
 
+  const tabParam = searchParams.get('tab');
+  const targetJobId = searchParams.get('job') || searchParams.get('id');
+
+  useEffect(() => {
+    if (tabParam === 'applications' || tabParam === 'saved' || tabParam === 'opportunities') {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  useEffect(() => {
+    if (targetJobId && jobs.length > 0) {
+      const match = jobs.find((j) => j.id === targetJobId);
+      if (match) {
+        setSelectedJob(match);
+        loadMyApplication(match);
+      }
+    }
+  }, [targetJobId, jobs]);
+
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('alumni_saved_jobs');
@@ -1670,6 +1689,12 @@ export default function JobsPage() {
                 setSelectedJob(null);
                 setApplication(null);
                 setLoadingApplication(false);
+                if (searchParams.has('job') || searchParams.has('id')) {
+                  const next = new URLSearchParams(searchParams);
+                  next.delete('job');
+                  next.delete('id');
+                  setSearchParams(next, { replace: true });
+                }
               }}
               application={application}
               loadingApplication={loadingApplication}

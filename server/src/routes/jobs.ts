@@ -309,7 +309,7 @@ router.post('/:id/apply', authenticate, upload.single('resume'), validate(applyJ
         type: 'application',
         title: `Application Received: ${job.position}`,
         message: `Your application for ${job.position} at ${job.company_name} was successfully submitted and is under review.`,
-        link: '/jobs',
+        link: '/jobs?tab=applications',
       });
     }
 

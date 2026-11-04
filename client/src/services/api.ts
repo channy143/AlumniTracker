@@ -506,8 +506,16 @@ export const messagesApi = {
       `/messages/presence?profileIds=${encodeURIComponent(profileIds.join(','))}`
     ),
   groups: () => api.get<any[]>('/messages/groups'),
-  createGroup: (data: { name: string; description?: string; member_ids?: string[] }) =>
+  createGroup: (data: { name: string; description?: string; member_ids?: string[]; avatar_url?: string | null }) =>
     api.post<any>('/messages/groups', data),
+  updateGroup: (groupId: string, data: { name?: string; description?: string; avatar_url?: string | null }) =>
+    api.put<any>(`/messages/groups/${groupId}`, data),
+  uploadMedia: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.upload<{ url: string; file_name: string; size: number }>('/messages/upload', formData);
+  },
+  getGroupMembers: (groupId: string) => api.get<{ members: any[] }>(`/messages/groups/${groupId}/members`),
   getGroupMessages: (groupId: string) => api.get<any[]>(`/messages/groups/${groupId}/messages`),
   sendGroupMessage: (
     groupId: string,

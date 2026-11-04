@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CalendarDaysIcon, MapPinIcon, ClockIcon, UserIcon, LinkIcon, XMarkIcon, PhotoIcon, ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { eventsApi } from '@/services/api';
 import { SkeletonCard } from '@/components/ui/Skeleton';
@@ -6,10 +7,30 @@ import { SkeletonCard } from '@/components/ui/Skeleton';
 
 
 export default function EventsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+
+  const targetEventId = searchParams.get('id') || searchParams.get('event');
+
+  useEffect(() => {
+    if (targetEventId && events.length > 0) {
+      const match = events.find((e) => e.id === targetEventId);
+      if (match) setSelectedEvent(match);
+    }
+  }, [targetEventId, events]);
+
+  const handleBack = () => {
+    setSelectedEvent(null);
+    if (searchParams.has('id') || searchParams.has('event')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('id');
+      next.delete('event');
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   useEffect(() => {
     eventsApi.list()
@@ -76,7 +97,7 @@ export default function EventsPage() {
     return (
       <div className="max-w-4xl mx-auto">
         <div className="mb-4">
-          <button onClick={() => setSelectedEvent(null)} className="flex items-center gap-1 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors mb-2">
+          <button onClick={handleBack} className="flex items-center gap-1 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors mb-2">
             <ChevronLeftIcon className="w-4 h-4" />
             Back to Events
           </button>

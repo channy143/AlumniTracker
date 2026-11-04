@@ -32,10 +32,11 @@ function formatDate(dateStr: string) {
 }
 
 export default function AnnouncementsPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const search = searchParams.get('q') || '';
+  const targetId = searchParams.get('id');
   const [yearFilter, setYearFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [selected, setSelected] = useState<any>(null);
@@ -49,6 +50,22 @@ export default function AnnouncementsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (targetId && announcements.length > 0) {
+      const match = announcements.find((a) => a.id === targetId);
+      if (match) setSelected(match);
+    }
+  }, [targetId, announcements]);
+
+  const handleBack = () => {
+    setSelected(null);
+    if (searchParams.has('id')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('id');
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   const years = [...new Set(announcements.map((a) => {
     const d = new Date(a.created_at);
@@ -72,7 +89,7 @@ export default function AnnouncementsPage() {
     return (
       <div className="max-w-4xl mx-auto">
         <div className="mb-4">
-          <button onClick={() => setSelected(null)} className="flex items-center gap-1 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors mb-2">
+          <button onClick={handleBack} className="flex items-center gap-1 text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors mb-2">
             <ChevronLeftIcon className="w-4 h-4" />
             Back to Announcements
           </button>

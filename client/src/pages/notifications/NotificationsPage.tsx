@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificationsApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { useChatStore } from '@/store/chatStore';
+import { resolveNotificationLink, getNotificationActionLabel } from '@/utils/notificationHelpers';
 import {
   BellIcon,
   CheckCircleIcon,
@@ -28,11 +30,21 @@ const NOTIF_TYPES: Record<string, { id: string; label: string; icon: any }> = {
   post: { id: 'post', label: 'Alumni Posts', icon: ChatBubbleLeftRightIcon },
   announcement: { id: 'announcement', label: 'Announcements', icon: MegaphoneIcon },
   event: { id: 'event', label: 'Events', icon: CalendarDaysIcon },
+  group_mention: { id: 'group_mention', label: 'Mentions & Chat', icon: ChatBubbleLeftRightIcon },
   system: { id: 'system', label: 'System & Security', icon: ShieldExclamationIcon },
 };
 
 function getNotifConfig(type?: string) {
   switch (type) {
+    case 'group_mention':
+    case 'message':
+      return {
+        icon: ChatBubbleLeftRightIcon,
+        color: 'text-orange-600',
+        bg: 'bg-orange-50',
+        badge: 'Mention',
+        actionLabel: 'Open Chat',
+      };
     case 'survey':
       return {
         icon: DocumentTextIcon,
@@ -200,8 +212,22 @@ export default function NotificationsPage() {
     if (!n.is_read) {
       handleMarkRead(n.id);
     }
-    if (n.link) {
-      navigate(n.link);
+    const targetLink = resolveNotificationLink(n);
+    const groupMatch = targetLink?.match(/group=([^&]+)/);
+    if (groupMatch) {
+      const groupId = groupMatch[1];
+      const grp = useChatStore.getState().groups.find((g) => g.profileId === groupId);
+      useChatStore.getState().openChat({
+        profileId: groupId,
+        name: grp?.name || n.title?.replace(/.*in\s+/i, '') || 'Group Chat',
+        avatar: grp?.avatar,
+        isGroup: true,
+        members: grp?.members || [],
+      });
+      return;
+    }
+    if (targetLink) {
+      navigate(targetLink);
     }
   };
 
@@ -383,6 +409,7 @@ export default function NotificationsPage() {
             {filteredNotifications.map((notif) => {
               const cfg = getNotifConfig(notif.type);
               const Icon = cfg.icon;
+              const targetLink = resolveNotificationLink(notif);
 
               return (
                 <div
@@ -427,11 +454,10 @@ export default function NotificationsPage() {
                     )}
 
                     {/* Action link if available */}
-                    {notif.link && (
+                    {targetLink && (
                       <div className="mt-2.5">
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 group-hover:text-orange-700 group-hover:underline">
-                          <span>{cfg.actionLabel}</span>
-                          <span>&rarr;</span>
+                          <span>{getNotificationActionLabel(notif.type) || cfg.actionLabel}</span>
                         </span>
                       </div>
                     )}

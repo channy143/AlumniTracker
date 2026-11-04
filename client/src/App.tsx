@@ -135,6 +135,7 @@ export default function App() {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="connections" element={<ConnectionsPage />} />
         <Route path="network" element={<Navigate to="/connections" replace />} />
+        <Route path="mentorship" element={<Navigate to="/connections" replace />} />
         <Route path="community" element={<CommunityPage />} />
         <Route path="forum" element={<Navigate to="/community" replace />} />
 

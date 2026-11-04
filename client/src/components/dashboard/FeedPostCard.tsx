@@ -20,7 +20,8 @@ import {
   FaceSmileIcon,
 } from '@heroicons/react/24/outline';
 import { feedApi, connectionsApi, messagesApi, directoryApi } from '@/services/api';
-import { decodeUnicode } from '@/utils/helpers';
+import { decodeUnicode, setBackgroundInterval } from '@/utils/helpers';
+import { supabase } from '@/services/supabase';
 import { useChatStore } from '@/store/chatStore';
 import EmojiPicker from '@/components/ui/EmojiPicker';
 
@@ -204,13 +205,71 @@ export default function FeedPostCard({
     setCommentCount(post.comment_count || 0);
     setReactionsSummary(post.reactions_summary || {});
     setTopReactions(post.top_reactions || (post.like_count > 0 ? ['👍'] : []));
-    setEditContent(post.content);
-    setEditAudience(post.audience || 'public');
-    setEditLocation(post.location || '');
-    setEditImageUrl(post.image_url || '');
-    setEditVideoUrl(post.video_url || '');
-    setEditMediaType(post.media_type || 'photo');
-  }, [post]);
+    if (!showEditModal) {
+      setEditContent(post.content);
+      setEditAudience(post.audience || 'public');
+      setEditLocation(post.location || '');
+      setEditImageUrl(post.image_url || '');
+      setEditVideoUrl(post.video_url || '');
+      setEditMediaType(post.media_type || 'photo');
+    }
+  }, [post, showEditModal]);
+
+  // Live refresh for inline comments when expanded
+  useEffect(() => {
+    if (!commentsOpen) return;
+
+    let isCancelled = false;
+    const refreshInlineComments = async () => {
+      try {
+        const fullPost = await feedApi.get(currentPost.id);
+        if (isCancelled || !fullPost?.comments) return;
+        setComments((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(fullPost.comments)) {
+            return prev;
+          }
+          return fullPost.comments;
+        });
+        if (typeof fullPost.comment_count === 'number') {
+          setCommentCount(fullPost.comment_count);
+        }
+      } catch {
+        // Non-blocking live refresh
+      }
+    };
+
+    // Supabase Realtime channel for this post's comments & reactions
+    const channel = supabase
+      .channel(`card_comments_${currentPost.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'feed_post_comments', filter: `post_id=eq.${currentPost.id}` },
+        () => { refreshInlineComments(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'feed_comment_reactions' },
+        () => { refreshInlineComments(); }
+      )
+      .subscribe();
+
+    // Background interval poll every 3.5s while comments are open
+    const stopInterval = setBackgroundInterval(refreshInlineComments, 3500);
+
+    return () => {
+      isCancelled = true;
+      stopInterval();
+      supabase.removeChannel(channel);
+    };
+  }, [commentsOpen, currentPost.id]);
+
+  // Auto-refresh reactions breakdown if modal is open
+  useEffect(() => {
+    if (!showReactionsModal) return;
+    feedApi.getReactions(currentPost.id)
+      .then((list) => setReactionsList(list || []))
+      .catch(() => {});
+  }, [showReactionsModal, likeCount, currentPost.id]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -566,7 +625,7 @@ export default function FeedPostCard({
   const currentReactionObj = REAL_REACTIONS.find((r) => r.emoji === userReaction);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-xs overflow-hidden transition-all hover:border-gray-300">
+    <div id={`post-${post.id}`} className="bg-white border border-gray-200 rounded-xl shadow-xs overflow-hidden transition-all hover:border-gray-300">
       {/* Post Header */}
       <div className="p-4 pb-2">
         <div className="flex items-start justify-between gap-3">

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { getInitials, playTing, setBackgroundInterval } from '@/utils/helpers';
+import { resolveNotificationLink, getNotificationActionLabel } from '@/utils/notificationHelpers';
 import { profileApi, notificationsApi } from '@/services/api';
 import {
   Bars3Icon,
@@ -25,6 +26,7 @@ import { SecurityPolicyModal } from '@/components/security/SecurityPolicyModal';
 import { ReportSuspiciousActivityModal } from '@/components/security/ReportSuspiciousActivityModal';
 import { useIdleTimer } from '@/hooks/useIdleTimer';
 import ChatDropdown from '@/components/chat/ChatDropdown';
+import { useChatStore } from '@/store/chatStore';
 import '@/styles/blob.css';
 
 const SEARCH_PAGES = [
@@ -339,13 +341,30 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                     <div className="divide-y divide-gray-50">
                       {notifications.map((n: any) => {
                         const Icon = notifIcon(n.type);
+                        const targetLink = resolveNotificationLink(n);
                         return (
                           <div
                             key={n.id}
                             onClick={() => {
-                              if (!n.is_read) { notificationsApi.markRead(n.id); }
+                              if (!n.is_read) {
+                                notificationsApi.markRead(n.id).catch(() => {});
+                                setNotifications((prev) => prev.map((item) => (item.id === n.id ? { ...item, is_read: true } : item)));
+                              }
                               setNotifDropdownOpen(false);
-                              if (n.link) navigate(n.link);
+                              const groupMatch = targetLink?.match(/group=([^&]+)/);
+                              if (groupMatch) {
+                                const groupId = groupMatch[1];
+                                const grp = useChatStore.getState().groups.find((g) => g.profileId === groupId);
+                                useChatStore.getState().openChat({
+                                  profileId: groupId,
+                                  name: grp?.name || n.title?.replace(/.*in\s+/i, '') || 'Group Chat',
+                                  avatar: grp?.avatar,
+                                  isGroup: true,
+                                  members: grp?.members || [],
+                                });
+                                return;
+                              }
+                              if (targetLink) navigate(targetLink);
                             }}
                             className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer ${!n.is_read ? 'bg-orange-50/50' : ''}`}
                           >
@@ -356,9 +375,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                               <p className="text-sm text-gray-800 leading-snug">{n.title}</p>
                               {n.message && <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>}
                               <div className="flex items-center gap-2 mt-1">
-                                {n.link && (
+                                {targetLink && (
                                   <span className="text-[10px] font-medium text-orange-600 hover:text-orange-700">
-                                    {notifActionText(n.type)}
+                                    {getNotificationActionLabel(n.type)}
                                   </span>
                                 )}
                                 <span className="text-[10px] text-gray-400">

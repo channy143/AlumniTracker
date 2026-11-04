@@ -11,8 +11,8 @@ import FieldErrorAlert from '@/components/auth/FieldErrorAlert';
 
 type Step = 'verify' | 'form' | 'captcha' | 'otp';
 
-// Temporarily set to false to bypass alumni identity verification so users can freely register
-const REQUIRE_ALUMNI_VERIFICATION = false;
+// Set to true to enforce alumni identity verification against registry before registration
+const REQUIRE_ALUMNI_VERIFICATION = true;
 
 export default function RegisterPage() {
   const [step, setStep] = useState<Step>(REQUIRE_ALUMNI_VERIFICATION ? 'verify' : 'form');

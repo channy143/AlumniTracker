@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   MinusIcon,
   XMarkIcon,
@@ -11,6 +11,9 @@ import {
   ArrowRightOnRectangleIcon,
   UserPlusIcon,
   ArrowUturnLeftIcon,
+  PhotoIcon,
+  CameraIcon,
+  AtSymbolIcon,
 } from '@heroicons/react/24/outline';
 import { useChatStore } from '@/store/chatStore';
 import { messagesApi, profileApi, connectionsApi } from '@/services/api';
@@ -33,6 +36,105 @@ function isOnlyEmojis(text: string): boolean {
   const emojiRegex = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff]|\uFE0F|\u200D)+/g;
   const stripped = trimmed.replace(emojiRegex, '').replace(/\s+/g, '');
   return stripped.length === 0;
+}
+
+function parseMessageMedia(body: string): { imageUrl: string | null; text: string } {
+  if (!body) return { imageUrl: null, text: '' };
+  const imageMatch = body.match(/\[image:\s*([^\s\]]+)\]/i);
+  if (imageMatch) {
+    const imageUrl = imageMatch[1];
+    const text = body.replace(/\[image:\s*([^\s\]]+)\]/i, '').trim();
+    return { imageUrl, text };
+  }
+  const trimmed = body.trim();
+  if (/^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(trimmed)) {
+    return { imageUrl: trimmed, text: '' };
+  }
+  return { imageUrl: null, text: body };
+}
+
+function formatReplyBody(body: string): string {
+  if (!body) return '';
+  const parsed = parseMessageMedia(body);
+  if (parsed.imageUrl && !parsed.text) return '📷 Photo';
+  if (parsed.imageUrl && parsed.text) return `📷 Photo: ${parsed.text}`;
+  return body;
+}
+
+function renderMessageContent(
+  text: string,
+  isMe: boolean,
+  currentProfileName: string,
+  members: Array<{ profile_id?: string; id?: string; name: string }> = []
+) {
+  if (!text) return null;
+
+  const nameSet = new Set<string>();
+  members.forEach((m) => {
+    if (m.name && m.name.trim()) nameSet.add(m.name.trim());
+  });
+
+  const sortedNames = Array.from(nameSet).sort((a, b) => b.length - a.length);
+  const patterns = ['@everyone\\b', '@all\\b'];
+  sortedNames.forEach((n) => {
+    patterns.push(`@${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+  });
+  patterns.push('@[a-zA-Z0-9_]+');
+
+  const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
+  const tokens = text.split(regex);
+
+  const myNameLower = (currentProfileName || '').toLowerCase().trim();
+  const myFirstLower = myNameLower.split(/\s+/)[0] || '';
+
+  return (
+    <>
+      {tokens.map((part, idx) => {
+        if (part.startsWith('@')) {
+          const target = part.slice(1).toLowerCase().trim();
+          const isEveryone = target === 'everyone' || target === 'all';
+          const isMeMentioned =
+            !isMe &&
+            myNameLower &&
+            (target === myNameLower || (myFirstLower && target === myFirstLower));
+
+          if (isMe) {
+            return (
+              <span
+                key={idx}
+                className="font-bold bg-white/25 text-white px-1.5 py-0.5 rounded-md ring-1 ring-white/30 backdrop-blur-xs select-none inline-block mx-0.5"
+              >
+                {part}
+              </span>
+            );
+          }
+
+          if (isMeMentioned || isEveryone) {
+            return (
+              <span
+                key={idx}
+                className="font-bold bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded-md ring-1 ring-amber-400 select-none inline-block mx-0.5"
+                title={isEveryone ? 'Everyone mentioned' : 'You were mentioned'}
+              >
+                {part}
+              </span>
+            );
+          }
+
+          return (
+            <span
+              key={idx}
+              className="font-semibold text-orange-600 bg-orange-100/90 hover:bg-orange-200/90 px-1.5 py-0.5 rounded-md ring-1 ring-orange-200 transition-colors select-none inline-block mx-0.5"
+            >
+              {part}
+            </span>
+          );
+        }
+
+        return <span key={idx}>{part}</span>;
+      })}
+    </>
+  );
 }
 
 interface ReplyPreviewData {
@@ -94,6 +196,7 @@ export default function DockedChatBox() {
     replyingTo,
     setReplyingTo,
     setChatMessages,
+    updateGroupInfo,
   } = useChatStore();
 
   const [overflowHovered, setOverflowHovered] = useState(false);
@@ -110,10 +213,152 @@ export default function DockedChatBox() {
   const [groupActionLoading, setGroupActionLoading] = useState(false);
   const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
+
+  // Group Picture Upload state
+  const [uploadingGroupPic, setUploadingGroupPic] = useState(false);
+  const groupPicInputRef = useRef<HTMLInputElement>(null);
+
+  // Message Photo Attachment state
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
+  const [uploadingMsgPhoto, setUploadingMsgPhoto] = useState(false);
+  const msgPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  // Photo Lightbox modal
+  const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
+
+  // Group Mention autocomplete state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState<number>(0);
+  const [mentionTriggerPos, setMentionTriggerPos] = useState<number>(-1);
+
+  // Group chat mention candidates
+  const mentionCandidates = useMemo(() => {
+    if (!activeChat?.isGroup || mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    const results: Array<{ id: string; name: string; avatar?: string; role?: string; isEveryone?: boolean }> = [];
+
+    if ('everyone'.includes(q) || 'all'.includes(q) || q === '') {
+      results.push({
+        id: '__everyone__',
+        name: 'everyone',
+        role: 'Notify all members',
+        isEveryone: true,
+      });
+    }
+
+    const members = (activeChat.members || []).filter((m) => {
+      const pid = m.profile_id || m.id;
+      if (currentProfileId && pid === currentProfileId) return false;
+      if (!q) return true;
+      return m.name.toLowerCase().includes(q);
+    });
+
+    members.forEach((m) => {
+      results.push({
+        id: m.profile_id || m.id || m.name,
+        name: m.name,
+        avatar: m.avatar,
+        role: m.role === 'admin' ? 'Admin' : undefined,
+      });
+    });
+
+    return results.slice(0, 8);
+  }, [activeChat?.isGroup, activeChat?.members, mentionQuery, currentProfileId]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputText(val);
+
+    if (!activeChat?.isGroup) {
+      if (mentionQuery !== null) setMentionQuery(null);
+      return;
+    }
+
+    const cursorPos = e.target.selectionStart ?? val.length;
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const match = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9_\s]{0,25})$/);
+
+    if (match) {
+      const query = match[1];
+      const triggerPos = cursorPos - query.length - 1;
+      setMentionQuery(query);
+      setMentionTriggerPos(triggerPos);
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+      setMentionTriggerPos(-1);
+    }
+  };
+
+  const handleSelectMention = (candidate: { name: string }) => {
+    if (mentionTriggerPos < 0) return;
+    const cursorPos = inputRef.current?.selectionStart ?? inputText.length;
+    const beforeAt = inputText.slice(0, mentionTriggerPos);
+    const afterCursor = inputText.slice(cursorPos);
+    const mentionText = `@${candidate.name} `;
+    const newText = beforeAt + mentionText + afterCursor;
+    setInputText(newText);
+    setMentionQuery(null);
+    setMentionTriggerPos(-1);
+    setMentionIndex(0);
+
+    const newCursorPos = beforeAt.length + mentionText.length;
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 20);
+  };
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const prevMsgCountRef = useRef<number>(0);
+
+  const handleGroupPictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeChat?.profileId) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (JPG, PNG, WebP).');
+      return;
+    }
+    setUploadingGroupPic(true);
+    try {
+      const res = await messagesApi.uploadMedia(file);
+      if (res?.url) {
+        await messagesApi.updateGroup(activeChat.profileId, { avatar_url: res.url });
+        updateGroupInfo(activeChat.profileId, { avatar: res.url });
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to update group picture');
+    } finally {
+      setUploadingGroupPic(false);
+      if (groupPicInputRef.current) groupPicInputRef.current.value = '';
+    }
+  };
+
+  const handleSelectMessagePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file (JPG, PNG, GIF, WebP).');
+      return;
+    }
+    setPendingPhotoFile(file);
+    const localUrl = URL.createObjectURL(file);
+    setPendingPhotoPreview(localUrl);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  };
+
+  const handleCancelMessagePhoto = () => {
+    setPendingPhotoFile(null);
+    setPendingPhotoPreview(null);
+    if (msgPhotoInputRef.current) msgPhotoInputRef.current.value = '';
+  };
 
   // Fetch current user's profile ID and name
   useEffect(() => {
@@ -229,6 +474,8 @@ export default function DockedChatBox() {
       setMessages(cached);
       setLoadingChat(cached.length === 0);
       setInputText('');
+      setMentionQuery(null);
+      setMentionTriggerPos(-1);
       setShowGroupInfo(false);
       setShowAddAlumni(false);
       setActiveReactionMsgId(null);
@@ -239,7 +486,17 @@ export default function DockedChatBox() {
         if (m?.id) knownMessageIdsRef.current.add(m.id);
       });
       loadMessages(true);
-      if (!activeChat.isGroup) refreshPresence();
+      if (!activeChat.isGroup) {
+        refreshPresence();
+      } else if (!activeChat.members || activeChat.members.length === 0) {
+        messagesApi.getGroupMembers(activeChat.profileId)
+          .then((res) => {
+            if (Array.isArray(res?.members)) {
+              updateGroupMembers(activeChat.profileId, res.members);
+            }
+          })
+          .catch(() => {});
+      }
 
       return setBackgroundInterval(() => {
         loadMessages(false);
@@ -339,8 +596,10 @@ export default function DockedChatBox() {
   };
 
   const handleSend = async (textToSend?: string) => {
-    const text = (textToSend || inputText).trim();
-    if (!text || !activeChat?.profileId) return;
+    const rawText = (textToSend || inputText).trim();
+    const hasPhoto = !!pendingPhotoFile;
+    if (!rawText && !hasPhoto) return;
+    if (!activeChat?.profileId) return;
 
     if (!textToSend) {
       setInputText('');
@@ -360,13 +619,23 @@ export default function DockedChatBox() {
         }
       : null;
 
+    const fileToUpload = pendingPhotoFile;
+    const localPreviewUrl = pendingPhotoPreview;
+    setPendingPhotoFile(null);
+    setPendingPhotoPreview(null);
+    if (msgPhotoInputRef.current) msgPhotoInputRef.current.value = '';
+
     const targetProfileId = activeChat.profileId;
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const optimisticBody = localPreviewUrl
+      ? `[image: ${localPreviewUrl}]${rawText ? '\n' + rawText : ''}`
+      : rawText;
+
     const optimisticMsg: MessageItem = {
       id: tempId,
       sender_id: currentProfileId || 'me',
       receiver_id: targetProfileId,
-      body: text,
+      body: optimisticBody,
       created_at: new Date().toISOString(),
       reply_to_id: currentReply?.id || null,
       reply_preview: replyPreview,
@@ -384,16 +653,26 @@ export default function DockedChatBox() {
     }, 10);
 
     try {
+      let finalBody = rawText;
+      if (fileToUpload) {
+        setUploadingMsgPhoto(true);
+        const uploadRes = await messagesApi.uploadMedia(fileToUpload);
+        if (uploadRes?.url) {
+          finalBody = `[image: ${uploadRes.url}]${rawText ? '\n' + rawText : ''}`;
+        }
+        setUploadingMsgPhoto(false);
+      }
+
       const realMsg = activeChat.isGroup
         ? await messagesApi.sendGroupMessage(
             targetProfileId,
-            text,
+            finalBody,
             currentReply?.id || null,
             replyPreview
           )
         : await messagesApi.send(
             targetProfileId,
-            text,
+            finalBody,
             undefined,
             undefined,
             currentReply?.id || null,
@@ -408,6 +687,7 @@ export default function DockedChatBox() {
               ? {
                   ...m,
                   id: realMsg.id,
+                  body: realMsg.body || finalBody,
                   created_at: realMsg.created_at || m.created_at,
                   sender_id: realMsg.sender_id || m.sender_id,
                   sender_name: realMsg.sender_name || m.sender_name,
@@ -423,6 +703,7 @@ export default function DockedChatBox() {
         });
       }
     } catch (err: any) {
+      setUploadingMsgPhoto(false);
       console.error('Failed to deliver message:', err);
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m))
@@ -431,6 +712,33 @@ export default function DockedChatBox() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Mentions navigation
+    if (mentionQuery !== null && mentionCandidates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const selected = mentionCandidates[mentionIndex];
+        if (selected) {
+          handleSelectMention(selected);
+          return;
+        }
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionQuery(null);
+        return;
+      }
+    }
+
     if (e.key === 'Escape' && replyingTo) {
       e.preventDefault();
       setReplyingTo(null);
@@ -741,8 +1049,37 @@ export default function DockedChatBox() {
             <div className="flex-1 overflow-y-auto p-3.5 space-y-4 bg-gray-50/50">
               {/* Group Overview Banner */}
               <div className="bg-white p-3 rounded-xl border border-gray-200 text-center shadow-xs">
-                <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-600 text-white font-bold flex items-center justify-center text-lg mb-2 shadow-xs">
-                  <UserGroupIcon className="w-6 h-6" />
+                <div className="relative w-16 h-16 mx-auto mb-2 group">
+                  {activeChat.avatar ? (
+                    <img
+                      src={activeChat.avatar}
+                      alt={activeChat.name}
+                      className="w-16 h-16 rounded-2xl object-cover ring-2 ring-orange-200 shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-600 text-white font-bold flex items-center justify-center text-2xl shadow-sm">
+                      <UserGroupIcon className="w-8 h-8" />
+                    </div>
+                  )}
+                  {/* Change group photo button */}
+                  <label
+                    className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-orange-600 hover:bg-orange-700 text-white flex items-center justify-center shadow-md cursor-pointer transition-transform hover:scale-110 ring-2 ring-white"
+                    title="Change group photo"
+                  >
+                    {uploadingGroupPic ? (
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <CameraIcon className="w-3.5 h-3.5" />
+                    )}
+                    <input
+                      ref={groupPicInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleGroupPictureChange}
+                      disabled={uploadingGroupPic}
+                    />
+                  </label>
                 </div>
                 <h3 className="text-sm font-bold text-gray-900">{activeChat.name}</h3>
                 {activeChat.headline && (
@@ -876,6 +1213,25 @@ export default function DockedChatBox() {
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          {!isMe && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowGroupInfo(false);
+                                setInputText((prev) => {
+                                  const trimmed = prev.trim();
+                                  return (trimmed ? trimmed + ' ' : '') + `@${m.name} `;
+                                });
+                                setTimeout(() => inputRef.current?.focus(), 50);
+                              }}
+                              className="px-2 py-0.5 text-[10px] font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 hover:text-orange-700 rounded transition-colors cursor-pointer flex items-center gap-0.5"
+                              title={`Mention @${m.name}`}
+                            >
+                              <AtSymbolIcon className="w-3 h-3" />
+                              <span>Mention</span>
+                            </button>
+                          )}
+
                           {isMemberAdmin && (
                             <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                               Admin
@@ -960,7 +1316,8 @@ export default function DockedChatBox() {
                     const isMe =
                       m.id.startsWith('temp-') ||
                       (currentProfileId ? m.sender_id === currentProfileId : m.sender_id !== activeChat.profileId);
-                    const emojiOnly = isOnlyEmojis(m.body);
+                    const parsedMedia = parseMessageMedia(m.body);
+                    const emojiOnly = !parsedMedia.imageUrl && isOnlyEmojis(parsedMedia.text);
                     const isPending = m.id.startsWith('temp-');
                     const isFailed = m.failed;
 
@@ -1163,7 +1520,7 @@ export default function DockedChatBox() {
                                   className="px-3 py-1.5 rounded-2xl rounded-br-xs text-xs bg-gray-100 text-gray-600 border-r-2 border-orange-400 max-w-full break-words [overflow-wrap:anywhere] line-clamp-2 cursor-pointer hover:bg-gray-200/80 transition-colors"
                                   title="Click to view original message"
                                 >
-                                  {replyInfo.body}
+                                  {formatReplyBody(replyInfo.body)}
                                 </div>
                               </div>
                             )}
@@ -1178,21 +1535,37 @@ export default function DockedChatBox() {
                               {messageActionButtons}
 
                               <div className="relative max-w-full min-w-0">
-                                {emojiOnly ? (
+                                {parsedMedia.imageUrl && (
                                   <div
-                                    className="text-3xl sm:text-4xl py-0.5 px-1 select-none animate-emoji-pop text-right"
-                                    title={m.body}
+                                    onClick={() => setViewingPhotoUrl(parsedMedia.imageUrl)}
+                                    className="mb-1 rounded-2xl overflow-hidden cursor-pointer shadow-xs border border-orange-400/30 hover:opacity-95 transition-opacity bg-black/5"
+                                    title="Click to view image"
                                   >
-                                    {m.body}
+                                    <img
+                                      src={parsedMedia.imageUrl}
+                                      alt="Chat photo"
+                                      className="max-h-56 max-w-full rounded-2xl object-cover"
+                                      loading="lazy"
+                                    />
                                   </div>
-                                ) : (
-                                  <div
-                                    className={`max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed break-words [overflow-wrap:anywhere] whitespace-pre-wrap bg-orange-600 text-white rounded-br-xs shadow-xs ${
-                                      isFailed ? 'border border-red-400 bg-red-600 text-white' : ''
-                                    }`}
-                                  >
-                                    {m.body}
-                                  </div>
+                                )}
+                                {parsedMedia.text && (
+                                  emojiOnly ? (
+                                    <div
+                                      className="text-3xl sm:text-4xl py-0.5 px-1 select-none animate-emoji-pop text-right"
+                                      title={parsedMedia.text}
+                                    >
+                                      {parsedMedia.text}
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className={`max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed break-words [overflow-wrap:anywhere] whitespace-pre-wrap bg-orange-600 text-white rounded-br-xs shadow-xs ${
+                                        isFailed ? 'border border-red-400 bg-red-600 text-white' : ''
+                                      }`}
+                                    >
+                                      {renderMessageContent(parsedMedia.text, true, currentProfileName, activeChat.members || [])}
+                                    </div>
+                                  )
                                 )}
                                 {reactionBadge}
                               </div>
@@ -1257,7 +1630,7 @@ export default function DockedChatBox() {
                                   className="px-3 py-1.5 rounded-2xl rounded-bl-xs text-xs bg-gray-100 text-gray-600 border-l-2 border-orange-400 max-w-full break-words [overflow-wrap:anywhere] line-clamp-2 cursor-pointer hover:bg-gray-200/80 transition-colors"
                                   title="Click to view original message"
                                 >
-                                  {replyInfo.body}
+                                  {formatReplyBody(replyInfo.body)}
                                 </div>
                               </div>
                             )}
@@ -1271,17 +1644,33 @@ export default function DockedChatBox() {
                               {reactionPickerPopover}
 
                               <div className="relative max-w-full min-w-0">
-                                {emojiOnly ? (
+                                {parsedMedia.imageUrl && (
                                   <div
-                                    className="text-3xl sm:text-4xl py-0.5 px-1 select-none animate-emoji-pop text-left"
-                                    title={m.body}
+                                    onClick={() => setViewingPhotoUrl(parsedMedia.imageUrl)}
+                                    className="mb-1 rounded-2xl overflow-hidden cursor-pointer shadow-xs border border-gray-200 hover:opacity-95 transition-opacity bg-black/5"
+                                    title="Click to view image"
                                   >
-                                    {m.body}
+                                    <img
+                                      src={parsedMedia.imageUrl}
+                                      alt="Chat photo"
+                                      className="max-h-56 max-w-full rounded-2xl object-cover"
+                                      loading="lazy"
+                                    />
                                   </div>
-                                ) : (
-                                  <div className="max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed bg-gray-200/90 text-gray-900 rounded-tl-xs break-words [overflow-wrap:anywhere] whitespace-pre-wrap shadow-2xs">
-                                    {m.body}
-                                  </div>
+                                )}
+                                {parsedMedia.text && (
+                                  emojiOnly ? (
+                                    <div
+                                      className="text-3xl sm:text-4xl py-0.5 px-1 select-none animate-emoji-pop text-left"
+                                      title={parsedMedia.text}
+                                    >
+                                      {parsedMedia.text}
+                                    </div>
+                                  ) : (
+                                    <div className="max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed bg-gray-200/90 text-gray-900 rounded-tl-xs break-words [overflow-wrap:anywhere] whitespace-pre-wrap shadow-2xs">
+                                      {renderMessageContent(parsedMedia.text, false, currentProfileName, activeChat.members || [])}
+                                    </div>
+                                  )
                                 )}
                                 {reactionBadge}
                               </div>
@@ -1318,7 +1707,7 @@ export default function DockedChatBox() {
                       </span>
                     </p>
                     <p className="text-[11px] text-gray-500 truncate">
-                      {replyingTo.body}
+                      {formatReplyBody(replyingTo.body)}
                     </p>
                   </div>
                   <button
@@ -1326,6 +1715,42 @@ export default function DockedChatBox() {
                     onClick={() => setReplyingTo(null)}
                     className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-orange-100 transition-colors cursor-pointer shrink-0"
                     title="Cancel reply"
+                  >
+                    <XMarkIcon className="w-4 h-4 stroke-2" />
+                  </button>
+                </div>
+              )}
+
+              {/* Photo Attachment Pending Preview */}
+              {pendingPhotoPreview && (
+                <div className="px-3 py-2 bg-orange-50/90 border-t border-orange-200/80 flex items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="relative w-11 h-11 rounded-lg overflow-hidden border border-orange-200 shrink-0 bg-black/5">
+                      <img
+                        src={pendingPhotoPreview}
+                        alt="Attachment preview"
+                        className="w-full h-full object-cover"
+                      />
+                      {uploadingMsgPhoto && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">
+                        {pendingPhotoFile?.name || 'Photo attachment'}
+                      </p>
+                      <p className="text-[10px] text-gray-500">
+                        {pendingPhotoFile ? `${(pendingPhotoFile.size / 1024).toFixed(0)} KB` : 'Image'} · Ready to send
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelMessagePhoto}
+                    className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-orange-100 transition-colors cursor-pointer shrink-0"
+                    title="Remove attachment"
                   >
                     <XMarkIcon className="w-4 h-4 stroke-2" />
                   </button>
@@ -1352,6 +1777,69 @@ export default function DockedChatBox() {
 
               {/* Input / Send Bar */}
               <div className="p-2.5 bg-white border-t border-gray-200 flex items-center gap-1.5 relative">
+                {/* Group Mention Autocomplete Popover */}
+                {activeChat.isGroup && mentionQuery !== null && mentionCandidates.length > 0 && (
+                  <div className="absolute left-2 right-2 bottom-full mb-1.5 z-40 bg-white/95 backdrop-blur-md rounded-2xl border border-orange-200/90 shadow-2xl overflow-hidden animate-fade-in divide-y divide-gray-100">
+                    <div className="px-3 py-1.5 bg-orange-50/80 border-b border-orange-100 flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-orange-900 flex items-center gap-1.5">
+                        <AtSymbolIcon className="w-3.5 h-3.5 text-orange-600" />
+                        <span>Mention group member</span>
+                      </span>
+                      <span className="text-[10px] text-gray-400 hidden sm:inline">
+                        ↑↓ to navigate · Enter to select · Esc to close
+                      </span>
+                    </div>
+                    <div className="max-h-44 overflow-y-auto p-1 space-y-0.5">
+                      {mentionCandidates.map((candidate, idx) => {
+                        const isSelected = idx === mentionIndex;
+                        return (
+                          <div
+                            key={candidate.id}
+                            onMouseEnter={() => setMentionIndex(idx)}
+                            onClick={() => handleSelectMention(candidate)}
+                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-colors cursor-pointer ${
+                              isSelected
+                                ? 'bg-orange-100/90 text-orange-950 font-semibold'
+                                : 'hover:bg-gray-100/80 text-gray-800'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {candidate.isEveryone ? (
+                                <div className="w-6 h-6 rounded-lg bg-orange-600 text-white font-bold flex items-center justify-center text-[10px] shrink-0 shadow-2xs">
+                                  <UserGroupIcon className="w-3.5 h-3.5" />
+                                </div>
+                              ) : candidate.avatar ? (
+                                <img
+                                  src={candidate.avatar}
+                                  alt={candidate.name}
+                                  className="w-6 h-6 rounded-full object-cover shrink-0 ring-1 ring-gray-200"
+                                />
+                              ) : (
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center text-[9px] shrink-0 shadow-2xs">
+                                  {candidate.name.slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="min-w-0 flex items-baseline gap-1.5">
+                                <span className="font-semibold truncate">@{candidate.name}</span>
+                                {candidate.role && (
+                                  <span className={`text-[10px] truncate ${candidate.isEveryone ? 'text-orange-600 font-normal' : 'text-gray-400'}`}>
+                                    {candidate.role}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <span className="text-[10px] font-bold text-orange-700 bg-orange-200/80 px-1.5 py-0.2 rounded-md shrink-0">
+                                Select ↵
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {showEmojiPicker && (
                   <EmojiPicker
                     position="top"
@@ -1376,29 +1864,75 @@ export default function DockedChatBox() {
                   <FaceSmileIcon className="w-5 h-5" />
                 </button>
 
+                <button
+                  type="button"
+                  onClick={() => msgPhotoInputRef.current?.click()}
+                  className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
+                  title="Attach photo"
+                >
+                  <PhotoIcon className="w-5 h-5" />
+                </button>
+                <input
+                  ref={msgPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleSelectMessagePhoto}
+                />
+
+                {activeChat.isGroup && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputText((prev) => {
+                        const spacer = prev.length > 0 && !prev.endsWith(' ') ? ' ' : '';
+                        return prev + spacer + '@';
+                      });
+                      setMentionQuery('');
+                      setMentionTriggerPos(
+                        inputText.length + (inputText.length > 0 && !inputText.endsWith(' ') ? 1 : 0)
+                      );
+                      setTimeout(() => inputRef.current?.focus(), 20);
+                    }}
+                    className={`p-1.5 rounded-full transition-colors cursor-pointer shrink-0 ${
+                      mentionQuery !== null
+                        ? 'text-orange-600 bg-orange-100'
+                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                    }`}
+                    title="Mention someone (@)"
+                  >
+                    <AtSymbolIcon className="w-5 h-5" />
+                  </button>
+                )}
+
                 <input
                   ref={inputRef}
                   type="text"
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
                   placeholder={
                     replyingTo
                       ? `Reply to ${replyingTo.senderId === currentProfileId ? 'yourself' : replyingTo.senderName}...`
                       : activeChat.isGroup
-                        ? 'Message group...'
+                        ? 'Message group (type @ to mention)...'
                         : 'Write a message...'
                   }
                   className="flex-1 bg-gray-100 hover:bg-gray-200/60 focus:bg-white focus:ring-1 focus:ring-orange-500 border border-transparent focus:border-orange-400 rounded-full px-3.5 py-1.5 text-sm text-gray-800 placeholder-gray-500 outline-none transition-all"
                 />
 
-                {inputText.trim() ? (
+                {inputText.trim() || pendingPhotoFile ? (
                   <button
                     onClick={() => handleSend()}
-                    className="p-2 bg-orange-600 hover:bg-orange-700 text-white rounded-full transition-colors shadow-xs cursor-pointer active:scale-95"
+                    disabled={uploadingMsgPhoto}
+                    className="p-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-full transition-colors shadow-xs cursor-pointer active:scale-95"
                     title="Send message"
                   >
-                    <PaperAirplaneIcon className="w-4 h-4" />
+                    {uploadingMsgPhoto ? (
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                    ) : (
+                      <PaperAirplaneIcon className="w-4 h-4" />
+                    )}
                   </button>
                 ) : (
                   <button
@@ -1412,6 +1946,32 @@ export default function DockedChatBox() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Lightbox / Fullscreen Image Viewer Modal */}
+      {viewingPhotoUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setViewingPhotoUrl(null)}
+        >
+          <div
+            className="relative max-w-3xl max-h-[90vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setViewingPhotoUrl(null)}
+              className="absolute -top-10 right-0 p-1.5 text-white/80 hover:text-white bg-black/40 hover:bg-black/60 rounded-full transition-colors cursor-pointer"
+              title="Close image"
+            >
+              <XMarkIcon className="w-6 h-6 stroke-2" />
+            </button>
+            <img
+              src={viewingPhotoUrl}
+              alt="Full view"
+              className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl ring-1 ring-white/10"
+            />
+          </div>
         </div>
       )}
     </>

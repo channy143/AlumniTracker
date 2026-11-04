@@ -67,6 +67,7 @@ interface ChatState {
 
   // Group Conversation Actions
   setGroups: (groups: ChatContact[]) => void;
+  updateGroupInfo: (groupId: string, data: { name?: string; description?: string; avatar?: string }) => void;
   updateGroupMembers: (groupId: string, members: GroupMember[]) => void;
   removeMemberFromGroup: (groupId: string, profileId: string) => void;
   addMemberToGroup: (groupId: string, member: GroupMember) => void;
@@ -329,6 +330,29 @@ export const useChatStore = create<ChatState>((set) => ({
       });
       return { groups, messagesByChat: updatedMsgs };
     }),
+
+  updateGroupInfo: (groupId, data) =>
+    set((state) => ({
+      groups: state.groups.map((g) =>
+        g.profileId === groupId
+          ? {
+              ...g,
+              ...(data.name ? { name: data.name } : {}),
+              ...(data.description !== undefined ? { headline: data.description } : {}),
+              ...(data.avatar !== undefined ? { avatar: data.avatar } : {}),
+            }
+          : g
+      ),
+      activeChat:
+        state.activeChat?.profileId === groupId
+          ? {
+              ...state.activeChat,
+              ...(data.name ? { name: data.name } : {}),
+              ...(data.description !== undefined ? { headline: data.description } : {}),
+              ...(data.avatar !== undefined ? { avatar: data.avatar } : {}),
+            }
+          : state.activeChat,
+    })),
 
   updateGroupMembers: (groupId, members) =>
     set((state) => ({

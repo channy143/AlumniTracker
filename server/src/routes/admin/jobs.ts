@@ -194,7 +194,7 @@ router.post('/', validate(adminCreateJobSchema), async (req, res, next) => {
         type: 'job',
         title: `💼 New Job Opening: ${data.position}`,
         message: `${data.company_name} is hiring for ${data.position} in ${data.industry || data.location}. View details and apply now.`,
-        link: '/jobs',
+        link: `/jobs?job=${data.id}`,
       });
     }
 
@@ -502,7 +502,7 @@ router.put('/applications/:applicationId/status', validate(applicationStatusSche
           type: 'application',
           title,
           message,
-          link: '/jobs',
+          link: '/jobs?tab=applications',
         });
       }
     } catch (notifErr) {

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/store/authStore';
 import { feedApi, careerTrendsApi, profileApi, surveyApi } from '@/services/api';
@@ -21,8 +21,9 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { HandThumbUpIcon as ThumbUpSolid } from '@heroicons/react/24/solid';
-import { decodeUnicode } from '@/utils/helpers';
+import { decodeUnicode, setBackgroundInterval } from '@/utils/helpers';
 import { formatExperience } from '@/utils/formatExperience';
+import { supabase } from '@/services/supabase';
 import CreatePostBox from '@/components/dashboard/CreatePostBox';
 import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
 
@@ -106,11 +107,13 @@ function PostDetailView({
   onBack,
   currentUser,
   currentProfile,
+  onPostUpdated,
 }: {
   post: FeedPost;
   onBack: () => void;
   currentUser?: any;
   currentProfile?: any;
+  onPostUpdated?: (updated: any) => void;
 }) {
   const [comments, setComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(true);
@@ -119,33 +122,88 @@ function PostDetailView({
   const [liked, setLiked] = useState(!!post.liked);
   const [likeCount, setLikeCount] = useState(post.like_count || 0);
 
+  // Live refresh for post details, comments, and likes
   useEffect(() => {
-    feedApi.get(post.id)
-      .then((fullPost) => {
-        if (fullPost?.comments) {
-          setComments(fullPost.comments);
-        }
-        if (typeof fullPost?.liked === 'boolean') {
+    let isCancelled = false;
+
+    const refreshPostDetails = async () => {
+      try {
+        const fullPost = await feedApi.get(post.id);
+        if (isCancelled || !fullPost) return;
+
+        if (typeof fullPost.liked === 'boolean') {
           setLiked(fullPost.liked);
         }
-        if (typeof fullPost?.like_count === 'number') {
+        if (typeof fullPost.like_count === 'number') {
           setLikeCount(fullPost.like_count);
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingComments(false));
+        if (fullPost.comments) {
+          setComments((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(fullPost.comments)) {
+              return prev;
+            }
+            return fullPost.comments;
+          });
+        }
+      } catch {
+        // Non-blocking live refresh
+      }
+    };
+
+    // Initial fetch
+    refreshPostDetails().finally(() => {
+      if (!isCancelled) setLoadingComments(false);
+    });
+
+    // Supabase Realtime channel for this specific post
+    const channel = supabase
+      .channel(`live_modal_post_${post.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'feed_post_comments', filter: `post_id=eq.${post.id}` },
+        () => { refreshPostDetails(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'feed_post_likes', filter: `post_id=eq.${post.id}` },
+        () => { refreshPostDetails(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'feed_posts', filter: `id=eq.${post.id}` },
+        () => { refreshPostDetails(); }
+      )
+      .subscribe();
+
+    // Background interval poll every 3 seconds while modal is open
+    const stopInterval = setBackgroundInterval(refreshPostDetails, 3000);
+
+    return () => {
+      isCancelled = true;
+      stopInterval();
+      supabase.removeChannel(channel);
+    };
   }, [post.id]);
 
   const handleToggleLike = async () => {
     const nextLiked = !liked;
+    const nextCount = nextLiked ? likeCount + 1 : Math.max(0, likeCount - 1);
     setLiked(nextLiked);
-    setLikeCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+    setLikeCount(nextCount);
+    onPostUpdated?.({ id: post.id, liked: nextLiked, like_count: nextCount });
     try {
       const res = await feedApi.like(post.id);
-      if (res && typeof res.liked === 'boolean') setLiked(res.liked);
+      if (res && typeof res.liked === 'boolean') {
+        setLiked(res.liked);
+        if (typeof res.like_count === 'number') {
+          setLikeCount(res.like_count);
+          onPostUpdated?.({ id: post.id, liked: res.liked, like_count: res.like_count });
+        }
+      }
     } catch {
       setLiked(!nextLiked);
-      setLikeCount((prev) => (!nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+      setLikeCount(likeCount);
+      onPostUpdated?.({ id: post.id, liked: !nextLiked, like_count: likeCount });
     }
   };
 
@@ -157,6 +215,7 @@ function PostDetailView({
       const newComment = await feedApi.addComment(post.id, commentText.trim());
       setComments((prev) => [...prev, newComment]);
       setCommentText('');
+      onPostUpdated?.({ id: post.id, comment_count: comments.length + 1 });
     } catch (err: any) {
       alert(err.message || 'Failed to post comment.');
     } finally {
@@ -168,6 +227,7 @@ function PostDetailView({
     try {
       await feedApi.deleteComment(commentId);
       setComments((prev) => prev.filter((c) => c.id !== commentId));
+      onPostUpdated?.({ id: post.id, comment_count: Math.max(0, comments.length - 1) });
     } catch (err: any) {
       alert(err.message || 'Failed to delete comment.');
     }
@@ -772,6 +832,7 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [greeting, setGreeting] = useState('Welcome');
@@ -780,6 +841,77 @@ export default function DashboardPage() {
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
   const [profile, setProfile] = useState<any>(null);
+
+  const targetPostId = searchParams.get('post');
+
+  // Handle deep-linking from notification or URL query (?post=<id>)
+  useEffect(() => {
+    if (!targetPostId) {
+      return;
+    }
+
+    if (selectedPost && selectedPost.id === targetPostId) {
+      return;
+    }
+
+    // 1. Try finding in current in-memory feedPosts
+    const found = feedPosts.find((p) => p.id === targetPostId);
+    if (found) {
+      setSelectedPost(found);
+      return;
+    }
+
+    // 2. Fetch directly from backend (supports older posts or when feed is still loading)
+    let isCancelled = false;
+    feedApi.get(targetPostId)
+      .then((postData) => {
+        if (!isCancelled && postData) {
+          setSelectedPost(postData);
+          setFeedPosts((prev) => {
+            if (prev.some((p) => p.id === postData.id)) return prev;
+            return [postData, ...prev];
+          });
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load target post from notification query:', err);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [targetPostId, feedPosts, selectedPost]);
+
+  // Scroll to post card in feed if present
+  useEffect(() => {
+    if (!targetPostId) return;
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`post-${targetPostId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [targetPostId, feedPosts]);
+
+  const handleOpenPost = useCallback((post: FeedPost) => {
+    setSelectedPost(post);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('post', post.id);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleClosePost = useCallback(() => {
+    setSelectedPost(null);
+    setSearchParams((prev) => {
+      if (!prev.has('post')) return prev;
+      const next = new URLSearchParams(prev);
+      next.delete('post');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   useEffect(() => {
     profileApi.get().then((p) => { if (p) setProfile(p); }).catch(() => {});
@@ -793,13 +925,108 @@ export default function DashboardPage() {
     else setGreeting('Good evening');
   }, []);
 
+  const refreshFeedData = useCallback(async () => {
+    try {
+      const data = await feedApi.list();
+      if (!data || !Array.isArray(data)) return;
+
+      setFeedPosts((prev) => {
+        if (!prev || prev.length === 0) return data;
+
+        const newMap = new Map<string, FeedPost>(data.map((p) => [p.id, p]));
+        const prevIds = new Set(prev.map((p) => p.id));
+        let changed = false;
+
+        if (prev.length !== data.length) {
+          changed = true;
+        }
+
+        const merged = prev
+          .filter((p) => newMap.has(p.id))
+          .map((oldPost) => {
+            const fresh = newMap.get(oldPost.id)!;
+            const isDifferent =
+              oldPost.like_count !== fresh.like_count ||
+              oldPost.comment_count !== fresh.comment_count ||
+              oldPost.share_count !== fresh.share_count ||
+              oldPost.liked !== fresh.liked ||
+              oldPost.user_reaction !== fresh.user_reaction ||
+              oldPost.content !== fresh.content ||
+              oldPost.title !== fresh.title ||
+              oldPost.image_url !== fresh.image_url ||
+              oldPost.video_url !== fresh.video_url ||
+              oldPost.tag !== fresh.tag ||
+              JSON.stringify(oldPost.reactions_summary) !== JSON.stringify(fresh.reactions_summary) ||
+              JSON.stringify(oldPost.top_reactions) !== JSON.stringify(fresh.top_reactions);
+
+            if (isDifferent) {
+              changed = true;
+              return { ...oldPost, ...fresh };
+            }
+            return oldPost;
+          });
+
+        const newlyAdded = data.filter((p) => !prevIds.has(p.id));
+        if (newlyAdded.length > 0) {
+          changed = true;
+          return [...newlyAdded, ...merged];
+        }
+
+        return changed ? merged : prev;
+      });
+    } catch {
+      // Non-blocking live refresh error
+    }
+  }, []);
+
+  // Live real-time subscription & resilient background refresh
   useEffect(() => {
     setLoading(true);
-    feedApi.list().then((data) => {
-      if (data) setFeedPosts(data);
-    }).catch(() => {})
-    .finally(() => setLoading(false));
-  }, []);
+    refreshFeedData().finally(() => setLoading(false));
+
+    // Supabase Realtime WebSocket channel for instant home page updates
+    const channel = supabase
+      .channel('home_page_live_feed')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'feed_posts' },
+        () => { refreshFeedData(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'feed_post_likes' },
+        () => { refreshFeedData(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'feed_post_comments' },
+        () => { refreshFeedData(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'announcements' },
+        () => {
+          refreshFeedData();
+          setSidebarRefreshKey((k) => k + 1);
+        }
+      )
+      .subscribe();
+
+    // Background interval poll every 3.5 seconds
+    const stopInterval = setBackgroundInterval(refreshFeedData, 3500);
+
+    // Instant refresh when user returns to tab
+    const handleFocus = () => {
+      refreshFeedData();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      stopInterval();
+      supabase.removeChannel(channel);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [refreshFeedData]);
 
   const handlePostCreated = (newPost: any) => {
     setFeedPosts((prev) => [newPost, ...prev]);
@@ -808,6 +1035,12 @@ export default function DashboardPage() {
   const handlePostDeleted = (postId: string) => {
     setFeedPosts((prev) => prev.filter((p) => p.id !== postId));
   };
+
+  const handlePostUpdated = useCallback((updated: any) => {
+    setFeedPosts((prev) =>
+      prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+    );
+  }, []);
 
   const filtered = feedPosts
     .filter((p) => {
@@ -864,11 +1097,14 @@ export default function DashboardPage() {
           ))}
         </div>
         <span className="text-gray-200 mx-1 hidden sm:inline">|</span>
-        <span className="text-xs text-gray-400 hidden sm:flex items-center gap-1 shrink-0 ml-auto">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-          </svg>
-          Alumni Network Updates
+        <span className="text-xs text-gray-400 hidden sm:flex items-center gap-1.5 shrink-0 ml-auto select-none">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          </span>
+          <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+            Live Refresh Active
+          </span>
         </span>
       </div>
 
@@ -885,9 +1121,10 @@ export default function DashboardPage() {
           {selectedPost && (
             <PostDetailView
               post={selectedPost}
-              onBack={() => setSelectedPost(null)}
+              onBack={handleClosePost}
               currentUser={user}
               currentProfile={profile}
+              onPostUpdated={handlePostUpdated}
             />
           )}
 
@@ -908,7 +1145,8 @@ export default function DashboardPage() {
                 currentUserId={user?.id}
                 currentUserRole={user?.role}
                 onPostDeleted={handlePostDeleted}
-                onViewDetails={setSelectedPost}
+                onPostUpdated={handlePostUpdated}
+                onViewDetails={handleOpenPost}
               />
             ))
           )}

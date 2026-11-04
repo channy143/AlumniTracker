@@ -62,7 +62,7 @@ router.post('/', async (req, res, next) => {
         type: 'announcement',
         title: `📢 ${data.title}`,
         message: data.content?.slice(0, 120) ? `${data.content.slice(0, 120)}...` : 'A new announcement has been published.',
-        link: '/',
+        link: `/announcements?id=${data.id}`,
       });
     }
 
@@ -161,7 +161,7 @@ router.put('/:id/publish', async (req, res, next) => {
         type: 'announcement',
         title: `📢 ${ann.title}`,
         message: ann.content?.slice(0, 120) ? `${ann.content.slice(0, 120)}...` : 'A new announcement has been published.',
-        link: '/',
+        link: `/announcements?id=${req.params.id}`,
       });
     }
 

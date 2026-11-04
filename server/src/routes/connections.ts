@@ -112,7 +112,7 @@ router.post('/request', authenticate, validate(connectionRequestSchema), async (
         type: 'mentorship',
         title: 'New Connection Request',
         message: `${requesterName} sent you a connection request.`,
-        link: '/connections',
+        link: '/connections?tab=received',
       });
     }
 
@@ -163,7 +163,7 @@ router.put('/:id/respond', authenticate, validate(connectionRespondSchema), asyn
           type: 'mentorship',
           title: 'Connection Accepted',
           message: `${accepterName} accepted your connection request.`,
-          link: '/connections',
+          link: '/connections?tab=friends',
         });
       }
     }

@@ -10,6 +10,8 @@ import {
   PlusIcon,
   CheckIcon,
   ShieldCheckIcon,
+  CameraIcon,
+  PhotoIcon,
 } from '@heroicons/react/24/outline';
 import { messagesApi, connectionsApi, profileApi } from '@/services/api';
 import { useChatStore, ChatContact } from '@/store/chatStore';
@@ -70,6 +72,19 @@ function formatLastActive(dateStr?: string | null): string {
   return 'Offline';
 }
 
+function formatLastMessageSnippet(msg?: string | null): string {
+  if (!msg) return '';
+  const match = msg.match(/\[image:\s*([^\s\]]+)\]/i);
+  if (match) {
+    const text = msg.replace(/\[image:\s*([^\s\]]+)\]/i, '').trim();
+    return text ? `📷 Photo: ${text}` : '📷 Photo';
+  }
+  if (/^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i.test(msg.trim())) {
+    return '📷 Photo';
+  }
+  return msg;
+}
+
 export default function ChatDropdown() {
   const navigate = useNavigate();
   const {
@@ -98,6 +113,28 @@ export default function ChatDropdown() {
   const [newGroupDescription, setNewGroupDescription] = useState('');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [creatingGroup, setCreatingGroup] = useState(false);
+  const [groupPhotoFile, setGroupPhotoFile] = useState<File | null>(null);
+  const [groupPhotoPreview, setGroupPhotoPreview] = useState<string | null>(null);
+  const [uploadingGroupPhoto, setUploadingGroupPhoto] = useState(false);
+  const groupPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGroupPhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (JPG, PNG, WebP).');
+      return;
+    }
+    setGroupPhotoFile(file);
+    const localPreview = URL.createObjectURL(file);
+    setGroupPhotoPreview(localPreview);
+  };
+
+  const handleRemoveGroupPhoto = () => {
+    setGroupPhotoFile(null);
+    setGroupPhotoPreview(null);
+    if (groupPhotoInputRef.current) groupPhotoInputRef.current.value = '';
+  };
   const [myProfileId, setMyProfileId] = useState<string | null>(null);
   const [isMessageRinging, setIsMessageRinging] = useState(false);
   const lastUnreadMessagesRef = useRef<number | null>(null);
@@ -422,10 +459,26 @@ export default function ChatDropdown() {
 
     setCreatingGroup(true);
     try {
+      let uploadedAvatarUrl: string | null = null;
+      if (groupPhotoFile) {
+        setUploadingGroupPhoto(true);
+        try {
+          const uploadRes = await messagesApi.uploadMedia(groupPhotoFile);
+          if (uploadRes?.url) {
+            uploadedAvatarUrl = uploadRes.url;
+          }
+        } catch (uploadErr) {
+          console.warn('Failed to upload group photo:', uploadErr);
+        } finally {
+          setUploadingGroupPhoto(false);
+        }
+      }
+
       const created = await messagesApi.createGroup({
         name: newGroupName.trim(),
         description: newGroupDescription.trim() || undefined,
         member_ids: selectedMemberIds,
+        avatar_url: uploadedAvatarUrl || undefined,
       });
 
       if (created) {
@@ -433,6 +486,7 @@ export default function ChatDropdown() {
         openChat({
           profileId: created.id,
           name: created.name,
+          avatar: created.avatar || created.avatar_url || uploadedAvatarUrl || undefined,
           isGroup: true,
           admin_id: created.admin_id,
           isAdmin: true,
@@ -443,6 +497,8 @@ export default function ChatDropdown() {
         setNewGroupName('');
         setNewGroupDescription('');
         setSelectedMemberIds([]);
+        setGroupPhotoFile(null);
+        setGroupPhotoPreview(null);
         closeHeaderDropdown();
       }
     } catch (err: any) {
@@ -581,21 +637,62 @@ export default function ChatDropdown() {
           {isCreatingGroup ? (
             <form onSubmit={handleCreateGroupSubmit} className="flex flex-col flex-1 overflow-hidden min-h-[380px]">
               {/* Group Name & Description Inputs */}
-              <div className="p-3 border-b border-gray-100 bg-gray-50/70 space-y-2">
-                <div>
-                  <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                    Group Name <span className="text-orange-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    placeholder="e.g. BSIT Batch 2024, Project Team..."
-                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-                  />
+              <div className="p-3 border-b border-gray-100 bg-gray-50/70 space-y-2.5">
+                <div className="flex items-center gap-3">
+                  {/* Photo picker */}
+                  <div className="relative shrink-0">
+                    <input
+                      type="file"
+                      ref={groupPhotoInputRef}
+                      accept="image/*"
+                      onChange={handleGroupPhotoSelect}
+                      className="hidden"
+                    />
+                    {groupPhotoPreview ? (
+                      <div className="relative group/avatar">
+                        <img
+                          src={groupPhotoPreview}
+                          alt="Group Preview"
+                          className="w-14 h-14 rounded-2xl object-cover ring-2 ring-orange-500 shadow-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleRemoveGroupPhoto}
+                          className="absolute -top-1.5 -right-1.5 bg-red-600 hover:bg-red-700 text-white p-0.5 rounded-full shadow-xs cursor-pointer"
+                          title="Remove picture"
+                        >
+                          <XMarkIcon className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => groupPhotoInputRef.current?.click()}
+                        className="w-14 h-14 rounded-2xl border-2 border-dashed border-orange-300 hover:border-orange-500 bg-white hover:bg-orange-50 flex flex-col items-center justify-center text-orange-600 transition-all cursor-pointer shadow-2xs group/btn"
+                        title="Add group picture"
+                      >
+                        <CameraIcon className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
+                        <span className="text-[9px] font-bold mt-0.5">Add Pic</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                      Group Name <span className="text-orange-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      autoFocus
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="e.g. BSIT Batch 2024, Project Team..."
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
                 </div>
+
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
                     Description (optional)
@@ -949,9 +1046,17 @@ export default function ChatDropdown() {
                         >
                           {/* Group Avatar */}
                           <div className="relative shrink-0">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-600 text-white font-bold flex items-center justify-center text-sm shadow-xs ring-1 ring-orange-200">
-                              <UserGroupIcon className="w-6 h-6" />
-                            </div>
+                            {group.avatar ? (
+                              <img
+                                src={group.avatar}
+                                alt={group.name}
+                                className="w-12 h-12 rounded-xl object-cover ring-1 ring-orange-200 shadow-xs"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-600 text-white font-bold flex items-center justify-center text-sm shadow-xs ring-1 ring-orange-200">
+                                <UserGroupIcon className="w-6 h-6" />
+                              </div>
+                            )}
                             {group.isAdmin && (
                               <span
                                 className="absolute -top-1 -right-1 bg-amber-500 text-white p-0.5 rounded-full shadow-xs"
@@ -986,7 +1091,7 @@ export default function ChatDropdown() {
                             </div>
                             <div className="flex items-center justify-between mt-0.5">
                               <p className="text-xs truncate max-w-[210px] text-gray-500">
-                                {group.lastMessage || `${memberCount} alumni members`}
+                                {formatLastMessageSnippet(group.lastMessage) || `${memberCount} alumni members`}
                               </p>
                               <span className="text-[10px] font-medium text-gray-400 shrink-0 ml-2">
                                 {memberCount} {memberCount === 1 ? 'member' : 'members'}
@@ -1054,7 +1159,7 @@ export default function ChatDropdown() {
                           </div>
                           <div className="flex items-center justify-between mt-0.5">
                             <p className={`text-xs truncate max-w-[210px] ${conv.unread > 0 ? 'font-semibold text-gray-900' : 'text-gray-500'}`}>
-                              {conv.lastMessage || 'Say hello to your fellow alumni 👋'}
+                              {formatLastMessageSnippet(conv.lastMessage) || 'Say hello to your fellow alumni 👋'}
                             </p>
                             {conv.unread > 0 && (
                               <span className="w-2.5 h-2.5 bg-blue-600 rounded-full shrink-0 ml-2" />
