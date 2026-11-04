@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Antigravity ERD Replicator">
   <diagram id="AlumniTrackerERD" name="AlumniTracker Complete ERD">
-    <mxGraphModel dx="2575" dy="1435" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2650" pageHeight="1900" background="#ffffff" math="0" shadow="0">
+    <mxGraphModel dx="858" dy="478" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2650" pageHeight="1900" background="#ffffff" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -83,10 +83,21 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="edge_r_users_devices" edge="1" parent="1" source="ent_users" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=2;dashed=0;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" target="ent_user_trusted_devices" value="fingerprints (1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[CASCADE]&lt;/span&gt;">
-          <mxGeometry relative="1" as="geometry" />
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="230" y="500" />
+              <mxPoint x="710" y="500" />
+            </Array>
+          </mxGeometry>
         </mxCell>
         <mxCell id="edge_r_users_otp" edge="1" parent="1" source="ent_users" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=2;dashed=0;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" target="ent_otp_codes" value="issues (1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[CASCADE]&lt;/span&gt;">
-          <mxGeometry relative="1" as="geometry" />
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="260" y="350" />
+              <mxPoint x="260" y="1050" />
+              <mxPoint x="540" y="1050" />
+            </Array>
+          </mxGeometry>
         </mxCell>
         <mxCell id="edge_r_prof_edu" edge="1" parent="1" source="ent_profiles" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=2;dashed=0;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" target="ent_education" value="attained (1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[CASCADE]&lt;/span&gt;">
           <mxGeometry relative="1" as="geometry" />
@@ -116,13 +127,28 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="edge_r_prof_conn" edge="1" parent="1" source="ent_profiles" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=2;dashed=0;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" target="ent_connections" value="networks (1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[CASCADE]&lt;/span&gt;">
-          <mxGeometry relative="1" as="geometry" />
+          <mxGeometry relative="1" x="0.0407" as="geometry">
+            <Array as="points">
+              <mxPoint x="650" y="350" />
+              <mxPoint x="650" y="1712" />
+            </Array>
+          </mxGeometry>
         </mxCell>
         <mxCell id="edge_r_users_eligible" edge="1" parent="1" source="ent_users" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;dashed=1;dashPattern=8 4;startArrow=ERzeroToOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" target="ent_alumni_eligible" value="claims (0..1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[SET NULL]&lt;/span&gt;">
-          <mxGeometry relative="1" as="geometry" />
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="180" y="350.33" />
+              <mxPoint x="180" y="640.33" />
+            </Array>
+          </mxGeometry>
         </mxCell>
         <mxCell id="edge_r_users_audit" edge="1" parent="1" source="ent_users" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;dashed=1;dashPattern=8 4;startArrow=ERzeroToOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" target="ent_audit_logs" value="triggers (0..1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[SET NULL]&lt;/span&gt;">
-          <mxGeometry relative="1" as="geometry" />
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="150" y="350.33" />
+              <mxPoint x="150" y="1100.33" />
+            </Array>
+          </mxGeometry>
         </mxCell>
         <mxCell id="edge_r_users_companies" edge="1" parent="1" source="ent_users" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;dashed=1;dashPattern=8 4;startArrow=ERzeroToOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" target="ent_companies" value="verifies (0..1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[SET NULL]&lt;/span&gt;">
           <mxGeometry relative="1" as="geometry" />
@@ -130,8 +156,15 @@
         <mxCell id="edge_r_companies_jobs" edge="1" parent="1" source="ent_companies" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;dashed=1;dashPattern=8 4;startArrow=ERzeroToOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" target="ent_job_postings" value="hires_for (0..1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[SET NULL]&lt;/span&gt;">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="edge_r_prof_jobs" edge="1" parent="1" source="ent_profiles" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;dashed=1;dashPattern=8 4;startArrow=ERzeroToOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" target="ent_job_postings" value="posted_by (0..1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[SET NULL]&lt;/span&gt;">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="edge_r_prof_jobs" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;dashed=1;dashPattern=8 4;startArrow=ERzeroToOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" value="posted_by (0..1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[SET NULL]&lt;/span&gt;">
+          <mxGeometry relative="1" x="0.1578" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="350" />
+              <mxPoint x="590" y="954" />
+            </Array>
+            <mxPoint x="730" y="350" as="sourcePoint" />
+            <mxPoint x="1620" y="954" as="targetPoint" />
+          </mxGeometry>
         </mxCell>
         <mxCell id="edge_r_prof_groups" edge="1" parent="1" source="ent_profiles" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.5;dashed=1;dashPattern=8 4;startArrow=ERzeroToOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;labelBorderColor=#000000;fontColor=#000000;fontSize=10;fontStyle=1;" target="ent_community_groups" value="founded_by (0..1:N)&lt;br/&gt;&lt;span style=&quot;font-size:9px;font-weight:normal;&quot;&gt;[SET NULL]&lt;/span&gt;">
           <mxGeometry relative="1" as="geometry" />

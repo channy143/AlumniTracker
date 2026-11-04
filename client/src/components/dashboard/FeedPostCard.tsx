@@ -21,7 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { feedApi, connectionsApi, messagesApi, directoryApi } from '@/services/api';
 import { decodeUnicode, setBackgroundInterval } from '@/utils/helpers';
-import { supabase } from '@/services/supabase';
+import { supabase, isSupabaseConfigured } from '@/services/supabase';
 import { useChatStore } from '@/store/chatStore';
 import EmojiPicker from '@/components/ui/EmojiPicker';
 
@@ -238,20 +238,27 @@ export default function FeedPostCard({
       }
     };
 
-    // Supabase Realtime channel for this post's comments & reactions
-    const channel = supabase
-      .channel(`card_comments_${currentPost.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'feed_post_comments', filter: `post_id=eq.${currentPost.id}` },
-        () => { refreshInlineComments(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'feed_comment_reactions' },
-        () => { refreshInlineComments(); }
-      )
-      .subscribe();
+    // Supabase Realtime channel for this post's comments & reactions (if configured)
+    let channel: any = null;
+    if (isSupabaseConfigured) {
+      try {
+        channel = supabase
+          .channel(`card_comments_${currentPost.id}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'feed_post_comments', filter: `post_id=eq.${currentPost.id}` },
+            () => { refreshInlineComments(); }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'feed_comment_reactions' },
+            () => { refreshInlineComments(); }
+          )
+          .subscribe();
+      } catch {
+        // Fallback to polling
+      }
+    }
 
     // Background interval poll every 3.5s while comments are open
     const stopInterval = setBackgroundInterval(refreshInlineComments, 3500);
@@ -259,7 +266,11 @@ export default function FeedPostCard({
     return () => {
       isCancelled = true;
       stopInterval();
-      supabase.removeChannel(channel);
+      if (channel && isSupabaseConfigured) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      }
     };
   }, [commentsOpen, currentPost.id]);
 

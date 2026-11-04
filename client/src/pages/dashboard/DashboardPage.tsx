@@ -23,7 +23,7 @@ import {
 import { HandThumbUpIcon as ThumbUpSolid } from '@heroicons/react/24/solid';
 import { decodeUnicode, setBackgroundInterval } from '@/utils/helpers';
 import { formatExperience } from '@/utils/formatExperience';
-import { supabase } from '@/services/supabase';
+import { supabase, isSupabaseConfigured } from '@/services/supabase';
 import CreatePostBox from '@/components/dashboard/CreatePostBox';
 import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
 
@@ -155,25 +155,32 @@ function PostDetailView({
       if (!isCancelled) setLoadingComments(false);
     });
 
-    // Supabase Realtime channel for this specific post
-    const channel = supabase
-      .channel(`live_modal_post_${post.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'feed_post_comments', filter: `post_id=eq.${post.id}` },
-        () => { refreshPostDetails(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'feed_post_likes', filter: `post_id=eq.${post.id}` },
-        () => { refreshPostDetails(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'feed_posts', filter: `id=eq.${post.id}` },
-        () => { refreshPostDetails(); }
-      )
-      .subscribe();
+    // Supabase Realtime channel for this specific post (if configured)
+    let channel: any = null;
+    if (isSupabaseConfigured) {
+      try {
+        channel = supabase
+          .channel(`live_modal_post_${post.id}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'feed_post_comments', filter: `post_id=eq.${post.id}` },
+            () => { refreshPostDetails(); }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'feed_post_likes', filter: `post_id=eq.${post.id}` },
+            () => { refreshPostDetails(); }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'feed_posts', filter: `id=eq.${post.id}` },
+            () => { refreshPostDetails(); }
+          )
+          .subscribe();
+      } catch {
+        // Fallback to background interval polling
+      }
+    }
 
     // Background interval poll every 3 seconds while modal is open
     const stopInterval = setBackgroundInterval(refreshPostDetails, 3000);
@@ -181,7 +188,11 @@ function PostDetailView({
     return () => {
       isCancelled = true;
       stopInterval();
-      supabase.removeChannel(channel);
+      if (channel && isSupabaseConfigured) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      }
     };
   }, [post.id]);
 
@@ -984,33 +995,40 @@ export default function DashboardPage() {
     setLoading(true);
     refreshFeedData().finally(() => setLoading(false));
 
-    // Supabase Realtime WebSocket channel for instant home page updates
-    const channel = supabase
-      .channel('home_page_live_feed')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'feed_posts' },
-        () => { refreshFeedData(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'feed_post_likes' },
-        () => { refreshFeedData(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'feed_post_comments' },
-        () => { refreshFeedData(); }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'announcements' },
-        () => {
-          refreshFeedData();
-          setSidebarRefreshKey((k) => k + 1);
-        }
-      )
-      .subscribe();
+    // Supabase Realtime WebSocket channel for instant home page updates (if configured)
+    let channel: any = null;
+    if (isSupabaseConfigured) {
+      try {
+        channel = supabase
+          .channel('home_page_live_feed')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'feed_posts' },
+            () => { refreshFeedData(); }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'feed_post_likes' },
+            () => { refreshFeedData(); }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'feed_post_comments' },
+            () => { refreshFeedData(); }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'announcements' },
+            () => {
+              refreshFeedData();
+              setSidebarRefreshKey((k) => k + 1);
+            }
+          )
+          .subscribe();
+      } catch {
+        // Fallback to background interval polling
+      }
+    }
 
     // Background interval poll every 3.5 seconds
     const stopInterval = setBackgroundInterval(refreshFeedData, 3500);
@@ -1023,7 +1041,11 @@ export default function DashboardPage() {
 
     return () => {
       stopInterval();
-      supabase.removeChannel(channel);
+      if (channel && isSupabaseConfigured) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {}
+      }
       window.removeEventListener('focus', handleFocus);
     };
   }, [refreshFeedData]);
