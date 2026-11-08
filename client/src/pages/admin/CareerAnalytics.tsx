@@ -165,6 +165,42 @@ function StatusDoughnut({ data }: { data: any[] }) {
   );
 }
 
+function GenderDoughnut({ data }: { data: any[] }) {
+  if (!data || data.length === 0 || !data.some((d: any) => d.count > 0)) {
+    return <p className="text-xs text-gray-400 text-center py-8">No gender demographic data recorded yet.</p>;
+  }
+  const GENDER_COLORS: Record<string, string> = {
+    'Female': '#ec4899',
+    'Male': '#3b82f6',
+    'Other / Unspecified': '#9ca3af',
+  };
+  return (
+    <>
+      <div className="h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="count" nameKey="name">
+              {data.map((entry: any) => (
+                <Cell key={entry.name} fill={GENDER_COLORS[entry.name] || '#9ca3af'} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(value: number) => [`${value} alumni`, 'Count']} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-gray-500 mt-2">
+        {data.map((g: any) => (
+          <span key={g.name} className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: GENDER_COLORS[g.name] || '#9ca3af' }} />
+            {g.name}: <strong className="text-gray-900">{g.count}</strong>
+            <span className="text-gray-400">({g.percentage}%)</span>
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function RankedList({ title, items }: { title: string; items: any[] }) {
   if (items.length === 0) {
     return (
@@ -269,6 +305,8 @@ export default function CareerAnalytics() {
   const missingInfo = data?.missingInfo || { withoutEmployment: 0, withoutSurvey: 0, withoutEmploymentList: [], withoutSurveyList: [] };
   const recentlyUpdated = data?.recentlyUpdated || [];
   const onboardingSurvey = data?.onboardingSurvey || null;
+  const demographics = data?.demographics || { ageDistribution: [], genderDistribution: [] };
+  const accreditation = data?.accreditation || { verifiedCount: 0, pendingCount: 0, verifiedRate: 0 };
 
   const buildReport = () => [
     {
@@ -277,6 +315,7 @@ export default function CareerAnalytics() {
         { Metric: 'Total Alumni', Value: overview.totalAlumni },
         { Metric: 'Employment Rate', Value: `${overview.employmentRate}%` },
         { Metric: 'Unemployment Rate', Value: `${overview.unemployedRate ?? (100 - (overview.employmentRate || 0))}%` },
+        { Metric: 'Verified Employment Rate (Q-Pro)', Value: `${accreditation.verifiedRate}%` },
         { Metric: 'Average Salary', Value: formatPeso(overview.averageSalary) },
         { Metric: 'Average Time to Employment', Value: formatMonths(overview.averageTimeToEmployment) },
         { Metric: 'Work Alignment Rate', Value: `${overview.workAlignmentRate}%` },
@@ -284,6 +323,8 @@ export default function CareerAnalytics() {
         { Metric: 'Tracer Survey Response Rate', Value: `${overview.tracerSurveyResponseRate}%` },
       ],
     },
+    { title: 'Demographics - Age Distribution', headers: ['Age Bracket', 'Count'], rows: (demographics.ageDistribution || []).map((a: any) => ({ 'Age Bracket': a.label, Count: a.count })) },
+    { title: 'Demographics - Gender Ratio', headers: ['Gender', 'Count', 'Percentage'], rows: (demographics.genderDistribution || []).map((g: any) => ({ Gender: g.name, Count: g.count, Percentage: `${g.percentage}%` })) },
     { title: 'Employment Status Distribution', headers: ['Status', 'Count', 'Percentage'], rows: statusDistribution.map((s: any) => ({ Status: s.status, Count: s.count, Percentage: `${s.percentage}%` })) },
     { title: 'Employment Type Distribution', headers: ['Type', 'Count'], rows: employmentTypeDistribution.map((t: any) => ({ Type: t.type, Count: t.count })) },
     { title: 'Salary Distribution', headers: ['Range', 'Count'], rows: salaryDistribution.map((s: any) => ({ Range: s.range, Count: s.count })) },
@@ -576,6 +617,26 @@ export default function CareerAnalytics() {
                 </div>
               ) : <p className="text-xs text-gray-400 text-center py-8">No employment timeline data available.</p>}
             </Card>
+
+            <Card title="Demographics: Age Distribution (Accreditation)">
+              {(demographics.ageDistribution || []).some((a: any) => a.count > 0) ? (
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={demographics.ageDistribution}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip formatter={(value: number) => [`${value} alumni`, 'Count']} />
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#8b5cf6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : <p className="text-xs text-gray-400 text-center py-8">No age demographic data available.</p>}
+            </Card>
+
+            <Card title="Demographics: Gender Ratio (PESO / Q-Pro)">
+              <GenderDoughnut data={demographics.genderDistribution} />
+            </Card>
           </div>
 
           {/* CTU Graduate Tracer & Registration Survey Section */}
@@ -850,6 +911,20 @@ export default function CareerAnalytics() {
                     ) : (
                       <p className="text-[11px] text-gray-400">All filtered alumni have completed tracer surveys.</p>
                     )}
+                  </div>
+                  <div className="pt-2 border-t border-gray-100">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-medium text-gray-700">Verified Employment (Q-Pro)</p>
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        {accreditation.verifiedRate}% Verified
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5 mb-1.5 overflow-hidden">
+                      <div className="bg-emerald-500 h-full rounded-full transition-all" style={{ width: `${accreditation.verifiedRate}%` }} />
+                    </div>
+                    <p className="text-[10px] text-gray-500">
+                      {accreditation.verifiedCount} records verified with COE/ID ({accreditation.pendingCount} pending verification)
+                    </p>
                   </div>
                 </div>
               </Card>

@@ -109,6 +109,59 @@ router.post('/employers', validate(createEmployerSchema), async (req, res, next)
   } catch (err) { next(err); }
 });
 
+// POST /api/admin/jobs/upload-poster - upload hiring flyer / poster image
+router.post('/upload-poster', upload.single('poster'), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const file = req.file;
+    if (!file) throw new AppError('No poster file uploaded', 400);
+
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/gif'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new AppError('Unsupported image format. Please upload a JPG, PNG, WEBP, or GIF image.', 400);
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      throw new AppError('File size exceeds the 15MB limit.', 400);
+    }
+
+    const ext = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `job-posters/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+
+    let publicUrl: string | null = null;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('profiles')
+        .upload(fileName, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true,
+        });
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from('profiles')
+          .getPublicUrl(fileName);
+        publicUrl = urlData.publicUrl;
+      }
+    } catch (storageErr) {
+      console.warn('[Poster Upload] Supabase storage upload failed, falling back to data URL:', storageErr);
+    }
+
+    if (!publicUrl) {
+      publicUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    }
+
+    res.json({
+      url: publicUrl,
+      file_name: file.originalname,
+      size: file.size,
+      mime_type: file.mimetype,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/', validate(adminCreateJobSchema), async (req, res, next) => {
   try {
     const {
@@ -122,6 +175,10 @@ router.post('/', validate(adminCreateJobSchema), async (req, res, next) => {
       job_type,
       salary_range,
       application_url,
+      poster_url,
+      vacancies_count,
+      contact_email,
+      contact_phone,
       is_alumni_exclusive,
       expires_at,
       industry,
@@ -177,6 +234,10 @@ router.post('/', validate(adminCreateJobSchema), async (req, res, next) => {
       job_type: job_type || 'full-time',
       salary_range: salary_range || null,
       application_url: application_url || null,
+      poster_url: poster_url || null,
+      vacancies_count: vacancies_count !== undefined && vacancies_count !== null ? Number(vacancies_count) : 1,
+      contact_email: contact_email || null,
+      contact_phone: contact_phone || null,
       is_alumni_exclusive: is_alumni_exclusive || false,
       posted_by: null,
       industry: resolvedIndustry,
@@ -1178,7 +1239,26 @@ router.delete('/:id/company-files/:fileId', async (req: AuthenticatedRequest, re
 
 router.put('/:id', validate(adminUpdateJobSchema), async (req, res, next) => {
   try {
-    const { company_id, position, description, requirements, location, job_type, salary_range, application_url, is_alumni_exclusive, expires_at, industry, required_skills, experience_level, is_remote } = req.body;
+    const {
+      company_id,
+      position,
+      description,
+      requirements,
+      location,
+      job_type,
+      salary_range,
+      application_url,
+      poster_url,
+      vacancies_count,
+      contact_email,
+      contact_phone,
+      is_alumni_exclusive,
+      expires_at,
+      industry,
+      required_skills,
+      experience_level,
+      is_remote,
+    } = req.body;
 
     const payload: any = {};
     if (company_id !== undefined) {
@@ -1200,6 +1280,10 @@ router.put('/:id', validate(adminUpdateJobSchema), async (req, res, next) => {
     if (job_type !== undefined) payload.job_type = job_type;
     if (salary_range !== undefined) payload.salary_range = salary_range || null;
     if (application_url !== undefined) payload.application_url = application_url || null;
+    if (poster_url !== undefined) payload.poster_url = poster_url || null;
+    if (vacancies_count !== undefined) payload.vacancies_count = vacancies_count ? Number(vacancies_count) : 1;
+    if (contact_email !== undefined) payload.contact_email = contact_email || null;
+    if (contact_phone !== undefined) payload.contact_phone = contact_phone || null;
     if (is_alumni_exclusive !== undefined) payload.is_alumni_exclusive = is_alumni_exclusive;
     if (industry !== undefined) payload.industry = industry || null;
     if (required_skills !== undefined) payload.required_skills = required_skills || [];

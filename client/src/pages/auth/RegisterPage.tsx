@@ -12,7 +12,7 @@ import FieldErrorAlert from '@/components/auth/FieldErrorAlert';
 type Step = 'verify' | 'form' | 'captcha' | 'otp';
 
 // Set to true to enforce alumni identity verification against registry before registration
-const REQUIRE_ALUMNI_VERIFICATION = true;
+const REQUIRE_ALUMNI_VERIFICATION = false;
 
 export default function RegisterPage() {
   const [step, setStep] = useState<Step>(REQUIRE_ALUMNI_VERIFICATION ? 'verify' : 'form');

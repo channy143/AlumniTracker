@@ -44,11 +44,42 @@ export function errorHandler(
     });
   }
 
-  console.error('Unhandled error:', err.message || err);
+  // Handle common PostgreSQL / Supabase low-level database exceptions
+  const pgCode = (err as any).code;
+  if (pgCode === '23505') {
+    return res.status(409).json({
+      message: 'A record with this information already exists in the system.',
+    });
+  }
+  if (pgCode === '23503') {
+    return res.status(400).json({
+      message: 'Referenced account or document record could not be found.',
+    });
+  }
+  if (pgCode === '42P01' || pgCode === 'PGRST205') {
+    return res.status(503).json({
+      message: 'The requested service is temporarily undergoing maintenance. Please try again shortly.',
+    });
+  }
+
+  // Handle PostgREST relationship ambiguity errors
+  if (typeof (err as any).message === 'string' && (err as any).message.includes('Could not embed')) {
+    console.error('[PostgREST Relationship Conflict]:', (err as any).message);
+    return res.status(500).json({
+      message: 'A database synchronization error occurred. Please refresh the page or try again shortly.',
+    });
+  }
+
+  console.error('[Unhandled Server Error]:', err.message || err);
   if (err.stack) console.error(err.stack);
 
+  // In production, never leak raw internal server or SQL traces to the client
+  const clientMessage = process.env.NODE_ENV === 'production'
+    ? 'An unexpected error occurred. Please try again later.'
+    : (err.message || 'Internal server error');
+
   return res.status(500).json({
-    message: err.message || 'Internal server error',
+    message: clientMessage,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 }

@@ -454,7 +454,7 @@ router.get('/career-statistics', async (req, res, next) => {
     if (alumniUserIds.length > 0) {
       const { data: p } = await supabase
         .from('profiles')
-        .select('id, user_id, first_name, last_name, employment_status, current_job_title, company_name, industry, salary_range, city, province, last_updated_at')
+        .select('id, user_id, first_name, last_name, birth_date, gender, employment_status, current_job_title, company_name, industry, salary_range, city, province, last_updated_at')
         .in('user_id', alumniUserIds);
       profiles = p || [];
     }
@@ -465,7 +465,7 @@ router.get('/career-statistics', async (req, res, next) => {
     if (profileIds.length > 0) {
       const [{ data: e }, { data: emp }] = await Promise.all([
         supabase.from('education').select('profile_id, program, year_graduated').in('profile_id', profileIds),
-        supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, job_type, start_date, end_date, is_current, salary_range, updated_at').in('profile_id', profileIds),
+        supabase.from('employment').select('id, profile_id, company_name, position, company_industry, employment_status, job_type, start_date, end_date, is_current, salary_range, proof_url, proof_type, is_verified, verification_status, updated_at').in('profile_id', profileIds),
       ]);
       education = e || [];
       employment = emp || [];
@@ -872,6 +872,54 @@ router.get('/career-statistics', async (req, res, next) => {
       },
     };
 
+    // Demographics: Age Brackets and Gender Distribution (Accreditation / PESO Requirement)
+    const ageBuckets = [
+      { label: 'Under 21', count: 0, min: 0, max: 20 },
+      { label: '21–25', count: 0, min: 21, max: 25 },
+      { label: '26–30', count: 0, min: 26, max: 30 },
+      { label: '31–40', count: 0, min: 31, max: 40 },
+      { label: '41+', count: 0, min: 41, max: 150 },
+      { label: 'Unspecified', count: 0, min: -1, max: -1 },
+    ];
+    const nowYear = new Date().getFullYear();
+    filteredProfiles.forEach((p: any) => {
+      if (!p.birth_date) {
+        ageBuckets[5].count++;
+        return;
+      }
+      const birthYear = new Date(p.birth_date).getFullYear();
+      if (isNaN(birthYear)) {
+        ageBuckets[5].count++;
+        return;
+      }
+      const age = nowYear - birthYear;
+      const bucket = ageBuckets.find((b) => b.min >= 0 && age >= b.min && age <= b.max);
+      if (bucket) bucket.count++;
+      else ageBuckets[5].count++;
+    });
+
+    const genderCounts: Record<string, number> = {
+      'Female': 0,
+      'Male': 0,
+      'Other / Unspecified': 0,
+    };
+    filteredProfiles.forEach((p: any) => {
+      const g = String(p.gender || '').trim().toLowerCase();
+      if (g === 'female' || g === 'f') genderCounts['Female']++;
+      else if (g === 'male' || g === 'm') genderCounts['Male']++;
+      else genderCounts['Other / Unspecified']++;
+    });
+    const genderDistribution = Object.entries(genderCounts).map(([name, count]) => ({
+      name,
+      count,
+      percentage: filteredProfiles.length > 0 ? Math.round((count / filteredProfiles.length) * 100) : 0,
+    }));
+
+    // Employment Proof Verification for Institutional Accreditation (Q-Pro / SUC Leveling)
+    const verifiedEmploymentCount = currentEmployment.filter((e: any) => e.is_verified === true || e.verification_status === 'verified').length;
+    const pendingVerificationCount = currentEmployment.filter((e: any) => e.verification_status === 'pending').length;
+    const verifiedRate = employedCount > 0 ? Math.round((verifiedEmploymentCount / employedCount) * 100) : 0;
+
     res.json({
       overview: {
         totalAlumni,
@@ -885,6 +933,17 @@ router.get('/career-statistics', async (req, res, next) => {
         averageYearsExperience,
         tracerSurveyResponseRate,
         activeSurveyCount,
+        verifiedEmploymentCount,
+        verifiedRate,
+      },
+      demographics: {
+        ageDistribution: ageBuckets.map((b) => ({ label: b.label, count: b.count })),
+        genderDistribution,
+      },
+      accreditation: {
+        verifiedCount: verifiedEmploymentCount,
+        pendingCount: pendingVerificationCount,
+        verifiedRate,
       },
       statusDistribution,
       employmentTypeDistribution,

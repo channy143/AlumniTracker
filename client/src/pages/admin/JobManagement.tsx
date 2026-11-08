@@ -19,14 +19,17 @@ import {
   TagIcon,
   PlusIcon,
   XMarkIcon,
+  GlobeAltIcon,
+  PhotoIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
-import ApplicantScreeningModal from '@/components/admin/ApplicantScreeningModal';
 import { SkeletonStatCard } from '@/components/ui/Skeleton';
 
 const EMPTY_FORM = {
   employer_id: '', company_name: '', position: '', description: '', location: '', job_type: 'full-time',
   salary_range: '', industry: '', experience_level: 'entry', required_skills: [] as string[],
-  application_url: '', is_alumni_exclusive: false, is_remote: false, expires_at: '',
+  application_url: '', poster_url: '', vacancies_count: 1, contact_email: '', contact_phone: '',
+  is_alumni_exclusive: false, is_remote: false, expires_at: '',
 };
 
 function daysLeft(expiresAt: string): number {
@@ -54,15 +57,13 @@ export default function JobManagement() {
   const addNotification = useUIStore((s) => s.addNotification);
   const limit = 15;
 
-  const [screeningJob, setScreeningJob] = useState<any>(null);
-
   const stats = useMemo(() => {
     const activeCount = data.filter((j) => new Date(j.expires_at).getTime() >= Date.now()).length;
-    const totalApplicants = data.reduce((acc, j) => acc + (Number(j.applicant_count) || 0), 0);
+    const totalVacancies = data.reduce((acc, j) => acc + (Number(j.vacancies_count) || 1), 0);
     return {
       totalPostings: total,
       activePostings: activeCount,
-      totalApplicants,
+      totalVacancies,
       totalEmployers: employers.length,
     };
   }, [data, total, employers]);
@@ -151,6 +152,10 @@ export default function JobManagement() {
       experience_level: job.experience_level || 'entry',
       required_skills: Array.isArray(job.required_skills) ? [...job.required_skills] : [],
       application_url: job.application_url || '',
+      poster_url: job.poster_url || '',
+      vacancies_count: job.vacancies_count ?? 1,
+      contact_email: job.contact_email || '',
+      contact_phone: job.contact_phone || '',
       is_alumni_exclusive: !!job.is_alumni_exclusive,
       is_remote: !!job.is_remote,
       expires_at: job.expires_at ? job.expires_at.slice(0, 10) : '',
@@ -166,6 +171,11 @@ export default function JobManagement() {
     try {
       const payload = {
         ...form,
+        vacancies_count: form.vacancies_count ? Number(form.vacancies_count) : 1,
+        poster_url: form.poster_url?.trim() || null,
+        contact_email: form.contact_email?.trim() || null,
+        contact_phone: form.contact_phone?.trim() || null,
+        application_url: form.application_url?.trim() || null,
         required_skills: form.required_skills,
         expires_at: form.expires_at ? new Date(form.expires_at + 'T23:59:59').toISOString() : undefined,
       };
@@ -200,8 +210,48 @@ export default function JobManagement() {
   const setField = (key: string) => (e: any) => setForm((f: any) => ({ ...f, [key]: e.target.value }));
   const toggleField = (key: string) => (e: any) => setForm((f: any) => ({ ...f, [key]: e.target.checked }));
 
-  const openScreening = (job: any) => {
-    setScreeningJob(job);
+  const [uploadingPoster, setUploadingPoster] = useState(false);
+
+  const handlePosterUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      addNotification('Please select a valid image file (PNG, JPG, JPEG, WEBP)', 'error');
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      addNotification('Poster file is too large (maximum size is 15MB)', 'error');
+      return;
+    }
+
+    setUploadingPoster(true);
+    try {
+      const res = await adminApi.jobUploadPoster(file);
+      if (res?.url) {
+        setForm((f: any) => ({ ...f, poster_url: res.url }));
+        addNotification('Hiring poster uploaded successfully', 'success');
+      }
+    } catch (err: any) {
+      // Local fallback: convert to base64 data URL so it never fails
+      try {
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          const dataUrl = re.target?.result as string;
+          if (dataUrl) {
+            setForm((f: any) => ({ ...f, poster_url: dataUrl }));
+            addNotification('Poster image attached', 'success');
+          }
+        };
+        reader.readAsDataURL(file);
+      } catch {
+        addNotification(err?.message || 'Failed to attach poster image', 'error');
+      }
+    } finally {
+      setUploadingPoster(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -210,7 +260,7 @@ export default function JobManagement() {
       <div className="flex items-center justify-between flex-wrap gap-3 pb-1">
         <div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">Career Opportunities</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Manage employer job listings, track applicant pipelines, and screen candidates.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Manage employer job listings, available vacancies, and external application channels.</p>
         </div>
         <button
           onClick={openCreate}
@@ -252,8 +302,8 @@ export default function JobManagement() {
                 <UserGroupIcon className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-[11px] font-medium text-gray-500">Total Candidates</p>
-                <p className="text-lg font-bold text-blue-700 leading-tight">{stats.totalApplicants}</p>
+                <p className="text-[11px] font-medium text-gray-500">Available Vacancies</p>
+                <p className="text-lg font-bold text-blue-700 leading-tight">{stats.totalVacancies}</p>
               </div>
             </div>
 
@@ -440,6 +490,18 @@ export default function JobManagement() {
                         {job.job_type}
                       </span>
                     )}
+
+                    {job.vacancies_count && Number(job.vacancies_count) > 1 ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                        {job.vacancies_count} Openings
+                      </span>
+                    ) : null}
+
+                    {job.poster_url && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                        Poster Attached
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -498,36 +560,32 @@ export default function JobManagement() {
                   </div>
                 )}
 
-                {/* Card Action Footer: Pipeline Counts (Left) & Unified Action Buttons (Right) */}
+                {/* Card Action Footer: Vacancies (Left) & Unified Action Buttons (Right) */}
                 <div className="border-t border-gray-100 pt-3 flex items-center justify-between flex-wrap gap-3 mt-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200/70 rounded-lg text-xs font-semibold">
                       <UserGroupIcon className="w-3.5 h-3.5 text-blue-600" />
-                      <span>{job.applicant_count || 0} Candidate{job.applicant_count === 1 ? '' : 's'}</span>
+                      <span>{job.vacancies_count ? `${job.vacancies_count} Vacanc${Number(job.vacancies_count) > 1 ? 'ies' : 'y'}` : '1 Vacancy'}</span>
                     </div>
 
-                    {typeof job.referral_count === 'number' && job.referral_count > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200/70 rounded-lg text-xs font-medium">
-                        {job.referral_count} Referral{job.referral_count === 1 ? '' : 's'}
-                      </span>
+                    {job.application_url && (
+                      <a
+                        href={job.application_url.startsWith('http') ? job.application_url : `https://${job.application_url}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 rounded-lg text-xs font-medium transition-colors"
+                        title="External application page"
+                      >
+                        <GlobeAltIcon className="w-3.5 h-3.5 text-gray-500" />
+                        <span>Application Link ↗</span>
+                      </a>
                     )}
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
-                      onClick={() => openScreening(job)}
-                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-xs hover:shadow transition-all flex items-center gap-1.5"
-                    >
-                      <UserGroupIcon className="w-4 h-4" />
-                      <span>Screen Applicants</span>
-                      <span className="ml-0.5 px-1.5 py-0.2 bg-blue-700 rounded-full text-[10px] font-bold">
-                        {job.applicant_count || 0}
-                      </span>
-                    </button>
-
-                    <button
                       onClick={() => openEdit(job)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       <PencilSquareIcon className="w-3.5 h-3.5 text-gray-500" />
                       <span>Edit</span>
@@ -686,14 +744,28 @@ export default function JobManagement() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Industry</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Industry Sector</label>
                   <input
                     type="text"
+                    list="industry-datalist"
                     value={form.industry}
                     onChange={(e) => setForm((f: any) => ({ ...f, industry: e.target.value }))}
-                    placeholder="e.g. Information Technology"
+                    placeholder="Select or type industry..."
                     className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
                   />
+                  <datalist id="industry-datalist">
+                    <option value="Information Technology & Software" />
+                    <option value="Business Process Outsourcing (BPO)" />
+                    <option value="Education & Academics" />
+                    <option value="Industrial Technology & Manufacturing" />
+                    <option value="Engineering & Construction" />
+                    <option value="Agriculture & Agribusiness" />
+                    <option value="Hospitality, Hotel & Tourism" />
+                    <option value="Financial Services & Accounting" />
+                    <option value="Healthcare & Allied Medicine" />
+                    <option value="Government & Public Administration" />
+                    <option value="Retail, Sales & Marketing" />
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-0.5">Location</label>
@@ -757,12 +829,132 @@ export default function JobManagement() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-0.5">External Application URL</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Number of Openings / Vacancies</label>
                   <input
-                    type="url"
-                    value={form.application_url}
-                    onChange={(e) => setForm((f: any) => ({ ...f, application_url: e.target.value }))}
-                    placeholder="https://company.com/apply or email"
+                    type="number"
+                    min="1"
+                    max="9999"
+                    value={form.vacancies_count}
+                    onChange={(e) => setForm((f: any) => ({ ...f, vacancies_count: e.target.value }))}
+                    placeholder="e.g. 20 (Mass hiring)"
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-0.5">External Application URL / Portal</label>
+                <input
+                  type="url"
+                  value={form.application_url}
+                  onChange={(e) => setForm((f: any) => ({ ...f, application_url: e.target.value }))}
+                  placeholder="https://company.com/careers/apply"
+                  className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                />
+              </div>
+
+              {/* Official Hiring Poster / Recruitment Flyer Upload */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-gray-700">
+                    Official Recruitment Flyer / Poster (Image File)
+                  </label>
+                  <span className="text-[10px] text-gray-400">PNG, JPG, WEBP · Max 15MB</span>
+                </div>
+
+                {form.poster_url ? (
+                  <div className="border border-orange-200 bg-orange-50/40 rounded-xl p-3 flex items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={form.poster_url}
+                        alt="Poster Preview"
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-gray-200 bg-white shrink-0 shadow-xs"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-gray-900">Flyer Image Uploaded</span>
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-semibold bg-emerald-100 text-emerald-800">Ready</span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                          Will be displayed as the main promotional flyer in alumni job details.
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <label className="text-xs font-semibold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer flex items-center gap-1">
+                            <ArrowUpTrayIcon className="w-3.5 h-3.5" />
+                            <span>Replace File</span>
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/jpg,image/webp"
+                              className="hidden"
+                              onChange={handlePosterUpload}
+                            />
+                          </label>
+                          <span className="text-gray-300">·</span>
+                          <button
+                            type="button"
+                            onClick={() => setForm((f: any) => ({ ...f, poster_url: '' }))}
+                            className="text-xs font-semibold text-red-600 hover:text-red-700 hover:underline cursor-pointer flex items-center gap-1"
+                          >
+                            <XMarkIcon className="w-3.5 h-3.5" />
+                            <span>Remove</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <label className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                    uploadingPoster
+                      ? 'border-orange-400 bg-orange-50/40 pointer-events-none'
+                      : 'border-gray-300 hover:border-orange-400 hover:bg-orange-50/20 bg-gray-50/50'
+                  }`}>
+                    {uploadingPoster ? (
+                      <div className="flex items-center gap-2 py-2 text-xs font-medium text-orange-600">
+                        <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                        <span>Uploading flyer image...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 mb-2">
+                          <PhotoIcon className="w-5 h-5" />
+                        </div>
+                        <p className="text-xs font-semibold text-gray-800">
+                          Click to upload hiring poster / flyer image
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          Drag & drop or browse image from your computer (PNG, JPG, WEBP up to 15MB)
+                        </p>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      disabled={uploadingPoster}
+                      onChange={handlePosterUpload}
+                    />
+                  </label>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Direct Contact Email (HR)</label>
+                  <input
+                    type="email"
+                    value={form.contact_email}
+                    onChange={(e) => setForm((f: any) => ({ ...f, contact_email: e.target.value }))}
+                    placeholder="e.g. careers@company.com"
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Direct Contact Phone / Hotline</label>
+                  <input
+                    type="text"
+                    value={form.contact_phone}
+                    onChange={(e) => setForm((f: any) => ({ ...f, contact_phone: e.target.value }))}
+                    placeholder="e.g. 0917-123-4567 or (032) 234-5678"
                     className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
                   />
                 </div>
@@ -872,16 +1064,6 @@ export default function JobManagement() {
             </form>
           </div>
         </div>
-      )}
-      {screeningJob && (
-        <ApplicantScreeningModal
-          isOpen={true}
-          onClose={() => setScreeningJob(null)}
-          jobId={screeningJob.id}
-          jobPosition={screeningJob.position}
-          jobCompany={screeningJob.company_name}
-          requiredSkills={screeningJob.required_skills || []}
-        />
       )}
     </div>
   );

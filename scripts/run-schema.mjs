@@ -140,6 +140,7 @@ async function main() {
     { path: './supabase/migration_chat_groups.sql', label: 'Chat groups and group messaging migration' },
     { path: './supabase/migration_message_replies_reactions.sql', label: 'Message replies and reactions migration' },
     { path: './supabase/migration_forum_enhancements.sql', label: 'Forum enhancements migration' },
+    { path: './supabase/migration_maam_recommendations.sql', label: 'Maam recommendations (job poster, vacancies, proof of employment, demographics) migration' },
   ];
 
   for (const f of files) {

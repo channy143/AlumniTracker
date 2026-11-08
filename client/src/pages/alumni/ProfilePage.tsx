@@ -6,7 +6,8 @@ import {
   BuildingOfficeIcon, ChartBarIcon, LinkIcon, CalendarDaysIcon,
   TrophyIcon, ArrowTrendingUpIcon, UserCircleIcon, XMarkIcon,
   LockClosedIcon, ShieldCheckIcon, ShieldExclamationIcon, InformationCircleIcon,
-  ChatBubbleBottomCenterTextIcon
+  ChatBubbleBottomCenterTextIcon, DocumentArrowUpIcon, DocumentTextIcon,
+  ArrowTopRightOnSquareIcon, TrashIcon, ArrowPathIcon, QuestionMarkCircleIcon
 } from '@heroicons/react/24/outline';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { playTing } from '@/utils/helpers';
@@ -16,6 +17,7 @@ import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authStore';
 import { clearTrustedDeviceToken } from '@/utils/device';
 import { isPasswordStrong, checkPasswordCriteria } from '@/utils/validation';
+import { getHumanErrorMessage } from '@/utils/errorMapper';
 import CreatePostBox from '@/components/dashboard/CreatePostBox';
 import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
 
@@ -71,6 +73,21 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+export function formatProofType(type?: string): string {
+  if (!type) return 'Certificate of Employment (COE)';
+  if (type.startsWith('other:')) return type.replace('other:', '').trim();
+  const map: Record<string, string> = {
+    coe: 'Certificate of Employment (COE)',
+    welcome_email_payslip: 'First-day Payslip / Welcome Email',
+    affidavit: 'Affidavit of Employment / Declaration',
+    company_id: 'Official Company ID',
+    contract: 'Job Contract / Appointment Letter',
+    dti_sec: 'Business Permit / DTI / SEC (Self-employed)',
+    other: 'Other Official Document',
+  };
+  return map[type] || type.toUpperCase();
+}
+
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -99,6 +116,15 @@ export default function ProfilePage() {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaOtp, setMfaOtp] = useState('');
   const [mfaLoading, setMfaLoading] = useState(false);
+
+  // Proof of employment & Accreditation dossier states
+  const [proofSubmissionTab, setProofSubmissionTab] = useState<'upload' | 'link'>('upload');
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [isDraggingProof, setIsDraggingProof] = useState(false);
+  const [showQProTooltip, setShowQProTooltip] = useState(false);
+  const [proofUploadError, setProofUploadError] = useState('');
+  const [proofFileInfo, setProofFileInfo] = useState<{ name: string; size?: number; url: string } | null>(null);
+  const proofFileRef = useRef<HTMLInputElement>(null);
 
   // Posts management on profile
   const { user } = useAuthStore();
@@ -174,12 +200,26 @@ export default function ProfilePage() {
       setProfile(data);
       let currentJobType = '';
       let currentSalary = data?.salary_range || '';
+      let currentProofType = 'coe';
+      let currentProofTypeOther = '';
+      let currentProofUrl = '';
+      let currentStartDate = '';
       try {
         const records = await employmentApi.list();
         const current = records.find((r: any) => r.is_current);
         const isNotEmployed = data?.employment_status && ['unemployed', 'seeking opportunities', 'retired', 'student'].includes(String(data.employment_status).toLowerCase());
         if (current && !isNotEmployed) {
           currentJobType = current.job_type || '';
+          currentProofUrl = current.proof_url || '';
+          if (current.start_date) currentStartDate = String(current.start_date).slice(0, 10);
+          if (current.proof_type) {
+            if (current.proof_type.startsWith('other:')) {
+              currentProofType = 'other';
+              currentProofTypeOther = current.proof_type.replace('other:', '').trim();
+            } else {
+              currentProofType = current.proof_type;
+            }
+          }
           if (!currentSalary && current.salary_range) currentSalary = current.salary_range;
           if (data && !data.company_name && current.company_name && data.employment_status !== 'Self-employed') data.company_name = current.company_name;
           if (data && !data.current_job_title && current.position) data.current_job_title = current.position;
@@ -213,12 +253,26 @@ export default function ProfilePage() {
           industry: data.industry || '',
           salary_range: currentSalary,
           job_type: currentJobType,
+          start_date: currentStartDate,
+          proof_type: currentProofType,
+          proof_type_other: currentProofTypeOther,
+          proof_url: currentProofUrl,
           privacy_settings: parsedPrivacy,
         });
+
+        if (currentProofUrl) {
+          const isUploaded = currentProofUrl.includes('/storage/v1/object/public/profiles') || currentProofUrl.includes('employment-proofs');
+          setProofSubmissionTab(isUploaded ? 'upload' : 'link');
+          const cleanName = currentProofUrl.split('/').pop()?.split('?')[0] || 'Uploaded Document';
+          setProofFileInfo({ name: decodeURIComponent(cleanName), url: currentProofUrl });
+        } else {
+          setProofSubmissionTab('upload');
+          setProofFileInfo(null);
+        }
       }
       setError('');
     } catch (err: any) {
-      setError(err.message || 'Failed to load profile');
+      setError(getHumanErrorMessage(err, 'Failed to load profile'));
     } finally {
       setLoading(false);
     }
@@ -239,6 +293,17 @@ export default function ProfilePage() {
     try {
       setSaving(true);
       setError('');
+
+      // Pre-save validation for proof link if provided
+      if (form.proof_url) {
+        const trimmed = String(form.proof_url).trim();
+        if (trimmed && !trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+          setError('Proof document link must be a valid URL starting with http:// or https://');
+          setSaving(false);
+          return;
+        }
+      }
+
       const payload: any = {};
       if (form.first_name !== undefined) payload.first_name = form.first_name;
       if (form.last_name !== undefined) payload.last_name = form.last_name;
@@ -280,6 +345,37 @@ export default function ProfilePage() {
           industry: isNotEmployed ? null : (form.industry || null),
           salary_range: form.salary_range || null,
         });
+
+        // Sync employment record and proof of employment for accreditation (Q-Pro)
+        try {
+          const records = await employmentApi.list();
+          const current = records.find((r: any) => r.is_current);
+          if (!isNotEmployed) {
+            let effectiveProofType = form.proof_type || 'coe';
+            if (effectiveProofType === 'other' && form.proof_type_other) {
+              effectiveProofType = `other: ${form.proof_type_other.trim()}`;
+            }
+
+            const empPayload: any = {
+              company_name: form.company_name || (status === 'Self-employed' ? 'Self-employed / Business' : 'Organization'),
+              position: form.current_job_title || 'Position',
+              company_industry: form.industry || null,
+              job_type: form.job_type || 'full-time',
+              start_date: form.start_date || (current?.start_date ? String(current.start_date).slice(0, 10) : new Date().toISOString().slice(0, 10)),
+              salary_range: form.salary_range || null,
+              proof_type: effectiveProofType,
+              proof_url: form.proof_url || null,
+              is_current: true,
+            };
+            if (current) {
+              await employmentApi.update(current.id, empPayload);
+            } else {
+              await employmentApi.create(empPayload);
+            }
+          }
+        } catch (empErr) {
+          console.warn('Employment record sync notice:', empErr);
+        }
       }
 
       if (Array.isArray(editSkills) && editSkills.length > 0) {
@@ -483,6 +579,62 @@ export default function ProfilePage() {
     } catch (err: any) {
       setError(err.message || 'Failed to upload photo');
     }
+  };
+
+  const handleUploadProofFile = async (file: File) => {
+    setProofUploadError('');
+    if (file.size > 10 * 1024 * 1024) {
+      setProofUploadError('File exceeds 10MB limit. Please upload a smaller file (Max 10MB).');
+      return;
+    }
+    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+    const validExts = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
+    const validMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!validExts.includes(ext) && !validMimes.includes(file.type)) {
+      setProofUploadError('Unsupported file format. Please upload a PDF, JPG, or PNG document.');
+      return;
+    }
+
+    try {
+      setUploadingProof(true);
+      const res = await employmentApi.uploadProof(file);
+      setForm((prev: any) => ({ ...prev, proof_url: res.url }));
+      setProofFileInfo({ name: res.file_name || file.name, size: file.size, url: res.url });
+      useUIStore.getState().addNotification('Proof document uploaded. Save changes to submit for university accreditation.', 'success');
+    } catch (err: any) {
+      setProofUploadError(getHumanErrorMessage(err, 'Failed to upload document.'));
+    } finally {
+      setUploadingProof(false);
+      if (proofFileRef.current) proofFileRef.current.value = '';
+    }
+  };
+
+  const handleProofDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingProof(true);
+  };
+
+  const handleProofDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingProof(false);
+  };
+
+  const handleProofDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingProof(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleUploadProofFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleRemoveProof = () => {
+    setForm((prev: any) => ({ ...prev, proof_url: '' }));
+    setProofFileInfo(null);
+    setProofUploadError('');
+    if (proofFileRef.current) proofFileRef.current.value = '';
   };
 
   const handleAddCertification = async () => {
@@ -860,6 +1012,248 @@ export default function ProfilePage() {
                           <option value="internship">Internship</option>
                         </select>
                       </div>
+                      <div>
+                        <label className="text-xs text-gray-600 font-medium mb-1 block">
+                          Date of Employment / Start Date
+                        </label>
+                        <input
+                          type="date"
+                          value={form.start_date || ''}
+                          onChange={(e) => setForm((prev: any) => ({ ...prev, start_date: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                        />
+                      </div>
+
+                      {/* Proof of Employment for Q-Pro Accreditation */}
+                      {(form.employment_status === 'Employed' || form.employment_status === 'Self-employed') && (
+                        <div className="sm:col-span-2 pt-4 border-t border-gray-100">
+                          {/* Header with Title and Tooltip */}
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-xs text-gray-800 font-bold flex items-center gap-1.5">
+                              <CheckBadgeIcon className="w-4 h-4 text-orange-600" />
+                              <span>Proof of Employment (University Accreditation / Q-Pro Dossier)</span>
+                            </label>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowQProTooltip(!showQProTooltip)}
+                                onMouseEnter={() => setShowQProTooltip(true)}
+                                onMouseLeave={() => setShowQProTooltip(false)}
+                                className="text-gray-400 hover:text-orange-600 transition-colors p-0.5 rounded-full hover:bg-orange-50 cursor-pointer"
+                                title="Learn more about Q-Pro Dossier"
+                              >
+                                <QuestionMarkCircleIcon className="w-4 h-4" />
+                              </button>
+                              {showQProTooltip && (
+                                <div className="absolute right-0 bottom-full mb-2 w-72 bg-gray-900 text-white text-[11px] rounded-lg p-3 shadow-xl z-50 leading-relaxed border border-gray-800">
+                                  <p className="font-semibold text-orange-300 mb-1">What is Q-Pro Dossier?</p>
+                                  CTU-Naga is mandated by CHED, AACCUP, and PESO to verify graduate employment outcomes. Providing official placement proof validates university accreditation metrics. All submitted records are held strictly confidential under Republic Act 10173 (Data Privacy Act of 2012).
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-gray-500 mb-3">
+                            Submit verified evidence of your placement (COE, payslip, contract, or ID) for institutional quality assurance.
+                          </p>
+
+                          {/* Proof Type & Specification */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <label className="text-[11px] text-gray-600 font-medium mb-1 block">Proof Document Type</label>
+                              <select
+                                value={form.proof_type || 'coe'}
+                                onChange={(e) => setForm((prev: any) => ({ ...prev, proof_type: e.target.value }))}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                              >
+                                <option value="coe">Certificate of Employment (COE)</option>
+                                <option value="welcome_email_payslip">First-day Payslip / Welcome Email</option>
+                                <option value="affidavit">Affidavit of Employment / Declaration of Status</option>
+                                <option value="company_id">Official Company ID</option>
+                                <option value="contract">Job Contract / Appointment Letter</option>
+                                <option value="dti_sec">Business Permit / DTI / SEC (Self-employed / Freelance)</option>
+                                <option value="other">Other (Please specify)</option>
+                              </select>
+                            </div>
+                            {form.proof_type === 'other' ? (
+                              <div>
+                                <label className="text-[11px] text-gray-600 font-medium mb-1 block">Please specify document type</label>
+                                <input
+                                  type="text"
+                                  value={form.proof_type_other || ''}
+                                  onChange={(e) => setForm((prev: any) => ({ ...prev, proof_type_other: e.target.value }))}
+                                  placeholder="e.g. Appointment Letter, OEC, Consultancy Agreement"
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex items-end">
+                                <span className="text-[11px] text-gray-500 italic pb-2">
+                                  {form.proof_type === 'coe' && 'Standard HR certificate confirming active or past tenure.'}
+                                  {form.proof_type === 'welcome_email_payslip' && 'Useful if newly hired and official COE is not yet released.'}
+                                  {form.proof_type === 'affidavit' && 'Notarized sworn statement of freelancing, gig, or remote work.'}
+                                  {form.proof_type === 'company_id' && 'Official corporate badge showing your name and company.'}
+                                  {form.proof_type === 'contract' && 'Signed job offer or appointment agreement.'}
+                                  {form.proof_type === 'dti_sec' && 'Registered trade name, DTI certificate, or SEC registration.'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Submission Method Tabs: Direct Upload vs Cloud Link */}
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                            <div className="flex items-center gap-2 mb-3 border-b border-gray-200 pb-2">
+                              <span className="text-[11px] font-semibold text-gray-700">Submission Method:</span>
+                              <div className="inline-flex rounded-lg bg-gray-200/80 p-0.5 text-xs font-medium">
+                                <button
+                                  type="button"
+                                  onClick={() => setProofSubmissionTab('upload')}
+                                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                                    proofSubmissionTab === 'upload'
+                                      ? 'bg-white text-orange-700 shadow-xs font-semibold'
+                                      : 'text-gray-600 hover:text-gray-900'
+                                  }`}
+                                >
+                                  <DocumentArrowUpIcon className="w-3.5 h-3.5" />
+                                  Direct File Upload
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setProofSubmissionTab('link')}
+                                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                                    proofSubmissionTab === 'link'
+                                      ? 'bg-white text-orange-700 shadow-xs font-semibold'
+                                      : 'text-gray-600 hover:text-gray-900'
+                                  }`}
+                                >
+                                  <LinkIcon className="w-3.5 h-3.5" />
+                                  Provide Cloud Link
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* TAB 1: Direct File Upload */}
+                            {proofSubmissionTab === 'upload' && (
+                              <div>
+                                <input
+                                  type="file"
+                                  ref={proofFileRef}
+                                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                  onChange={(e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                      handleUploadProofFile(e.target.files[0]);
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
+
+                                {form.proof_url && (proofFileInfo || form.proof_url.includes('employment-proofs')) ? (
+                                  <div className="flex items-center justify-between p-3 bg-white border border-emerald-200 rounded-lg shadow-2xs">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
+                                        <DocumentTextIcon className="w-5 h-5" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-gray-800 truncate">
+                                          {proofFileInfo?.name || 'Uploaded Proof Document'}
+                                        </p>
+                                        <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                                          <CheckBadgeIcon className="w-3 h-3 text-emerald-600" />
+                                          Uploaded & Ready to Submit
+                                          {proofFileInfo?.size ? ` • ${(proofFileInfo.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <a
+                                        href={form.proof_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-orange-600 hover:text-orange-700 font-medium inline-flex items-center gap-0.5 px-2 py-1 rounded hover:bg-orange-50 transition-colors"
+                                      >
+                                        <span>Preview</span>
+                                        <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
+                                      </a>
+                                      <button
+                                        type="button"
+                                        onClick={handleRemoveProof}
+                                        className="text-xs text-red-600 hover:text-red-700 font-medium p-1 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                                        title="Remove uploaded document"
+                                      >
+                                        <TrashIcon className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div
+                                    onDragOver={handleProofDragOver}
+                                    onDragLeave={handleProofDragLeave}
+                                    onDrop={handleProofDrop}
+                                    onClick={() => proofFileRef.current?.click()}
+                                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
+                                      isDraggingProof
+                                        ? 'border-orange-500 bg-orange-50/50 scale-[1.01]'
+                                        : 'border-gray-300 hover:border-orange-400 bg-white hover:bg-orange-50/20'
+                                    }`}
+                                  >
+                                    {uploadingProof ? (
+                                      <div className="flex flex-col items-center justify-center py-2">
+                                        <ArrowPathIcon className="w-6 h-6 text-orange-600 animate-spin mb-1.5" />
+                                        <p className="text-xs font-semibold text-gray-700">Uploading document...</p>
+                                        <p className="text-[11px] text-gray-500">Storing securely in university repository</p>
+                                      </div>
+                                    ) : (
+                                      <div className="flex flex-col items-center justify-center">
+                                        <DocumentArrowUpIcon className="w-8 h-8 text-orange-500 mb-1.5 stroke-[1.5]" />
+                                        <p className="text-xs font-semibold text-gray-800">
+                                          Drag and drop your file here, or <span className="text-orange-600 underline">Browse</span>
+                                        </p>
+                                        <p className="text-[11px] text-gray-500 mt-0.5">
+                                          Accepts PDF, JPG, or PNG (Maximum file size: 10MB)
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {proofUploadError && (
+                                  <p className="text-xs text-red-600 font-medium mt-1.5 flex items-center gap-1">
+                                    <InformationCircleIcon className="w-3.5 h-3.5 shrink-0" />
+                                    {proofUploadError}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* TAB 2: Provide Cloud Link */}
+                            {proofSubmissionTab === 'link' && (
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] text-gray-600 font-medium block">Document Cloud Link / URL</label>
+                                <input
+                                  type="url"
+                                  value={form.proof_url || ''}
+                                  onChange={(e) => setForm((prev: any) => ({ ...prev, proof_url: e.target.value }))}
+                                  placeholder="https://drive.google.com/file/d/... or OneDrive / Dropbox link"
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                                />
+                                <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                                  <InformationCircleIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                  <span>Make sure link sharing permissions are set to <strong>"Anyone with the link can view"</strong> so administrators can review it.</span>
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Privacy Notice Disclaimer */}
+                            <div className="mt-3 bg-amber-50/90 border border-amber-200/80 rounded-lg p-2.5 text-xs text-amber-900 flex items-start gap-2 shadow-2xs">
+                              <ShieldCheckIcon className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                              <div className="leading-snug">
+                                <span className="font-semibold text-amber-950">🛡️ Privacy Notice:</span> Please redact (black out) or blur sensitive information such as your exact salary, TIN, SSS, PhilHealth, and bank account numbers before uploading.
+                                <p className="text-[10px] text-amber-800/80 mt-0.5">
+                                  In compliance with RA 10173 (Data Privacy Act of 2012), your file will be stored in an encrypted university container and viewed solely for accreditation verification.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1724,7 +2118,16 @@ export default function ProfilePage() {
           <div className="absolute bottom-0 left-1/3 w-48 h-48 bg-white rounded-full translate-y-1/3" />
         </div>
 
-        <div className="relative flex flex-col sm:flex-row gap-4 sm:gap-6">
+        {/* Mascot on the lower part of the orange banner: shows 60% upper part, contained within banner */}
+        <div className="absolute bottom-0 right-4 sm:right-10 md:right-16 pointer-events-none select-none z-0">
+          <img
+            src="/mascot.png"
+            alt="Mascot"
+            className="w-36 sm:w-48 md:w-60 lg:w-72 h-auto object-contain translate-y-[40%] drop-shadow-md"
+          />
+        </div>
+
+        <div className="relative z-10 flex flex-col sm:flex-row gap-4 sm:gap-6">
           {/* Left - Avatar + Basic Info */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-4 sm:gap-5 flex-1">
             <div className="relative shrink-0">
@@ -1937,6 +2340,46 @@ export default function ProfilePage() {
                     {currentEmp?.start_date && (
                       <InfoRow label="Started" value={new Date(currentEmp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} />
                     )}
+
+                    {/* Proof of Employment Verification Banner for Q-Pro Accreditation */}
+                    <div className="pt-2.5 mt-2 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <span className="text-[11px] text-gray-500 block font-medium">Accreditation Dossier (Q-Pro)</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <CheckBadgeIcon className={`w-4 h-4 ${currentEmp?.is_verified || currentEmp?.verification_status === 'verified' ? 'text-emerald-600' : currentEmp?.verification_status === 'pending' ? 'text-amber-500' : 'text-gray-400'}`} />
+                          <span className="text-xs font-semibold text-gray-800">
+                            {currentEmp?.is_verified || currentEmp?.verification_status === 'verified'
+                              ? 'Verified Employment'
+                              : currentEmp?.verification_status === 'pending'
+                              ? 'Pending Admin Verification'
+                              : currentEmp?.verification_status === 'rejected'
+                              ? 'Resubmission Requested'
+                              : 'Unverified Record'}
+                          </span>
+                        </div>
+                      </div>
+                      {currentEmp?.proof_url ? (
+                        <a
+                          href={currentEmp.proof_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 text-xs font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg border border-orange-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <DocumentTextIcon className="w-3.5 h-3.5" />
+                          <span>View {formatProofType(currentEmp.proof_type)}</span>
+                          <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { setEditing(true); setEditSection('personal'); }}
+                          className="px-2.5 py-1 text-xs font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <DocumentArrowUpIcon className="w-3.5 h-3.5" />
+                          <span>+ Submit Proof</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               }

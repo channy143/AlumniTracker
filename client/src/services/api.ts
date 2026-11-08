@@ -26,12 +26,19 @@ async function request<T>(
   };
 
   const url = `${API_BASE}${endpoint}`;
-  console.log(`[API] ${options.method || 'GET'} ${url}`);
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
-  console.log(`[API] ${response.status} ${response.statusText}`);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (netErr: any) {
+    console.warn(`[API Network Disconnect] ${options.method || 'GET'} ${url}:`, netErr?.message || netErr);
+    throw new ApiError(
+      'Unable to connect to the CTU-Naga service. Please check your internet connection.',
+      0
+    );
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -44,15 +51,36 @@ async function request<T>(
       const match = String(error.message).match(/(?:in|wait)\s+(\d+)\s*(?:s|seconds?)/i);
       if (match) cooldown = parseInt(match[1], 10);
     }
+
+    let userMsg = error.message;
+    if (!userMsg) {
+      if (response.status === 401) userMsg = 'Your session has expired. Please sign in again.';
+      else if (response.status === 403) userMsg = 'You do not have permission to perform this action.';
+      else if (response.status === 404) userMsg = 'The requested item or page could not be found.';
+      else if (response.status === 413) userMsg = 'The submitted file or request is too large. Limit is 10MB.';
+      else if (response.status >= 500) userMsg = 'The service is temporarily unavailable. Please try again shortly.';
+      else userMsg = `Request failed (${response.status}: ${response.statusText})`;
+    }
+
     throw new ApiError(
-      error.message || `API Error: ${response.statusText}`,
+      userMsg,
       response.status,
       cooldown,
       error.remainingAttempts
     );
   }
 
-  return response.json();
+  if (response.status === 204) {
+    return {} as T;
+  }
+
+  const text = await response.text();
+  if (!text) return {} as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as unknown as T;
+  }
 }
 
 export const api = {
@@ -105,12 +133,15 @@ export const api = {
     }).then(async (res) => {
       if (!res.ok) {
         if (res.status === 413) {
-          throw new Error('The uploaded file is too large (413). Please choose a file under 10MB.');
+          throw new ApiError('The uploaded file is too large (maximum size is 10MB). Please compress the document or choose a smaller file.', 413);
         }
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || (res.status === 413 ? 'File too large (max 10MB)' : 'Upload failed'));
+        throw new ApiError(err.message || 'File upload failed. Please try again.', res.status);
       }
       return res.json() as T;
+    }).catch((err) => {
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Network connection failed during upload. Please check your internet connection and try again.', 0);
     });
   },
 };
@@ -219,6 +250,11 @@ export const employmentApi = {
   create: (data: any) => api.post<any>('/employment', data),
   update: (id: string, data: any) => api.put<any>(`/employment/${id}`, data),
   delete: (id: string) => api.delete(`/employment/${id}`),
+  uploadProof: (file: File) => {
+    const formData = new FormData();
+    formData.append('proof', file);
+    return api.upload<{ url: string; file_name: string; size: number }>('/employment/upload-proof', formData);
+  },
 };
 
 export const careerTrendsApi = {
@@ -315,6 +351,8 @@ export const adminApi = {
   alumniVerify: (id: string) => api.put<any>(`/admin/alumni/${id}/verify`, {}),
   alumniResetPassword: (id: string, newPassword: string) => api.post<any>(`/admin/alumni/${id}/reset-password`, { newPassword }),
   alumniEmployment: (id: string) => api.get<any[]>(`/admin/alumni/${id}/employment`),
+  verifyEmploymentProof: (employmentId: string, data: { status: 'verified' | 'rejected' | 'pending'; notes?: string }) =>
+    api.put<any>(`/admin/alumni/employment/${employmentId}/verify`, data),
   alumniExport: (format = 'csv') => api.get<Blob>(`/admin/alumni/export?format=${format}`),
 
   companyList: (params: Record<string, any> = {}) => api.get<any>(`/admin/companies?${toQuery(params)}`),
@@ -330,6 +368,11 @@ export const adminApi = {
   companyDelete: (id: string) => api.delete(`/admin/companies/${id}`),
 
   jobCreate: (data: any) => api.post<any>('/admin/jobs', data),
+  jobUploadPoster: (file: File) => {
+    const formData = new FormData();
+    formData.append('poster', file);
+    return api.upload<{ url: string; file_name: string }>('/admin/jobs/upload-poster', formData);
+  },
   jobList: (params: Record<string, any> = {}) => api.get<any>(`/admin/jobs?${toQuery(params)}`),
   jobUpdate: (id: string, data: any) => api.put<any>(`/admin/jobs/${id}`, data),
   jobDelete: (id: string) => api.delete(`/admin/jobs/${id}`),

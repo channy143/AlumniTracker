@@ -48,6 +48,21 @@ export default function AlumniManagement() {
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
 
+  const formatProofLabel = (type?: string): string => {
+    if (!type) return 'COE';
+    if (type.startsWith('other:')) return type.replace('other:', '').trim();
+    const map: Record<string, string> = {
+      coe: 'COE',
+      welcome_email_payslip: 'Payslip / Welcome Email',
+      affidavit: 'Affidavit',
+      company_id: 'Company ID',
+      contract: 'Contract',
+      dti_sec: 'DTI / SEC',
+      other: 'Other Proof',
+    };
+    return map[type] || type.toUpperCase();
+  };
+
   const statusBadge = (status: string) => {
     const normal = normalizeStatus(status);
     const styles: Record<string, string> = {
@@ -148,6 +163,20 @@ export default function AlumniManagement() {
       addNotification('Alumni verified', 'success');
       load();
     } catch (err: any) { addNotification(err.message || 'Failed to verify', 'error'); }
+  };
+
+  const handleVerifyEmploymentProof = async (empId: string, status: 'verified' | 'rejected') => {
+    try {
+      await adminApi.verifyEmploymentProof(empId, { status });
+      addNotification(`Employment record marked as ${status} for accreditation`, 'success');
+      if (detailData?.id) {
+        const fresh = await adminApi.alumniGet(detailData.id);
+        setDetailData(fresh);
+      }
+      load();
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to update employment verification', 'error');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -620,7 +649,7 @@ export default function AlumniManagement() {
                 {/* Employment History Table */}
                 {detailData.employment?.length > 0 && (
                   <div className="mb-4 overflow-x-auto">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Employment History</h3>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Employment History &amp; Verification (Q-Pro)</h3>
                     <table className="w-full text-xs border-collapse">
                       <thead>
                         <tr className="bg-gray-50 text-gray-500 text-left">
@@ -631,20 +660,67 @@ export default function AlumniManagement() {
                           <th className="px-2 py-1.5 font-medium">Salary</th>
                           <th className="px-2 py-1.5 font-medium">Started</th>
                           <th className="px-2 py-1.5 font-medium">Status</th>
+                          <th className="px-2 py-1.5 font-medium">Proof (COE/ID)</th>
+                          <th className="px-2 py-1.5 font-medium text-right">Accreditation</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {detailData.employment.map((emp: any, i: number) => (
-                          <tr key={i} className="border-b border-gray-100">
-                            <td className="px-2 py-1.5 text-gray-700">{emp.company_industry || '---'}</td>
-                            <td className="px-2 py-1.5 text-gray-700">{emp.company_name || '---'}</td>
-                            <td className="px-2 py-1.5 text-gray-700 font-medium">{emp.position || '---'}</td>
-                            <td className="px-2 py-1.5 text-gray-700">{emp.job_type || '---'}</td>
-                            <td className="px-2 py-1.5 text-gray-700">{emp.salary_range ? `₱${emp.salary_range}` : '---'}</td>
-                            <td className="px-2 py-1.5 text-gray-700">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '---'}</td>
-                            <td className="px-2 py-1.5">{emp.is_current ? <span className="text-emerald-600 font-medium">Current</span> : <span className="text-gray-400">Past</span>}</td>
-                          </tr>
-                        ))}
+                        {detailData.employment.map((emp: any, i: number) => {
+                          const isVer = emp.is_verified || emp.verification_status === 'verified';
+                          return (
+                            <tr key={i} className="border-b border-gray-100 hover:bg-gray-50/50">
+                              <td className="px-2 py-1.5 text-gray-700">{emp.company_industry || '---'}</td>
+                              <td className="px-2 py-1.5 text-gray-700">{emp.company_name || '---'}</td>
+                              <td className="px-2 py-1.5 text-gray-700 font-medium">{emp.position || '---'}</td>
+                              <td className="px-2 py-1.5 text-gray-700">{emp.job_type || '---'}</td>
+                              <td className="px-2 py-1.5 text-gray-700">{emp.salary_range ? `₱${emp.salary_range}` : '---'}</td>
+                              <td className="px-2 py-1.5 text-gray-700">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '---'}</td>
+                              <td className="px-2 py-1.5">{emp.is_current ? <span className="text-emerald-600 font-medium">Current</span> : <span className="text-gray-400">Past</span>}</td>
+                              <td className="px-2 py-1.5">
+                                {emp.proof_url ? (
+                                  <a
+                                    href={emp.proof_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-orange-600 hover:underline font-semibold inline-flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded border border-orange-200"
+                                    title={emp.proof_type?.startsWith('other:') ? emp.proof_type : undefined}
+                                  >
+                                    <span>{formatProofLabel(emp.proof_type)}</span>
+                                    <span>↗</span>
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400 italic">None</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5 text-right">
+                                {isVer ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                    ✓ Verified
+                                  </span>
+                                ) : emp.proof_url ? (
+                                  <div className="inline-flex items-center gap-1 justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleVerifyEmploymentProof(emp.id, 'verified')}
+                                      className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-semibold transition-colors cursor-pointer"
+                                    >
+                                      Verify
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleVerifyEmploymentProof(emp.id, 'rejected')}
+                                      className="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[10px] font-medium border border-red-200 transition-colors cursor-pointer"
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-gray-400">Unverified</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

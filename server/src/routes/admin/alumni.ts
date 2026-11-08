@@ -488,4 +488,38 @@ router.delete('/:id', async (req: AuthenticatedRequest, res, next) => {
   }
 });
 
+router.put('/employment/:employmentId/verify', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { status, notes } = req.body;
+    const isVerified = status === 'verified';
+    const { data, error } = await supabase
+      .from('employment')
+      .update({
+        is_verified: isVerified,
+        verification_status: status || (isVerified ? 'verified' : 'rejected'),
+        verification_notes: notes || null,
+        verified_at: isVerified ? new Date().toISOString() : null,
+        verified_by: isVerified ? (req.user?.userId || null) : null,
+      })
+      .eq('id', req.params.employmentId)
+      .select()
+      .single();
+
+    if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: isVerified ? 'VERIFY_EMPLOYMENT_PROOF' : 'REJECT_EMPLOYMENT_PROOF',
+      entity: 'employment',
+      entityId: req.params.employmentId,
+      severity: 'info',
+      status: 'success',
+      details: { verification_status: status, notes },
+    });
+
+    res.json({ message: `Employment record marked as ${status}`, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
