@@ -190,7 +190,7 @@ export default function ProfilePage() {
   useEffect(() => {
     loadProfile();
     loadCareerData();
-    api.get<string[]>('/profile/skills/suggestions').then(setSkillSuggestions).catch(() => {});
+    api.get<string[]>('/profile/skills/suggestions').then(setSkillSuggestions).catch(() => { });
   }, []);
 
   const loadProfile = async () => {
@@ -226,7 +226,7 @@ export default function ProfilePage() {
           if (data && !data.industry && current.company_industry) data.industry = current.company_industry;
           if (data && !data.employment_status && current.employment_status) data.employment_status = current.employment_status;
         }
-      } catch {}
+      } catch { }
       if (data) {
         const defaultPrivacy = {
           show_email: false,
@@ -286,7 +286,7 @@ export default function ProfilePage() {
       ]);
       setCertifications(certs);
       setAchievements(achievs || []);
-    } catch {}
+    } catch { }
   };
 
   const handleSave = async () => {
@@ -831,33 +831,30 @@ export default function ProfilePage() {
             <div className="w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-gray-100 bg-gray-50/50 p-2.5 md:p-4 flex md:flex-col gap-1.5 overflow-x-auto scrollbar-none">
               <button
                 onClick={() => setEditSection('personal')}
-                className={`flex items-center justify-center md:justify-start gap-2 px-3 py-2 md:py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${
-                  editSection === 'personal'
+                className={`flex items-center justify-center md:justify-start gap-2 px-3 py-2 md:py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'personal'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
-                }`}
+                  }`}
               >
                 <UserIcon className="w-4 h-4 shrink-0" />
                 <span>Personal Info</span>
               </button>
               <button
                 onClick={() => setEditSection('security')}
-                className={`flex items-center justify-center md:justify-start gap-2 px-3 py-2 md:py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${
-                  editSection === 'security'
+                className={`flex items-center justify-center md:justify-start gap-2 px-3 py-2 md:py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'security'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
-                }`}
+                  }`}
               >
                 <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                 <span>Security &amp; Password</span>
               </button>
               <button
                 onClick={() => setEditSection('privacy')}
-                className={`flex items-center justify-center md:justify-start gap-2 px-3 py-2 md:py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${
-                  editSection === 'privacy'
+                className={`flex items-center justify-center md:justify-start gap-2 px-3 py-2 md:py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'privacy'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
-                }`}
+                  }`}
               >
                 <ShieldCheckIcon className="w-4 h-4 shrink-0" />
                 <span>Privacy &amp; Data</span>
@@ -1107,11 +1104,10 @@ export default function ProfilePage() {
                                 <button
                                   type="button"
                                   onClick={() => setProofSubmissionTab('upload')}
-                                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
-                                    proofSubmissionTab === 'upload'
+                                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${proofSubmissionTab === 'upload'
                                       ? 'bg-white text-orange-700 shadow-xs font-semibold'
                                       : 'text-gray-600 hover:text-gray-900'
-                                  }`}
+                                    }`}
                                 >
                                   <DocumentArrowUpIcon className="w-3.5 h-3.5" />
                                   Direct File Upload
@@ -1119,11 +1115,10 @@ export default function ProfilePage() {
                                 <button
                                   type="button"
                                   onClick={() => setProofSubmissionTab('link')}
-                                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
-                                    proofSubmissionTab === 'link'
+                                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${proofSubmissionTab === 'link'
                                       ? 'bg-white text-orange-700 shadow-xs font-semibold'
                                       : 'text-gray-600 hover:text-gray-900'
-                                  }`}
+                                    }`}
                                 >
                                   <LinkIcon className="w-3.5 h-3.5" />
                                   Provide Cloud Link
@@ -1189,11 +1184,10 @@ export default function ProfilePage() {
                                     onDragLeave={handleProofDragLeave}
                                     onDrop={handleProofDrop}
                                     onClick={() => proofFileRef.current?.click()}
-                                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
-                                      isDraggingProof
+                                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${isDraggingProof
                                         ? 'border-orange-500 bg-orange-50/50 scale-[1.01]'
                                         : 'border-gray-300 hover:border-orange-400 bg-white hover:bg-orange-50/20'
-                                    }`}
+                                      }`}
                                   >
                                     {uploadingProof ? (
                                       <div className="flex flex-col items-center justify-center py-2">
@@ -1245,7 +1239,7 @@ export default function ProfilePage() {
                             <div className="mt-3 bg-amber-50/90 border border-amber-200/80 rounded-lg p-2.5 text-xs text-amber-900 flex items-start gap-2 shadow-2xs">
                               <ShieldCheckIcon className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                               <div className="leading-snug">
-                                <span className="font-semibold text-amber-950">🛡️ Privacy Notice:</span> Please redact (black out) or blur sensitive information such as your exact salary, TIN, SSS, PhilHealth, and bank account numbers before uploading.
+                                <span className="font-semibold text-amber-950">Privacy Notice:</span> Please redact (black out) or blur sensitive information such as your exact salary, TIN, SSS, PhilHealth, and bank account numbers before uploading.
                                 <p className="text-[10px] text-amber-800/80 mt-0.5">
                                   In compliance with RA 10173 (Data Privacy Act of 2012), your file will be stored in an encrypted university container and viewed solely for accreditation verification.
                                 </p>
@@ -1472,13 +1466,11 @@ export default function ProfilePage() {
                               show_email: !prev.privacy_settings?.show_email,
                             },
                           }))}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                            form.privacy_settings?.show_email ? 'bg-orange-600' : 'bg-gray-200'
-                          }`}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_email ? 'bg-orange-600' : 'bg-gray-200'
+                            }`}
                         >
-                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                            form.privacy_settings?.show_email ? 'translate-x-4' : 'translate-x-0'
-                          }`} />
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_email ? 'translate-x-4' : 'translate-x-0'
+                            }`} />
                         </button>
                       </div>
 
@@ -1496,13 +1488,11 @@ export default function ProfilePage() {
                               show_phone: !prev.privacy_settings?.show_phone,
                             },
                           }))}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                            form.privacy_settings?.show_phone ? 'bg-orange-600' : 'bg-gray-200'
-                          }`}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_phone ? 'bg-orange-600' : 'bg-gray-200'
+                            }`}
                         >
-                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                            form.privacy_settings?.show_phone ? 'translate-x-4' : 'translate-x-0'
-                          }`} />
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_phone ? 'translate-x-4' : 'translate-x-0'
+                            }`} />
                         </button>
                       </div>
 
@@ -1520,13 +1510,11 @@ export default function ProfilePage() {
                               show_address: !prev.privacy_settings?.show_address,
                             },
                           }))}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                            form.privacy_settings?.show_address ? 'bg-orange-600' : 'bg-gray-200'
-                          }`}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_address ? 'bg-orange-600' : 'bg-gray-200'
+                            }`}
                         >
-                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                            form.privacy_settings?.show_address ? 'translate-x-4' : 'translate-x-0'
-                          }`} />
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_address ? 'translate-x-4' : 'translate-x-0'
+                            }`} />
                         </button>
                       </div>
 
@@ -1544,13 +1532,11 @@ export default function ProfilePage() {
                               show_employment: !prev.privacy_settings?.show_employment,
                             },
                           }))}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                            form.privacy_settings?.show_employment !== false ? 'bg-orange-600' : 'bg-gray-200'
-                          }`}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_employment !== false ? 'bg-orange-600' : 'bg-gray-200'
+                            }`}
                         >
-                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                            form.privacy_settings?.show_employment !== false ? 'translate-x-4' : 'translate-x-0'
-                          }`} />
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_employment !== false ? 'translate-x-4' : 'translate-x-0'
+                            }`} />
                         </button>
                       </div>
                     </div>
@@ -1599,9 +1585,8 @@ export default function ProfilePage() {
           {/* Employment entries */}
           {sortedEmployment.map((emp: any, i: number) => (
             <div key={emp.id || i} className="relative pb-6 last:pb-0">
-              <div className={`absolute left-[-23px] top-1 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                emp.is_current ? 'bg-orange-400 border-orange-400' : 'bg-white border-orange-300'
-              }`}>
+              <div className={`absolute left-[-23px] top-1 w-4 h-4 rounded-full border-2 flex items-center justify-center ${emp.is_current ? 'bg-orange-400 border-orange-400' : 'bg-white border-orange-300'
+                }`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${emp.is_current ? 'bg-white' : 'bg-orange-300'}`} />
               </div>
               <div className={`${emp.is_current ? 'bg-orange-50 -ml-3 -mr-3 px-3 py-2 rounded-lg' : ''}`}>
@@ -1963,13 +1948,11 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => updatePrivacyKey('show_email', !privacyForm.show_email)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  privacyForm.show_email ? 'bg-orange-600' : 'bg-gray-200'
-                }`}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${privacyForm.show_email ? 'bg-orange-600' : 'bg-gray-200'
+                  }`}
               >
-                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  privacyForm.show_email ? 'translate-x-4' : 'translate-x-0'
-                }`} />
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${privacyForm.show_email ? 'translate-x-4' : 'translate-x-0'
+                  }`} />
               </button>
             </div>
 
@@ -1981,13 +1964,11 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => updatePrivacyKey('show_phone', !privacyForm.show_phone)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  privacyForm.show_phone ? 'bg-orange-600' : 'bg-gray-200'
-                }`}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${privacyForm.show_phone ? 'bg-orange-600' : 'bg-gray-200'
+                  }`}
               >
-                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  privacyForm.show_phone ? 'translate-x-4' : 'translate-x-0'
-                }`} />
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${privacyForm.show_phone ? 'translate-x-4' : 'translate-x-0'
+                  }`} />
               </button>
             </div>
 
@@ -1999,13 +1980,11 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => updatePrivacyKey('show_address', !privacyForm.show_address)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  privacyForm.show_address ? 'bg-orange-600' : 'bg-gray-200'
-                }`}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${privacyForm.show_address ? 'bg-orange-600' : 'bg-gray-200'
+                  }`}
               >
-                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  privacyForm.show_address ? 'translate-x-4' : 'translate-x-0'
-                }`} />
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${privacyForm.show_address ? 'translate-x-4' : 'translate-x-0'
+                  }`} />
               </button>
             </div>
 
@@ -2017,13 +1996,11 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => updatePrivacyKey('show_employment', !privacyForm.show_employment)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                  privacyForm.show_employment !== false ? 'bg-orange-600' : 'bg-gray-200'
-                }`}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${privacyForm.show_employment !== false ? 'bg-orange-600' : 'bg-gray-200'
+                  }`}
               >
-                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  privacyForm.show_employment !== false ? 'translate-x-4' : 'translate-x-0'
-                }`} />
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${privacyForm.show_employment !== false ? 'translate-x-4' : 'translate-x-0'
+                  }`} />
               </button>
             </div>
           </div>
@@ -2253,11 +2230,10 @@ export default function ProfilePage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${
-                    activeTab === tab.id
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${activeTab === tab.id
                       ? 'bg-black/5 text-black shadow-sm'
                       : 'text-black/50 hover:text-black hover:bg-black/5'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   {tab.label}
@@ -2268,7 +2244,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-        {/* Tab Content + Sidebar */}
+      {/* Tab Content + Sidebar */}
       <div className="mt-6 flex flex-col lg:flex-row lg:items-start gap-6">
         <div className="w-full lg:flex-1 min-w-0">
           {renderTabContent()}
@@ -2351,10 +2327,10 @@ export default function ProfilePage() {
                             {currentEmp?.is_verified || currentEmp?.verification_status === 'verified'
                               ? 'Verified Employment'
                               : currentEmp?.verification_status === 'pending'
-                              ? 'Pending Admin Verification'
-                              : currentEmp?.verification_status === 'rejected'
-                              ? 'Resubmission Requested'
-                              : 'Unverified Record'}
+                                ? 'Pending Admin Verification'
+                                : currentEmp?.verification_status === 'rejected'
+                                  ? 'Resubmission Requested'
+                                  : 'Unverified Record'}
                           </span>
                         </div>
                       </div>

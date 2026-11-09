@@ -7,7 +7,6 @@ import { formatProgramLongName } from '@/utils/formatProgram';
 import CareerLeaderboardNav, { type RankCard } from './CareerLeaderboardNav';
 import CareerCardInsightsPanel from './CareerCardInsightsPanel';
 import ActiveJobOpeningsNavCard from './ActiveJobOpeningsNavCard';
-import QProAnalyticsView from './QProAnalyticsView';
 import AlumniDemographicsHighlights from './AlumniDemographicsHighlights';
 
 const JOB_TYPE_LABELS: Record<string, string> = {
@@ -249,9 +248,6 @@ function matchQuery(text: string, query: string): boolean {
 export default function CareerTrendsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'trends' | 'qpro'>(
-    searchParams.get('tab') === 'qpro' ? 'qpro' : 'trends'
-  );
   const [qproProgram, setQproProgram] = useState<string | null>(null);
   const [qproBatch, setQproBatch] = useState<string | null>(null);
 
@@ -283,17 +279,6 @@ export default function CareerTrendsPage() {
     if (qproBatch) params.batch = qproBatch;
     fetchTrends(params);
   }, [qproProgram, qproBatch, fetchTrends]);
-
-  const handleTabChange = (tab: 'trends' | 'qpro') => {
-    setActiveTab(tab);
-    const next = new URLSearchParams(searchParams);
-    if (tab === 'qpro') {
-      next.set('tab', 'qpro');
-    } else {
-      next.delete('tab');
-    }
-    setSearchParams(next, { replace: true });
-  };
 
   const query = (searchParams.get('q') || '').toLowerCase().trim();
   const isSearching = query.length > 0;
@@ -467,61 +452,18 @@ export default function CareerTrendsPage() {
         <p className="text-xs text-gray-500">Explore career pathways, salary benchmarks, demographic breakdowns, and employment trajectories of CTU Naga alumni.</p>
       </div>
 
-      {/* Primary Sub-Navigation Tab Switcher */}
-      <div className="flex items-center gap-2 mb-4 border-b border-gray-200">
-        <button
-          onClick={() => handleTabChange('trends')}
-          className={`flex items-center gap-2 py-2 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-            activeTab === 'trends'
-              ? 'border-orange-500 text-orange-600 bg-orange-50/60 rounded-t-lg'
-              : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
-          }`}
-        >
-          <BriefcaseIcon className="w-4 h-4" />
-          <span>Career Pathways &amp; Trends</span>
-        </button>
-
-        <button
-          onClick={() => handleTabChange('qpro')}
-          className={`flex items-center gap-2 py-2 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-            activeTab === 'qpro'
-              ? 'border-orange-500 text-orange-600 bg-orange-50/60 rounded-t-lg'
-              : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
-          }`}
-        >
-          <ChartBarIcon className="w-4 h-4" />
-          <span>Accreditation &amp; Q-Pro Roster</span>
-          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
-            Q-Pro Standard
-          </span>
-        </button>
-      </div>
-
-      {activeTab === 'qpro' ? (
-        <QProAnalyticsView
+      {/* Integrated Alumni Demographics & Employability Highlights */}
+      {data?.qproAnalytics && (
+        <AlumniDemographicsHighlights
           data={data}
-          onProgramChange={(p) => setQproProgram(p)}
-          onBatchChange={(b) => setQproBatch(b)}
           selectedProgram={qproProgram}
           selectedBatch={qproBatch}
+          onProgramChange={(p) => setQproProgram(p)}
+          onBatchChange={(b) => setQproBatch(b)}
           programs={data.programs || []}
           batches={filterOptions.batches || []}
         />
-      ) : (
-        <>
-          {/* Integrated Alumni Demographics & Employability Highlights */}
-          {data?.qproAnalytics && (
-            <AlumniDemographicsHighlights
-              data={data}
-              selectedProgram={qproProgram}
-              selectedBatch={qproBatch}
-              onProgramChange={(p) => setQproProgram(p)}
-              onBatchChange={(b) => setQproBatch(b)}
-              programs={data.programs || []}
-              batches={filterOptions.batches || []}
-              onOpenDetailedReport={() => handleTabChange('qpro')}
-            />
-          )}
+      )}
 
           {isSearching && (
             <div className="flex items-center gap-2 mb-3 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
@@ -654,14 +596,11 @@ export default function CareerTrendsPage() {
                     data={data}
                     selectedCard={selectedCard}
                     onCardSelect={handleSelectCard}
-                    onSwitchToQPro={() => handleTabChange('qpro')}
                   />
                 )}
               </div>
             </aside>
           </div>
-        </>
-      )}
     </div>
   );
 }

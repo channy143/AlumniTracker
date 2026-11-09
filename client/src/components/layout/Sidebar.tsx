@@ -22,6 +22,7 @@ import {
   BriefcaseIcon,
   ShieldCheckIcon,
   GlobeAltIcon,
+  CheckBadgeIcon,
 } from '@heroicons/react/24/outline';
 
 type NavItem = { name: string; href: string; icon: any; end?: boolean };
@@ -52,6 +53,7 @@ const adminNav: NavItem[] = [
   { name: 'Announcements', href: '/admin/announcements', icon: MegaphoneIcon },
   { name: 'Events', href: '/admin/events', icon: CalendarDaysIcon },
   { name: 'Career Analytics', href: '/admin/analytics', icon: ChartBarIcon },
+  { name: 'Accreditation & Q-Pro', href: '/admin/accreditation', icon: CheckBadgeIcon },
   { name: 'Curriculum Insights', href: '/admin/curriculum', icon: AcademicCapIcon },
   { name: 'Employer Insights', href: '/admin/employers', icon: BuildingOfficeIcon },
   { name: 'Reports & Exports', href: '/admin/reports', icon: ChartBarIcon },

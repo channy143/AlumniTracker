@@ -171,6 +171,7 @@ export default function App() {
         <Route path="/admin/announcements" element={<AnnouncementManagement />} />
         <Route path="/admin/events" element={<AdminEvents />} />
         <Route path="/admin/analytics" element={<CareerAnalytics />} />
+        <Route path="/admin/accreditation" element={<CareerAnalytics defaultTab="qpro" />} />
         <Route path="/admin/curriculum" element={<CurriculumInsights />} />
         <Route path="/admin/employers" element={<EmployerInsights />} />
         <Route path="/admin/employers/:name" element={<EmployerDetail />} />

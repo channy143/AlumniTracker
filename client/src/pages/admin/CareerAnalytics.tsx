@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
-import { adminApi } from '@/services/api';
-import { Link } from 'react-router-dom';
+import { adminApi, careerTrendsApi } from '@/services/api';
+import { Link, useSearchParams } from 'react-router-dom';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { formatExperience } from '@/utils/formatExperience';
+import QProAnalyticsView from '@/pages/career-trends/QProAnalyticsView';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line,
@@ -21,6 +22,7 @@ import {
   StarIcon,
   CheckCircleIcon,
   UserMinusIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 
 const ORANGE = '#f97316';
@@ -230,7 +232,50 @@ function RankedList({ title, items }: { title: string; items: any[] }) {
   );
 }
 
-export default function CareerAnalytics() {
+export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytics' | 'qpro' }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const initialTab = tabParam === 'qpro' || (!tabParam && defaultTab === 'qpro') ? 'qpro' : 'analytics';
+  const [activeTab, setActiveTab] = useState<'analytics' | 'qpro'>(initialTab);
+
+  const [qproData, setQproData] = useState<any>(null);
+  const [qproLoading, setQproLoading] = useState(false);
+  const [qproProgram, setQproProgram] = useState<string | null>(null);
+  const [qproBatch, setQproBatch] = useState<string | null>(null);
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl === 'qpro' || (!tabFromUrl && defaultTab === 'qpro')) {
+      setActiveTab('qpro');
+    } else {
+      setActiveTab('analytics');
+    }
+  }, [searchParams, defaultTab]);
+
+  useEffect(() => {
+    if (activeTab === 'qpro') {
+      setQproLoading(true);
+      const params: Record<string, any> = {};
+      if (qproProgram) params.program = qproProgram;
+      if (qproBatch) params.batch = qproBatch;
+      careerTrendsApi.list(params)
+        .then((res) => setQproData(res))
+        .catch(() => {})
+        .finally(() => setQproLoading(false));
+    }
+  }, [activeTab, qproProgram, qproBatch]);
+
+  const handleTabChange = (tab: 'analytics' | 'qpro') => {
+    setActiveTab(tab);
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'qpro') {
+      next.set('tab', 'qpro');
+    } else {
+      next.delete('tab');
+    }
+    setSearchParams(next, { replace: true });
+  };
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<any>(null);
@@ -395,12 +440,18 @@ export default function CareerAnalytics() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
         <div>
-          <h1 className="text-base font-bold text-gray-900">Career Analytics</h1>
-          <p className="text-xs text-gray-500">Analyze graduate employment outcomes and workforce trends using Graduate Tracer Survey data.</p>
+          <h1 className="text-base font-bold text-gray-900">
+            {activeTab === 'qpro' ? 'Accreditation & Q-Pro Institutional Analytics' : 'Career Analytics'}
+          </h1>
+          <p className="text-xs text-gray-500">
+            {activeTab === 'qpro'
+              ? 'Accreditation reporting, cohort demographics, time-to-job milestones, and official alumni rosters for Q-Pro compliance.'
+              : 'Analyze graduate employment outcomes and workforce trends using Graduate Tracer Survey data.'}
+          </p>
         </div>
-        {data && (
+        {activeTab === 'analytics' && data && (
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={handleExportPDF} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-orange-300">
               <ArrowDownTrayIcon className="w-3.5 h-3.5" /> PDF
@@ -414,6 +465,62 @@ export default function CareerAnalytics() {
           </div>
         )}
       </div>
+
+      {/* Primary Sub-Navigation Tab Switcher */}
+      <div className="flex items-center gap-2 mb-4 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => handleTabChange('analytics')}
+          className={`flex items-center gap-2 py-2 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'analytics'
+              ? 'border-orange-500 text-orange-600 bg-orange-50/60 rounded-t-lg'
+              : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+          }`}
+        >
+          <ChartBarIcon className="w-4 h-4" />
+          <span>Career Analytics Overview</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange('qpro')}
+          className={`flex items-center gap-2 py-2 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'qpro'
+              ? 'border-orange-500 text-orange-600 bg-orange-50/60 rounded-t-lg'
+              : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+          }`}
+        >
+          <CheckBadgeIcon className="w-4 h-4" />
+          <span>Accreditation &amp; Q-Pro Roster</span>
+          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
+            Q-Pro Standard
+          </span>
+        </button>
+      </div>
+
+      {activeTab === 'qpro' ? (
+        qproLoading && !qproData ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[1, 2, 3, 4].map((i) => <KpiSkeleton key={i} />)}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SkeletonCard className="h-64" />
+              <SkeletonCard className="h-64" />
+            </div>
+          </div>
+        ) : (
+          <QProAnalyticsView
+            data={qproData || {}}
+            onProgramChange={(p) => setQproProgram(p)}
+            onBatchChange={(b) => setQproBatch(b)}
+            selectedProgram={qproProgram}
+            selectedBatch={qproBatch}
+            programs={qproData?.programs || []}
+            batches={qproData?.filterOptions?.batches || []}
+          />
+        )
+      ) : (
 
       <div className="space-y-3">
         {refreshing && (
@@ -958,6 +1065,7 @@ export default function CareerAnalytics() {
         </>
         )}
       </div>
+      )}
     </div>
   );
 }
