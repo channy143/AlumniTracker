@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { api, profileApi, employmentApi, authApi, feedApi } from '@/services/api';
 import {
   CameraIcon, PencilIcon, BriefcaseIcon, MapPinIcon,
@@ -2139,121 +2140,166 @@ export default function ProfilePage() {
       )}
 
       {/* Hero Card */}
-      <div data-tour="profile-header-card" className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 sm:p-8 mb-0 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
+      <div data-tour="profile-header-card" className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 sm:p-8 mb-0 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-1/3 w-48 h-48 bg-white rounded-full translate-y-1/3" />
         </div>
 
-        {/* Mascot on the lower part of the orange banner: shows 60% upper part, contained within banner */}
-        <div className="absolute bottom-0 right-4 sm:right-10 md:right-16 pointer-events-none select-none z-0">
+        {/* Mascot on the lower part of the orange banner with bouncy pop-up intro animation */}
+        <motion.div
+          initial={{ y: 90, scale: 0.5, opacity: 0 }}
+          animate={{ y: 0, scale: 1, opacity: 1 }}
+          transition={{
+            type: 'spring',
+            stiffness: 260,
+            damping: 18,
+            delay: 0.25,
+          }}
+          className="absolute bottom-0 right-2 sm:right-8 md:right-14 pointer-events-none select-none z-0"
+        >
+          {/* Pop-up greeting bubble */}
+          <motion.div
+            initial={{ scale: 0, opacity: 0, y: 8 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{
+              type: 'spring',
+              stiffness: 300,
+              damping: 20,
+              delay: 0.6,
+            }}
+            className="hidden xs:flex absolute -top-5 right-2 sm:right-4 bg-white/95 text-orange-950 text-[10px] sm:text-xs font-bold py-0.5 px-2.5 rounded-full shadow-md border border-orange-200/80 items-center gap-1 whitespace-nowrap"
+          >
+            <span>Mabuhay! 👋</span>
+          </motion.div>
+
           <img
             src="/mascot.png"
             alt="Mascot"
-            className="w-36 sm:w-48 md:w-60 lg:w-72 h-auto object-contain translate-y-[40%] drop-shadow-md"
+            className="w-24 xs:w-28 sm:w-44 md:w-56 lg:w-68 h-auto object-contain translate-y-[35%] drop-shadow-md"
           />
-        </div>
+        </motion.div>
 
-        <div className="relative z-10 flex flex-col sm:flex-row gap-4 sm:gap-6">
-          {/* Left - Avatar + Basic Info */}
-          <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-4 sm:gap-5 flex-1">
-            <div className="relative shrink-0">
-              <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full border-4 border-white/60 shadow-lg overflow-hidden bg-white/20 flex items-center justify-center">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-white text-2xl sm:text-4xl font-bold font-display">{initials}</span>
-                )}
-              </div>
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="absolute -bottom-1 -right-1 w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-full flex items-center justify-center text-orange-600 hover:bg-orange-50 transition-colors shadow-md border-2 border-orange-500 cursor-pointer"
-              >
-                <CameraIcon className="w-4 h-4" />
-              </button>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-            </div>
-
-            <div className="min-w-0 flex flex-col items-center sm:items-start">
-              <h2 className="text-xl sm:text-2xl font-bold font-display text-white">{fullName}</h2>
-              {programInfo && (
-                <p className="text-orange-100 text-xs sm:text-sm mt-0.5 flex items-center justify-center sm:justify-start gap-1.5">
-                  <AcademicCapIcon className="w-4 h-4 shrink-0" />
-                  <span>{programInfo}{batchInfo ? ` · Class of ${batchInfo}` : ''}</span>
-                </p>
+        <div className="relative z-10 flex flex-row items-start text-left gap-3.5 sm:gap-6">
+          {/* Avatar on the Left */}
+          <div className="relative shrink-0">
+            <div className="w-18 h-18 sm:w-28 sm:h-28 rounded-full border-4 border-white/60 shadow-lg overflow-hidden bg-white/20 flex items-center justify-center">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white text-2xl sm:text-4xl font-bold font-display">{initials}</span>
               )}
-              {(() => {
-                const status = (profile?.employment_status || '').toLowerCase();
-                const isNotEmployed = status === 'unemployed' || status === 'seeking opportunities' || status === 'retired' || status === 'student';
-                if (isNotEmployed) return null;
+            </div>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-9 sm:h-9 bg-white rounded-full flex items-center justify-center text-orange-600 hover:bg-orange-50 transition-colors shadow-md border-2 border-orange-500 cursor-pointer"
+              title="Change Photo"
+            >
+              <CameraIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+          </div>
 
-                if (status === 'self-employed') {
-                  const jobTitle = profile?.current_job_title;
-                  const company = profile?.company_name;
-                  return (
-                    <p className="text-xs sm:text-sm text-white/90 mt-1 flex items-center justify-center sm:justify-start gap-1.5">
-                      <BriefcaseIcon className="w-3.5 h-3.5 shrink-0" />
-                      <span>
-                        {jobTitle ? `${jobTitle} · Self-employed` : 'Self-employed / Freelance'}
-                        {company ? ` (${company})` : ''}
-                      </span>
-                    </p>
-                  );
-                }
+          {/* Info on the Right (left-aligned on all screen sizes, matching Desktop Image 2) */}
+          <div className="min-w-0 flex-1 flex flex-col items-start text-left">
+            <h2 className="text-lg sm:text-2xl font-bold font-display text-white leading-tight truncate max-w-full">
+              {fullName}
+            </h2>
 
-                const position = profile?.current_job_title || currentEmp?.position;
-                const company = profile?.company_name || currentEmp?.company_name;
-                if (!position && !company) return null;
+            {programInfo && (
+              <p className="text-orange-100 text-xs sm:text-sm mt-0.5 flex items-center gap-1.5 leading-snug">
+                <AcademicCapIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">{programInfo}{batchInfo ? ` · Class of ${batchInfo}` : ''}</span>
+              </p>
+            )}
 
+            {/* Employment role or status if employed */}
+            {(() => {
+              const status = (profile?.employment_status || '').toLowerCase();
+              const isNotEmployed = status === 'unemployed' || status === 'seeking opportunities' || status === 'retired' || status === 'student';
+              if (isNotEmployed) return null;
+
+              if (status === 'self-employed') {
+                const jobTitle = profile?.current_job_title;
+                const company = profile?.company_name;
                 return (
-                  <p className="text-xs sm:text-sm text-white/90 mt-1 flex items-center justify-center sm:justify-start gap-1.5">
+                  <p className="text-xs sm:text-sm text-white/90 mt-1 flex items-center gap-1.5 leading-snug">
                     <BriefcaseIcon className="w-3.5 h-3.5 shrink-0" />
-                    <span>{position || 'Employed'}{company ? ` at ${company}` : ''}</span>
+                    <span className="truncate">
+                      {jobTitle ? `${jobTitle} · Self-employed` : 'Self-employed / Freelance'}
+                      {company ? ` (${company})` : ''}
+                    </span>
                   </p>
                 );
-              })()}
-              {(profile?.city || profile?.province) && (
-                <p className="text-xs text-white/70 mt-1 flex items-center justify-center sm:justify-start gap-1">
-                  <MapPinIcon className="w-3 h-3 shrink-0" />
-                  <span>{[profile.city, profile.province].filter(Boolean).join(', ')}</span>
+              }
+
+              const position = profile?.current_job_title || currentEmp?.position;
+              const company = profile?.company_name || currentEmp?.company_name;
+              if (!position && !company) return null;
+
+              return (
+                <p className="text-xs sm:text-sm text-white/90 mt-1 flex items-center gap-1.5 leading-snug">
+                  <BriefcaseIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{position || 'Employed'}{company ? ` at ${company}` : ''}</span>
                 </p>
-              )}
+              );
+            })()}
 
-              {/* Edit Profile button */}
-              <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
-                <button
-                  data-tour="profile-edit-btn"
-                  onClick={() => {
-                    setEditSkills(profile?.skills?.map((s: any) => s.name || s) || []);
-                    const eduList = profile?.education?.map((e: any) => ({ ...e })) || [];
-                    if (eduList.length === 0) {
-                      eduList.push({ program: '', year_graduated: '', campus: 'CTU-Naga Extension Campus', institution: 'CTU-Naga Extension Campus' });
-                    }
-                    setEditEducation(eduList);
-                    setEditing(true);
-                    window.dispatchEvent(new CustomEvent('tour-edit-profile-clicked'));
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-orange-600 rounded-lg text-sm font-semibold hover:bg-orange-50 transition-colors shadow-sm cursor-pointer"
-                >
-                  <PencilIcon className="w-4 h-4" /> Edit Profile
-                </button>
+            {(profile?.city || profile?.province) && (
+              <p className="text-xs text-white/70 mt-0.5 sm:mt-1 flex items-center gap-1 leading-snug">
+                <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{[profile.city, profile.province].filter(Boolean).join(', ')}</span>
+              </p>
+            )}
 
-                {/* Resume upload */}
-                <input ref={resumeRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleResumeUpload} />
-                {profile?.resume_url ? (
-                  <div className="flex items-center gap-2">
-                    <a href={profile.resume_url} target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-white/70 hover:text-white underline underline-offset-2 transition-colors font-light">View Resume</a>
-                    <span className="text-white/30 text-xs">|</span>
-                    <button onClick={handleDeleteResume} className="text-xs text-white/50 hover:text-red-300 underline underline-offset-2 transition-colors font-light cursor-pointer">Remove</button>
-                  </div>
-                ) : (
-                  <button onClick={() => resumeRef.current?.click()} disabled={uploadingResume}
-                    className="text-xs text-white/70 hover:text-white underline underline-offset-2 transition-colors disabled:opacity-50 font-light cursor-pointer">
-                    {uploadingResume ? 'Uploading...' : 'Add Resume'}
+            {/* Action buttons (Edit Profile + Resume) */}
+            <div className="mt-2.5 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <button
+                data-tour="profile-edit-btn"
+                onClick={() => {
+                  setEditSkills(profile?.skills?.map((s: any) => s.name || s) || []);
+                  const eduList = profile?.education?.map((e: any) => ({ ...e })) || [];
+                  if (eduList.length === 0) {
+                    eduList.push({ program: '', year_graduated: '', campus: 'CTU-Naga Extension Campus', institution: 'CTU-Naga Extension Campus' });
+                  }
+                  setEditEducation(eduList);
+                  setEditing(true);
+                  window.dispatchEvent(new CustomEvent('tour-edit-profile-clicked'));
+                }}
+                className="inline-flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 bg-white text-orange-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-orange-50 transition-colors shadow-sm cursor-pointer"
+              >
+                <PencilIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Edit Profile
+              </button>
+
+              {/* Resume upload */}
+              <input ref={resumeRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleResumeUpload} />
+              {profile?.resume_url ? (
+                <div className="flex items-center gap-1.5 sm:gap-2 text-xs">
+                  <a
+                    href={profile.resume_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white/80 hover:text-white underline underline-offset-2 transition-colors font-medium text-xs sm:text-sm"
+                  >
+                    View Resume
+                  </a>
+                  <span className="text-white/30 text-xs">|</span>
+                  <button
+                    onClick={handleDeleteResume}
+                    className="text-white/60 hover:text-red-200 underline underline-offset-2 transition-colors font-light text-xs cursor-pointer"
+                  >
+                    Remove
                   </button>
-                )}
-              </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => resumeRef.current?.click()}
+                  disabled={uploadingResume}
+                  className="text-xs sm:text-sm text-white/80 hover:text-white underline underline-offset-2 transition-colors disabled:opacity-50 font-medium cursor-pointer"
+                >
+                  {uploadingResume ? 'Uploading...' : 'Add Resume'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -2272,29 +2318,29 @@ export default function ProfilePage() {
         ))}
       </div>
 
-      {/* Tabs */}
-      <div className="sticky top-12 z-20 -mt-px bg-gray-50/95 backdrop-blur-xs">
-        <div className="px-2">
-          <nav className="flex overflow-x-auto gap-1 py-2">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  data-tour={tab.id === 'privacy' ? 'profile-privacy-tab' : undefined}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${activeTab === tab.id
-                      ? 'bg-black/5 text-black shadow-sm'
-                      : 'text-black/50 hover:text-black hover:bg-black/5'
-                    }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
+      {/* Navigation Tabs (Fixed in-place position, never flying or floating on mobile) */}
+      <div className="mt-4 bg-white border border-gray-200 rounded-xl p-1.5 shadow-2xs">
+        <nav className="flex overflow-x-auto gap-1 scrollbar-none">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                data-tour={tab.id === 'privacy' ? 'profile-privacy-tab' : undefined}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-orange-50 text-orange-600 shadow-2xs font-bold'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-orange-600' : 'text-gray-400'}`} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       {/* Tab Content + Sidebar */}
