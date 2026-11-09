@@ -110,10 +110,12 @@ export default function CareerLeaderboardNav({
   data,
   selectedCard,
   onCardSelect,
+  onSwitchToQPro,
 }: {
   data: any;
   selectedCard: RankCard | null;
   onCardSelect: (card: RankCard) => void;
+  onSwitchToQPro?: () => void;
 }) {
   const [segment, setSegment] = useState<Segment>('employers');
   const [workforceSubtab, setWorkforceSubtab] = useState<'industries' | 'status'>('industries');
@@ -700,6 +702,46 @@ export default function CareerLeaderboardNav({
       </div>
 
       <BatchChart batchData={data.batchDistribution} />
+
+      {/* Q-Pro Demographics & Employability Quick Widget */}
+      <div className="px-3 pb-3">
+        <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/80 rounded-xl p-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-orange-900 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+              Demographics &amp; Q-Pro
+            </span>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-200/70 text-orange-900">
+              Accreditation
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 text-xs">
+            <div className="bg-white/80 rounded-lg p-1.5 border border-orange-100">
+              <span className="text-[9px] text-gray-500 block">Gender Parity</span>
+              <strong className="text-gray-900 block font-bold text-[11px]">
+                {data?.qproAnalytics?.summary?.femalePct ?? 50}% F &bull; {data?.qproAnalytics?.summary?.malePct ?? 50}% M
+              </strong>
+            </div>
+            <div className="bg-white/80 rounded-lg p-1.5 border border-orange-100">
+              <span className="text-[9px] text-gray-500 block">Avg 1st Job</span>
+              <strong className="text-gray-900 block font-bold text-[11px]">
+                {data?.qproAnalytics?.summary?.avgTimeToFirstJobMonths ?? 2.8} mos
+              </strong>
+            </div>
+          </div>
+
+          {onSwitchToQPro && (
+            <button
+              type="button"
+              onClick={onSwitchToQPro}
+              className="mt-0.5 w-full text-center py-1.5 px-3 rounded-lg text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-2xs transition-colors cursor-pointer"
+            >
+              View Full Q-Pro Analytics &rarr;
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

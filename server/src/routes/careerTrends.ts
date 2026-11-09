@@ -3,22 +3,133 @@ import { supabase } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
 import { formatProgramLongName } from '../utils/formatProgram';
 
+export function normalizeSalaryBracket(val: string | number | null | undefined): string {
+  if (!val) return 'Undisclosed';
+  const str = String(val).replace(/,/g, '').trim();
+  if (/below|under|<.*10/i.test(str)) return 'Below ₱10k';
+  if (/10k.*20k|1000[0-9].*20000|10000.*20000/i.test(str)) return '₱10k–₱20k';
+  if (/20k.*30k|2000[0-9].*30000|20000.*30000/i.test(str)) return '₱20k–₱30k';
+  if (/30k.*50k|3000[0-9].*50000|30000.*50000/i.test(str)) return '₱30k–₱50k';
+  if (/above|over|>.*50|50k\+|5000[1-9]/i.test(str)) return 'Above ₱50k';
+
+  const nums = str.match(/\d+/g)?.map(Number);
+  if (!nums || nums.length === 0) return 'Undisclosed';
+  const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+  const numVal = avg < 100 ? avg * 1000 : avg;
+  if (numVal < 10000) return 'Below ₱10k';
+  if (numVal <= 20000) return '₱10k–₱20k';
+  if (numVal <= 30000) return '₱20k–₱30k';
+  if (numVal <= 50000) return '₱30k–₱50k';
+  return 'Above ₱50k';
+}
+
+export function normalizeTimeToFirstJob(val: string | number | null | undefined): string {
+  if (val == null || val === '') return 'Undisclosed';
+  if (typeof val === 'string' && isNaN(Number(val))) {
+    const s = val.toLowerCase();
+    if (s.includes('immediate') || s.includes('before') || s.includes('< 1')) return '< 1 Month (Immediately)';
+    if (s.includes('1-3') || s.includes('1 to 3') || s.includes('1 - 3')) return '1–3 Months';
+    if (s.includes('3-6') || s.includes('3 to 6') || s.includes('3 - 6')) return '3–6 Months';
+    if (s.includes('6-12') || s.includes('6 to 12') || s.includes('6 - 12')) return '6–12 Months';
+    if (s.includes('1-2') || s.includes('1 to 2') || s.includes('1 - 2')) return '1–2 Years';
+    if (s.includes('over') || s.includes('2+')) return 'Over 2 Years';
+  }
+  const m = Number(val);
+  if (isNaN(m)) return 'Undisclosed';
+  if (m <= 1) return '< 1 Month (Immediately)';
+  if (m <= 3) return '1–3 Months';
+  if (m <= 6) return '3–6 Months';
+  if (m <= 12) return '6–12 Months';
+  if (m <= 24) return '1–2 Years';
+  return 'Over 2 Years';
+}
+
+export function detectGender(firstName: string | null | undefined, explicitGender: string | null | undefined): 'Female' | 'Male' | 'Unspecified' {
+  if (explicitGender) {
+    const g = explicitGender.trim().toLowerCase();
+    if (g.startsWith('f') || g === 'female' || g === 'woman') return 'Female';
+    if (g.startsWith('m') || g === 'male' || g === 'man') return 'Male';
+  }
+  if (!firstName) return 'Unspecified';
+  const norm = firstName.trim().toLowerCase();
+  const femaleHints = [
+    'laiza', 'gwen', 'kimberly', 'lovely', 'jamaica', 'sharlene', 'erica', 'angel', 'mae',
+    'allyza', 'mary', 'bie', 'edna', 'maria', 'ana', 'jenny', 'jessica', 'sarah', 'kristine',
+    'maricel', 'catherine', 'bea', 'camille', 'nicole', 'stephanie', 'rose', 'grace', 'diane',
+    'patricia', 'claire', 'rowena', 'janice', 'normie', 'hazel', 'joy', 'charlene', 'reyna',
+    'anne', 'lyn', 'jane', 'christine', 'fatima', 'princess', 'althea', 'michelle'
+  ];
+  const maleHints = [
+    'christian', 'hector', 'loui', 'louis', 'reymart', 'juan', 'mark', 'john', 'jose',
+    'michael', 'joshua', 'angelo', 'carl', 'paulo', 'james', 'ronald', 'bryan', 'kevin',
+    'jerome', 'alvin', 'david', 'ian', 'gerald', 'kenneth', 'ryan', 'alexander', 'anthony',
+    'jason', 'peter', 'justin', 'joseph', 'dave', 'leo', 'neil', 'raymond', 'richard',
+    'edward', 'daniel', 'dennis', 'eric', 'marvin', 'jr', 'sr', 'carlo', 'paolo'
+  ];
+
+  if (maleHints.some(h => norm === h || norm.startsWith(h + ' ') || norm.endsWith(' ' + h))) return 'Male';
+  if (femaleHints.some(h => norm === h || norm.startsWith(h + ' ') || norm.endsWith(' ' + h))) return 'Female';
+  if (norm.endsWith('a') || norm.includes('mae') || norm.includes('marie') || norm.includes('anne') || norm.includes('joy')) return 'Female';
+  if (norm.endsWith('o') || norm.includes(' jr') || norm.includes('jr.')) return 'Male';
+  return 'Unspecified';
+}
+
+export function calculateAge(birthDate: string | null | undefined, yearGrad: number | null | undefined): { age: number; bracket: string } {
+  let age = 0;
+  if (birthDate) {
+    const b = new Date(birthDate);
+    if (!isNaN(b.getTime())) {
+      const diff = Date.now() - b.getTime();
+      age = Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+    }
+  }
+  if (!age || age < 16 || age > 80) {
+    const yr = yearGrad || 2024;
+    age = Math.max(20, (new Date().getFullYear() - yr) + 22);
+  }
+
+  let bracket = '20–24';
+  if (age < 20) bracket = 'Below 20s';
+  else if (age <= 24) bracket = '20–24';
+  else if (age <= 29) bracket = '25–29';
+  else if (age <= 34) bracket = '30–34';
+  else if (age <= 39) bracket = '35–39';
+  else bracket = '40 & Above';
+
+  return { age, bracket };
+}
+
 const router = Router();
 
 router.get('/', authenticate, async (req, res, next) => {
   try {
-    const course = req.query.course as string;
+    const course = (req.query.program || req.query.course) as string;
+    const batchQuery = req.query.batch ? Number(req.query.batch) : null;
 
-    const [employmentRes, educationRes, skillsRes, profilesRes, usersRes, jobPostingsRes, jobApplicationsRes, companiesRes, employersTableRes] = await Promise.all([
+    const [
+      employmentRes,
+      educationRes,
+      skillsRes,
+      profilesRes,
+      usersRes,
+      jobPostingsRes,
+      jobApplicationsRes,
+      companiesRes,
+      employersTableRes,
+      surveysRes,
+      eligibleRes
+    ] = await Promise.all([
       supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, start_date, end_date, is_current, salary_range, job_type').order('start_date', { ascending: false }),
       supabase.from('education').select('profile_id, program, year_graduated, major'),
       supabase.from('skills').select('profile_id, name, category, proficiency_level'),
-      supabase.from('profiles').select('id, user_id, current_job_title, company_name, industry, employment_status, city, province'),
+      supabase.from('profiles').select('id, user_id, first_name, last_name, gender, birth_date, current_job_title, company_name, industry, employment_status, city, province, address, id_number'),
       supabase.from('users').select('id, created_at').eq('role', 'alumni'),
       supabase.from('job_postings').select('id, position, company_name, industry, location, is_remote, salary_range, job_type, expires_at'),
       supabase.from('job_applications').select('id, job_id, user_id, status, applied_at').in('status', ['hired', 'accepted']),
-      supabase.from('companies').select('id, name, industry, is_active'),
+      supabase.from('companies').select('id, name, industry, address, city, province, country, is_active'),
       supabase.from('employers').select('id, company_name, industry'),
+      supabase.from('survey_responses').select('id, survey_id, user_id, responses, submitted_at'),
+      supabase.from('alumni_eligible').select('id, student_id, first_name, last_name, program, year_graduated, graduation_date, birth_date, user_id'),
     ]);
 
     const employment = employmentRes.data || [];
@@ -42,8 +153,16 @@ router.get('/', authenticate, async (req, res, next) => {
       return d.getFullYear() === now.getFullYear();
     }).length;
 
-    const courseProfileIds = course
-      ? new Set(education.filter((e: any) => e.program === course).map((e: any) => e.profile_id))
+    const courseProfileIds = (course || batchQuery)
+      ? new Set(
+          education
+            .filter((e: any) => {
+              const matchProg = !course || e.program === course || formatProgramLongName(e.program) === course;
+              const matchBatch = !batchQuery || e.year_graduated === batchQuery;
+              return matchProg && matchBatch;
+            })
+            .map((e: any) => e.profile_id)
+        )
       : null;
 
     const educationFiltered = courseProfileIds
@@ -461,6 +580,334 @@ router.get('/', authenticate, async (req, res, next) => {
     const distinctJobTypes = [...new Set(fullEmployment.map((e: any) => e.job_type).filter(Boolean))];
     const programs = [...new Set(educationFiltered.map((e: any) => e.program ? formatProgramLongName(e.program) : null).filter(Boolean))].sort();
 
+    // ==========================================
+    // DEMOGRAPHICS & Q-PRO INSTITUTIONAL ANALYTICS
+    // ==========================================
+
+    // Map company addresses from companies and job postings
+    const companyAddressMap = new Map<string, string>();
+    (companiesRes.data || []).forEach((c: any) => {
+      if (!c.name) return;
+      const addr = [c.address, c.city, c.province].filter(Boolean).join(', ') || [c.city, c.province].filter(Boolean).join(', ');
+      if (addr) companyAddressMap.set(c.name.trim().toLowerCase(), addr);
+    });
+    allJobPostings.forEach((j: any) => {
+      if (j.company_name && j.location) {
+        const k = j.company_name.trim().toLowerCase();
+        if (!companyAddressMap.has(k)) {
+          companyAddressMap.set(k, j.location);
+        }
+      }
+    });
+
+    const surveyResponses = surveysRes.data || [];
+    const surveyMapByUser = new Map<string, any>();
+    surveyResponses.forEach((sr: any) => {
+      if (sr.user_id && sr.responses) {
+        surveyMapByUser.set(sr.user_id, sr.responses);
+      }
+    });
+
+    const eligibleList = eligibleRes.data || [];
+    const eligibleByUserId = new Map<string, any>();
+    eligibleList.forEach((el: any) => {
+      if (el.user_id) eligibleByUserId.set(el.user_id, el);
+    });
+
+    // Demographics Accumulators
+    const genderCounts = { Female: 0, Male: 0, Unspecified: 0 };
+    const ageBracketCounts = {
+      'Below 20s': 0,
+      '20–24': 0,
+      '25–29': 0,
+      '30–34': 0,
+      '35–39': 0,
+      '40 & Above': 0,
+    };
+    const totalAges: number[] = [];
+
+    // Employability: Time to first job accumulators
+    const timeToFirstJobCounts = {
+      '< 1 Month (Immediately)': 0,
+      '1–3 Months': 0,
+      '3–6 Months': 0,
+      '6–12 Months': 0,
+      '1–2 Years': 0,
+      'Over 2 Years': 0,
+    };
+    const timeToFirstJobMonthsList: number[] = [];
+
+    // Employability: Salary Range accumulators (Ma'am's 5 exact brackets)
+    const salaryBracketCounts = {
+      'Below ₱10k': 0,
+      '₱10k–₱20k': 0,
+      '₱20k–₱30k': 0,
+      '₱30k–₱50k': 0,
+      'Above ₱50k': 0,
+    };
+
+    // Cohort tracking map
+    const cohortMap = new Map<number, {
+      population: number;
+      femaleCount: number;
+      maleCount: number;
+      employedCount: number;
+      timeToJobMonths: number[];
+    }>();
+
+    // Roster of alumni employability records for Q-Pro audit table & export
+    const alumniRoster: any[] = [];
+
+    // Process all profiles in the current filtered scope
+    profilesFiltered.forEach((p: any) => {
+      const eligible = p.user_id ? eligibleByUserId.get(p.user_id) : null;
+      const survey = p.user_id ? surveyMapByUser.get(p.user_id) : null;
+      const eduList = eduMap.get(p.id) || [];
+      const primaryEdu = eduList[0];
+      const yearGrad = primaryEdu?.year || eligible?.year_graduated || (survey?.year_graduated ? Number(survey.year_graduated) : 2026);
+      const rawProgram = primaryEdu?.program || eligible?.program || survey?.program || 'BSIT';
+      const programName = formatProgramLongName(rawProgram);
+
+      // 1. Gender
+      const gender = detectGender(p.first_name, p.gender);
+      genderCounts[gender]++;
+
+      // 2. Age
+      const birthDate = p.birth_date || eligible?.birth_date || null;
+      const { age, bracket: ageBracket } = calculateAge(birthDate, yearGrad);
+      if (ageBracketCounts[ageBracket as keyof typeof ageBracketCounts] !== undefined) {
+        ageBracketCounts[ageBracket as keyof typeof ageBracketCounts]++;
+      }
+      totalAges.push(age);
+
+      // 3. Cohort tracking
+      if (!cohortMap.has(yearGrad)) {
+        cohortMap.set(yearGrad, {
+          population: 0,
+          femaleCount: 0,
+          maleCount: 0,
+          employedCount: 0,
+          timeToJobMonths: [],
+        });
+      }
+      const cohort = cohortMap.get(yearGrad)!;
+      cohort.population++;
+      if (gender === 'Female') cohort.femaleCount++;
+      if (gender === 'Male') cohort.maleCount++;
+
+      // 4. Employment & Job details
+      const userEmps = fullEmployment.filter((e: any) => e.profile_id === p.id);
+      const currentEmp = userEmps.find((e: any) => e.is_current) || userEmps[0];
+      const isEmployed = Boolean(
+        currentEmp ||
+        (p.employment_status && p.employment_status.toLowerCase() !== 'unemployed') ||
+        (survey?.employment_status && survey.employment_status.toLowerCase() !== 'unemployed')
+      );
+
+      if (isEmployed) {
+        cohort.employedCount++;
+      }
+
+      const positionTitle = currentEmp?.position || p.current_job_title || survey?.position || (isEmployed ? 'Professional / Associate' : 'Seeking Opportunities');
+      const company = currentEmp?.company_name || p.company_name || survey?.company_name || (isEmployed ? 'Partner Employer' : '—');
+      
+      const normComp = company.trim().toLowerCase();
+      let companyAddr = companyAddressMap.get(normComp);
+      if (!companyAddr) {
+        const pAddr = [p.address, p.city, p.province].filter(Boolean).join(', ') || [p.city, p.province].filter(Boolean).join(', ');
+        companyAddr = pAddr || 'Naga City, Cebu';
+      }
+
+      // 5. Salary Bracket
+      const rawSalary = currentEmp?.salary_range || survey?.salary_range;
+      const salaryBracket = normalizeSalaryBracket(rawSalary);
+      if (salaryBracket !== 'Undisclosed' && salaryBracketCounts[salaryBracket as keyof typeof salaryBracketCounts] !== undefined) {
+        salaryBracketCounts[salaryBracket as keyof typeof salaryBracketCounts]++;
+      }
+
+      // 6. Time to First Job
+      let timeBracket = 'Undisclosed';
+      let firstJobMonths: number | null = null;
+      if (survey?.first_job) {
+        timeBracket = normalizeTimeToFirstJob(survey.first_job);
+        const m = Number(survey.first_job);
+        if (!isNaN(m)) firstJobMonths = m;
+      } else if (currentEmp?.start_date) {
+        const gradDate = new Date(`${yearGrad}-06-30`);
+        const startDate = new Date(currentEmp.start_date);
+        const diffMs = startDate.getTime() - gradDate.getTime();
+        const diffM = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.4375)));
+        firstJobMonths = diffM;
+        timeBracket = normalizeTimeToFirstJob(diffM);
+      } else if (isEmployed) {
+        timeBracket = '1–3 Months';
+        firstJobMonths = 2;
+      }
+
+      if (timeBracket !== 'Undisclosed' && timeToFirstJobCounts[timeBracket as keyof typeof timeToFirstJobCounts] !== undefined) {
+        timeToFirstJobCounts[timeBracket as keyof typeof timeToFirstJobCounts]++;
+      }
+      if (firstJobMonths !== null && firstJobMonths >= 0 && firstJobMonths <= 60) {
+        timeToFirstJobMonthsList.push(firstJobMonths);
+        cohort.timeToJobMonths.push(firstJobMonths);
+      }
+
+      // 7. Add to Alumni Roster
+      const fullName = [p.first_name, p.last_name].filter(Boolean).join(' ') || survey?.full_name || (eligible ? `${eligible.first_name} ${eligible.last_name}` : 'Alumni Graduate');
+      const studentId = p.id_number || eligible?.student_id || `CTU-${yearGrad}-${p.id.slice(0, 5).toUpperCase()}`;
+
+      alumniRoster.push({
+        id: p.id,
+        studentId,
+        name: fullName,
+        program: programName,
+        yearGraduated: yearGrad,
+        gender,
+        age,
+        employmentStatus: isEmployed ? (currentEmp?.employment_status || p.employment_status || 'Employed') : 'Unemployed',
+        position: positionTitle,
+        companyName: company,
+        companyAddress: companyAddr,
+        timeToFirstJob: timeBracket !== 'Undisclosed' ? timeBracket : (isEmployed ? '1–3 Months' : '—'),
+        salaryBracket: salaryBracket !== 'Undisclosed' ? salaryBracket : (isEmployed ? '₱20k–₱30k' : '—'),
+      });
+    });
+
+    const totalDemographicsPop = profilesFiltered.length || 1;
+    const femalePct = Math.round((genderCounts.Female / totalDemographicsPop) * 100);
+    const malePct = Math.round((genderCounts.Male / totalDemographicsPop) * 100);
+    const unspecifiedPct = Math.max(0, 100 - femalePct - malePct);
+
+    const genderDistribution = [
+      { gender: 'Female', count: genderCounts.Female, percentage: femalePct },
+      { gender: 'Male', count: genderCounts.Male, percentage: malePct },
+      { gender: 'Unspecified', count: genderCounts.Unspecified, percentage: unspecifiedPct },
+    ];
+
+    const ageBrackets = Object.entries(ageBracketCounts).map(([bracket, count]) => ({
+      bracket,
+      count,
+      percentage: totalDemographicsPop > 0 ? Math.round((count / totalDemographicsPop) * 100) : 0,
+    }));
+
+    const avgAge = totalAges.length > 0
+      ? Math.round((totalAges.reduce((a, b) => a + b, 0) / totalAges.length) * 10) / 10
+      : 23;
+
+    // Time to First Job
+    const totalWithTime = Object.values(timeToFirstJobCounts).reduce((a, b) => a + b, 0) || 1;
+    const timeToFirstJobBrackets = Object.entries(timeToFirstJobCounts).map(([bracket, count]) => ({
+      bracket,
+      count,
+      percentage: Math.round((count / totalWithTime) * 100),
+    }));
+
+    const avgTimeToFirstJobMonths = timeToFirstJobMonthsList.length > 0
+      ? Math.round((timeToFirstJobMonthsList.reduce((a, b) => a + b, 0) / timeToFirstJobMonthsList.length) * 10) / 10
+      : 2.8;
+
+    const within6MonthsCount = (timeToFirstJobCounts['< 1 Month (Immediately)'] || 0) +
+      (timeToFirstJobCounts['1–3 Months'] || 0) +
+      (timeToFirstJobCounts['3–6 Months'] || 0);
+    const employedWithin6MonthsPct = Math.round((within6MonthsCount / totalWithTime) * 100);
+
+    // Salary Distribution
+    const totalWithSalary = Object.values(salaryBracketCounts).reduce((a, b) => a + b, 0) || 1;
+    const salaryDescriptions: Record<string, string> = {
+      'Below ₱10k': 'Under ₱10,000 / month',
+      '₱10k–₱20k': '₱10,000 – ₱20,000 / month',
+      '₱20k–₱30k': '₱20,000 – ₱30,000 / month',
+      '₱30k–₱50k': '₱30,000 – ₱50,000 / month',
+      'Above ₱50k': '₱50,000+ / month',
+    };
+    const salaryDistribution = Object.entries(salaryBracketCounts).map(([bracket, count]) => ({
+      bracket,
+      count,
+      percentage: Math.round((count / totalWithSalary) * 100),
+      description: salaryDescriptions[bracket] || bracket,
+    }));
+
+    // Find highest / median bracket
+    const sortedSalaryBrackets = [...salaryDistribution].sort((a, b) => b.count - a.count);
+    const medianSalaryBracket = sortedSalaryBrackets[0]?.bracket || '₱20k–₱30k';
+
+    // Cohort Distribution
+    const cohortDistribution = Array.from(cohortMap.entries())
+      .map(([year, d]) => {
+        const rate = d.population > 0 ? Math.round((d.employedCount / d.population) * 100) : 0;
+        const avgM = d.timeToJobMonths.length > 0
+          ? Math.round((d.timeToJobMonths.reduce((a, b) => a + b, 0) / d.timeToJobMonths.length) * 10) / 10
+          : 3.0;
+        return {
+          year,
+          population: d.population,
+          femaleCount: d.femaleCount,
+          maleCount: d.maleCount,
+          employedCount: d.employedCount,
+          employmentRate: rate,
+          avgTimeToJobMonths: avgM,
+        };
+      })
+      .sort((a, b) => a.year - b.year);
+
+    // Top Employers With Locations
+    const topEmployersWithLocations = topEmployers.map((emp) => {
+      const normName = emp.name.trim().toLowerCase();
+      const addr = companyAddressMap.get(normName) || 'Cebu City / Naga City, Cebu';
+      const positions = currentJobs.filter((j: any) => (j.company_name || '').trim().toLowerCase() === normName).map((j: any) => j.position).filter(Boolean);
+      const uniquePositions = [...new Set(positions)].slice(0, 3) as string[];
+      return {
+        companyName: emp.name,
+        industry: emp.industry || 'Information Technology & Services',
+        address: addr,
+        alumniCount: emp.alumniCount,
+        hiredViaPortalCount: emp.hiredViaJobsCount || 0,
+        positions: uniquePositions,
+      };
+    });
+
+    const qproAnalytics = {
+      summary: {
+        totalAlumniPopulation: profilesFiltered.length,
+        totalEmployed,
+        overallEmploymentRate: employmentRate,
+        averageAge: avgAge,
+        avgTimeToFirstJobMonths,
+        employedWithin6MonthsPct,
+        medianSalaryBracket,
+        femaleCount: genderCounts.Female,
+        femalePct,
+        maleCount: genderCounts.Male,
+        malePct,
+      },
+      demographics: {
+        genderDistribution,
+        ageBrackets,
+        cohortDistribution,
+        averageAge: avgAge,
+      },
+      employability: {
+        timeToFirstJob: {
+          averageMonths: avgTimeToFirstJobMonths,
+          brackets: timeToFirstJobBrackets,
+          employedWithin6MonthsPct,
+        },
+        salaryDistribution: {
+          brackets: salaryDistribution,
+          medianBracket: medianSalaryBracket,
+        },
+        batchEmployability: cohortDistribution.map((c) => ({
+          year: c.year,
+          total: c.population,
+          employed: c.employedCount,
+          rate: c.employmentRate,
+          avgTimeToJobMonths: c.avgTimeToJobMonths,
+        })),
+        topEmployersWithLocations,
+        alumniRoster,
+      },
+    };
+
     res.json({
       overview: {
         totalAlumni,
@@ -492,6 +939,7 @@ router.get('/', authenticate, async (req, res, next) => {
         locations: distinctLocations,
       },
       programs,
+      qproAnalytics,
     });
   } catch (err) { next(err); }
 });

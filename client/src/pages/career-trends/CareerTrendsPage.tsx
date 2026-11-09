@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { BriefcaseIcon, BuildingOfficeIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon, AcademicCapIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { BriefcaseIcon, BuildingOfficeIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon, AcademicCapIcon, SparklesIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
 import { careerTrendsApi, jobsApi } from '@/services/api';
 import { formatExperience } from '@/utils/formatExperience';
 import { formatProgramLongName } from '@/utils/formatProgram';
 import CareerLeaderboardNav, { type RankCard } from './CareerLeaderboardNav';
 import CareerCardInsightsPanel from './CareerCardInsightsPanel';
 import ActiveJobOpeningsNavCard from './ActiveJobOpeningsNavCard';
+import QProAnalyticsView from './QProAnalyticsView';
 
 const JOB_TYPE_LABELS: Record<string, string> = {
   'full-time': 'Full-time',
@@ -247,6 +248,12 @@ function matchQuery(text: string, query: string): boolean {
 export default function CareerTrendsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'trends' | 'qpro'>(
+    searchParams.get('tab') === 'qpro' ? 'qpro' : 'trends'
+  );
+  const [qproProgram, setQproProgram] = useState<string | null>(null);
+  const [qproBatch, setQproBatch] = useState<string | null>(null);
+
   const [data, setData] = useState<any>({
     overview: null,
     topCareers: [],
@@ -258,16 +265,34 @@ export default function CareerTrendsPage() {
     statusDistribution: [],
     fastestGrowing: [],
     topBatches: [],
+    qproAnalytics: null,
   });
 
-  useEffect(() => {
-    let cancelled = false;
-    careerTrendsApi.list()
-      .then((res) => { if (!cancelled) setData(res); })
-      .catch(() => { })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+  const fetchTrends = useCallback((params: Record<string, any> = {}) => {
+    setLoading(true);
+    careerTrendsApi.list(params)
+      .then((res) => { setData(res); })
+      .catch(() => {})
+      .finally(() => { setLoading(false); });
   }, []);
+
+  useEffect(() => {
+    const params: Record<string, any> = {};
+    if (qproProgram) params.program = qproProgram;
+    if (qproBatch) params.batch = qproBatch;
+    fetchTrends(params);
+  }, [qproProgram, qproBatch, fetchTrends]);
+
+  const handleTabChange = (tab: 'trends' | 'qpro') => {
+    setActiveTab(tab);
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'qpro') {
+      next.set('tab', 'qpro');
+    } else {
+      next.delete('tab');
+    }
+    setSearchParams(next, { replace: true });
+  };
 
   const query = (searchParams.get('q') || '').toLowerCase().trim();
   const isSearching = query.length > 0;
@@ -436,147 +461,192 @@ export default function CareerTrendsPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="mb-4">
-        <h1 className="text-base font-bold text-gray-900">Career Trends</h1>
-        <p className="text-xs text-gray-500">Employment insights and career trends based on alumni data.</p>
+      <div className="mb-3">
+        <h1 className="text-lg font-bold text-gray-900">Career &amp; Alumni Analytics</h1>
+        <p className="text-xs text-gray-500">Employment insights, industry trajectories, and official institutional accreditation data.</p>
       </div>
 
-      {isSearching && (
-        <div className="flex items-center gap-2 mb-3 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-          <span className="text-xs text-orange-700">
-            Showing results for <strong>"{query}"</strong>
-            {!hasResults && ' — no results found'}
+      {/* Primary Sub-Navigation Tab Switcher */}
+      <div className="flex items-center gap-2 mb-4 border-b border-gray-200">
+        <button
+          onClick={() => handleTabChange('trends')}
+          className={`flex items-center gap-2 py-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'trends'
+              ? 'border-orange-500 text-orange-600 bg-orange-50/60 rounded-t-lg'
+              : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+          }`}
+        >
+          <BriefcaseIcon className="w-4 h-4" />
+          <span>Career &amp; Market Trends</span>
+        </button>
+
+        <button
+          onClick={() => handleTabChange('qpro')}
+          className={`flex items-center gap-2 py-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'qpro'
+              ? 'border-orange-500 text-orange-600 bg-orange-50/60 rounded-t-lg'
+              : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+          }`}
+        >
+          <ChartBarIcon className="w-4 h-4" />
+          <span>Demographics &amp; Q-Pro Analytics</span>
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
+            Q-Pro Standard
           </span>
-          <button onClick={clearSearch} className="ml-auto p-0.5 text-orange-500 hover:text-orange-700 hover:bg-orange-100 rounded">
-            <XMarkIcon className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
-        <BriefcaseIcon className="w-4 h-4 text-gray-400 shrink-0" />
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <button
-            onClick={() => { clearAllFilters(); }}
-            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${!hasAnyFilter && sortBy === 'all'
-                ? 'bg-orange-500 text-white shadow-sm'
-                : 'text-gray-500 hover:bg-gray-100'
-              }`}
-          >
-            All Careers
-          </button>
-          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
-
-          <FilterDropdown
-            label="Job Position"
-            options={careerNames}
-            selected={selectedPosition}
-            onChange={setSelectedPosition}
-          />
-          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
-
-          <FilterDropdown
-            label="Industry"
-            options={careerIndustryNames}
-            selected={selectedIndustry}
-            onChange={setSelectedIndustry}
-          />
-          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
-
-          <FilterDropdown
-            label="Employment Type"
-            options={filterOptions.employmentTypes}
-            selected={selectedEmploymentType}
-            onChange={setSelectedEmploymentType}
-            formatLabel={(v) => JOB_TYPE_LABELS[v] || v}
-          />
-          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
-
-          <FilterDropdown
-            label="Batch"
-            options={filterOptions.batches.map(String)}
-            selected={selectedBatch}
-            onChange={setSelectedBatch}
-          />
-          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
-
-          <FilterDropdown
-            label="Experience"
-            options={EXPERIENCE_RANGES.map((r) => r.value)}
-            selected={selectedExperience}
-            onChange={setSelectedExperience}
-            formatLabel={(v) => EXPERIENCE_RANGES.find((r) => r.value === v)?.label || v}
-          />
-          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
-
-          <FilterDropdown
-            label="Location"
-            options={filterOptions.locations}
-            selected={selectedLocation}
-            onChange={setSelectedLocation}
-          />
-          <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
-
-          <FilterDropdown
-            label="Sort"
-            options={SORT_OPTIONS.map((s) => s.value)}
-            selected={sortBy}
-            onChange={(v) => setSortBy(v || 'all')}
-            formatLabel={(v) => SORT_OPTIONS.find((s) => s.value === v)?.label || v}
-          />
-        </div>
+        </button>
       </div>
 
-      {hasAnyFilter && (
-        <div className="flex items-center gap-2 mb-3 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5">
-          <span className="text-xs text-orange-700">
-            Filters active
-          </span>
-          <button
-            onClick={() => { clearAllFilters(); }}
-            className="ml-auto p-0.5 text-orange-500 hover:text-orange-700 rounded flex items-center gap-1 text-xs"
-          >
-            <XMarkIcon className="w-3.5 h-3.5" /> Clear all
-          </button>
-        </div>
-      )}
-
-      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-        <div className="w-full lg:flex-1 min-w-0 space-y-3">
-          {selectedCard ? (
-            <CareerCardInsightsPanel
-              card={selectedCard}
-              onBack={() => handleSelectCard(null)}
-              onToggleActiveJobs={handleToggleActiveJobs}
-              isActiveJobsNavOpen={!!activeJobsNav && activeJobsNav.cardName === selectedCard.name}
-            />
-          ) : (
-            filteredCareers.length > 0 && filteredCareers.map((career) => (
-              <CareerCard key={career.position} career={career} />
-            ))
+      {activeTab === 'qpro' ? (
+        <QProAnalyticsView
+          data={data}
+          onProgramChange={(p) => setQproProgram(p)}
+          onBatchChange={(b) => setQproBatch(b)}
+          selectedProgram={qproProgram}
+          selectedBatch={qproBatch}
+          programs={data.programs || []}
+          batches={filterOptions.batches || []}
+        />
+      ) : (
+        <>
+          {isSearching && (
+            <div className="flex items-center gap-2 mb-3 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+              <span className="text-xs text-orange-700">
+                Showing results for <strong>"{query}"</strong>
+                {!hasResults && ' — no results found'}
+              </span>
+              <button onClick={clearSearch} className="ml-auto p-0.5 text-orange-500 hover:text-orange-700 hover:bg-orange-100 rounded">
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+            </div>
           )}
-        </div>
 
-        <aside className="w-full lg:w-96 xl:w-[410px] shrink-0 self-stretch">
-          <div className="lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)]">
-            {activeJobsNav ? (
-              <ActiveJobOpeningsNavCard
-                cardName={activeJobsNav.cardName}
-                kindLabel={activeJobsNav.kindLabel}
-                jobs={activeJobsNav.jobs}
-                myApplications={myApplications}
-                onClose={() => setActiveJobsNav(null)}
+          <div className="flex flex-wrap items-center gap-2 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
+            <BriefcaseIcon className="w-4 h-4 text-gray-400 shrink-0" />
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => { clearAllFilters(); }}
+                className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${!hasAnyFilter && sortBy === 'all'
+                    ? 'bg-orange-500 text-white shadow-sm'
+                    : 'text-gray-500 hover:bg-gray-100'
+                  }`}
+              >
+                All Careers
+              </button>
+              <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
+
+              <FilterDropdown
+                label="Job Position"
+                options={careerNames}
+                selected={selectedPosition}
+                onChange={setSelectedPosition}
               />
-            ) : (
-              <CareerLeaderboardNav
-                data={data}
-                selectedCard={selectedCard}
-                onCardSelect={handleSelectCard}
+              <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
+
+              <FilterDropdown
+                label="Industry"
+                options={careerIndustryNames}
+                selected={selectedIndustry}
+                onChange={setSelectedIndustry}
               />
-            )}
+              <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
+
+              <FilterDropdown
+                label="Employment Type"
+                options={filterOptions.employmentTypes}
+                selected={selectedEmploymentType}
+                onChange={setSelectedEmploymentType}
+                formatLabel={(v) => JOB_TYPE_LABELS[v] || v}
+              />
+              <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
+
+              <FilterDropdown
+                label="Batch"
+                options={filterOptions.batches.map(String)}
+                selected={selectedBatch}
+                onChange={setSelectedBatch}
+              />
+              <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
+
+              <FilterDropdown
+                label="Experience"
+                options={EXPERIENCE_RANGES.map((r) => r.value)}
+                selected={selectedExperience}
+                onChange={setSelectedExperience}
+                formatLabel={(v) => EXPERIENCE_RANGES.find((r) => r.value === v)?.label || v}
+              />
+              <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
+
+              <FilterDropdown
+                label="Location"
+                options={filterOptions.locations}
+                selected={selectedLocation}
+                onChange={setSelectedLocation}
+              />
+              <span className="w-px h-4 bg-gray-300 mx-0.5 hidden sm:inline-block" />
+
+              <FilterDropdown
+                label="Sort"
+                options={SORT_OPTIONS.map((s) => s.value)}
+                selected={sortBy}
+                onChange={(v) => setSortBy(v || 'all')}
+                formatLabel={(v) => SORT_OPTIONS.find((s) => s.value === v)?.label || v}
+              />
+            </div>
           </div>
-        </aside>
-      </div>
+
+          {hasAnyFilter && (
+            <div className="flex items-center gap-2 mb-3 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5">
+              <span className="text-xs text-orange-700">
+                Filters active
+              </span>
+              <button
+                onClick={() => { clearAllFilters(); }}
+                className="ml-auto p-0.5 text-orange-500 hover:text-orange-700 rounded flex items-center gap-1 text-xs"
+              >
+                <XMarkIcon className="w-3.5 h-3.5" /> Clear all
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+            <div className="w-full lg:flex-1 min-w-0 space-y-3">
+              {selectedCard ? (
+                <CareerCardInsightsPanel
+                  card={selectedCard}
+                  onBack={() => handleSelectCard(null)}
+                  onToggleActiveJobs={handleToggleActiveJobs}
+                  isActiveJobsNavOpen={!!activeJobsNav && activeJobsNav.cardName === selectedCard.name}
+                />
+              ) : (
+                filteredCareers.length > 0 && filteredCareers.map((career) => (
+                  <CareerCard key={career.position} career={career} />
+                ))
+              )}
+            </div>
+
+            <aside className="w-full lg:w-96 xl:w-[410px] shrink-0 self-stretch">
+              <div className="lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)]">
+                {activeJobsNav ? (
+                  <ActiveJobOpeningsNavCard
+                    cardName={activeJobsNav.cardName}
+                    kindLabel={activeJobsNav.kindLabel}
+                    jobs={activeJobsNav.jobs}
+                    myApplications={myApplications}
+                    onClose={() => setActiveJobsNav(null)}
+                  />
+                ) : (
+                  <CareerLeaderboardNav
+                    data={data}
+                    selectedCard={selectedCard}
+                    onCardSelect={handleSelectCard}
+                    onSwitchToQPro={() => handleTabChange('qpro')}
+                  />
+                )}
+              </div>
+            </aside>
+          </div>
+        </>
+      )}
     </div>
   );
 }
