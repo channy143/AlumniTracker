@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, ChevronLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { TourStep } from './tourSteps';
@@ -32,11 +32,24 @@ export default function CoachMarkTooltip({
   const isFinalStep = currentStepIndex === totalSteps - 1;
   const isFirstStep = currentStepIndex === 0;
 
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [actualHeight, setActualHeight] = useState(450);
+
+  // Continuously track actual rendered height of tooltip content
+  useLayoutEffect(() => {
+    if (tooltipRef.current) {
+      const h = tooltipRef.current.offsetHeight;
+      if (h > 0 && Math.abs(h - actualHeight) > 4) {
+        setActualHeight(h);
+      }
+    }
+  });
+
   // Collision-Avoidance Placement Solver
   // Guarantees the modal NEVER covers or overlays targetRect
   const placement = useMemo(() => {
     const tooltipWidth = Math.min(390, window.innerWidth - 32);
-    const estimatedHeight = isFinalStep ? 360 : 310;
+    const estimatedHeight = Math.max(actualHeight, 430);
     const vpWidth = window.innerWidth;
     const vpHeight = window.innerHeight;
 
@@ -59,10 +72,10 @@ export default function CoachMarkTooltip({
       const boxBottom = y + estimatedHeight;
 
       // Expand target by small margin for safety
-      const safeTargetLeft = targetRect.left - 8;
-      const safeTargetRight = targetRect.right + 8;
-      const safeTargetTop = targetRect.top - 8;
-      const safeTargetBottom = targetRect.bottom + 8;
+      const safeTargetLeft = targetRect.left - 10;
+      const safeTargetRight = targetRect.right + 10;
+      const safeTargetTop = targetRect.top - 10;
+      const safeTargetBottom = targetRect.bottom + 10;
 
       const overlapX = boxLeft < safeTargetRight && boxRight > safeTargetLeft;
       const overlapY = boxTop < safeTargetBottom && boxBottom > safeTargetTop;
@@ -115,9 +128,9 @@ export default function CoachMarkTooltip({
     } else if (pref === 'right') {
       dirOrder = ['right', 'top', 'bottom', 'left'];
     } else if (pref === 'top') {
-      dirOrder = ['top', 'bottom', 'left', 'right'];
+      dirOrder = ['top', 'bottom', 'right', 'left'];
     } else if (pref === 'bottom') {
-      dirOrder = ['bottom', 'top', 'left', 'right'];
+      dirOrder = ['bottom', 'top', 'right', 'left'];
     }
 
     // 1. Try to find a direction where it fits viewport AND has ZERO COLLISION with target
@@ -160,7 +173,7 @@ export default function CoachMarkTooltip({
       width: tooltipWidth,
       direction: chosen.direction,
     };
-  }, [targetRect, step.pointingDirection, isFinalStep]);
+  }, [targetRect, step.pointingDirection, isFinalStep, actualHeight]);
 
   // Dynamic hand arrow pointing at the highlighted target
   const getPointerEmoji = () => {
@@ -173,6 +186,7 @@ export default function CoachMarkTooltip({
 
   return (
     <motion.div
+      ref={tooltipRef}
       initial={false}
       animate={{
         top: placement.y,

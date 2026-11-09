@@ -29,7 +29,7 @@ export default function SpotlightOverlay({ targetRect, padding = 8 }: SpotlightO
   const height = Math.max(0, targetRect.height + padding * 2);
 
   return (
-    <div className="fixed inset-0 z-[100001] overflow-hidden pointer-events-auto">
+    <div className="fixed inset-0 z-[100001] overflow-hidden pointer-events-none">
       {/* 
         Single unified spotlight element:
         - The surrounding dimming overlay is rendered by a 9999px box shadow extending in all directions.
@@ -57,6 +57,28 @@ export default function SpotlightOverlay({ targetRect, padding = 8 }: SpotlightO
           <div className="absolute inset-0 rounded-2xl ring-2 ring-amber-300/60 animate-pulse pointer-events-none" />
         </div>
       </motion.div>
+
+      {/* 
+        4 Transparent backdrop click-interceptors:
+        Surround the target hole to block clicks on the darkened area,
+        while leaving the spotlight hole 100% clickable for the user (e.g. clicking 'Edit Profile')!
+      */}
+      <div
+        className="fixed top-0 left-0 right-0 pointer-events-auto"
+        style={{ height: `${Math.max(0, top)}px` }}
+      />
+      <div
+        className="fixed left-0 right-0 bottom-0 pointer-events-auto"
+        style={{ top: `${top + height}px` }}
+      />
+      <div
+        className="fixed left-0 pointer-events-auto"
+        style={{ top: `${top}px`, height: `${height}px`, width: `${Math.max(0, left)}px` }}
+      />
+      <div
+        className="fixed right-0 pointer-events-auto"
+        style={{ top: `${top}px`, height: `${height}px`, left: `${left + width}px` }}
+      />
     </div>
   );
 }

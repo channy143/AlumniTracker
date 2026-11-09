@@ -946,7 +946,7 @@ export default function ProfilePage() {
                     <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 mt-3" placeholder="Brief professional summary" />
                   </div>
 
-                  <div>
+                  <div data-tour="profile-edit-employment-section">
                     <SectionLine label="Employment Information" />
                     <p className="text-[11px] text-gray-500 mt-1 mb-2.5">
                       Maintain your current employment status and workplace details. You can update these anytime.
@@ -1068,14 +1068,13 @@ export default function ProfilePage() {
                       </div>
 
                       {/* Proof of Employment for Q-Pro Accreditation */}
-                      {(form.employment_status === 'Employed' || form.employment_status === 'Self-employed') && (
-                        <div data-tour="profile-proof-section" className="sm:col-span-2 pt-4 border-t border-gray-100">
-                          {/* Header with Title and Tooltip */}
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="text-xs text-gray-800 font-bold flex items-center gap-1.5">
-                              <CheckBadgeIcon className="w-4 h-4 text-orange-600" />
-                              <span>Proof of Employment (University Accreditation / Q-Pro Dossier)</span>
-                            </label>
+                      <div data-tour="profile-proof-section" className="sm:col-span-2 pt-4 border-t border-gray-100">
+                        {/* Header with Title and Tooltip */}
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs text-gray-800 font-bold flex items-center gap-1.5">
+                            <CheckBadgeIcon className="w-4 h-4 text-orange-600" />
+                            <span>Proof of Employment (University Accreditation / Q-Pro Dossier)</span>
+                          </label>
                             <div className="relative">
                               <button
                                 type="button"
@@ -1098,6 +1097,12 @@ export default function ProfilePage() {
                           <p className="text-[11px] text-gray-500 mb-3">
                             Submit verified evidence of your placement (COE, payslip, contract, or ID) for institutional quality assurance.
                           </p>
+
+                          {(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') && (
+                            <div className="mb-3 p-2.5 rounded-lg bg-orange-50/80 border border-orange-100 text-[11px] text-orange-800 flex items-center gap-2">
+                              <span>💡 When you secure employment or freelance work, submit your Certificate of Employment (COE), Company ID, or Contract here for institutional Q-Pro verification.</span>
+                            </div>
+                          )}
 
                           {/* Proof Type & Specification */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
@@ -1293,9 +1298,8 @@ export default function ProfilePage() {
                             </div>
                           </div>
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
 
                   <div>
                     <SectionLine label="Skills" />
@@ -2227,6 +2231,7 @@ export default function ProfilePage() {
                     }
                     setEditEducation(eduList);
                     setEditing(true);
+                    window.dispatchEvent(new CustomEvent('tour-edit-profile-clicked'));
                   }}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-orange-600 rounded-lg text-sm font-semibold hover:bg-orange-50 transition-colors shadow-sm cursor-pointer"
                 >

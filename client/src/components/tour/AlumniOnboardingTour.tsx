@@ -102,11 +102,15 @@ export default function AlumniOnboardingTour() {
       navigate(currentStep.route);
     }
 
-    // Sync tab on Profile page if needed
+    // Sync tab and modal on Profile page
     if (currentStep.route === '/profile') {
       if (currentStep.id === 'profile-privacy-tab') {
+        window.dispatchEvent(new CustomEvent('tour-close-edit-profile'));
         window.dispatchEvent(new CustomEvent('tour-switch-profile-tab', { detail: 'privacy' }));
+      } else if (currentStep.id === 'profile-edit-modal-status' || currentStep.id === 'profile-edit-modal-proof') {
+        window.dispatchEvent(new CustomEvent('tour-open-edit-profile'));
       } else {
+        window.dispatchEvent(new CustomEvent('tour-close-edit-profile'));
         window.dispatchEvent(new CustomEvent('tour-switch-profile-tab', { detail: 'overview' }));
       }
     }
@@ -200,6 +204,7 @@ export default function AlumniOnboardingTour() {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        window.dispatchEvent(new CustomEvent('tour-close-edit-profile'));
         skipTour();
       } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
         nextStep(totalSteps);
@@ -211,6 +216,25 @@ export default function AlumniOnboardingTour() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isActive, nextStep, prevStep, skipTour, totalSteps]);
+
+  // When user clicks the "Edit Profile" button directly on the page, advance to the modal guide!
+  useEffect(() => {
+    if (!isActive) return;
+
+    const handleEditClicked = () => {
+      if (currentStep.id === 'profile-edit-btn') {
+        nextStep(totalSteps);
+      }
+    };
+
+    window.addEventListener('tour-edit-profile-clicked', handleEditClicked);
+    return () => window.removeEventListener('tour-edit-profile-clicked', handleEditClicked);
+  }, [isActive, currentStep, nextStep, totalSteps]);
+
+  const handleSkipTour = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('tour-close-edit-profile'));
+    skipTour();
+  }, [skipTour]);
 
   if (!isActive) {
     return null;
@@ -236,7 +260,7 @@ export default function AlumniOnboardingTour() {
           targetRect={targetRect}
           onNext={() => nextStep(totalSteps)}
           onPrev={prevStep}
-          onSkip={skipTour}
+          onSkip={handleSkipTour}
         />
       </div>
     </div>,

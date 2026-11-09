@@ -61,18 +61,29 @@ export const ALUMNI_TOUR_STEPS: TourStep[] = [
     badge: '🏢 Updating Employment Status',
     title: 'Keep Your Career Status Verified',
     content:
-      'Whenever your career situation changes, click "Edit Profile". Here you can update your status to Employed, Self-employed, or Seeking Opportunities, along with your current position, employer name, industry sector, and monthly compensation bracket.',
+      'Whenever your career situation changes, click "Edit Profile". Here you can update your status to Employed, Self-employed, or Seeking Opportunities, along with your position, company, and accreditation placement proof.',
+    pointingDirection: 'bottom',
+    actionText: 'Open Edit Form →',
+  },
+  {
+    id: 'profile-edit-modal-status',
+    targetSelector: '[data-tour="profile-edit-employment-section"]',
+    route: '/profile',
+    badge: '💼 Career Status Settings',
+    title: 'Update Your Employment Details',
+    content:
+      'Inside this editor, maintain your active career record. Select whether you are Employed, Self-employed, or Seeking Opportunities, and input your position, employer, industry sector, and compensation bracket.',
     pointingDirection: 'bottom',
     actionText: 'Next: Q-Pro Accreditation →',
   },
   {
-    id: 'profile-accreditation',
-    targetSelector: '[data-tour="profile-accreditation-card"]',
+    id: 'profile-edit-modal-proof',
+    targetSelector: '[data-tour="profile-proof-section"]',
     route: '/profile',
     badge: '🏆 Institutional Q-Pro',
     title: 'Accreditation Placement Proof',
     content:
-      'CTU-Naga is mandated by CHED, AACCUP, and PESO to verify graduate placement outcomes. In the Edit form, upload your Certificate of Employment (COE), Company ID, or Contract. Once verified by campus administrators, your employment status validates university performance ratings while your personal data remains strictly protected.',
+      'CTU-Naga is mandated by CHED, AACCUP, and PESO to verify graduate placement outcomes. In this section, choose your proof type (COE, Company ID, Payslip, or Contract) and upload your file or provide a link. Once verified by campus administrators, your placement validates institutional ratings while remaining strictly confidential under RA 10173.',
     pointingDirection: 'top',
     actionText: 'Next: Privacy Controls',
   },
