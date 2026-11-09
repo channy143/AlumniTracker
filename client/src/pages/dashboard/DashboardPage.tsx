@@ -1083,7 +1083,7 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div data-tour="dashboard-welcome" className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4">
         <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white text-sm font-bold shadow-xs">
           {profile?.avatar_url ? (
             <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />

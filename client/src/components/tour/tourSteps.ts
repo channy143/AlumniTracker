@@ -11,17 +11,6 @@ export interface TourStep {
 
 export const ALUMNI_TOUR_STEPS: TourStep[] = [
   {
-    id: 'welcome',
-    targetSelector: '[data-tour="dashboard-welcome"]',
-    route: '/',
-    badge: '🎓 CTU-Naga Alumni Hub',
-    title: 'Welcome to Your Alumni Portal!',
-    content:
-      'Kumusta, Naga graduate! This is your official alumni command center. Here you can track university announcements, celebrate batch milestones, explore career benchmarks, and keep your verified alumni credentials up to date.',
-    pointingDirection: 'bottom',
-    actionText: 'Begin Walkthrough →',
-  },
-  {
     id: 'feed-composer',
     targetSelector: '[data-tour="feed-composer"]',
     route: '/',
