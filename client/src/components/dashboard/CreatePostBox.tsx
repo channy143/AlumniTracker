@@ -273,7 +273,7 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
   const AudienceIcon = audience === 'public' ? GlobeAmericasIcon : audience === 'friends' ? UserGroupIcon : LockClosedIcon;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-xs p-3.5 mb-4 transition-all">
+    <div data-tour="feed-composer" className="bg-white border border-gray-200 rounded-xl shadow-xs p-3.5 mb-4 transition-all">
       {/* Hidden File Input for Direct Media Uploads */}
       <input
         ref={fileInputRef}

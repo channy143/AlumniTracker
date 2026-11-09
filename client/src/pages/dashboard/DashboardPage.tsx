@@ -1123,13 +1123,11 @@ export default function DashboardPage() {
       <div className="flex gap-4">
         <div className="flex-1 min-w-0 space-y-3">
           {/* Post Creation Box */}
-          <div data-tour="feed-composer">
-            <CreatePostBox
-              currentUser={user}
-              currentProfile={profile}
-              onPostCreated={handlePostCreated}
-            />
-          </div>
+          <CreatePostBox
+            currentUser={user}
+            currentProfile={profile}
+            onPostCreated={handlePostCreated}
+          />
 
           {/* Post Detail Modal (Overlaid on top of feed with dimmed background) */}
           {selectedPost && (

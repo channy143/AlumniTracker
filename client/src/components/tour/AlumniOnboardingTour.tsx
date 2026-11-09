@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTourStore } from '@/store/tourStore';
 import { useAuthStore } from '@/store/authStore';
@@ -7,7 +8,7 @@ import SpotlightOverlay from './SpotlightOverlay';
 import CoachMarkTooltip from './CoachMarkTooltip';
 
 export default function AlumniOnboardingTour() {
-  const { isActive, currentStepIndex, setUserId, startTour, nextStep, prevStep, skipTour, completeTour } = useTourStore();
+  const { isActive, currentStepIndex, setUserId, startTour, nextStep, prevStep, skipTour } = useTourStore();
   const { user } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -18,14 +19,14 @@ export default function AlumniOnboardingTour() {
   const totalSteps = ALUMNI_TOUR_STEPS.length;
   const currentStep = ALUMNI_TOUR_STEPS[currentStepIndex] || ALUMNI_TOUR_STEPS[0];
 
-  // Sync logged in user ID to tour store
+  // Sync user ID
   useEffect(() => {
     if (user?.id) {
       setUserId(user.id);
     }
   }, [user, setUserId]);
 
-  // Auto-activate tour for first-time alumni when on dashboard '/'
+  // Auto-activate tour for first-time alumni on dashboard '/'
   useEffect(() => {
     if (!user || user.role === 'admin') return;
     if (location.pathname !== '/') return;
@@ -41,7 +42,7 @@ export default function AlumniOnboardingTour() {
     }
   }, [user, location.pathname, isActive, startTour]);
 
-  // Listen for manual trigger (e.g. from Header menu)
+  // Listen for manual trigger (e.g. from Header dropdown)
   useEffect(() => {
     const handleStartTour = () => {
       if (location.pathname !== '/') {
@@ -56,7 +57,7 @@ export default function AlumniOnboardingTour() {
     return () => window.removeEventListener('start-alumni-tour', handleStartTour);
   }, [location.pathname, navigate, startTour]);
 
-  // Update target bounding rect
+  // Update target bounding rect smoothly
   const updateRect = useCallback(() => {
     if (!isActive || !currentStep.targetSelector) {
       setTargetRect(null);
@@ -66,33 +67,24 @@ export default function AlumniOnboardingTour() {
     const element = document.querySelector(currentStep.targetSelector);
     if (element) {
       const rect = element.getBoundingClientRect();
-      setTargetRect(rect);
-    } else {
-      setTargetRect(null);
+      if (rect.width > 0 && rect.height > 0) {
+        setTargetRect(rect);
+        return;
+      }
     }
+    setTargetRect(null);
   }, [isActive, currentStep]);
 
-  // Step transition effect: route change, modal triggers, element polling
+  // Measure and scroll target without shaking layout
   useEffect(() => {
     if (!isActive) {
       setTargetRect(null);
       return;
     }
 
-    // 1. Handle route transition if needed
+    // 1. Ensure correct route
     if (currentStep.route && location.pathname !== currentStep.route) {
       navigate(currentStep.route);
-    }
-
-    // 2. Handle modal actions
-    if (currentStep.autoOpenEditModal) {
-      window.dispatchEvent(new CustomEvent('tour-open-edit-profile'));
-    }
-    if (currentStep.switchEditSection) {
-      window.dispatchEvent(new CustomEvent('tour-switch-edit-section', { detail: currentStep.switchEditSection }));
-    }
-    if (currentStep.autoCloseEditModal) {
-      window.dispatchEvent(new CustomEvent('tour-close-edit-profile'));
     }
 
     if (!currentStep.targetSelector) {
@@ -100,26 +92,42 @@ export default function AlumniOnboardingTour() {
       return;
     }
 
-    // 3. Poll for target element until rendered
+    // 2. Poll for target element
     let attempts = 0;
-    const maxAttempts = 20;
+    const maxAttempts = 25;
 
     const findAndMeasure = () => {
       const element = document.querySelector(currentStep.targetSelector);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setTimeout(() => {
-          const freshRect = element.getBoundingClientRect();
-          setTargetRect(freshRect);
-        }, 300);
+        const rect = element.getBoundingClientRect();
+
+        // If element is hidden (e.g., hidden mobile sidebar), fallback to centered modal
+        if (rect.width === 0 || rect.height === 0) {
+          setTargetRect(null);
+          return;
+        }
+
+        // Only vertically scroll window if target is partially off-screen
+        const isOffscreen = rect.top < 80 || rect.bottom > window.innerHeight - 80;
+        if (isOffscreen) {
+          const targetY = window.scrollY + rect.top - 140;
+          window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          setTimeout(() => {
+            const freshRect = element.getBoundingClientRect();
+            setTargetRect(freshRect);
+          }, 300);
+        } else {
+          setTargetRect(rect);
+        }
       } else if (attempts < maxAttempts) {
         attempts++;
-        pollTimerRef.current = setTimeout(findAndMeasure, 120);
+        pollTimerRef.current = setTimeout(findAndMeasure, 100);
+      } else {
+        setTargetRect(null);
       }
     };
 
-    // Initial short pause to allow route / modal animation to start
-    pollTimerRef.current = setTimeout(findAndMeasure, 150);
+    pollTimerRef.current = setTimeout(findAndMeasure, 120);
 
     return () => {
       if (pollTimerRef.current) {
@@ -128,24 +136,24 @@ export default function AlumniOnboardingTour() {
     };
   }, [isActive, currentStepIndex, currentStep, location.pathname, navigate]);
 
-  // Handle window scroll & resize events
+  // Window resize and scroll sync
   useEffect(() => {
     if (!isActive) return;
 
-    const handleScrollOrResize = () => {
+    const handleSync = () => {
       updateRect();
     };
 
-    window.addEventListener('resize', handleScrollOrResize);
-    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleSync);
+    window.addEventListener('scroll', handleSync, true);
 
     return () => {
-      window.removeEventListener('resize', handleScrollOrResize);
-      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleSync);
+      window.removeEventListener('scroll', handleSync, true);
     };
   }, [isActive, updateRect]);
 
-  // Keyboard navigation shortcuts
+  // Keyboard navigation
   useEffect(() => {
     if (!isActive) return;
 
@@ -167,9 +175,10 @@ export default function AlumniOnboardingTour() {
     return null;
   }
 
-  return (
-    <div className="fixed inset-0 z-[9990] overflow-hidden pointer-events-none">
-      <SpotlightOverlay targetRect={targetRect} padding={10} />
+  // Render directly in document.body at top-most z-index
+  return createPortal(
+    <div className="fixed inset-0 z-[100000] overflow-hidden pointer-events-none">
+      <SpotlightOverlay targetRect={targetRect} padding={8} />
       <div className="pointer-events-auto">
         <CoachMarkTooltip
           step={currentStep}
@@ -181,7 +190,7 @@ export default function AlumniOnboardingTour() {
           onSkip={skipTour}
         />
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
-

@@ -2268,6 +2268,7 @@ export default function ProfilePage() {
               return (
                 <button
                   key={tab.id}
+                  data-tour={tab.id === 'privacy' ? 'profile-privacy-tab' : undefined}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all cursor-pointer ${activeTab === tab.id
                       ? 'bg-black/5 text-black shadow-sm'
@@ -2357,7 +2358,7 @@ export default function ProfilePage() {
                     )}
 
                     {/* Proof of Employment Verification Banner for Q-Pro Accreditation */}
-                    <div className="pt-2.5 mt-2 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
+                    <div data-tour="profile-accreditation-card" className="pt-2.5 mt-2 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
                       <div>
                         <span className="text-[11px] text-gray-500 block font-medium">Accreditation Dossier (Q-Pro)</span>
                         <div className="flex items-center gap-1.5 mt-0.5">
