@@ -193,6 +193,44 @@ export default function ProfilePage() {
     api.get<string[]>('/profile/skills/suggestions').then(setSkillSuggestions).catch(() => { });
   }, []);
 
+  // Interactive Tour (FTUE) event bridges
+  useEffect(() => {
+    const handleOpenEdit = () => {
+      setEditSkills(profile?.skills?.map((s: any) => s.name || s) || []);
+      const eduList = profile?.education?.map((e: any) => ({ ...e })) || [];
+      if (eduList.length === 0) {
+        eduList.push({ program: '', year_graduated: '', campus: 'CTU-Naga Extension Campus', institution: 'CTU-Naga Extension Campus' });
+      }
+      setEditEducation(eduList);
+      setEditing(true);
+      setEditSection('personal');
+      setForm((prev: any) => ({
+        ...prev,
+        employment_status: prev?.employment_status && prev.employment_status !== 'Unemployed' ? prev.employment_status : 'Employed',
+      }));
+    };
+
+    const handleSwitchSection = (e: any) => {
+      if (e?.detail) {
+        setEditSection(e.detail);
+      }
+    };
+
+    const handleCloseEdit = () => {
+      setEditing(false);
+    };
+
+    window.addEventListener('tour-open-edit-profile', handleOpenEdit);
+    window.addEventListener('tour-switch-edit-section', handleSwitchSection);
+    window.addEventListener('tour-close-edit-profile', handleCloseEdit);
+
+    return () => {
+      window.removeEventListener('tour-open-edit-profile', handleOpenEdit);
+      window.removeEventListener('tour-switch-edit-section', handleSwitchSection);
+      window.removeEventListener('tour-close-edit-profile', handleCloseEdit);
+    };
+  }, [profile]);
+
   const loadProfile = async () => {
     try {
       setLoading(true);
@@ -1023,7 +1061,7 @@ export default function ProfilePage() {
 
                       {/* Proof of Employment for Q-Pro Accreditation */}
                       {(form.employment_status === 'Employed' || form.employment_status === 'Self-employed') && (
-                        <div className="sm:col-span-2 pt-4 border-t border-gray-100">
+                        <div data-tour="profile-proof-section" className="sm:col-span-2 pt-4 border-t border-gray-100">
                           {/* Header with Title and Tooltip */}
                           <div className="flex items-center justify-between mb-1">
                             <label className="text-xs text-gray-800 font-bold flex items-center gap-1.5">
@@ -1446,7 +1484,7 @@ export default function ProfilePage() {
               ) : (
                 <div className="space-y-6">
                   {/* Privacy Settings in Modal */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                  <div data-tour="profile-privacy-section" className="bg-gray-50 border border-gray-200 rounded-xl p-5">
                     <SectionLine label="Directory Visibility Preferences" />
                     <p className="text-xs text-gray-500 mb-4">
                       Control which information is visible to other registered alumni in the alumni directory.
@@ -2089,7 +2127,7 @@ export default function ProfilePage() {
       )}
 
       {/* Hero Card */}
-      <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 sm:p-8 mb-0 relative overflow-hidden">
+      <div data-tour="profile-header-card" className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 sm:p-8 mb-0 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-1/3 w-48 h-48 bg-white rounded-full translate-y-1/3" />
@@ -2172,6 +2210,7 @@ export default function ProfilePage() {
               {/* Edit Profile button */}
               <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                 <button
+                  data-tour="profile-edit-btn"
                   onClick={() => {
                     setEditSkills(profile?.skills?.map((s: any) => s.name || s) || []);
                     const eduList = profile?.education?.map((e: any) => ({ ...e })) || [];

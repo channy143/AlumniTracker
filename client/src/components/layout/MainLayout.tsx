@@ -11,6 +11,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import NotificationContainer from '../ui/Notification';
 import DockedChatBox from '@/components/chat/DockedChatBox';
+import AlumniOnboardingTour from '@/components/tour/AlumniOnboardingTour';
 
 const mobileNavItems = [
   { name: 'Home', href: '/', icon: HomeIcon, end: true },
@@ -71,6 +72,9 @@ export default function MainLayout() {
 
       {/* Alumni Connect Docked Messaging & Minimized Conversation Heads */}
       <DockedChatBox />
+
+      {/* Interactive Alumni Onboarding Walkthrough & FTUE Coach Marks */}
+      {!isAdminPath && <AlumniOnboardingTour />}
     </div>
   );
 }

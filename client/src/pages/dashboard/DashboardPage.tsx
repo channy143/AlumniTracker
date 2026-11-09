@@ -787,7 +787,7 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg p-3">
+      <div data-tour="profile-completion-card" className="bg-white border border-gray-200 rounded-lg p-3">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <CheckCircleIcon className="w-4 h-4 text-orange-500" />
           Profile Completion
@@ -1083,7 +1083,7 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex items-center gap-2 mb-4">
+      <div data-tour="dashboard-welcome" className="flex items-center gap-2 mb-4">
         <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white text-sm font-bold shadow-xs">
           {profile?.avatar_url ? (
             <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
@@ -1123,11 +1123,13 @@ export default function DashboardPage() {
       <div className="flex gap-4">
         <div className="flex-1 min-w-0 space-y-3">
           {/* Post Creation Box */}
-          <CreatePostBox
-            currentUser={user}
-            currentProfile={profile}
-            onPostCreated={handlePostCreated}
-          />
+          <div data-tour="feed-composer">
+            <CreatePostBox
+              currentUser={user}
+              currentProfile={profile}
+              onPostCreated={handlePostCreated}
+            />
+          </div>
 
           {/* Post Detail Modal (Overlaid on top of feed with dimmed background) */}
           {selectedPost && (

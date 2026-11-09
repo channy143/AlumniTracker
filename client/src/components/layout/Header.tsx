@@ -20,6 +20,7 @@ import {
   MegaphoneIcon,
   CalendarIcon,
   ChatBubbleLeftRightIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { JellyBlobMascot, BlobSpeech } from '@/components/ui/feral-blob/JellyBlobMascot';
 import { SecurityPolicyModal } from '@/components/security/SecurityPolicyModal';
@@ -424,13 +425,26 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               {dropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-1rem)] bg-white border border-gray-100 rounded-xl shadow-xl py-1.5 z-50 animate-in fade-in duration-150">
                   {user?.role !== 'admin' && (
-                    <button
-                      onClick={() => { setDropdownOpen(false); navigate('/profile'); }}
-                      className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-left"
-                    >
-                      <UserIcon className="w-4 h-4 text-gray-400 shrink-0" />
-                      <span>My Profile</span>
-                    </button>
+                    <>
+                      <button
+                        onClick={() => { setDropdownOpen(false); navigate('/profile'); }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap text-left"
+                      >
+                        <UserIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                        <span>My Profile</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setDropdownOpen(false);
+                          window.dispatchEvent(new CustomEvent('start-alumni-tour'));
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-orange-50/70 hover:text-orange-700 transition-colors whitespace-nowrap text-left"
+                      >
+                        <SparklesIcon className="w-4 h-4 text-orange-500 shrink-0" />
+                        <span>Interactive Walkthrough</span>
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={() => { setDropdownOpen(false); setShowPolicyModal(true); }}
