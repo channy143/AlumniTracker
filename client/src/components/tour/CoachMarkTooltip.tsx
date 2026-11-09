@@ -32,35 +32,70 @@ export default function CoachMarkTooltip({
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        maxWidth: '480px',
+        maxWidth: '440px',
         width: 'calc(100vw - 32px)',
+        maxHeight: 'calc(100vh - 32px)',
         zIndex: 100000,
       };
     }
 
     const margin = 16;
-    const tooltipWidth = Math.min(420, window.innerWidth - 32);
-    const estimatedHeight = 270;
+    const tooltipWidth = Math.min(400, window.innerWidth - 32);
+    // Estimated max height of the coach mark card
+    const estimatedHeight = isFinalStep ? 360 : 300;
 
     let left = targetRect.left + targetRect.width / 2 - tooltipWidth / 2;
-    left = Math.max(16, Math.min(window.innerWidth - tooltipWidth - 16, left));
-
     let top = targetRect.bottom + margin;
 
-    // If placed below and overflows bottom of screen, flip to top
-    if (top + estimatedHeight > window.innerHeight - 20) {
-      if (targetRect.top - estimatedHeight - margin > 20) {
+    // Smart placement based on pointingDirection
+    if (step.pointingDirection === 'left') {
+      // Prefer placing to the left of targetRect
+      if (targetRect.left - tooltipWidth - margin >= 16) {
+        left = targetRect.left - tooltipWidth - margin;
+        top = targetRect.top + targetRect.height / 2 - estimatedHeight / 2;
+      } else if (targetRect.top - estimatedHeight - margin >= 16) {
         top = targetRect.top - estimatedHeight - margin;
       } else {
-        top = Math.max(20, window.innerHeight - estimatedHeight - 20);
+        top = targetRect.bottom + margin;
+      }
+    } else if (step.pointingDirection === 'right') {
+      // Prefer placing to the right of targetRect
+      if (targetRect.right + tooltipWidth + margin <= window.innerWidth - 16) {
+        left = targetRect.right + margin;
+        top = targetRect.top + targetRect.height / 2 - estimatedHeight / 2;
+      } else if (targetRect.top - estimatedHeight - margin >= 16) {
+        top = targetRect.top - estimatedHeight - margin;
+      } else {
+        top = targetRect.bottom + margin;
+      }
+    } else if (step.pointingDirection === 'top') {
+      // Prefer placing above targetRect
+      if (targetRect.top - estimatedHeight - margin >= 16) {
+        top = targetRect.top - estimatedHeight - margin;
+      } else {
+        top = targetRect.bottom + margin;
+      }
+    } else {
+      // Default: 'bottom' -> prefer placing below targetRect
+      if (targetRect.bottom + estimatedHeight + margin <= window.innerHeight - 16) {
+        top = targetRect.bottom + margin;
+      } else if (targetRect.top - estimatedHeight - margin >= 16) {
+        top = targetRect.top - estimatedHeight - margin;
+      } else {
+        top = (window.innerHeight - estimatedHeight) / 2;
       }
     }
+
+    // STRICT VIEWPORT CLAMPING: Tooltip NEVER goes below or out of the screen
+    top = Math.max(16, Math.min(window.innerHeight - estimatedHeight - 16, top));
+    left = Math.max(16, Math.min(window.innerWidth - tooltipWidth - 16, left));
 
     return {
       position: 'fixed',
       top: `${top}px`,
       left: `${left}px`,
       width: `${tooltipWidth}px`,
+      maxHeight: 'calc(100vh - 32px)',
       zIndex: 100000,
       transition: 'top 0.22s ease-out, left 0.22s ease-out',
     };
@@ -69,10 +104,10 @@ export default function CoachMarkTooltip({
   return (
     <div
       style={getTooltipStyle()}
-      className="bg-white rounded-2xl shadow-2xl border border-orange-200/90 overflow-hidden select-none text-left animate-in zoom-in-95 fade-in duration-200"
+      className="bg-white rounded-2xl shadow-2xl border border-orange-200/90 overflow-y-auto max-h-[calc(100vh-32px)] select-none text-left animate-in zoom-in-95 fade-in duration-200 scrollbar-none"
     >
       {/* Top gradient progress line */}
-      <div className="h-1.5 w-full bg-orange-100/70 overflow-hidden">
+      <div className="h-1.5 w-full bg-orange-100/70 overflow-hidden shrink-0">
         <div
           className="h-full bg-gradient-to-r from-orange-500 to-amber-500 transition-all duration-300 rounded-r-full"
           style={{ width: `${((currentStepIndex + 1) / totalSteps) * 100}%` }}
@@ -98,9 +133,10 @@ export default function CoachMarkTooltip({
               <div className="w-4 h-4 rounded-full overflow-hidden bg-orange-200 ring-1 ring-orange-300 shrink-0">
                 <img src="/image/mascot.png" alt="Alumi" className="w-full h-full object-cover scale-125" />
               </div>
-              {step.badge}
+              <span>{step.badge}</span>
             </span>
-            <span className="text-[11px] font-semibold text-gray-400">
+
+            <span className="text-[11px] font-bold text-gray-500">
               Step {currentStepIndex + 1} of {totalSteps}
             </span>
           </div>
@@ -109,27 +145,33 @@ export default function CoachMarkTooltip({
             type="button"
             onClick={onSkip}
             className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
-            title="Close walkthrough"
+            title="Close Tutorial"
           >
             <XMarkIcon className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Step Title */}
-        <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-snug mb-1.5 flex items-center gap-1.5">
+        {/* Title */}
+        <h2 className="text-sm sm:text-base font-extrabold text-gray-900 leading-snug mb-1.5">
           {step.title}
-        </h3>
+        </h2>
 
-        {/* Step Content */}
-        <p className="text-xs sm:text-sm text-gray-600 leading-relaxed mb-4">
+        {/* Content */}
+        <p className="text-xs text-gray-600 leading-relaxed mb-3">
           {step.content}
         </p>
 
-        {/* Floating Coach Mark Hint */}
-        {targetRect && step.pointingDirection !== 'none' && (
+        {/* Pointing Coach Direction Indicator */}
+        {step.pointingDirection !== 'none' && targetRect && (
           <div className="flex items-center gap-2 mb-3 px-2.5 py-1.5 bg-orange-50 border border-orange-100 rounded-lg text-[11px] text-orange-800 font-medium">
             <span className="animate-bounce inline-block text-sm">
-              {step.pointingDirection === 'top' ? '👆' : step.pointingDirection === 'left' ? '👈' : '👇'}
+              {step.pointingDirection === 'top'
+                ? '👇'
+                : step.pointingDirection === 'bottom'
+                ? '👆'
+                : step.pointingDirection === 'left'
+                ? '👉'
+                : '👈'}
             </span>
             <span>Highlighted on your screen</span>
           </div>

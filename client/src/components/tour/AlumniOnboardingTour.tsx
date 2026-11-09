@@ -122,15 +122,20 @@ export default function AlumniOnboardingTour() {
           return;
         }
 
-        // Only vertically scroll window if target is partially off-screen
-        const isOffscreen = rect.top < 80 || rect.bottom > window.innerHeight - 80;
+        // Scroll target comfortably into view if outside comfortable viewport bounds
+        const isOffscreen = rect.top < 100 || rect.bottom > window.innerHeight - 100;
         if (isOffscreen) {
-          const targetY = window.scrollY + rect.top - 140;
-          window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          try {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+          } catch {
+            const targetY = window.scrollY + rect.top - 140;
+            window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          }
+          // Set initial estimate and then re-measure after smooth scrolling completes
+          setTargetRect(element.getBoundingClientRect());
           setTimeout(() => {
-            const freshRect = element.getBoundingClientRect();
-            setTargetRect(freshRect);
-          }, 300);
+            setTargetRect(element.getBoundingClientRect());
+          }, 350);
         } else {
           setTargetRect(rect);
         }
