@@ -226,13 +226,21 @@ export default function CareerCardInsightsPanel({
 
                           {/* Position & Company */}
                           {(a.position || a.company) && (
-                            <p className="text-xs text-gray-700 font-medium mt-0.5 truncate flex items-center gap-1.5">
-                              <BriefcaseIcon className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                              <span className="truncate">
-                                <span className="font-semibold text-gray-900">{a.position || 'Alumni'}</span>
-                                {a.company && <span className="text-gray-500 font-normal"> at <strong className="font-medium text-gray-800">{a.company}</strong></span>}
-                              </span>
-                            </p>
+                            <div>
+                              <p className="text-xs text-gray-700 font-medium mt-0.5 truncate flex items-center gap-1.5">
+                                <BriefcaseIcon className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                                <span className="truncate">
+                                  <span className="font-semibold text-gray-900">{a.position || 'Alumni'}</span>
+                                  {a.company && <span className="text-gray-500 font-normal"> at <strong className="font-medium text-gray-800">{a.company}</strong></span>}
+                                </span>
+                              </p>
+                              {a.companyAddress && (
+                                <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5 ml-5">
+                                  <MapPinIcon className="w-3 h-3 text-orange-400 shrink-0" />
+                                  <span className="truncate">{a.companyAddress}</span>
+                                </p>
+                              )}
+                            </div>
                           )}
 
                           {/* Meta Information Section */}
@@ -250,7 +258,7 @@ export default function CareerCardInsightsPanel({
                               </span>
                             )}
 
-                            {a.location && (
+                            {a.location && !a.companyAddress && (
                               <span className="flex items-center gap-1 text-[11px] text-gray-500">
                                 <MapPinIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                                 <span className="truncate">{a.location}</span>
@@ -264,10 +272,10 @@ export default function CareerCardInsightsPanel({
                               </span>
                             )}
 
-                            {a.salary && (
+                            {(a.salary || a.salaryBracket) && (
                               <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/80">
                                 <CurrencyDollarIcon className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                                <span>₱{a.salary}</span>
+                                <span>{a.salary ? `₱${a.salary}` : a.salaryBracket}</span>
                               </span>
                             )}
                           </div>

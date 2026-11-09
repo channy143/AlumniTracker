@@ -8,6 +8,7 @@ import CareerLeaderboardNav, { type RankCard } from './CareerLeaderboardNav';
 import CareerCardInsightsPanel from './CareerCardInsightsPanel';
 import ActiveJobOpeningsNavCard from './ActiveJobOpeningsNavCard';
 import QProAnalyticsView from './QProAnalyticsView';
+import AlumniDemographicsHighlights from './AlumniDemographicsHighlights';
 
 const JOB_TYPE_LABELS: Record<string, string> = {
   'full-time': 'Full-time',
@@ -462,35 +463,35 @@ export default function CareerTrendsPage() {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-3">
-        <h1 className="text-lg font-bold text-gray-900">Career &amp; Alumni Analytics</h1>
-        <p className="text-xs text-gray-500">Employment insights, industry trajectories, and official institutional accreditation data.</p>
+        <h1 className="text-lg font-bold text-gray-900">Career &amp; Market Trends</h1>
+        <p className="text-xs text-gray-500">Explore career pathways, salary benchmarks, demographic breakdowns, and employment trajectories of CTU Naga alumni.</p>
       </div>
 
       {/* Primary Sub-Navigation Tab Switcher */}
       <div className="flex items-center gap-2 mb-4 border-b border-gray-200">
         <button
           onClick={() => handleTabChange('trends')}
-          className={`flex items-center gap-2 py-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
             activeTab === 'trends'
               ? 'border-orange-500 text-orange-600 bg-orange-50/60 rounded-t-lg'
               : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
           }`}
         >
           <BriefcaseIcon className="w-4 h-4" />
-          <span>Career &amp; Market Trends</span>
+          <span>Career Pathways &amp; Trends</span>
         </button>
 
         <button
           onClick={() => handleTabChange('qpro')}
-          className={`flex items-center gap-2 py-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
             activeTab === 'qpro'
               ? 'border-orange-500 text-orange-600 bg-orange-50/60 rounded-t-lg'
               : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
           }`}
         >
           <ChartBarIcon className="w-4 h-4" />
-          <span>Demographics &amp; Q-Pro Analytics</span>
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
+          <span>Accreditation &amp; Q-Pro Roster</span>
+          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
             Q-Pro Standard
           </span>
         </button>
@@ -508,6 +509,20 @@ export default function CareerTrendsPage() {
         />
       ) : (
         <>
+          {/* Integrated Alumni Demographics & Employability Highlights */}
+          {data?.qproAnalytics && (
+            <AlumniDemographicsHighlights
+              data={data}
+              selectedProgram={qproProgram}
+              selectedBatch={qproBatch}
+              onProgramChange={(p) => setQproProgram(p)}
+              onBatchChange={(b) => setQproBatch(b)}
+              programs={data.programs || []}
+              batches={filterOptions.batches || []}
+              onOpenDetailedReport={() => handleTabChange('qpro')}
+            />
+          )}
+
           {isSearching && (
             <div className="flex items-center gap-2 mb-3 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
               <span className="text-xs text-orange-700">

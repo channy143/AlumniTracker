@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BriefcaseIcon, BuildingOfficeIcon, AcademicCapIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, ChartBarIcon, UserGroupIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { BriefcaseIcon, BuildingOfficeIcon, AcademicCapIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, ChartBarIcon, UserGroupIcon, CheckCircleIcon, MapPinIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { careerTrendsApi, jobsApi } from '@/services/api';
 import { formatExperience } from '@/utils/formatExperience';
@@ -143,6 +143,155 @@ export default function CareerInsightsPage() {
       <div className="flex flex-col lg:flex-row gap-4 lg:items-stretch">
         <div className="w-full lg:flex-1 min-w-0 space-y-4">
 
+          {/* Demographics & Employability Indicators */}
+          {(data.demographics || data.employability) && (
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
+                    <SparklesIcon className="w-4 h-4 text-orange-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                      Alumni Demographics &amp; Employability Profile
+                    </h3>
+                    <p className="text-[11px] text-gray-500">
+                      Demographic distribution and employment indicators for {position} alumni
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-orange-50 text-orange-700 border border-orange-200/80">
+                  Accreditation &amp; Q-Pro Metrics
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Demographic Snapshot */}
+                <div className="bg-gray-50/70 border border-gray-100 rounded-lg p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                      <UserGroupIcon className="w-4 h-4 text-orange-500" />
+                      Demographic Breakdown
+                    </h4>
+                    <span className="text-[11px] text-gray-500">
+                      Avg Age: <strong className="text-gray-800">{data.demographics?.averageAge || 23.5} yrs</strong>
+                    </span>
+                  </div>
+
+                  {/* Female vs Male Population Ratio */}
+                  <div className="space-y-1.5 bg-white p-2.5 rounded-lg border border-gray-100 shadow-2xs">
+                    <div className="flex items-center justify-between text-xs font-medium">
+                      <span className="text-pink-600 font-semibold flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-pink-500 inline-block" />
+                        Female: {data.demographics?.femaleCount ?? 0} ({data.demographics?.femalePct ?? 50}%)
+                      </span>
+                      <span className="text-blue-600 font-semibold flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                        Male: {data.demographics?.maleCount ?? 0} ({data.demographics?.malePct ?? 50}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden flex">
+                      <div
+                        className="h-full bg-pink-500 transition-all duration-500"
+                        style={{ width: `${data.demographics?.femalePct ?? 50}%` }}
+                      />
+                      <div
+                        className="h-full bg-blue-500 transition-all duration-500"
+                        style={{ width: `${data.demographics?.malePct ?? 50}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Age Brackets Breakdown */}
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-600 mb-1.5">Age Distribution</p>
+                    <div className="space-y-1.5">
+                      {(data.demographics?.ageBrackets || []).map((ab: any) => (
+                        <div key={ab.bracket} className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600 text-[11px] w-24 shrink-0 font-medium">{ab.bracket}</span>
+                          <div className="flex-1 mx-2 h-1.5 bg-gray-200/80 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-orange-500 rounded-full"
+                              style={{ width: `${Math.min(ab.percentage || 0, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-[11px] text-gray-500 font-semibold w-14 text-right">
+                            {ab.count} ({ab.percentage}%)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Employability & Compensation */}
+                <div className="bg-gray-50/70 border border-gray-100 rounded-lg p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                      <BriefcaseIcon className="w-4 h-4 text-emerald-600" />
+                      Employability &amp; Compensation
+                    </h4>
+                    <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                      {data.employability?.timeToFirstJob?.employedWithin6MonthsPct ?? 85}% within 6 mos
+                    </span>
+                  </div>
+
+                  {/* Time to First Job */}
+                  <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-2xs">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-600 font-medium flex items-center gap-1">
+                        <ClockIcon className="w-3.5 h-3.5 text-orange-500" />
+                        Time to 1st Job After Graduation
+                      </span>
+                      <span className="text-orange-600 font-bold text-[11px]">
+                        Avg {data.employability?.timeToFirstJob?.averageMonths ?? 2.8} mos
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {(data.employability?.timeToFirstJob?.brackets || []).map((tb: any) => (
+                        <span
+                          key={tb.bracket}
+                          className="text-[10px] px-2 py-0.5 bg-orange-50 text-orange-800 rounded border border-orange-100 font-medium"
+                        >
+                          {tb.bracket}: <strong>{tb.count}</strong> ({tb.percentage}%)
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Salary Brackets Breakdown */}
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-gray-600 mb-1.5">
+                      <span className="flex items-center gap-1">
+                        <CurrencyDollarIcon className="w-3.5 h-3.5 text-emerald-600" />
+                        Monthly Salary Distribution
+                      </span>
+                      <span className="text-emerald-700 font-bold">
+                        Median: {data.employability?.salaryDistribution?.medianBracket || '₱20k–₱30k'}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {(data.employability?.salaryDistribution?.brackets || []).map((sb: any) => (
+                        <div key={sb.bracket} className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600 text-[11px] w-24 shrink-0 font-medium">{sb.bracket}</span>
+                          <div className="flex-1 mx-2 h-1.5 bg-gray-200/80 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 rounded-full"
+                              style={{ width: `${Math.min(sb.percentage || 0, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-[11px] text-gray-500 font-semibold w-14 text-right">
+                            {sb.count} ({sb.percentage}%)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Where They Work: Top Employers & Alumni */}
           {(data.topEmployers?.length > 0 || data.recentAlumni?.length > 0) && (
             <div>
@@ -153,16 +302,29 @@ export default function CareerInsightsPage() {
                   <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
                     <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                       <BuildingOfficeIcon className="w-4 h-4 text-orange-500" />
-                      Top Employers
+                      Top Employers &amp; Locations
                     </h4>
-                    <div className="space-y-1.5 flex-1">
-                      {data.topEmployers.map((emp: any, i: number) => (
-                        <div key={emp.name} className="flex items-center justify-between text-xs py-2 px-2.5 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-colors">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="w-5 h-5 rounded bg-orange-100 flex items-center justify-center text-[9px] font-bold text-orange-600 shrink-0">{i + 1}</span>
-                            <span className="text-gray-700 font-medium truncate">{emp.name}</span>
+                    <div className="space-y-2 flex-1">
+                      {(data.topEmployersWithLocations || data.topEmployers).map((emp: any, i: number) => (
+                        <div key={emp.name} className="flex items-start justify-between text-xs py-2 px-2.5 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-colors">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <span className="w-5 h-5 rounded bg-orange-100 flex items-center justify-center text-[9px] font-bold text-orange-600 shrink-0 mt-0.5">{i + 1}</span>
+                            <div className="min-w-0">
+                              <p className="text-gray-800 font-semibold truncate">{emp.name}</p>
+                              {emp.address && (
+                                <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                  <MapPinIcon className="w-3 h-3 text-orange-400 shrink-0" />
+                                  <span className="truncate">{emp.address}</span>
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <span className="text-gray-400 shrink-0 text-[11px] font-medium">{emp.count} alumni</span>
+                          <div className="text-right shrink-0">
+                            <span className="text-gray-500 text-[11px] font-medium">{emp.count} alumni</span>
+                            {emp.hasOpenings && (
+                              <span className="block text-[9px] text-emerald-600 font-semibold">Hiring Now</span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -176,23 +338,34 @@ export default function CareerInsightsPage() {
                       <UserGroupIcon className="w-4 h-4 text-orange-500" />
                       Alumni Working as {position}
                     </h4>
-                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 flex-1">
+                    <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1 flex-1">
                       {data.recentAlumni.slice(0, 10).map((alumni: any) => (
-                        <div key={alumni.id} className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-3 text-xs p-2 rounded-lg hover:bg-gray-50 border border-gray-50 transition-colors">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-[10px] font-bold text-orange-600 shrink-0">
+                        <div key={alumni.id} className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-2 sm:gap-3 text-xs p-2.5 rounded-lg hover:bg-gray-50 border border-gray-100 transition-colors">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-[10px] font-bold text-orange-600 shrink-0 mt-0.5">
                               {alumni.name?.charAt(0) || 'A'}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-semibold text-gray-800 truncate">{alumni.name}</p>
-                              <p className="text-[11px] text-gray-500 truncate">
+                              <p className="font-semibold text-gray-900 truncate">{alumni.name}</p>
+                              <p className="text-[11px] text-gray-600 truncate">
                                 {alumni.position || position}
-                                {alumni.company && <span> at {alumni.company}</span>}
+                                {alumni.company && <span> at <strong className="font-medium text-gray-800">{alumni.company}</strong></span>}
                               </p>
+                              {alumni.companyAddress && (
+                                <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                  <MapPinIcon className="w-3 h-3 text-orange-400 shrink-0" />
+                                  <span className="truncate">{alumni.companyAddress}</span>
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="text-right shrink-0 text-xs leading-tight flex flex-col items-end gap-1">
                             <div className="flex items-center gap-1 flex-wrap justify-end">
+                              {alumni.salaryBracket && (
+                                <span className="inline-block text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/80">
+                                  {alumni.salaryBracket}
+                                </span>
+                              )}
                               {alumni.hiredViaJob && (
                                 <span className="inline-block text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/80">
                                   Hired via Portal

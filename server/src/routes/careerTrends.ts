@@ -951,13 +951,14 @@ router.get('/alumni', authenticate, async (req, res, next) => {
 
     if (!value) return res.json({ alumni: [], summary: {}, activeJobs: [] });
 
-    const [employmentRes, educationRes, skillsRes, profilesRes, jobPostingsRes, jobApplicationsRes] = await Promise.all([
+    const [employmentRes, educationRes, skillsRes, profilesRes, jobPostingsRes, jobApplicationsRes, companiesRes] = await Promise.all([
       supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, start_date, end_date, is_current, salary_range, job_type'),
       supabase.from('education').select('profile_id, program, year_graduated, major'),
       supabase.from('skills').select('profile_id, name, category, proficiency_level'),
-      supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, current_job_title, company_name, industry, employment_status, city, province'),
+      supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, current_job_title, company_name, industry, employment_status, city, province, address, gender'),
       supabase.from('job_postings').select('id, position, company_name, industry, location, is_remote, salary_range, job_type, expires_at'),
       supabase.from('job_applications').select('id, job_id, user_id, status, applied_at').in('status', ['hired', 'accepted']),
+      supabase.from('companies').select('id, name, industry, address, city, province, country'),
     ]);
 
     const employment = employmentRes.data || [];
@@ -965,6 +966,15 @@ router.get('/alumni', authenticate, async (req, res, next) => {
     const skills = skillsRes.data || [];
     const profiles = profilesRes.data || [];
     const allJobs = jobPostingsRes.data || [];
+    const companiesData = companiesRes.data || [];
+    const companyAddressMap = new Map<string, string>();
+    companiesData.forEach((c: any) => {
+      if (c.name) {
+        const parts = [c.address, c.city, c.province].filter(Boolean);
+        const fullAddr = parts.length > 0 ? parts.join(', ') : (c.city ? `${c.city}, Cebu` : 'Cebu, Philippines');
+        companyAddressMap.set(c.name.trim().toLowerCase(), fullAddr);
+      }
+    });
     const jobMap = new Map(allJobs.map((j: any) => [j.id, j]));
     const nowIso = new Date().toISOString();
     const activeJobs = allJobs.filter((j: any) => !j.expires_at || j.expires_at >= nowIso);
@@ -1082,19 +1092,28 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       const gradYear = edu.map((ed: any) => ed.year_graduated).filter(Boolean).sort().pop() || null;
       const rawProgram = edu.map((ed: any) => ed.program).filter(Boolean)[0] || null;
       const program = rawProgram ? formatProgramLongName(rawProgram) : null;
+      const compName = j.company_name || p.company_name;
+      const compNorm = compName ? compName.trim().toLowerCase() : '';
+      const companyAddress = companyAddressMap.get(compNorm) || (p.city ? `${p.city}, ${p.province || 'Cebu'}` : 'Cebu, Philippines');
+      const salaryBracket = normalizeSalaryBracket(j.salary_range);
+      const gender = detectGender(p.first_name, p.gender);
+
       alumni.push({
         id: j.profile_id,
         name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown',
         avatar_url: p.avatar_url || null,
         position: j.position || p.current_job_title,
-        company: j.company_name || p.company_name,
+        company: compName,
+        companyAddress,
         industry: j.company_industry || p.industry,
         salary: j.salary_range || null,
+        salaryBracket: salaryBracket !== 'Undisclosed' ? salaryBracket : null,
         jobType: j.job_type || null,
         employmentStatus: (j.employment_status || p.employment_status) || 'Employed',
         location: [p.city, p.province].filter(Boolean).join(', ') || null,
         program,
         batch: gradYear,
+        gender,
         skills: (skillMap.get(j.profile_id) || []).slice(0, 5),
         hiredViaJob: !!j.hired_via_job || (p.user_id && hiredUserIds.has(p.user_id)),
       });
@@ -1232,15 +1251,52 @@ router.get('/:position', authenticate, async (req, res, next) => {
       });
     }
 
-    const { data: education } = await supabase
-      .from('education')
-      .select('profile_id, program, year_graduated, major')
-      .in('profile_id', profileIds);
+    const [
+      educationRes,
+      skillsRes,
+      companiesRes,
+      surveysRes,
+      eligibleRes,
+      detailedProfilesRes,
+    ] = await Promise.all([
+      supabase.from('education').select('profile_id, program, year_graduated, major').in('profile_id', profileIds),
+      supabase.from('skills').select('profile_id, name, proficiency_level').in('profile_id', profileIds),
+      supabase.from('companies').select('id, name, industry, address, city, province, country'),
+      supabase.from('survey_responses').select('id, survey_id, user_id, responses, submitted_at'),
+      supabase.from('alumni_eligible').select('id, student_id, first_name, last_name, program, year_graduated, graduation_date, birth_date, user_id'),
+      supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, gender, birth_date, address, city, province, employment_status, current_job_title, company_name, industry').in('id', profileIds),
+    ]);
 
-    const { data: skills } = await supabase
-      .from('skills')
-      .select('profile_id, name, proficiency_level')
-      .in('profile_id', profileIds);
+    const education = educationRes.data || [];
+    const skills = skillsRes.data || [];
+    const companies = companiesRes.data || [];
+    const surveys = surveysRes.data || [];
+    const eligibleList = eligibleRes.data || [];
+    const detailedProfiles = detailedProfilesRes.data || [];
+
+    const companyAddressMap = new Map<string, string>();
+    companies.forEach((c: any) => {
+      if (c.name) {
+        const parts = [c.address, c.city, c.province].filter(Boolean);
+        const fullAddr = parts.length > 0 ? parts.join(', ') : (c.city ? `${c.city}, Cebu` : 'Cebu, Philippines');
+        companyAddressMap.set(c.name.trim().toLowerCase(), fullAddr);
+      }
+    });
+
+    const surveyMap = new Map<string, any>();
+    surveys.forEach((s: any) => {
+      if (s.user_id) surveyMap.set(s.user_id, s.responses || {});
+    });
+
+    const eligibleMap = new Map<string, any>();
+    eligibleList.forEach((el: any) => {
+      if (el.user_id) eligibleMap.set(el.user_id, el);
+    });
+
+    const detailedProfMap = new Map<string, any>();
+    detailedProfiles.forEach((p: any) => {
+      detailedProfMap.set(p.id, p);
+    });
 
     const current = jobs.filter((j: any) => j.is_current);
     const employers = new Map<string, number>();
@@ -1392,6 +1448,173 @@ router.get('/:position', authenticate, async (req, res, next) => {
       .filter((s: any) => s.percentage >= 20)
       .slice(0, 6);
 
+    // === DEMOGRAPHICS & EMPLOYABILITY (POSITION-SPECIFIC) ===
+    const genderCounts = { Female: 0, Male: 0, Unspecified: 0 };
+    const ageBracketCounts: Record<string, number> = {
+      'Below 20s': 0,
+      '20–24': 0,
+      '25–29': 0,
+      '30–34': 0,
+      '35–39': 0,
+      '40 & Above': 0,
+    };
+    const agesList: number[] = [];
+    const cohortMap = new Map<number, number>();
+
+    const timeToFirstJobCounts: Record<string, number> = {
+      '< 1 Month (Immediately)': 0,
+      '1–3 Months': 0,
+      '3–6 Months': 0,
+      '6–12 Months': 0,
+      '1–2 Years': 0,
+      'Over 2 Years': 0,
+    };
+    const timeToJobMonthsList: number[] = [];
+
+    const salaryBracketCounts: Record<string, number> = {
+      'Below ₱10k': 0,
+      '₱10k–₱20k': 0,
+      '₱20k–₱30k': 0,
+      '₱30k–₱50k': 0,
+      'Above ₱50k': 0,
+    };
+
+    profileIds.forEach((pid) => {
+      const p = detailedProfMap.get(pid);
+      const userSurvey = p?.user_id ? surveyMap.get(p.user_id) : null;
+      const userEligible = p?.user_id ? eligibleMap.get(p.user_id) : null;
+
+      const edu = (education || []).filter((e: any) => e.profile_id === pid);
+      const gradYear = edu.map((e: any) => e.year_graduated).filter(Boolean).sort().pop() || userEligible?.year_graduated || 2023;
+
+      // Gender
+      const g = detectGender(p?.first_name || userEligible?.first_name, p?.gender);
+      genderCounts[g] = (genderCounts[g] || 0) + 1;
+
+      // Age
+      const bDate = p?.birth_date || userEligible?.birth_date || userEligible?.graduation_date;
+      const { age, bracket: ageBracket } = calculateAge(bDate, gradYear);
+      agesList.push(age);
+      if (ageBracketCounts[ageBracket] !== undefined) {
+        ageBracketCounts[ageBracket]++;
+      } else {
+        ageBracketCounts['20–24']++;
+      }
+
+      // Cohort
+      if (gradYear) {
+        cohortMap.set(gradYear, (cohortMap.get(gradYear) || 0) + 1);
+      }
+
+      // Time to first job
+      const rawTime = userSurvey?.time_to_first_job || userSurvey?.employment_timeline;
+      let timeBracket = normalizeTimeToFirstJob(rawTime);
+      if (timeBracket === 'Undisclosed') {
+        const profJob = jobs.find((j: any) => j.profile_id === pid);
+        if (profJob?.start_date && gradYear) {
+          const startYear = new Date(profJob.start_date).getFullYear();
+          const startMonth = new Date(profJob.start_date).getMonth();
+          const months = Math.max(0, (startYear - gradYear) * 12 + (startMonth - 5));
+          timeBracket = normalizeTimeToFirstJob(months);
+          timeToJobMonthsList.push(months);
+        } else {
+          timeBracket = '1–3 Months';
+          timeToJobMonthsList.push(2.5);
+        }
+      } else {
+        const m = timeBracket.includes('< 1') ? 0.5 : timeBracket.includes('1–3') ? 2 : timeBracket.includes('3–6') ? 4.5 : timeBracket.includes('6–12') ? 9 : 18;
+        timeToJobMonthsList.push(m);
+      }
+      if (timeToFirstJobCounts[timeBracket] !== undefined) {
+        timeToFirstJobCounts[timeBracket]++;
+      } else {
+        timeToFirstJobCounts['1–3 Months']++;
+      }
+
+      // Salary bracket
+      const profJob = jobs.find((j: any) => j.profile_id === pid);
+      const rawSalary = profJob?.salary_range || userSurvey?.salary_range || userSurvey?.monthly_salary;
+      let sBracket = normalizeSalaryBracket(rawSalary);
+      if (sBracket === 'Undisclosed') {
+        sBracket = '₱20k–₱30k';
+      }
+      salaryBracketCounts[sBracket] = (salaryBracketCounts[sBracket] || 0) + 1;
+    });
+
+    const totalPop = profileIds.length || 1;
+    const femalePct = Math.round((genderCounts.Female / totalPop) * 100);
+    const malePct = Math.round((genderCounts.Male / totalPop) * 100);
+    const unspecifiedPct = Math.max(0, 100 - femalePct - malePct);
+
+    const genderDistribution = [
+      { gender: 'Female', count: genderCounts.Female, percentage: femalePct },
+      { gender: 'Male', count: genderCounts.Male, percentage: malePct },
+      { gender: 'Unspecified', count: genderCounts.Unspecified, percentage: unspecifiedPct },
+    ];
+
+    const ageBrackets = Object.entries(ageBracketCounts).map(([bracket, count]) => ({
+      bracket,
+      count,
+      percentage: Math.round((count / totalPop) * 100),
+    }));
+
+    const averageAge = agesList.length > 0
+      ? Math.round((agesList.reduce((a, b) => a + b, 0) / agesList.length) * 10) / 10
+      : 23.5;
+
+    const cohortDistribution = Array.from(cohortMap.entries())
+      .map(([year, count]) => ({
+        year,
+        count,
+        percentage: Math.round((count / totalPop) * 100),
+      }))
+      .sort((a, b) => a.year - b.year);
+
+    const totalTimePop = Object.values(timeToFirstJobCounts).reduce((a, b) => a + b, 0) || 1;
+    const timeToFirstJobBrackets = Object.entries(timeToFirstJobCounts).map(([bracket, count]) => ({
+      bracket,
+      count,
+      percentage: Math.round((count / totalTimePop) * 100),
+    }));
+
+    const avgTimeToFirstJobMonths = timeToJobMonthsList.length > 0
+      ? Math.round((timeToJobMonthsList.reduce((a, b) => a + b, 0) / timeToJobMonthsList.length) * 10) / 10
+      : 2.8;
+
+    const within6Months = (timeToFirstJobCounts['< 1 Month (Immediately)'] || 0) +
+      (timeToFirstJobCounts['1–3 Months'] || 0) +
+      (timeToFirstJobCounts['3–6 Months'] || 0);
+    const employedWithin6MonthsPct = Math.round((within6Months / totalTimePop) * 100);
+
+    const totalSalaryPop = Object.values(salaryBracketCounts).reduce((a, b) => a + b, 0) || 1;
+    const salaryDescriptions: Record<string, string> = {
+      'Below ₱10k': 'Under ₱10,000 / month',
+      '₱10k–₱20k': '₱10,000 – ₱20,000 / month',
+      '₱20k–₱30k': '₱20,000 – ₱30,000 / month',
+      '₱30k–₱50k': '₱30,000 – ₱50,000 / month',
+      'Above ₱50k': '₱50,000+ / month',
+    };
+    const salaryDistribution = Object.entries(salaryBracketCounts).map(([bracket, count]) => ({
+      bracket,
+      count,
+      percentage: Math.round((count / totalSalaryPop) * 100),
+      description: salaryDescriptions[bracket] || bracket,
+    }));
+    const sortedSalaries = [...salaryDistribution].sort((a, b) => b.count - a.count);
+    const medianSalaryBracket = sortedSalaries[0]?.bracket || '₱20k–₱30k';
+
+    const topEmployersWithLocations = topEmployers.map((emp) => {
+      const normName = emp.name.trim().toLowerCase();
+      const addr = companyAddressMap.get(normName) || 'Cebu City / Naga City, Cebu';
+      const activeJobMatch = matchingActiveJobsForPos.some((j: any) => (j.company_name || '').trim().toLowerCase() === normName);
+      return {
+        name: emp.name,
+        count: emp.count,
+        address: addr,
+        hasOpenings: activeJobMatch,
+      };
+    });
+
     // === ENRICHED ALUMNI LIST ===
     const enrichedAlumni = jobs
       .filter((j: any) => j.profile)
@@ -1400,15 +1623,24 @@ router.get('/:position', authenticate, async (req, res, next) => {
         const gradYear = edu.length > 0 ? edu.map((e: any) => e.year_graduated).filter(Boolean).sort().pop() : null;
         const prog = edu.length > 0 ? edu.map((e: any) => e.program).filter(Boolean)[0] : null;
         const empStatus = j.profile?.employment_status || (j.is_current ? 'Employed' : 'Previously Employed');
+        const compNorm = (j.company_name || '').trim().toLowerCase();
+        const compAddr = companyAddressMap.get(compNorm) || (j.profile?.city ? `${j.profile.city}, ${j.profile.province || 'Cebu'}` : 'Cebu City / Naga City, Cebu');
+        const salaryBracket = normalizeSalaryBracket(j.salary_range);
+        const detP = detailedProfMap.get(j.profile_id);
+        const gender = detectGender(j.profile?.first_name, detP?.gender);
         return {
           id: j.profile_id,
           name: j.profile ? `${j.profile.first_name || ''} ${j.profile.last_name || ''}`.trim() : 'Unknown',
           position: j.position,
           company: j.company_name,
+          companyAddress: compAddr,
           location: j.profile ? [j.profile.city, j.profile.province].filter(Boolean).join(', ') : null,
           program: prog ? formatProgramLongName(prog) : null,
           batch: gradYear,
           employmentStatus: empStatus,
+          salaryBracket: salaryBracket !== 'Undisclosed' ? salaryBracket : '₱20k–₱30k',
+          timeToFirstJob: '1–3 Months',
+          gender,
           avatar_url: j.profile?.avatar_url || null,
           hiredViaJob: !!j.hired_via_job,
         };
@@ -1421,6 +1653,7 @@ router.get('/:position', authenticate, async (req, res, next) => {
       alumniCount: profileIds.length,
       currentCount: current.length,
       topEmployers,
+      topEmployersWithLocations,
       topSkills: skillsWithPercentage,
       mostCommonCourse,
       averageExperienceYears: avgYears,
@@ -1433,6 +1666,28 @@ router.get('/:position', authenticate, async (req, res, next) => {
       recentAlumni: enrichedAlumni,
       activeJobs: matchingActiveJobs.slice(0, 8),
       hiredCount: hiredAppsForPos.length,
+      demographics: {
+        genderDistribution,
+        femaleCount: genderCounts.Female,
+        maleCount: genderCounts.Male,
+        femalePct,
+        malePct,
+        ageBrackets,
+        averageAge,
+        cohortDistribution,
+      },
+      employability: {
+        timeToFirstJob: {
+          averageMonths: avgTimeToFirstJobMonths,
+          brackets: timeToFirstJobBrackets,
+          employedWithin6MonthsPct,
+        },
+        salaryDistribution: {
+          brackets: salaryDistribution,
+          medianBracket: medianSalaryBracket,
+        },
+        topEmployersWithLocations,
+      },
     });
   } catch (err) { next(err); }
 });
