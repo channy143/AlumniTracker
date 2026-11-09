@@ -90,7 +90,7 @@ export default function AlumniOnboardingTour() {
     setTargetRect(null);
   }, [isActive, currentStep]);
 
-  // Measure and scroll target without shaking layout
+  // Measure and scroll target with fluid zero-latency tracking
   useEffect(() => {
     if (!isActive || showAlumiIntro) {
       setTargetRect(null);
@@ -116,9 +116,9 @@ export default function AlumniOnboardingTour() {
       return;
     }
 
-    // 2. Poll for target element
+    // 2. Poll for target element (immediate first attempt, fast follow-up)
     let attempts = 0;
-    const maxAttempts = 25;
+    const maxAttempts = 30;
 
     const findAndMeasure = () => {
       const element = document.querySelector(currentStep.targetSelector);
@@ -142,7 +142,7 @@ export default function AlumniOnboardingTour() {
         }
 
         // Scroll target comfortably into view if outside comfortable viewport bounds
-        const isOffscreen = rect.top < 80 || rect.bottom > window.innerHeight - 80;
+        const isOffscreen = rect.top < 70 || rect.bottom > window.innerHeight - 70;
         if (isOffscreen) {
           try {
             element.scrollIntoView({ behavior: 'smooth', block: scrollBlock, inline: 'nearest' });
@@ -150,26 +150,20 @@ export default function AlumniOnboardingTour() {
             const targetY = window.scrollY + rect.top - 140;
             window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
           }
-          // Set initial estimate and then re-measure after smooth scrolling completes
-          setTargetRect(element.getBoundingClientRect());
-          setTimeout(() => {
-            setTargetRect(element.getBoundingClientRect());
-          }, 250);
-          setTimeout(() => {
-            setTargetRect(element.getBoundingClientRect());
-          }, 450);
-        } else {
-          setTargetRect(rect);
         }
+
+        // Immediately update targetRect with ZERO artificial delay
+        setTargetRect(rect);
       } else if (attempts < maxAttempts) {
         attempts++;
-        pollTimerRef.current = setTimeout(findAndMeasure, 100);
+        pollTimerRef.current = setTimeout(findAndMeasure, 30);
       } else {
         setTargetRect(null);
       }
     };
 
-    pollTimerRef.current = setTimeout(findAndMeasure, 120);
+    // Execute immediately on the exact same frame!
+    findAndMeasure();
 
     return () => {
       if (pollTimerRef.current) {
@@ -178,18 +172,23 @@ export default function AlumniOnboardingTour() {
     };
   }, [isActive, currentStepIndex, currentStep, location.pathname, navigate]);
 
-  // Window resize and scroll sync
+  // Window resize and continuous 60fps scroll sync during smooth scrolling
   useEffect(() => {
     if (!isActive) return;
 
+    let rafId: number | null = null;
     const handleSync = () => {
-      updateRect();
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        updateRect();
+      });
     };
 
-    window.addEventListener('resize', handleSync);
-    window.addEventListener('scroll', handleSync, true);
+    window.addEventListener('resize', handleSync, { passive: true });
+    window.addEventListener('scroll', handleSync, { passive: true, capture: true });
 
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       window.removeEventListener('resize', handleSync);
       window.removeEventListener('scroll', handleSync, true);
     };
