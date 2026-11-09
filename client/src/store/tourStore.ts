@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 
-const STORAGE_PREFIX = 'ctu_alumni_ftue_completed_';
+const STORAGE_PREFIX = 'ctu_alumni_ftue_v2_';
 
-function getStorageKey(userId?: string): string {
+export function getStorageKey(userId?: string): string {
   return `${STORAGE_PREFIX}${userId || 'alumni'}`;
 }
 
@@ -86,6 +86,9 @@ export const useTourStore = create<TourState>((set, get) => ({
     const { userId } = get();
     const key = getStorageKey(userId || undefined);
     localStorage.removeItem(key);
+    if (userId) {
+      localStorage.removeItem(`ctu_alumni_ftue_completed_${userId}`);
+    }
     set({ isActive: true, showAlumiIntro: true, currentStepIndex: 0 });
   },
 }));

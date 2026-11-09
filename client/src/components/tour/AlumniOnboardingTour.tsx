@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useTourStore } from '@/store/tourStore';
+import { useTourStore, getStorageKey } from '@/store/tourStore';
 import { useAuthStore } from '@/store/authStore';
 import { ALUMNI_TOUR_STEPS } from './tourSteps';
 import SpotlightOverlay from './SpotlightOverlay';
@@ -27,17 +27,31 @@ export default function AlumniOnboardingTour() {
     }
   }, [user, setUserId]);
 
+  // Expose handy window helper for testing
+  useEffect(() => {
+    (window as any).resetAlumniTour = () => {
+      if (user?.id) {
+        localStorage.removeItem(getStorageKey(user.id));
+        localStorage.removeItem(`ctu_alumni_ftue_completed_${user.id}`);
+      }
+      startTour(true);
+    };
+  }, [user, startTour]);
+
   // Auto-activate tour for first-time alumni on dashboard '/'
   useEffect(() => {
     if (!user || user.role === 'admin') return;
     if (location.pathname !== '/') return;
 
-    const storageKey = `ctu_alumni_ftue_completed_${user.id}`;
+    const searchParams = new URLSearchParams(window.location.search);
+    const forceParam = searchParams.get('tour') === '1' || searchParams.get('tour') === 'true' || searchParams.get('reset_tour') === '1';
+
+    const storageKey = getStorageKey(user.id);
     const completed = localStorage.getItem(storageKey) === 'true';
 
-    if (!completed && !isActive) {
+    if ((!completed || forceParam) && !isActive) {
       const timer = setTimeout(() => {
-        startTour(false);
+        startTour(forceParam);
       }, 700);
       return () => clearTimeout(timer);
     }
