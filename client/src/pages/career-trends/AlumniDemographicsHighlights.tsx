@@ -34,7 +34,7 @@ export default function AlumniDemographicsHighlights({
   batches = [],
   onOpenDetailedReport,
 }: AlumniDemographicsHighlightsProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const qpro = data?.qproAnalytics || {};
   const summary = qpro.summary || {};
@@ -125,10 +125,11 @@ export default function AlumniDemographicsHighlights({
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 border border-gray-200 transition-colors cursor-pointer"
             title={isExpanded ? 'Collapse highlights' : 'Expand highlights'}
           >
-            <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+            <span>{isExpanded ? 'Collapse' : 'Expand Details'}</span>
+            <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
           </button>
         </div>
       </div>
