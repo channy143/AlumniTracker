@@ -124,7 +124,7 @@ export default function Sidebar({
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto scrollbar-hover border-r border-gray-200">
+          <div className="flex-1 overflow-y-auto scrollbar-none border-r border-gray-200">
             <nav data-tour={!isAdminPath ? 'sidebar-nav' : undefined} className="p-2 space-y-0.5">
               <div className={`px-3 py-1.5 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap ${collapsed ? 'max-h-0 opacity-0 py-0' : 'max-h-12 opacity-100 py-1.5'}`}>
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
