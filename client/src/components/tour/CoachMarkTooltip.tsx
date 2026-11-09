@@ -80,11 +80,24 @@ export default function CoachMarkTooltip({
       </div>
 
       <div className="p-4 sm:p-5">
+        {/* If celebration step, show Alumi happily celebrating */}
+        {isFinalStep && (
+          <div className="flex justify-center -mt-1 mb-3">
+            <img
+              src="/image/mascot.png"
+              alt="Alumi Celebrating"
+              className="w-24 sm:w-32 h-auto object-contain drop-shadow-lg"
+            />
+          </div>
+        )}
+
         {/* Meta Bar: Badge, Step Counter, Close Button */}
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
-              <SparklesIcon className="w-3 h-3 text-orange-600" />
+              <div className="w-4 h-4 rounded-full overflow-hidden bg-orange-200 ring-1 ring-orange-300 shrink-0">
+                <img src="/image/mascot.png" alt="Alumi" className="w-full h-full object-cover scale-125" />
+              </div>
               {step.badge}
             </span>
             <span className="text-[11px] font-semibold text-gray-400">

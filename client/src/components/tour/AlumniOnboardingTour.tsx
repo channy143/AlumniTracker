@@ -6,9 +6,10 @@ import { useAuthStore } from '@/store/authStore';
 import { ALUMNI_TOUR_STEPS } from './tourSteps';
 import SpotlightOverlay from './SpotlightOverlay';
 import CoachMarkTooltip from './CoachMarkTooltip';
+import AlumiIntroScene from './AlumiIntroScene';
 
 export default function AlumniOnboardingTour() {
-  const { isActive, currentStepIndex, setUserId, startTour, nextStep, prevStep, skipTour } = useTourStore();
+  const { isActive, showAlumiIntro, startWalkthrough, currentStepIndex, setUserId, startTour, nextStep, prevStep, skipTour } = useTourStore();
   const { user } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -77,7 +78,7 @@ export default function AlumniOnboardingTour() {
 
   // Measure and scroll target without shaking layout
   useEffect(() => {
-    if (!isActive) {
+    if (!isActive || showAlumiIntro) {
       setTargetRect(null);
       return;
     }
@@ -173,6 +174,14 @@ export default function AlumniOnboardingTour() {
 
   if (!isActive) {
     return null;
+  }
+
+  // Render Alumi's big intro scene before Step 1 starts
+  if (showAlumiIntro) {
+    return createPortal(
+      <AlumiIntroScene onStart={startWalkthrough} onSkip={skipTour} />,
+      document.body
+    );
   }
 
   // Render directly in document.body at top-most z-index

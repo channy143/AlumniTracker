@@ -8,10 +8,12 @@ function getStorageKey(userId?: string): string {
 
 export interface TourState {
   isActive: boolean;
+  showAlumiIntro: boolean;
   currentStepIndex: number;
   userId: string | null;
   setUserId: (id: string | null) => void;
   startTour: (force?: boolean) => void;
+  startWalkthrough: () => void;
   nextStep: (totalSteps: number) => void;
   prevStep: () => void;
   goToStep: (index: number) => void;
@@ -22,6 +24,7 @@ export interface TourState {
 
 export const useTourStore = create<TourState>((set, get) => ({
   isActive: false,
+  showAlumiIntro: true,
   currentStepIndex: 0,
   userId: null,
 
@@ -38,7 +41,11 @@ export const useTourStore = create<TourState>((set, get) => ({
       return;
     }
 
-    set({ isActive: true, currentStepIndex: 0 });
+    set({ isActive: true, showAlumiIntro: true, currentStepIndex: 0 });
+  },
+
+  startWalkthrough: () => {
+    set({ showAlumiIntro: false, currentStepIndex: 0 });
   },
 
   nextStep: (totalSteps: number) => {
@@ -65,21 +72,20 @@ export const useTourStore = create<TourState>((set, get) => ({
     const { userId } = get();
     const key = getStorageKey(userId || undefined);
     localStorage.setItem(key, 'true');
-    set({ isActive: false, currentStepIndex: 0 });
+    set({ isActive: false, showAlumiIntro: false, currentStepIndex: 0 });
   },
 
   completeTour: () => {
     const { userId } = get();
     const key = getStorageKey(userId || undefined);
     localStorage.setItem(key, 'true');
-    set({ isActive: false, currentStepIndex: 0 });
+    set({ isActive: false, showAlumiIntro: false, currentStepIndex: 0 });
   },
 
   resetTour: () => {
     const { userId } = get();
     const key = getStorageKey(userId || undefined);
     localStorage.removeItem(key);
-    set({ isActive: true, currentStepIndex: 0 });
+    set({ isActive: true, showAlumiIntro: true, currentStepIndex: 0 });
   },
 }));
-

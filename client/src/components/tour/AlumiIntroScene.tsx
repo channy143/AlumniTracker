@@ -1,0 +1,103 @@
+import React from 'react';
+import { SparklesIcon, XMarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+
+interface AlumiIntroSceneProps {
+  onStart: () => void;
+  onSkip: () => void;
+}
+
+export default function AlumiIntroScene({ onStart, onSkip }: AlumiIntroSceneProps) {
+  return (
+    <div className="fixed inset-0 z-[100000] overflow-hidden">
+      {/* Soft dimmed backdrop */}
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 animate-in fade-in"
+        onClick={onSkip}
+      />
+
+      {/* Main Alumi + Speech Bubble presentation docked in bottom-left */}
+      <div className="fixed bottom-0 left-3 sm:left-6 md:left-10 z-[100001] flex flex-col md:flex-row items-center md:items-end gap-3 sm:gap-5 max-w-[calc(100vw-24px)] md:max-w-2xl select-none pointer-events-auto">
+        
+        {/* Alumi Mascot Graphic (Big in the bottom-left) */}
+        <div className="relative shrink-0 order-2 md:order-1 -mb-2 sm:-mb-3 md:-mb-4 animate-in slide-in-from-bottom-12 duration-500">
+          <img
+            src="/image/mascot.png"
+            alt="Alumi the CTU-Naga Mascot"
+            className="w-44 sm:w-56 md:w-68 lg:w-80 h-auto object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.45)] select-none pointer-events-none"
+          />
+          {/* Subtle glowing halo beneath Alumi */}
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-32 sm:w-44 h-8 bg-orange-500/25 rounded-full blur-xl pointer-events-none" />
+        </div>
+
+        {/* Speech Bubble Card */}
+        <div className="order-1 md:order-2 bg-white/98 backdrop-blur-md rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl border-2 border-orange-300 relative text-left mb-2 md:mb-10 w-full md:max-w-md animate-in zoom-in-95 fade-in duration-300">
+          
+          {/* Speech bubble tail pointing toward Alumi on desktop */}
+          <div className="hidden md:block absolute -left-3 bottom-12 w-0 h-0 border-t-[8px] border-t-transparent border-r-[12px] border-r-white border-b-[8px] border-b-transparent drop-shadow-xs" />
+          <div className="hidden md:block absolute -left-4 bottom-12 w-0 h-0 border-t-[10px] border-t-transparent border-r-[14px] border-r-orange-300 border-b-[10px] border-b-transparent -z-10" />
+
+          {/* Header Row: Badge & Close */}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-100 text-orange-900 border border-orange-200">
+              <SparklesIcon className="w-3.5 h-3.5 text-orange-600" />
+              Meet Alumi · Official CTU Naga Guide
+            </span>
+
+            <button
+              type="button"
+              onClick={onSkip}
+              className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+              title="Skip Tour"
+            >
+              <XMarkIcon className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Greeting Title */}
+          <h2 className="text-base sm:text-lg font-black text-gray-900 leading-snug mb-2">
+            Mabuhay, fellow Naga graduate! 👋
+          </h2>
+
+          {/* Alumi's Dialogue */}
+          <div className="space-y-2 text-xs sm:text-sm text-gray-700 leading-relaxed">
+            <p>
+              Hi, I'm <strong className="text-orange-600 font-extrabold">Alumi</strong>, and I'll be the one to guide you throughout our alumni portal!
+            </p>
+            <p className="text-gray-600 text-[11px] sm:text-xs">
+              I'll show you where to discover verified job vacancies, celebrate milestones with batchmates, and keep your employment status certified for CTU Naga's institutional Q-Pro accreditation.
+            </p>
+          </div>
+
+          {/* Duration hint */}
+          <div className="mt-3 py-1.5 px-3 bg-orange-50/80 rounded-xl border border-orange-100 flex items-center justify-between text-[11px] text-orange-900">
+            <span className="font-semibold">⏱ Takes only ~1 minute</span>
+            <span className="text-orange-600/90 font-medium">Interactive Walkthrough</span>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={onSkip}
+              className="text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors cursor-pointer px-1 py-1"
+            >
+              Skip for now
+            </button>
+
+            <button
+              type="button"
+              onClick={onStart}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/35 transition-all cursor-pointer active:scale-95"
+            >
+              <span>Let's Go, Alumi!</span>
+              <ArrowRightIcon className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
