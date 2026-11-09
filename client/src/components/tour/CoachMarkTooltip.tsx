@@ -1,5 +1,5 @@
-import React from 'react';
-import { XMarkIcon, ChevronLeftIcon, ArrowRightIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import React, { useMemo } from 'react';
+import { XMarkIcon, ChevronLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { TourStep } from './tourSteps';
 
 interface CoachMarkTooltipProps {
@@ -24,86 +24,161 @@ export default function CoachMarkTooltip({
   const isFinalStep = currentStepIndex === totalSteps - 1;
   const isFirstStep = currentStepIndex === 0;
 
-  // Determine smart coordinates in the viewport
-  const getTooltipStyle = (): React.CSSProperties => {
+  // Collision-Avoidance Placement Solver
+  // Guarantees the modal NEVER covers or overlays targetRect
+  const placement = useMemo(() => {
     if (!targetRect || step.pointingDirection === 'none') {
       return {
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        maxWidth: '440px',
-        width: 'calc(100vw - 32px)',
-        maxHeight: 'calc(100vh - 32px)',
-        zIndex: 100000,
+        style: {
+          position: 'fixed' as const,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          maxWidth: '440px',
+          width: 'calc(100vw - 32px)',
+          maxHeight: 'calc(100vh - 32px)',
+          zIndex: 100000,
+        },
+        direction: 'none' as const,
       };
     }
 
     const margin = 16;
-    const tooltipWidth = Math.min(400, window.innerWidth - 32);
-    // Estimated max height of the coach mark card
-    const estimatedHeight = isFinalStep ? 360 : 300;
+    const tooltipWidth = Math.min(390, window.innerWidth - 32);
+    // Generous estimate of tooltip height including padding, badge, title, content, buttons
+    const estimatedHeight = isFinalStep ? 360 : 310;
+    const vpWidth = window.innerWidth;
+    const vpHeight = window.innerHeight;
 
-    let left = targetRect.left + targetRect.width / 2 - tooltipWidth / 2;
-    let top = targetRect.bottom + margin;
+    // Helper: checks whether candidate tooltip box overlaps targetRect
+    const collides = (x: number, y: number): boolean => {
+      const boxLeft = x;
+      const boxRight = x + tooltipWidth;
+      const boxTop = y;
+      const boxBottom = y + estimatedHeight;
 
-    // Smart placement based on pointingDirection
-    if (step.pointingDirection === 'left') {
-      // Prefer placing to the left of targetRect
-      if (targetRect.left - tooltipWidth - margin >= 16) {
-        left = targetRect.left - tooltipWidth - margin;
-        top = targetRect.top + targetRect.height / 2 - estimatedHeight / 2;
-      } else if (targetRect.top - estimatedHeight - margin >= 16) {
-        top = targetRect.top - estimatedHeight - margin;
-      } else {
-        top = targetRect.bottom + margin;
+      // Expand target by small margin for safety
+      const safeTargetLeft = targetRect.left - 8;
+      const safeTargetRight = targetRect.right + 8;
+      const safeTargetTop = targetRect.top - 8;
+      const safeTargetBottom = targetRect.bottom + 8;
+
+      const overlapX = boxLeft < safeTargetRight && boxRight > safeTargetLeft;
+      const overlapY = boxTop < safeTargetBottom && boxBottom > safeTargetTop;
+
+      return overlapX && overlapY;
+    };
+
+    // Helper: checks whether candidate fits cleanly in visible viewport
+    const fitsViewport = (x: number, y: number): boolean => {
+      return (
+        x >= 12 &&
+        x + tooltipWidth <= vpWidth - 12 &&
+        y >= 12 &&
+        y + estimatedHeight <= vpHeight - 12
+      );
+    };
+
+    // Candidate generator for each direction
+    const getCandidate = (direction: 'top' | 'bottom' | 'left' | 'right') => {
+      let x = 0;
+      let y = 0;
+
+      if (direction === 'bottom') {
+        x = targetRect.left + targetRect.width / 2 - tooltipWidth / 2;
+        y = targetRect.bottom + margin;
+      } else if (direction === 'top') {
+        x = targetRect.left + targetRect.width / 2 - tooltipWidth / 2;
+        y = targetRect.top - estimatedHeight - margin;
+      } else if (direction === 'left') {
+        x = targetRect.left - tooltipWidth - margin;
+        y = targetRect.top + targetRect.height / 2 - estimatedHeight / 2;
+      } else if (direction === 'right') {
+        x = targetRect.right + margin;
+        y = targetRect.top + targetRect.height / 2 - estimatedHeight / 2;
       }
-    } else if (step.pointingDirection === 'right') {
-      // Prefer placing to the right of targetRect
-      if (targetRect.right + tooltipWidth + margin <= window.innerWidth - 16) {
-        left = targetRect.right + margin;
-        top = targetRect.top + targetRect.height / 2 - estimatedHeight / 2;
-      } else if (targetRect.top - estimatedHeight - margin >= 16) {
-        top = targetRect.top - estimatedHeight - margin;
-      } else {
-        top = targetRect.bottom + margin;
-      }
-    } else if (step.pointingDirection === 'top') {
-      // Prefer placing above targetRect
-      if (targetRect.top - estimatedHeight - margin >= 16) {
-        top = targetRect.top - estimatedHeight - margin;
-      } else {
-        top = targetRect.bottom + margin;
-      }
-    } else {
-      // Default: 'bottom' -> prefer placing below targetRect
-      if (targetRect.bottom + estimatedHeight + margin <= window.innerHeight - 16) {
-        top = targetRect.bottom + margin;
-      } else if (targetRect.top - estimatedHeight - margin >= 16) {
-        top = targetRect.top - estimatedHeight - margin;
-      } else {
-        top = (window.innerHeight - estimatedHeight) / 2;
+
+      // Clamp into viewport
+      const clampedX = Math.max(12, Math.min(vpWidth - tooltipWidth - 12, x));
+      const clampedY = Math.max(12, Math.min(vpHeight - estimatedHeight - 12, y));
+
+      return { x: clampedX, y: clampedY, rawX: x, rawY: y, direction };
+    };
+
+    // Order candidate directions based on preferred direction
+    const pref = step.pointingDirection;
+    let dirOrder: ('bottom' | 'top' | 'left' | 'right')[] = ['bottom', 'top', 'right', 'left'];
+
+    if (pref === 'left') {
+      dirOrder = ['left', 'top', 'bottom', 'right'];
+    } else if (pref === 'right') {
+      dirOrder = ['right', 'top', 'bottom', 'left'];
+    } else if (pref === 'top') {
+      dirOrder = ['top', 'bottom', 'left', 'right'];
+    } else if (pref === 'bottom') {
+      dirOrder = ['bottom', 'top', 'left', 'right'];
+    }
+
+    // 1. Try to find a direction where it fits viewport AND has ZERO COLLISION with target
+    let chosen: { x: number; y: number; direction: 'top' | 'bottom' | 'left' | 'right' } | null = null;
+    for (const dir of dirOrder) {
+      const cand = getCandidate(dir);
+      if (fitsViewport(cand.rawX, cand.rawY) && !collides(cand.x, cand.y)) {
+        chosen = cand;
+        break;
       }
     }
 
-    // STRICT VIEWPORT CLAMPING: Tooltip NEVER goes below or out of the screen
-    top = Math.max(16, Math.min(window.innerHeight - estimatedHeight - 16, top));
-    left = Math.max(16, Math.min(window.innerWidth - tooltipWidth - 16, left));
+    // 2. If raw doesn't fit without clamping, try clamped versions that have ZERO collision
+    if (!chosen) {
+      for (const dir of dirOrder) {
+        const cand = getCandidate(dir);
+        if (!collides(cand.x, cand.y)) {
+          chosen = cand;
+          break;
+        }
+      }
+    }
+
+    // 3. Fallback: if element is huge and covers almost entire viewport, pick the position
+    // with the least overlap, or place at the screen edge opposite the target center
+    if (!chosen) {
+      const targetCenterY = targetRect.top + targetRect.height / 2;
+      if (targetCenterY > vpHeight / 2) {
+        // Target is in lower half of screen -> place at top
+        chosen = { x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left)), y: 16, direction: 'top' as const };
+      } else {
+        // Target is in upper half of screen -> place at bottom
+        chosen = { x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left)), y: vpHeight - estimatedHeight - 16, direction: 'bottom' as const };
+      }
+    }
 
     return {
-      position: 'fixed',
-      top: `${top}px`,
-      left: `${left}px`,
-      width: `${tooltipWidth}px`,
-      maxHeight: 'calc(100vh - 32px)',
-      zIndex: 100000,
-      transition: 'top 0.22s ease-out, left 0.22s ease-out',
+      style: {
+        position: 'fixed' as const,
+        top: `${chosen.y}px`,
+        left: `${chosen.x}px`,
+        width: `${tooltipWidth}px`,
+        maxHeight: 'calc(100vh - 32px)',
+        zIndex: 100000,
+        transition: 'top 0.24s cubic-bezier(0.16, 1, 0.3, 1), left 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
+      },
+      direction: chosen.direction,
     };
+  }, [targetRect, step.pointingDirection, isFinalStep]);
+
+  // Dynamic hand arrow pointing at the highlighted target
+  const getPointerEmoji = () => {
+    if (placement.direction === 'bottom') return '👆'; // Tooltip is below -> points UP at target
+    if (placement.direction === 'top') return '👇';    // Tooltip is above -> points DOWN at target
+    if (placement.direction === 'left') return '👉';   // Tooltip is to the left -> points RIGHT at target
+    if (placement.direction === 'right') return '👈';  // Tooltip is to the right -> points LEFT at target
+    return '🎯';
   };
 
   return (
     <div
-      style={getTooltipStyle()}
+      style={placement.style}
       className="bg-white rounded-2xl shadow-2xl border border-orange-200/90 overflow-y-auto max-h-[calc(100vh-32px)] select-none text-left animate-in zoom-in-95 fade-in duration-200 scrollbar-none"
     >
       {/* Top gradient progress line */}
@@ -165,13 +240,7 @@ export default function CoachMarkTooltip({
         {step.pointingDirection !== 'none' && targetRect && (
           <div className="flex items-center gap-2 mb-3 px-2.5 py-1.5 bg-orange-50 border border-orange-100 rounded-lg text-[11px] text-orange-800 font-medium">
             <span className="animate-bounce inline-block text-sm">
-              {step.pointingDirection === 'top'
-                ? '👇'
-                : step.pointingDirection === 'bottom'
-                ? '👆'
-                : step.pointingDirection === 'left'
-                ? '👉'
-                : '👈'}
+              {getPointerEmoji()}
             </span>
             <span>Highlighted on your screen</span>
           </div>

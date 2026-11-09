@@ -220,14 +220,22 @@ export default function ProfilePage() {
       setEditing(false);
     };
 
+    const handleSwitchTab = (e: any) => {
+      if (e?.detail) {
+        setActiveTab(e.detail);
+      }
+    };
+
     window.addEventListener('tour-open-edit-profile', handleOpenEdit);
     window.addEventListener('tour-switch-edit-section', handleSwitchSection);
     window.addEventListener('tour-close-edit-profile', handleCloseEdit);
+    window.addEventListener('tour-switch-profile-tab', handleSwitchTab);
 
     return () => {
       window.removeEventListener('tour-open-edit-profile', handleOpenEdit);
       window.removeEventListener('tour-switch-edit-section', handleSwitchSection);
       window.removeEventListener('tour-close-edit-profile', handleCloseEdit);
+      window.removeEventListener('tour-switch-profile-tab', handleSwitchTab);
     };
   }, [profile]);
 
@@ -1969,7 +1977,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Directory Privacy Settings */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
+        <div data-tour="profile-privacy-card" className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <SectionLine label="Directory Visibility Preferences" />
           </div>
@@ -2323,6 +2331,18 @@ export default function ProfilePage() {
                       <span className="font-medium text-gray-800">{status || 'Unemployed'}</span>
                     </div>
                     <p className="text-xs text-black/50 font-light mt-1">Currently not employed or seeking opportunities.</p>
+
+                    {/* Proof of Employment Verification Banner for Q-Pro Accreditation */}
+                    <div data-tour="profile-accreditation-card" className="pt-2.5 mt-2 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <span className="text-[11px] text-gray-500 block font-medium">Accreditation Dossier (Q-Pro)</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <CheckBadgeIcon className="w-4 h-4 text-gray-400" />
+                          <span className="text-xs font-semibold text-gray-700">Pending Placement Proof</span>
+                        </div>
+                      </div>
+                      <span className="text-[11px] text-orange-600 font-medium">Upload COE in Edit Profile</span>
+                    </div>
                   </div>
                 );
               }
@@ -2338,6 +2358,19 @@ export default function ProfilePage() {
                     {profile?.company_name && <InfoRow label="Business / Freelance" value={profile.company_name} />}
                     <InfoRow label="Industry" value={profile?.industry || currentEmp?.company_industry} />
                     <InfoRow label="Location" value={profile?.city ? `${profile.city}${profile.province ? `, ${profile.province}` : ''}` : ''} />
+
+                    {/* Proof of Employment Verification Banner for Q-Pro Accreditation */}
+                    <div data-tour="profile-accreditation-card" className="pt-2.5 mt-2 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <span className="text-[11px] text-gray-500 block font-medium">Accreditation Dossier (Q-Pro)</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <CheckBadgeIcon className={`w-4 h-4 ${currentEmp?.is_verified ? 'text-emerald-600' : 'text-gray-400'}`} />
+                          <span className="text-xs font-semibold text-gray-800">
+                            {currentEmp?.is_verified ? 'Verified Freelance / Business' : 'DTI / Contract Submission Pending'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 );
               }

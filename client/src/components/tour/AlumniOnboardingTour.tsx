@@ -102,6 +102,15 @@ export default function AlumniOnboardingTour() {
       navigate(currentStep.route);
     }
 
+    // Sync tab on Profile page if needed
+    if (currentStep.route === '/profile') {
+      if (currentStep.id === 'profile-privacy-tab') {
+        window.dispatchEvent(new CustomEvent('tour-switch-profile-tab', { detail: 'privacy' }));
+      } else {
+        window.dispatchEvent(new CustomEvent('tour-switch-profile-tab', { detail: 'overview' }));
+      }
+    }
+
     if (!currentStep.targetSelector) {
       setTargetRect(null);
       return;
@@ -122,11 +131,21 @@ export default function AlumniOnboardingTour() {
           return;
         }
 
+        // Determine optimal scroll alignment so tooltip has maximum room without collision
+        let scrollBlock: ScrollLogicalPosition = 'center';
+        if (currentStep.pointingDirection === 'bottom') {
+          scrollBlock = 'start';
+        } else if (currentStep.pointingDirection === 'top') {
+          scrollBlock = 'end';
+        } else {
+          scrollBlock = 'center';
+        }
+
         // Scroll target comfortably into view if outside comfortable viewport bounds
-        const isOffscreen = rect.top < 100 || rect.bottom > window.innerHeight - 100;
+        const isOffscreen = rect.top < 80 || rect.bottom > window.innerHeight - 80;
         if (isOffscreen) {
           try {
-            element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            element.scrollIntoView({ behavior: 'smooth', block: scrollBlock, inline: 'nearest' });
           } catch {
             const targetY = window.scrollY + rect.top - 140;
             window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
@@ -135,7 +154,10 @@ export default function AlumniOnboardingTour() {
           setTargetRect(element.getBoundingClientRect());
           setTimeout(() => {
             setTargetRect(element.getBoundingClientRect());
-          }, 350);
+          }, 250);
+          setTimeout(() => {
+            setTargetRect(element.getBoundingClientRect());
+          }, 450);
         } else {
           setTargetRect(rect);
         }
