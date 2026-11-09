@@ -173,6 +173,7 @@ export default function CoachMarkTooltip({
 
   return (
     <motion.div
+      initial={false}
       animate={{
         top: placement.y,
         left: placement.x,
@@ -182,7 +183,7 @@ export default function CoachMarkTooltip({
         position: 'fixed',
         width: `${placement.width}px`,
         maxHeight: 'calc(100vh - 32px)',
-        zIndex: 100000,
+        zIndex: 100005,
       }}
       className="bg-white rounded-2xl shadow-2xl border border-orange-200/90 overflow-y-auto select-none text-left scrollbar-none"
     >

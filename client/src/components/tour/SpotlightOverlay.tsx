@@ -18,7 +18,7 @@ export default function SpotlightOverlay({ targetRect, padding = 8 }: SpotlightO
     return (
       <div
         aria-hidden="true"
-        className="fixed inset-0 bg-black/65 backdrop-blur-xs z-[99998] transition-opacity duration-300 pointer-events-auto"
+        className="fixed inset-0 bg-black/65 z-[100001] transition-opacity duration-300 pointer-events-auto"
       />
     );
   }
@@ -29,45 +29,17 @@ export default function SpotlightOverlay({ targetRect, padding = 8 }: SpotlightO
   const height = Math.max(0, targetRect.height + padding * 2);
 
   return (
-    <>
-      {/* SVG Mask overlay: dims the entire screen while smoothly morphing the cutout hole around the target */}
-      <svg
-        aria-hidden="true"
-        className="fixed inset-0 w-full h-full z-[99998] pointer-events-auto"
-        style={{ width: '100vw', height: '100vh' }}
-      >
-        <defs>
-          <mask id="ftue-spotlight-mask">
-            {/* White = fully visible darkened overlay */}
-            <rect x="0" y="0" width="100%" height="100%" fill="white" />
-            {/* Black = 100% transparent cutout hole with fluid spring animation */}
-            <motion.rect
-              animate={{
-                x: left,
-                y: top,
-                width: width,
-                height: height,
-              }}
-              transition={SPRING_TRANSITION}
-              rx="16"
-              ry="16"
-              fill="black"
-            />
-          </mask>
-        </defs>
-        <rect
-          x="0"
-          y="0"
-          width="100%"
-          height="100%"
-          fill="rgba(0, 0, 0, 0.65)"
-          mask="url(#ftue-spotlight-mask)"
-        />
-      </svg>
-
-      {/* Glowing orange border box gliding in perfect sync over the cutout */}
+    <div className="fixed inset-0 z-[100001] overflow-hidden pointer-events-auto">
+      {/* 
+        Single unified spotlight element:
+        - The surrounding dimming overlay is rendered by a 9999px box shadow extending in all directions.
+        - Framer-motion smoothly glides top, left, width, height with fluid spring physics.
+        - Inside the box is 100% transparent, perfectly framing the target element in full brightness.
+        - The glowing orange border is an inset child, eliminating any possibility of SVG mask desync or (0,0) coordinate bugs.
+      */}
       <motion.div
         aria-hidden="true"
+        initial={false}
         animate={{
           top: top,
           left: left,
@@ -75,10 +47,16 @@ export default function SpotlightOverlay({ targetRect, padding = 8 }: SpotlightO
           height: height,
         }}
         transition={SPRING_TRANSITION}
-        className="fixed rounded-2xl border-2 border-orange-500 ring-4 ring-orange-500/50 shadow-lg pointer-events-none z-[99999]"
+        style={{
+          position: 'fixed',
+          boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.65)',
+        }}
+        className="rounded-2xl pointer-events-none z-[100002]"
       >
-        <div className="absolute inset-0 rounded-2xl ring-2 ring-amber-300/60 animate-pulse pointer-events-none" />
+        <div className="absolute inset-0 rounded-2xl border-2 border-orange-500 ring-4 ring-orange-500/50 shadow-lg pointer-events-none">
+          <div className="absolute inset-0 rounded-2xl ring-2 ring-amber-300/60 animate-pulse pointer-events-none" />
+        </div>
       </motion.div>
-    </>
+    </div>
   );
 }

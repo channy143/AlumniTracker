@@ -82,10 +82,9 @@ export default function Sidebar({
   }, [location.pathname]);
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-      isActive
-        ? 'bg-gray-100 text-orange-600 font-semibold'
-        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
+      ? 'bg-gray-100 text-orange-600 font-semibold'
+      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
     }`;
 
   const items = isAdminPath && user?.role === 'admin' ? adminNav : mainNav;
@@ -97,11 +96,9 @@ export default function Sidebar({
       )}
 
       <aside
-        className={`fixed top-0 left-0 h-full bg-white z-50 transition-all duration-300 ease-in-out ${
-          collapsed ? 'lg:w-16' : 'lg:w-64'
-        } ${
-          mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full'
-        } ${collapsed ? 'lg:translate-x-0' : 'lg:translate-x-0'} lg:z-30`}
+        className={`fixed top-0 left-0 h-full bg-white z-50 transition-all duration-300 ease-in-out ${collapsed ? 'lg:w-16' : 'lg:w-64'
+          } ${mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full'
+          } ${collapsed ? 'lg:translate-x-0' : 'lg:translate-x-0'} lg:z-30`}
       >
         {/* Toggle handle at center-right edge */}
         <button
@@ -137,10 +134,9 @@ export default function Sidebar({
                   to={item.href}
                   onClick={onMobileClose}
                   className={isAdminPath ? linkClass : ({ isActive }) =>
-                    `flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-gray-100 text-orange-600 font-semibold'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    `flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
+                      ? 'bg-gray-100 text-orange-600 font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`
                   }
                   end={item.end}
@@ -166,10 +162,9 @@ export default function Sidebar({
                         to={item.href}
                         onClick={onMobileClose}
                         className={({ isActive }) =>
-                          `flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            isActive
-                              ? 'bg-gray-100 text-orange-600 font-semibold'
-                              : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                          `flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
+                            ? 'bg-gray-100 text-orange-600 font-semibold'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                           }`
                         }
                         title={collapsed ? item.name : undefined}
@@ -205,11 +200,10 @@ export default function Sidebar({
                           key={p.id}
                           to={`/directory/${p.id}`}
                           onClick={onMobileClose}
-                          className={`flex items-center rounded-lg transition-colors ${
-                            collapsed
+                          className={`flex items-center rounded-lg transition-colors ${collapsed
                               ? 'px-3 py-2 hover:bg-gray-100'
                               : 'px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                          }`}
+                            }`}
                           title={`${p.first_name} ${p.last_name}`}
                         >
                           <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-[9px] font-bold text-white shrink-0 overflow-hidden">
