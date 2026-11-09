@@ -292,54 +292,138 @@ export default function CareerInsightsPage() {
             </div>
           )}
 
-          {/* Where They Work: Top Employers & Alumni */}
-          {(data.topEmployers?.length > 0 || data.recentAlumni?.length > 0) && (
+          {/* Where They Work, Skills & Alumni Working as [Position] (Aligned 2-Column Grid) */}
+          {(data.topEmployers?.length > 0 || data.recentAlumni?.length > 0 || data.topSkills?.length > 0 || data.industryDistribution?.length > 0) && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Where They Work</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Where They Work &amp; Market Intelligence
+                </h3>
+                <span className="text-[11px] text-gray-400">
+                  {data.recentAlumni?.length || 0} Alumni Profiles &bull; {data.topEmployers?.length || 0} Employers
+                </span>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-                {/* Top Employers */}
-                {data.topEmployers?.length > 0 && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <BuildingOfficeIcon className="w-4 h-4 text-orange-500" />
-                      Top Employers &amp; Locations
-                    </h4>
-                    <div className="space-y-2 flex-1">
-                      {(data.topEmployersWithLocations || data.topEmployers).map((emp: any, i: number) => (
-                        <div key={emp.name} className="flex items-start justify-between text-xs py-2 px-2.5 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-colors">
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <span className="w-5 h-5 rounded bg-orange-100 flex items-center justify-center text-[9px] font-bold text-orange-600 shrink-0 mt-0.5">{i + 1}</span>
-                            <div className="min-w-0">
-                              <p className="text-gray-800 font-semibold truncate">{emp.name}</p>
-                              {emp.address && (
-                                <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
-                                  <MapPinIcon className="w-3 h-3 text-orange-400 shrink-0" />
-                                  <span className="truncate">{emp.address}</span>
-                                </p>
+                {/* Left Column: Top Employers & Locations + Skills & Industry */}
+                <div className="flex flex-col gap-4">
+                  {/* Top Employers & Locations Card */}
+                  {data.topEmployers?.length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                          <BuildingOfficeIcon className="w-4 h-4 text-orange-500" />
+                          Top Employers &amp; Locations
+                        </h4>
+                        <span className="text-[10px] text-gray-400 font-medium">Hiring Partners</span>
+                      </div>
+                      <div className="space-y-2 flex-1">
+                        {(data.topEmployersWithLocations || data.topEmployers).slice(0, 5).map((emp: any, i: number) => (
+                          <div key={emp.name} className="flex items-start justify-between text-xs py-2 px-2.5 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-colors">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <span className="w-5 h-5 rounded bg-orange-100 flex items-center justify-center text-[9px] font-bold text-orange-600 shrink-0 mt-0.5">{i + 1}</span>
+                              <div className="min-w-0">
+                                <p className="text-gray-800 font-semibold truncate">{emp.name}</p>
+                                {emp.address && (
+                                  <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                    <MapPinIcon className="w-3 h-3 text-orange-400 shrink-0" />
+                                    <span className="truncate">{emp.address}</span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-gray-500 text-[11px] font-medium">{emp.count} alumni</span>
+                              {emp.hasOpenings && (
+                                <span className="block text-[9px] text-emerald-600 font-semibold">Hiring Now</span>
                               )}
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
-                            <span className="text-gray-500 text-[11px] font-medium">{emp.count} alumni</span>
-                            {emp.hasOpenings && (
-                              <span className="block text-[9px] text-emerald-600 font-semibold">Hiring Now</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Alumni Working as [Position] */}
+                  {/* Skills & Industry Card */}
+                  {(data.topSkills?.length > 0 || data.industryDistribution?.length > 0) && (
+                    <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col flex-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                          <AcademicCapIcon className="w-4 h-4 text-orange-500" />
+                          Skills &amp; Industry
+                        </h4>
+                        <span className="text-[10px] text-gray-400 font-medium">Demand &amp; Distribution</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1">
+                        {/* Skills Distribution */}
+                        {data.topSkills?.length > 0 && (
+                          <div className="space-y-2">
+                            <h5 className="text-[11px] font-bold text-gray-700 flex items-center gap-1 mb-1.5">
+                              <AcademicCapIcon className="w-3.5 h-3.5 text-orange-500" />
+                              Top Skills
+                            </h5>
+                            <div className="space-y-2">
+                              {data.topSkills.slice(0, 6).map((skill: any) => (
+                                <div key={skill.name}>
+                                  <div className="flex items-center justify-between text-xs mb-1">
+                                    <span className="text-gray-700 font-medium truncate">{skill.name}</span>
+                                    <span className="text-gray-500 text-[11px] shrink-0">{skill.percentage}%</span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full bg-orange-500" style={{ width: `${Math.min(skill.percentage, 100)}%` }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Industry Distribution */}
+                        {data.industryDistribution?.length > 0 && (
+                          <div className="space-y-2">
+                            <h5 className="text-[11px] font-bold text-gray-700 flex items-center gap-1 mb-1.5">
+                              <ChartBarIcon className="w-3.5 h-3.5 text-orange-500" />
+                              Industry Breakdown
+                            </h5>
+                            <div className="space-y-2">
+                              {data.industryDistribution.slice(0, 6).map((ind: any, i: number) => (
+                                <div key={ind.name}>
+                                  <div className="flex items-center justify-between text-xs mb-1">
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: INDUSTRY_COLORS[i % INDUSTRY_COLORS.length] }} />
+                                      <span className="text-gray-700 font-medium truncate">{ind.name}</span>
+                                    </div>
+                                    <span className="text-gray-500 text-[11px] shrink-0">{ind.percentage}%</span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full" style={{ width: `${Math.min(ind.percentage, 100)}%`, backgroundColor: INDUSTRY_COLORS[i % INDUSTRY_COLORS.length] }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Alumni Working as [Position] (Longer card, perfectly aligned with the lower part of Skills & Industry!) */}
                 {data.recentAlumni?.length > 0 && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <UserGroupIcon className="w-4 h-4 text-orange-500" />
-                      Alumni Working as {position}
-                    </h4>
-                    <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1 flex-1">
-                      {data.recentAlumni.slice(0, 10).map((alumni: any) => (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col h-full shadow-2xs">
+                    <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-gray-100">
+                      <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <UserGroupIcon className="w-4 h-4 text-orange-500" />
+                        Alumni Working as {position}
+                      </h4>
+                      <span className="text-[10px] font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded border border-orange-200/80">
+                        {data.recentAlumni.length} Alumni
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5 overflow-y-auto pr-1 flex-1 min-h-0 max-h-[580px] scrollbar-hover">
+                      {data.recentAlumni.map((alumni: any) => (
                         <div key={alumni.id} className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-2 sm:gap-3 text-xs p-2.5 rounded-lg hover:bg-gray-50 border border-gray-100 transition-colors">
                           <div className="flex items-start gap-2.5 min-w-0">
                             <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-[10px] font-bold text-orange-600 shrink-0 mt-0.5">
@@ -382,62 +466,10 @@ export default function CareerInsightsPage() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* Skills & Industry: Skills Distribution & Industry Distribution */}
-          {(data.topSkills?.length > 0 || data.industryDistribution?.length > 0) && (
-            <div>
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Skills & Industry</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-                {/* Skills Distribution */}
-                {data.topSkills?.length > 0 && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <AcademicCapIcon className="w-4 h-4 text-orange-500" />
-                      Skills Distribution
-                    </h4>
-                    <div className="space-y-2.5 flex-1">
-                      {data.topSkills.slice(0, 6).map((skill: any) => (
-                        <div key={skill.name}>
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span className="text-gray-700 font-medium">{skill.name}</span>
-                            <span className="text-gray-500">{skill.percentage}%</span>
-                          </div>
-                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full bg-orange-500" style={{ width: `${Math.min(skill.percentage, 100)}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Industry Distribution */}
-                {data.industryDistribution?.length > 0 && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <ChartBarIcon className="w-4 h-4 text-orange-500" />
-                      Industry Distribution
-                    </h4>
-                    <div className="space-y-2.5 flex-1">
-                      {data.industryDistribution.map((ind: any, i: number) => (
-                        <div key={ind.name}>
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <div className="flex items-center gap-2">
-                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: INDUSTRY_COLORS[i % INDUSTRY_COLORS.length] }} />
-                              <span className="text-gray-700 font-medium">{ind.name}</span>
-                            </div>
-                            <span className="text-gray-500">{ind.percentage}%</span>
-                          </div>
-                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${Math.min(ind.percentage, 100)}%`, backgroundColor: INDUSTRY_COLORS[i % INDUSTRY_COLORS.length] }} />
-                          </div>
-                        </div>
-                      ))}
+                    <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400">
+                      <span>Verified CTU Naga Alumni Network</span>
+                      <span className="font-medium text-gray-600">{data.recentAlumni.length} verified</span>
                     </div>
                   </div>
                 )}
