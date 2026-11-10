@@ -325,7 +325,7 @@ export default function CoachMarkTooltip({
         </AnimatePresence>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
+        <div className={`flex items-center justify-between gap-2 pt-2 ${isFinalStep ? '' : 'border-t border-gray-100'}`}>
           <div>
             {!isFinalStep ? (
               <button
