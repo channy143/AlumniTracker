@@ -611,7 +611,7 @@ export default function ReportsPage() {
             {generating === 'master-workbook' ? 'Compiling Workbook...' : 'Master Excel (All Datasets)'}
           </button>
 
-          <div className="flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-xl">
+          <div data-tour="reports-tabs" className="flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-xl">
             <button
               onClick={() => setActiveTab('reports')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -784,7 +784,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Report Cards Grid */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div data-tour="reports-list" className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {reportCards.map((report) => {
               const Icon = report.icon;
               return (

@@ -318,14 +318,14 @@ export default function AlumniManagement() {
           <h1 className="text-base font-bold text-gray-900">Alumni Management</h1>
           <p className="text-xs text-gray-500">{tab === 'registered' ? `${total} registered alumni` : `${eligible.length} eligible (unclaimed) alumni`}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div data-tour="alumni-top-actions" className="flex flex-wrap gap-2">
           {tab === 'registered' && <button onClick={handleExport} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Export CSV</button>}
           <button onClick={() => { setShowForm(true); setError(''); }} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Add Alumni</button>
           <button onClick={openEligibleForm} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Eligible Alumni</button>
         </div>
       </div>
 
-      <div className="flex gap-1 mb-3 flex-wrap">
+      <div data-tour="alumni-tabs" className="flex gap-1 mb-3 flex-wrap">
         <button onClick={() => { setTab('registered'); setPage(1); }} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'registered' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
           Registered
         </button>
@@ -334,7 +334,7 @@ export default function AlumniManagement() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-3">
+      <div data-tour="alumni-search-filter" className="flex flex-wrap gap-2 mb-3">
         <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); setEligPage(1); }}
           placeholder={tab === 'eligible' ? "Search eligible by name or student ID..." : "Search by name, email, or ID..."} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full sm:w-56" />
         <select value={filters.course} onChange={(e) => { setFilters((f) => ({ ...f, course: e.target.value })); setPage(1); setEligPage(1); }}
@@ -405,7 +405,7 @@ export default function AlumniManagement() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          <div data-tour="alumni-grid" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {data.map((user: any) => {
               const p = user.profile || {};
               const emp = (p.employment || [])[0] || {};
@@ -437,7 +437,7 @@ export default function AlumniManagement() {
                       <p className="truncate"><span className="text-gray-400">Email:</span> {user.email}</p>
                     </div>
                   </div>
-                  <div className="px-2.5 pb-2.5 flex flex-wrap gap-1">
+                  <div data-tour="alumni-card-actions" className="px-2.5 pb-2.5 flex flex-wrap gap-1">
                     <button onClick={() => handleView(user.id)} className="text-[10px] px-2 py-1 font-medium bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100">View</button>
                     {!user.is_verified && (
                       <button onClick={() => handleVerify(user.id)} className="text-[10px] px-2 py-1 font-medium bg-emerald-50 text-emerald-600 rounded-md hover:bg-emerald-100">Verify</button>

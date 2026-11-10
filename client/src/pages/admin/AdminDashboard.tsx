@@ -480,7 +480,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Year / Batch Selector */}
-        <div className="inline-flex items-center gap-1 self-start sm:self-auto bg-white border border-gray-200/90 rounded-xl px-2 py-1 shadow-2xs">
+        <div data-tour="admin-year-filter" className="inline-flex items-center gap-1 self-start sm:self-auto bg-white border border-gray-200/90 rounded-xl px-2 py-1 shadow-2xs">
           <button
             type="button"
             onClick={handlePrevYear}
@@ -552,7 +552,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* KPI Cards - Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
+      <div data-tour="admin-kpi-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
         {loading ? (
           [1, 2, 3, 4, 5, 6, 7, 8].map((i) => <SkeletonStatCard key={i} />)
         ) : kpis.map((stat) => (
@@ -592,7 +592,9 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick Actions Carousel */}
-      <QuickActionsCarousel />
+      <div data-tour="admin-quick-actions">
+        <QuickActionsCarousel />
+      </div>
 
       {/* Summary Widgets */}
       <div className="flex items-center gap-2 mt-6 mb-3">
@@ -605,7 +607,7 @@ export default function AdminDashboard() {
           {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} className="h-44" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div data-tour="admin-summary-widgets" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           <SummaryCard title="Employment Status" icon={BriefcaseIcon} footer={{ label: 'View Career Analytics', to: '/admin/analytics' }}>
             <MiniDoughnut data={statusData} colors={STATUS_COLORS} />
           </SummaryCard>

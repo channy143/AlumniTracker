@@ -21,7 +21,9 @@ import {
   CalendarIcon,
   ChatBubbleLeftRightIcon,
   SparklesIcon,
+  QuestionMarkCircleIcon,
 } from '@heroicons/react/24/outline';
+import { useTourStore } from '@/store/tourStore';
 import { JellyBlobMascot, BlobSpeech } from '@/components/ui/feral-blob/JellyBlobMascot';
 import { SecurityPolicyModal } from '@/components/security/SecurityPolicyModal';
 import { ReportSuspiciousActivityModal } from '@/components/security/ReportSuspiciousActivityModal';
@@ -407,6 +409,17 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                 </div>
               )}
             </div>
+
+            {/* Page Guide & Walkthrough Trigger */}
+            <button
+              type="button"
+              onClick={() => useTourStore.getState().startPageTour(location.pathname)}
+              className="relative p-1.5 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50/70 transition-all cursor-pointer shrink-0"
+              title="Page Guide & Walkthrough"
+              aria-label="Page Guide & Walkthrough"
+            >
+              <QuestionMarkCircleIcon className="w-5 h-5" />
+            </button>
 
             <div className="relative ml-1 pl-2 border-l border-gray-200" ref={dropdownRef}>
               <button

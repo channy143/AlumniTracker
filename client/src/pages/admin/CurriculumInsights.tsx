@@ -371,7 +371,7 @@ export default function CurriculumInsights() {
           <p className="text-xs text-gray-500">Analyze alumni outcomes and workforce trends to support curriculum evaluation and continuous program improvement.</p>
         </div>
         {data && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div data-tour="curriculum-header-actions" className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleRefresh}
               disabled={loading || refreshing}
@@ -399,7 +399,7 @@ export default function CurriculumInsights() {
             <div className="h-full w-1/3 bg-orange-500 rounded animate-pulse" />
           </div>
         )}
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div data-tour="curriculum-filters" className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex flex-wrap gap-3 items-end">
             <FilterField label="Academic Year">
               <select className={inputCls} value={filters.academic_year} onChange={(e) => setFilter('academic_year', e.target.value)}>
@@ -470,7 +470,7 @@ export default function CurriculumInsights() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-3">
+            <div data-tour="curriculum-kpis" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-3">
               <KpiCard icon={CheckCircleIcon} label="Work Alignment Rate" value={`${overview.workAlignmentRate}%`} sub={overview.employedAlumni != null ? `${overview.alignedCount ?? 0} of ${overview.employedAlumni} working` : `${overview.totalAlumni || 0} alumni`} />
               <KpiCard icon={ClockIcon} label="Avg Time to Employment" value={formatMonths(overview.averageTimeToEmployment)} />
               <KpiCard icon={StarIcon} label="Avg Graduate Satisfaction" value={overview.averageSatisfaction ? `${overview.averageSatisfaction} / 5` : '—'} sub={overview.averageSatisfaction ? undefined : 'Not collected'} />
@@ -479,7 +479,7 @@ export default function CurriculumInsights() {
               <KpiCard icon={LightBulbIcon} label="Recommendations Generated" value={String(overview.recommendationsGenerated)} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div data-tour="curriculum-skills" className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <Card title="Degree Alignment" subtitle="Is alumni work aligned with their degree?">
                 <AlignmentDoughnut data={degreeAlignment} />
               </Card>
@@ -531,6 +531,7 @@ export default function CurriculumInsights() {
               </Card>
             </div>
 
+            <div data-tour="curriculum-recommendations">
             <Card title="Skills Gap Analysis" subtitle="Skills used at work vs. skills learned in the program">
               {skillsGap.length > 0 ? (
                 <div className="space-y-3">
@@ -603,6 +604,7 @@ export default function CurriculumInsights() {
                 <PrioritySection priority="Low" items={actions.low || []} color="#9ca3af" />
               </div>
             </Card>
+            </div>
           </>
         )}
       </div>

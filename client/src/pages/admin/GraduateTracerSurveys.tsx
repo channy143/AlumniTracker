@@ -252,10 +252,10 @@ export default function GraduateTracerSurveys() {
           <h1 className="text-base font-bold text-gray-900">Graduate Tracer Surveys</h1>
           <p className="text-xs text-gray-500">Manage annual graduate tracer studies, monitor responses and generate reports.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div data-tour="surveys-toolbar" className="flex flex-wrap gap-2">
           <button onClick={handleDownloadTemplate} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Download Template</button>
           <button onClick={handleImport} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Import Responses</button>
-          <button onClick={() => setShowCreate(true)} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Create Survey</button>
+          <button data-tour="surveys-create-btn" onClick={() => setShowCreate(true)} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Create Survey</button>
         </div>
       </div>
 
@@ -282,7 +282,7 @@ export default function GraduateTracerSurveys() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div data-tour="surveys-list" className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white border border-gray-200 animate-pulse p-4">
               <div className="h-4 bg-gray-200 rounded w-2/3 mb-3" />
@@ -302,7 +302,7 @@ export default function GraduateTracerSurveys() {
           {search || statusFilter || yearFilter || batchFilter ? 'No surveys match your filters' : 'No surveys yet. Create one to start collecting tracer data.'}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div data-tour="surveys-list" className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {filtered.map((s) => <SurveyCard key={s.id} survey={s} />)}
         </div>
       )}
@@ -1437,7 +1437,7 @@ function SurveyAnalytics({ surveyId }: { surveyId: string }) {
         </div>
 
         {/* Competencies & Enrollment Reasons */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div data-tour="surveys-list" className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <h3 className="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-3">Core Competencies Acquired from CTU</h3>
             <div className="space-y-2">

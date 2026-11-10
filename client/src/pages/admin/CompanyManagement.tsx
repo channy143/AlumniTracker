@@ -475,7 +475,7 @@ export default function CompanyManagement() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div data-tour="companies-header-actions" className="flex items-center gap-2 flex-wrap">
           <button
             onClick={handleSyncEmployers}
             disabled={syncing}
@@ -506,7 +506,7 @@ export default function CompanyManagement() {
       </div>
 
       {/* KPI Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div data-tour="companies-kpi-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {loading ? (
           [1, 2, 3, 4].map((i) => <SkeletonStatCard key={i} />)
         ) : (
@@ -728,6 +728,7 @@ export default function CompanyManagement() {
       </div>
 
       {/* Content View */}
+      <div data-tour="companies-list">
       {loading ? (
         <div className="bg-white border border-gray-200 rounded-xl p-8 space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -1133,6 +1134,7 @@ export default function CompanyManagement() {
           })}
         </div>
       )}
+      </div>
 
       {/* Add / Edit Company Modal */}
       {modalOpen && (

@@ -770,7 +770,7 @@ export default function AdminActivity() {
       </div>
 
       {/* Top Main Navigation Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 pb-0 overflow-x-auto scrollbar-none whitespace-nowrap">
+      <div data-tour="activity-tabs" className="flex gap-2 border-b border-gray-200 pb-0 overflow-x-auto scrollbar-none whitespace-nowrap">
         <button
           onClick={() => setMainTab('audit')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer shrink-0 ${
@@ -1288,7 +1288,7 @@ export default function AdminActivity() {
 
       {/* Audit Log Table */}
       {mainTab === 'audit' && (
-        <div className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden relative">
+        <div data-tour="activity-logs" className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden relative">
           {refreshing && (
             <div className="h-0.5 w-full bg-orange-100 overflow-hidden">
               <div className="h-full bg-orange-500 animate-pulse w-full" />

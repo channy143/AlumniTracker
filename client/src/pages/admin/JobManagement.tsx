@@ -262,17 +262,19 @@ export default function JobManagement() {
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">Career Opportunities</h1>
           <p className="text-xs text-gray-500 mt-0.5">Manage employer job listings, available vacancies, and external application channels.</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-orange-500 text-white rounded-lg hover:bg-orange-600 active:bg-orange-700 shadow-xs hover:shadow transition-all"
-        >
-          <PlusIcon className="w-4 h-4" />
-          <span>Post Opportunity</span>
-        </button>
+        <div data-tour="jobs-header-actions">
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-orange-500 text-white rounded-lg hover:bg-orange-600 active:bg-orange-700 shadow-xs hover:shadow transition-all"
+          >
+            <PlusIcon className="w-4 h-4" />
+            <span>Post Opportunity</span>
+          </button>
+        </div>
       </div>
 
       {/* Overview KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div data-tour="jobs-kpi-grid" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {loading ? (
           [1, 2, 3, 4].map((i) => <SkeletonStatCard key={i} className="p-3.5" />)
         ) : (
@@ -321,7 +323,7 @@ export default function JobManagement() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white border border-gray-200/90 rounded-xl p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+      <div data-tour="jobs-filters" className="bg-white border border-gray-200/90 rounded-xl p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 flex-1">
           {search && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-800 font-medium shrink-0">
@@ -374,6 +376,7 @@ export default function JobManagement() {
       </div>
 
       {/* Job Cards List */}
+      <div data-tour="jobs-list">
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -615,6 +618,7 @@ export default function JobManagement() {
           })}
         </div>
       )}
+      </div>
 
       {total > limit && (
         <div className="flex items-center justify-center gap-3 mt-4">

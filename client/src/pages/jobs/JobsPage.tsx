@@ -1269,7 +1269,7 @@ export default function JobsPage() {
 
       {/* Job Type Filters */}
       {activeTab === 'opportunities' && !selectedJob && (
-        <div className="flex flex-wrap items-center gap-2 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
+        <div data-tour="jobs-search" className="flex flex-wrap items-center gap-2 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
           <BriefcaseIcon className="w-4 h-4 text-gray-400 shrink-0" />
           <div className="flex items-center gap-1 flex-wrap">
             {([
@@ -1304,7 +1304,7 @@ export default function JobsPage() {
       )}
 
       <div className="flex gap-4">
-        <div className="flex-1 min-w-0 space-y-3">
+        <div data-tour="jobs-grid" className="flex-1 min-w-0 space-y-3">
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <SkeletonCard className="h-64 rounded-3xl" />

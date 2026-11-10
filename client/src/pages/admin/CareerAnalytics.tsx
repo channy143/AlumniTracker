@@ -467,7 +467,7 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
       </div>
 
       {/* Primary Sub-Navigation Tab Switcher */}
-      <div className="flex items-center gap-2 mb-4 border-b border-gray-200">
+      <div data-tour="analytics-tabs" className="flex items-center gap-2 mb-4 border-b border-gray-200">
         <button
           type="button"
           onClick={() => handleTabChange('analytics')}
@@ -528,7 +528,7 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
             <div className="h-full w-1/3 bg-orange-500 rounded animate-pulse" />
           </div>
         )}
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div data-tour="analytics-filters" className="bg-white border border-gray-200 rounded-lg p-4">
         <div className="flex flex-wrap gap-3 items-end">
           <FilterField label="Academic Year">
             <select className={inputCls} value={filters.academic_year} onChange={(e) => setFilter('academic_year', e.target.value)}>
@@ -604,7 +604,7 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-3">
+          <div data-tour="analytics-kpis" className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 mb-3">
             <KpiCard icon={BriefcaseIcon} label="Employment Rate" value={`${overview.employmentRate}%`} sub={`${overview.employedCount ?? Math.round(((overview.employmentRate || 0) / 100) * (overview.totalAlumni || 0))} employed`} />
             <KpiCard icon={UserMinusIcon} label="Unemployment Rate" value={`${overview.unemployedRate ?? (100 - (overview.employmentRate || 0))}%`} sub={`${overview.unemployedCount ?? 0} seeking`} />
             <KpiCard icon={BanknotesIcon} label="Average Salary" value={formatPeso(overview.averageSalary)} />
@@ -616,7 +616,7 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
 
           <div className="lg:flex lg:gap-3 lg:items-start">
             <div className="flex-1 min-w-0 space-y-3">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div data-tour="analytics-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <Card title="Employment Status">
               <StatusDoughnut data={statusDistribution} />
             </Card>

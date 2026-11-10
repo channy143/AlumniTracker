@@ -9,7 +9,18 @@ import CoachMarkTooltip from './CoachMarkTooltip';
 import AlumiIntroScene from './AlumiIntroScene';
 
 export default function AlumniOnboardingTour() {
-  const { isActive, showAlumiIntro, startWalkthrough, currentStepIndex, setUserId, startTour, nextStep, prevStep, skipTour } = useTourStore();
+  const {
+    isActive,
+    showAlumiIntro,
+    startWalkthrough,
+    currentStepIndex,
+    setUserId,
+    startTour,
+    nextStep,
+    prevStep,
+    skipTour,
+    activeSteps,
+  } = useTourStore();
   const { user } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -17,8 +28,9 @@ export default function AlumniOnboardingTour() {
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const totalSteps = ALUMNI_TOUR_STEPS.length;
-  const currentStep = ALUMNI_TOUR_STEPS[currentStepIndex] || ALUMNI_TOUR_STEPS[0];
+  const steps = activeSteps && activeSteps.length > 0 ? activeSteps : ALUMNI_TOUR_STEPS;
+  const totalSteps = steps.length;
+  const currentStep = steps[currentStepIndex] || steps[0];
 
   // Sync user ID
   useEffect(() => {
@@ -64,7 +76,7 @@ export default function AlumniOnboardingTour() {
         navigate('/');
       }
       setTimeout(() => {
-        startTour(true);
+        startTour(true, ALUMNI_TOUR_STEPS);
       }, 250);
     };
 
@@ -97,7 +109,8 @@ export default function AlumniOnboardingTour() {
     }
 
     // 1. Ensure correct route
-    if (currentStep.route && location.pathname !== currentStep.route) {
+    const normalizePath = (p: string) => p.split('?')[0].replace(/\/+$/, '') || '/';
+    if (currentStep.route && normalizePath(location.pathname) !== normalizePath(currentStep.route) && currentStep.route !== '') {
       navigate(currentStep.route);
     }
 

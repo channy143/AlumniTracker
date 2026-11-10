@@ -99,8 +99,8 @@ export default function MainLayout() {
       {/* Alumni Connect Docked Messaging & Minimized Conversation Heads */}
       <DockedChatBox />
 
-      {/* Interactive Alumni Onboarding Walkthrough & FTUE Coach Marks */}
-      {!isAdminPath && <AlumniOnboardingTour />}
+      {/* Interactive Page Walkthrough & Onboarding Tour */}
+      <AlumniOnboardingTour />
     </div>
   );
 }

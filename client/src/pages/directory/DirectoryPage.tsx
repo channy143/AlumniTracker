@@ -276,7 +276,7 @@ export default function DirectoryPage() {
       </div>
 
       {/* Filter Row */}
-      <div className="flex flex-wrap items-center gap-2 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
+      <div data-tour="directory-search" className="flex flex-wrap items-center gap-2 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
         <FunnelIcon className="w-4 h-4 text-gray-400 shrink-0" />
         <FilterDropdown label="Program" options={programOptions} selected={programs} onChange={setPrograms} />
         <FilterDropdown label="Batch" options={batchOptions} selected={batches} onChange={setBatches} />
@@ -303,6 +303,7 @@ export default function DirectoryPage() {
       </div>
 
       {/* Results */}
+      <div data-tour="directory-grid">
       {loading && (
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
@@ -477,6 +478,7 @@ export default function DirectoryPage() {
 
           );
         })}
+      </div>
       </div>
     </div>
   );

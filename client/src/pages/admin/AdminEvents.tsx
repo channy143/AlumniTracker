@@ -119,7 +119,7 @@ export default function AdminEvents() {
         <p className="text-xs text-gray-500">Manage alumni events, career fairs, and deadlines.</p>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div data-tour="events-header-actions" className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">{['upcoming', 'past'].map((f) => (
           <button key={f} onClick={() => setFilter(f as 'upcoming' | 'past')}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
@@ -132,7 +132,7 @@ export default function AdminEvents() {
           className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors">+ New Event</button>
       </div>
 
-      <div className="space-y-2">
+      <div data-tour="events-list" className="space-y-2">
         {loading ? (
           [1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between animate-pulse">

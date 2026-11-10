@@ -447,7 +447,7 @@ export default function CareerTrendsPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="mb-3">
+      <div data-tour="career-trends-header" className="mb-3">
         <h1 className="text-lg font-bold text-gray-900">Career &amp; Market Trends</h1>
         <p className="text-xs text-gray-500">Explore career pathways, salary benchmarks, demographic breakdowns, and employment trajectories of CTU Naga alumni.</p>
       </div>
@@ -566,7 +566,7 @@ export default function CareerTrendsPage() {
           )}
 
           <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-            <div className="w-full lg:flex-1 min-w-0 space-y-3">
+            <div data-tour="career-trends-grid" className="w-full lg:flex-1 min-w-0 space-y-3">
               {selectedCard ? (
                 <CareerCardInsightsPanel
                   card={selectedCard}

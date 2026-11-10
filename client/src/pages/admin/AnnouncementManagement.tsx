@@ -165,10 +165,12 @@ export default function AnnouncementManagement() {
           <h1 className="text-base font-bold text-gray-900">Announcement Management</h1>
           <p className="text-xs text-gray-500">{total} announcements</p>
         </div>
-        <button onClick={openCreate} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Create Announcement</button>
+        <div data-tour="announcements-header-actions">
+          <button onClick={openCreate} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Create Announcement</button>
+        </div>
       </div>
 
-      <div className="flex gap-1 mb-3 flex-wrap">
+      <div data-tour="announcements-tabs" className="flex gap-1 mb-3 flex-wrap">
         {tabs.map((t) => (
           <button key={t.key} onClick={() => { setStatusFilter(t.key); setPage(1); }} className={`px-3 py-1 text-xs rounded-full font-medium ${statusFilter === t.key ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
             {t.label}
@@ -177,7 +179,7 @@ export default function AnnouncementManagement() {
       </div>
 
       {loading ? (
-        <div className="space-y-2">
+        <div data-tour="announcements-list" className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="bg-white border border-gray-200 rounded-lg p-3.5 animate-pulse flex items-start justify-between">
               <div className="flex-1 space-y-2">
@@ -201,7 +203,7 @@ export default function AnnouncementManagement() {
           <p className="text-xs text-gray-400">No announcements for now.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div data-tour="announcements-list" className="space-y-2">
           {data.map((item: any, idx) => (
             <div key={item.id} className={`bg-white border border-gray-200 rounded-lg p-3 flex flex-wrap sm:flex-nowrap items-start justify-between gap-2 ${item.is_pinned ? 'ring-1 ring-orange-300' : ''}`}>
                 <div className="flex-1 min-w-0">
