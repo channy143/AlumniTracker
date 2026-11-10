@@ -21,135 +21,206 @@ router.get('/', async (req, res, next) => {
     const employmentStatus = (req.query.employment_status as string) || '';
     const employer = (req.query.employer as string) || '';
     const location = (req.query.location as string) || '';
-    const archived = req.query.archived === 'true';
+    const archivedParam = req.query.archived as string;
 
     let query = supabase
       .from('users')
-      .select('id, email, role, is_verified, is_active, is_archived, last_login, created_at, updated_at', { count: 'exact' })
-      .eq('role', 'alumni');
+      .select('id, email, role, is_verified, is_active, is_archived, last_login, created_at, updated_at')
+      .eq('role', 'alumni')
+      .order('created_at', { ascending: false });
 
-    if (req.query.archived === 'true') query = query.eq('is_archived', true);
-    else if (req.query.archived === 'false') query = query.eq('is_archived', false);
+    if (archivedParam === 'true') query = query.eq('is_archived', true);
+    else if (archivedParam === 'false') query = query.eq('is_archived', false);
 
     if (status === 'verified') query = query.eq('is_verified', true);
     else if (status === 'unverified') query = query.eq('is_verified', false);
 
-    query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+    const [
+      { data: usersList, error: usersError },
+      { data: allProfiles, error: profError },
+      { data: allEducation, error: eduError },
+      { data: allEmployment, error: empError },
+    ] = await Promise.all([
+      query,
+      supabase.from('profiles').select('*'),
+      supabase.from('education').select('id, profile_id, program, major, year_graduated, campus'),
+      supabase.from('employment').select('*').eq('is_current', true),
+    ]);
 
-    const { data: usersList, count, error } = await query;
-    if (error && (error.code === '42P01' || error.code === '42703')) return res.json({ data: [], total: 0, page, limit });
-    if (error) throw new AppError(error.message, 500);
+    if (usersError && (usersError.code === '42P01' || usersError.code === '42703')) {
+      return res.json({ data: [], total: 0, page, limit, employers: [], locations: [] });
+    }
+    if (usersError) throw new AppError(usersError.message, 500);
 
-    let result = usersList || [];
+    const profileByUserId = new Map<string, any>();
+    (allProfiles || []).forEach((p: any) => {
+      if (p.user_id) profileByUserId.set(p.user_id, p);
+    });
 
-    const userIds = result.map((u: any) => u.id).filter(Boolean);
-
-    if (userIds.length > 0) {
-      const [{ data: profiles }] = await Promise.all([
-        supabase.from('profiles').select('*').in('user_id', userIds),
-      ]);
-
-      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
-      const profileIds = (profiles || []).map((p: any) => p.id).filter(Boolean);
-
-      result = result.map((u: any) => ({ ...u, profile: profileMap.get(u.id) || null }));
-
-      if (search) {
-        const s = search.toLowerCase();
-        result = result.filter((u: any) =>
-          (u.email && u.email.toLowerCase().includes(s)) ||
-          (u.profile?.first_name && u.profile.first_name.toLowerCase().includes(s)) ||
-          (u.profile?.last_name && u.profile.last_name.toLowerCase().includes(s)) ||
-          (u.profile?.id_number && u.profile.id_number.toLowerCase().includes(s))
-        );
+    const eduByProfile = new Map<string, any[]>();
+    (allEducation || []).forEach((e: any) => {
+      if (e.profile_id) {
+        if (!eduByProfile.has(e.profile_id)) eduByProfile.set(e.profile_id, []);
+        eduByProfile.get(e.profile_id)!.push(e);
       }
+    });
 
-      // Filter by course/batch via education table (using profile_ids)
-      if (course || year) {
-        let eduQuery = supabase.from('education').select('profile_id, program, year_graduated').in('profile_id', profileIds);
-        if (course) {
-          const courseAliases: Record<string, string[]> = {
-            'BSIT': ['BSIT', 'Bachelor of Science in Information Technology'],
-            'BIT': ['BIT', 'Bachelor in Industrial Technology'],
-            'BEEd': ['BEEd', 'Bachelor of Elementary Education'],
-            'BSEd-Math': ['BSEd-Math', 'Bachelor of Secondary Education', 'Bachelor of Secondary Education major in Mathematics'],
-            'BTLED': ['BTLED', 'Bachelor of Technology and Livelihood Education', 'BTLED-HE', 'BTLED-ICT'],
-          };
-          const matchKey = Object.keys(courseAliases).find((k) => k.toLowerCase() === course.toLowerCase()) || course;
-          const aliases = courseAliases[matchKey] || [sanitizeFilterInput(course)];
-          const conditions = aliases.map((a) => `program.ilike.%${sanitizeFilterInput(a)}%`).join(',');
-          eduQuery = eduQuery.or(conditions);
-        }
-        if (year && !isNaN(parseInt(year))) eduQuery = eduQuery.eq('year_graduated', parseInt(year));
-        const { data: filteredEdu } = await eduQuery;
-        const validProfileIds = new Set((filteredEdu || []).map((e: any) => e.profile_id));
-        result = result.filter((u: any) => u.profile && validProfileIds.has(u.profile.id));
+    const empByProfile = new Map<string, any[]>();
+    (allEmployment || []).forEach((e: any) => {
+      if (e.profile_id) {
+        if (!empByProfile.has(e.profile_id)) empByProfile.set(e.profile_id, []);
+        empByProfile.get(e.profile_id)!.push(e);
       }
+    });
 
-      // Filter by employment status
-      if (employmentStatus) {
-        const statusMap: Record<string, string> = {
-          'employed': 'employed', 'Employed': 'employed',
-          'self-employed': 'self-employed', 'Self-employed': 'self-employed',
-          'unemployed': 'unemployed', 'Unemployed': 'unemployed',
+    // Populate distinct employers and locations across all profiles & employment records
+    const distinctEmployerSet = new Set<string>();
+    const distinctLocationSet = new Set<string>();
 
-          'seeking': 'seeking', 'Seeking Opportunities': 'seeking',
-          'retired': 'retired', 'Retired': 'retired',
-        };
-        const dbStatus = statusMap[employmentStatus] || employmentStatus.toLowerCase();
-        const { data: empData } = await supabase
-          .from('employment')
-          .select('profile_id')
-          .in('profile_id', profileIds)
-          .eq('is_current', true)
-          .eq('employment_status', dbStatus);
-        const empProfileIds = new Set((empData || []).map((e: any) => e.profile_id));
-        result = result.filter((u: any) => u.profile && empProfileIds.has(u.profile.id));
-      }
+    (allProfiles || []).forEach((p: any) => {
+      if (p.company_name?.trim()) distinctEmployerSet.add(p.company_name.trim());
+      if (p.city?.trim()) distinctLocationSet.add(p.city.trim());
+      if (p.province?.trim()) distinctLocationSet.add(p.province.trim());
+    });
+    (allEmployment || []).forEach((e: any) => {
+      if (e.company_name?.trim()) distinctEmployerSet.add(e.company_name.trim());
+    });
 
-      // Fetch education & employment data for display (use profile_ids)
-      if (profileIds.length > 0) {
-        const [{ data: education }, { data: employment }] = await Promise.all([
-          supabase.from('education').select('profile_id, program, year_graduated').in('profile_id', profileIds),
-          supabase.from('employment').select('*').in('profile_id', profileIds).eq('is_current', true),
-        ]);
+    const employers = Array.from(distinctEmployerSet).sort();
+    const locations = Array.from(distinctLocationSet).sort();
 
-        const eduMap = new Map((education || []).map((e: any) => [e.profile_id, {
-          ...e,
-          program: e.program ? formatProgramLongName(e.program) : e.program,
-        }]));
-        const empMap = new Map((employment || []).map((e: any) => [e.profile_id, e]));
+    // Map each user with their profile, education, and current employment
+    const enrichedAlumni = (usersList || []).map((u: any) => {
+      const p = profileByUserId.get(u.id) || null;
+      const pid = p?.id;
+      const edus = (pid ? eduByProfile.get(pid) : null) || eduByProfile.get(u.id) || [];
+      const emps = (pid ? empByProfile.get(pid) : null) || empByProfile.get(u.id) || [];
 
-        result = result.map((u: any) => {
-          if (u.profile) {
-            u.profile.education = eduMap.has(u.profile.id) ? [eduMap.get(u.profile.id)] : [];
-            u.profile.employment = empMap.has(u.profile.id) ? [empMap.get(u.profile.id)] : [];
+      const formattedEdus = edus.map((e: any) => ({
+        ...e,
+        program: e.program ? formatProgramLongName(e.program) : e.program,
+      }));
+
+      const profileObj = p
+        ? {
+            ...p,
+            education: formattedEdus,
+            employment: emps,
           }
-          return u;
-        });
-      }
+        : {
+            education: formattedEdus,
+            employment: emps,
+          };
 
-      // Filter by employer and location (exact match from dropdown values)
-      if (employer) {
-        result = result.filter((u: any) => {
-          const emp = (u.profile?.employment || [])[0];
-          return emp?.company_name === employer;
-        });
-      }
-      if (location) {
-        result = result.filter((u: any) => u.profile?.city === location);
-      }
+      return {
+        ...u,
+        profile: profileObj,
+      };
+    });
+
+    let filtered = enrichedAlumni;
+
+    // Search filter: name, email, student ID, employer, program
+    if (search.trim()) {
+      const s = search.trim().toLowerCase();
+      filtered = filtered.filter((u: any) => {
+        const p = u.profile;
+        const fullName = `${p?.first_name || ''} ${p?.last_name || ''}`.toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        const idNumber = (p?.id_number || '').toLowerCase();
+        const comp = (p?.employment?.[0]?.company_name || p?.company_name || '').toLowerCase();
+        const prog = (p?.education?.[0]?.program || '').toLowerCase();
+        return fullName.includes(s) || email.includes(s) || idNumber.includes(s) || comp.includes(s) || prog.includes(s);
+      });
     }
 
-    // Get distinct employers and locations for filter dropdowns
-    const [{ data: distinctCompanies }, { data: distinctCities }] = await Promise.all([
-      supabase.from('employment').select('company_name').not('company_name', 'is', null),
-      supabase.from('profiles').select('city').not('city', 'is', null),
-    ]);
-    const employers = [...new Set((distinctCompanies || []).map((e: any) => e.company_name).filter(Boolean))].sort();
-    const locations = [...new Set((distinctCities || []).map((p: any) => p.city).filter(Boolean))].sort();
+    // Course filter with intelligent degree abbreviation handling
+    if (course.trim()) {
+      const f = course.trim().toLowerCase();
+      filtered = filtered.filter((u: any) => {
+        const edus = u.profile?.education || [];
+        return edus.some((e: any) => {
+          const prog = (e.program || '').toLowerCase();
+          if (f === 'bsit') return prog.includes('bsit') || prog.includes('information technology');
+          if (f === 'bit') return (prog.includes('bit') && !prog.includes('orbit')) || prog.includes('industrial technology');
+          if (f === 'beed') return prog.includes('beed') || prog.includes('elementary education');
+          if (f === 'bsed-math' || f === 'bsed') return prog.includes('bsed') || prog.includes('secondary education');
+          if (f === 'btled') return prog.includes('btled') || prog.includes('technology and livelihood education') || prog.includes('home economics');
+          return prog.includes(f) || f.includes(prog);
+        });
+      });
+    }
 
-    res.json({ data: result, total: result.length, page, limit, employers, locations });
+    // Year / Batch filter
+    if (year.trim()) {
+      const targetYear = String(year.trim());
+      filtered = filtered.filter((u: any) => {
+        const edus = u.profile?.education || [];
+        return edus.some((e: any) => String(e.year_graduated) === targetYear);
+      });
+    }
+
+    // Employment Status filter: accurately accounts for profiles.employment_status and employment.employment_status
+    if (employmentStatus.trim()) {
+      const target = employmentStatus.trim().toLowerCase();
+      filtered = filtered.filter((u: any) => {
+        const p = u.profile;
+        const emp = (p?.employment || [])[0];
+        const raw = p?.employment_status || emp?.employment_status || '';
+        const lower = String(raw).trim().toLowerCase();
+
+        if (target === 'employed') {
+          return lower === 'employed' || lower === 'full-time' || lower === 'part-time';
+        }
+        if (target === 'self-employed') {
+          return lower === 'self-employed' || lower === 'entrepreneur' || lower === 'freelance';
+        }
+        if (target === 'unemployed') {
+          return !lower || lower === 'unemployed' || lower === 'seeking' || lower === 'seeking opportunities' || lower === 'null';
+        }
+        if (target === 'seeking opportunities' || target === 'seeking') {
+          return lower === 'seeking' || lower === 'seeking opportunities';
+        }
+        if (target === 'retired') {
+          return lower === 'retired';
+        }
+        return lower === target;
+      });
+    }
+
+    // Employer filter
+    if (employer.trim()) {
+      const target = employer.trim().toLowerCase();
+      filtered = filtered.filter((u: any) => {
+        const p = u.profile;
+        const empComp = (p?.employment?.[0]?.company_name || '').trim().toLowerCase();
+        const profComp = (p?.company_name || '').trim().toLowerCase();
+        return empComp === target || profComp === target;
+      });
+    }
+
+    // Location filter
+    if (location.trim()) {
+      const target = location.trim().toLowerCase();
+      filtered = filtered.filter((u: any) => {
+        const p = u.profile;
+        const city = (p?.city || '').trim().toLowerCase();
+        const prov = (p?.province || '').trim().toLowerCase();
+        return city === target || prov === target || `${city}, ${prov}`.includes(target);
+      });
+    }
+
+    const total = filtered.length;
+    const paged = filtered.slice(offset, offset + limit);
+
+    res.json({
+      data: paged,
+      total,
+      page,
+      limit,
+      employers,
+      locations,
+    });
   } catch (err) {
     next(err);
   }

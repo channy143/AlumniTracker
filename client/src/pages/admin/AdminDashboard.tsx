@@ -101,9 +101,15 @@ function aggregateEmploymentStatus(data: any[]) {
   let employed = 0, selfEmployed = 0, unemployed = 0;
   (data || []).forEach((d: any) => {
     const s = String(d.status || '').toLowerCase().trim();
-    if (s === 'self-employed' || s.includes('self-employed')) selfEmployed += d.count || 0;
-    else if (['employed', 'entrepreneur'].includes(s) || s === 'employed' || s.includes('employed')) employed += d.count || 0;
-    else unemployed += d.count || 0;
+    if (s === 'self-employed' || s.includes('self-employed') || s === 'freelance') {
+      selfEmployed += d.count || 0;
+    } else if (s === 'unemployed' || s.includes('unemployed') || s.includes('seeking')) {
+      unemployed += d.count || 0;
+    } else if (s === 'employed' || s === 'entrepreneur' || s === 'full-time' || s === 'part-time') {
+      employed += d.count || 0;
+    } else {
+      unemployed += d.count || 0;
+    }
   });
   return [
     { label: 'Employed', value: employed },

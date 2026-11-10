@@ -93,7 +93,7 @@ interface ParsedDecisionRow {
 
 function normalizeDecisionStatus(val: string): 'hired' | 'shortlisted' | 'rejected' | 'under_review' | 'pending' {
   const s = String(val || '').toLowerCase().trim();
-  if (s.includes('hire') || s.includes('accept') || s.includes('passed') || s.includes('employed') || s === 'hired')
+  if (s.includes('hire') || s.includes('accept') || s.includes('passed') || (s.includes('employed') && !s.includes('unemployed')) || s === 'hired')
     return 'hired';
   if (s.includes('shortlist') || s.includes('interview') || s.includes('qualif') || s === 'shortlisted')
     return 'shortlisted';

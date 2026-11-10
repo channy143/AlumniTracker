@@ -1007,7 +1007,7 @@ router.post('/:id/import-company-decisions', async (req: AuthenticatedRequest, r
       const s = String(rawStatus || '')
         .toLowerCase()
         .trim();
-      if (s.includes('hire') || s.includes('accept') || s.includes('passed') || s.includes('employed') || s === 'hired')
+      if (s.includes('hire') || s.includes('accept') || s.includes('passed') || (s.includes('employed') && !s.includes('unemployed')) || s === 'hired')
         return 'hired';
       if (
         s.includes('shortlist') ||

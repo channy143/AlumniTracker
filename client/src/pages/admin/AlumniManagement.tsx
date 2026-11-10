@@ -41,10 +41,13 @@ export default function AlumniManagement() {
   const batchYears = generateYears(2014, new Date().getFullYear());
 
   const normalizeStatus = (s: string) => {
-    if (!s) return '';
-    const lower = s.toLowerCase();
-    if (lower === 'student') return 'Unemployed';
-    if (lower === 'seeking') return 'Seeking Opportunities';
+    if (!s) return 'Unemployed';
+    const lower = String(s).toLowerCase().trim();
+    if (lower === 'student' || lower === 'unemployed' || lower === 'null') return 'Unemployed';
+    if (lower === 'seeking' || lower === 'seeking opportunities') return 'Seeking Opportunities';
+    if (lower === 'employed' || lower === 'full-time' || lower === 'part-time') return 'Employed';
+    if (lower === 'self-employed' || lower === 'freelance' || lower === 'entrepreneur') return 'Self-employed';
+    if (lower === 'retired') return 'Retired';
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
 
@@ -284,11 +287,11 @@ export default function AlumniManagement() {
   };
 
   const courseShort = (name: string) => {
-    const normalized = name.toLowerCase().trim();
-    if (normalized.includes('bsit') || normalized.includes('bachelor of science in information technology')) return 'BSIT';
-    if (normalized.includes('bit') || normalized.includes('bachelor in industrial technology')) return 'BIT';
-    if (normalized.includes('beed') || normalized.includes('bachelor of elementary education')) return 'BEEd';
-    if (normalized.includes('bsed') || normalized.includes('bachelor of secondary education')) return 'BSEd-Math';
+    const normalized = (name || '').toLowerCase().trim();
+    if (normalized.includes('bsit') || normalized.includes('information technology')) return 'BSIT';
+    if ((normalized.includes('bit') && !normalized.includes('orbit')) || normalized.includes('industrial technology')) return 'BIT';
+    if (normalized.includes('beed') || normalized.includes('elementary education')) return 'BEEd';
+    if (normalized.includes('bsed') || normalized.includes('secondary education')) return 'BSEd-Math';
     if (normalized.includes('btled') || normalized.includes('technology and livelihood education') || normalized.includes('home economics')) return 'BTLED';
     return name;
   };
@@ -430,7 +433,7 @@ export default function AlumniManagement() {
                       <p><span className="text-gray-400">ID:</span> {p.id_number || '---'}</p>
                       <p><span className="text-gray-400">Course:</span> {edu?.program ? courseShort(edu.program) : '---'}</p>
                       <p><span className="text-gray-400">Batch:</span> {edu?.year_graduated || '---'}</p>
-                      <p><span className="text-gray-400">Employer:</span> {emp?.company_name || '---'}</p>
+                      <p><span className="text-gray-400">Employer:</span> {emp?.company_name || p.company_name || '---'}</p>
                       <p className="truncate"><span className="text-gray-400">Email:</span> {user.email}</p>
                     </div>
                   </div>
