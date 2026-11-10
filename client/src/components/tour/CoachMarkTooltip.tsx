@@ -64,7 +64,7 @@ export default function CoachMarkTooltip({
     const isCenterModal = !targetRect || step.pointingDirection === 'none';
     const vpWidth = windowSize.width;
     const vpHeight = windowSize.height;
-    const tooltipWidth = Math.min(isCenterModal ? 440 : 390, vpWidth - 32);
+    const tooltipWidth = Math.min(isCenterModal ? 490 : 390, vpWidth - 32);
     const estimatedHeight = actualHeight > 50 ? actualHeight : 240;
 
     // Standalone centered modal (e.g. final celebration guide)
@@ -247,12 +247,12 @@ export default function CoachMarkTooltip({
             damping: 20,
             delay: 0.12,
           }}
-          className="absolute bottom-0 left-2 sm:left-4 pointer-events-none select-none z-0"
+          className="absolute bottom-0 left-0 sm:left-2 pointer-events-none select-none z-0"
         >
           <img
             src="/image/mascot1.png"
             alt="Alumi Mascot"
-            className="w-20 sm:w-24 h-auto object-contain translate-y-[40%] drop-shadow-md"
+            className="w-36 sm:w-48 md:w-52 h-auto object-contain translate-y-[40%] drop-shadow-md"
           />
         </motion.div>
       )}
@@ -337,7 +337,7 @@ export default function CoachMarkTooltip({
               </button>
             ) : (
               /* Non-interfering spacer on the left above the bottom-left mascot */
-              <div className="w-16 sm:w-20 h-4" />
+              <div className="w-24 sm:w-36 h-4" />
             )}
           </div>
 
