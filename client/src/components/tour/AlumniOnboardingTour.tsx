@@ -74,7 +74,7 @@ export default function AlumniOnboardingTour() {
 
   // Update target bounding rect smoothly
   const updateRect = useCallback(() => {
-    if (!isActive || !currentStep.targetSelector) {
+    if (!isActive || showAlumiIntro || !currentStep.targetSelector) {
       setTargetRect(null);
       return;
     }
@@ -87,8 +87,7 @@ export default function AlumniOnboardingTour() {
         return;
       }
     }
-    setTargetRect(null);
-  }, [isActive, currentStep]);
+  }, [isActive, showAlumiIntro, currentStep]);
 
   // Measure and scroll target with fluid zero-latency tracking
   useEffect(() => {
@@ -103,78 +102,132 @@ export default function AlumniOnboardingTour() {
     }
 
     // Sync tab and modal on Profile page
-    if (currentStep.route === '/profile') {
-      if (currentStep.id === 'profile-privacy-tab') {
-        window.dispatchEvent(new CustomEvent('tour-close-edit-profile'));
-        window.dispatchEvent(new CustomEvent('tour-switch-profile-tab', { detail: 'privacy' }));
-      } else if (currentStep.id === 'profile-edit-modal-status' || currentStep.id === 'profile-edit-modal-proof') {
-        window.dispatchEvent(new CustomEvent('tour-open-edit-profile'));
-      } else {
-        window.dispatchEvent(new CustomEvent('tour-close-edit-profile'));
-        window.dispatchEvent(new CustomEvent('tour-switch-profile-tab', { detail: 'overview' }));
+    const syncProfileState = () => {
+      if (currentStep.route === '/profile') {
+        if (currentStep.id === 'profile-privacy-tab') {
+          window.dispatchEvent(new CustomEvent('tour-close-edit-profile'));
+          window.dispatchEvent(new CustomEvent('tour-switch-profile-tab', { detail: 'privacy' }));
+        } else if (currentStep.id === 'profile-edit-modal-status' || currentStep.id === 'profile-edit-modal-proof') {
+          window.dispatchEvent(new CustomEvent('tour-open-edit-profile'));
+        } else {
+          window.dispatchEvent(new CustomEvent('tour-close-edit-profile'));
+          window.dispatchEvent(new CustomEvent('tour-switch-profile-tab', { detail: 'overview' }));
+        }
       }
-    }
+    };
+    syncProfileState();
 
     if (!currentStep.targetSelector) {
       setTargetRect(null);
       return;
     }
 
-    // 2. Poll for target element (immediate first attempt, fast follow-up)
+    let isDisposed = false;
     let attempts = 0;
-    const maxAttempts = 30;
+    const maxAttempts = 150; // Up to 15 seconds of progressive polling
+    let resizeObserver: ResizeObserver | null = null;
+    let scrollRafId: number | null = null;
 
     const findAndMeasure = () => {
-      const element = document.querySelector(currentStep.targetSelector);
+      if (isDisposed) return;
+      syncProfileState();
+
+      const element = document.querySelector(currentStep.targetSelector) as HTMLElement | null;
       if (element) {
         const rect = element.getBoundingClientRect();
 
-        // If element is hidden (e.g., hidden mobile sidebar), fallback to centered modal
+        // If element is in DOM but zero dimensions (e.g., hidden skeleton), keep polling
         if (rect.width === 0 || rect.height === 0) {
-          setTargetRect(null);
+          if (attempts < maxAttempts) {
+            attempts++;
+            pollTimerRef.current = setTimeout(findAndMeasure, attempts < 40 ? 50 : 150);
+          }
           return;
         }
 
-        // Determine optimal scroll alignment so tooltip has maximum room without collision
-        let scrollBlock: ScrollLogicalPosition = 'center';
-        if (currentStep.pointingDirection === 'bottom') {
-          scrollBlock = 'start';
-        } else if (currentStep.pointingDirection === 'top') {
-          scrollBlock = 'end';
-        } else {
-          scrollBlock = 'center';
+        // Element found with valid dimensions! Clear polling timer
+        if (pollTimerRef.current) {
+          clearTimeout(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+
+        // Attach ResizeObserver to keep rect locked on if inner contents/photos resize
+        if (!resizeObserver && typeof ResizeObserver !== 'undefined') {
+          resizeObserver = new ResizeObserver(() => {
+            if (isDisposed) return;
+            const fresh = element.getBoundingClientRect();
+            if (fresh.width > 0 && fresh.height > 0) {
+              setTargetRect(fresh);
+            }
+          });
+          resizeObserver.observe(element);
         }
 
         // Scroll target comfortably into view if outside comfortable viewport bounds
-        const isOffscreen = rect.top < 70 || rect.bottom > window.innerHeight - 70;
+        const navbarHeight = 68;
+        const isOffscreen = rect.top < navbarHeight + 20 || rect.bottom > window.innerHeight - 60;
         if (isOffscreen) {
-          try {
-            element.scrollIntoView({ behavior: 'smooth', block: scrollBlock, inline: 'nearest' });
-          } catch {
-            const targetY = window.scrollY + rect.top - 140;
-            window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          // If highlighting the profile hero banner at top of /profile, scroll to top leaving room below navbar
+          if (currentStep.route === '/profile' && currentStep.id === 'profile-header') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            try {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            } catch {
+              const targetY = window.scrollY + rect.top - 120;
+              window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+            }
           }
         }
 
-        // Immediately update targetRect with ZERO artificial delay
-        setTargetRect(rect);
+        // Immediately update targetRect with fresh measurement
+        setTargetRect(element.getBoundingClientRect());
+
+        // Track during smooth scroll animation (40 frames ~600ms)
+        let frames = 0;
+        const trackDuringScroll = () => {
+          if (isDisposed || frames > 40) return;
+          const fresh = element.getBoundingClientRect();
+          if (fresh.width > 0 && fresh.height > 0) {
+            setTargetRect(fresh);
+          }
+          frames++;
+          scrollRafId = requestAnimationFrame(trackDuringScroll);
+        };
+        trackDuringScroll();
       } else if (attempts < maxAttempts) {
         attempts++;
-        pollTimerRef.current = setTimeout(findAndMeasure, 30);
+        pollTimerRef.current = setTimeout(findAndMeasure, attempts < 40 ? 50 : 150);
       } else {
         setTargetRect(null);
       }
     };
 
-    // Execute immediately on the exact same frame!
+    // 1. Execute immediate attempt on this frame
     findAndMeasure();
 
+    // 2. MutationObserver: instantly captures elements mounted after API/network responses
+    const mutationObserver = new MutationObserver(() => {
+      if (!isDisposed) {
+        findAndMeasure();
+      }
+    });
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
+
     return () => {
+      isDisposed = true;
+      mutationObserver.disconnect();
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      if (scrollRafId) {
+        cancelAnimationFrame(scrollRafId);
+      }
       if (pollTimerRef.current) {
         clearTimeout(pollTimerRef.current);
       }
     };
-  }, [isActive, currentStepIndex, currentStep, location.pathname, navigate]);
+  }, [isActive, showAlumiIntro, currentStepIndex, currentStep, location.pathname, navigate]);
 
   // Window resize and continuous 60fps scroll sync during smooth scrolling
   useEffect(() => {
