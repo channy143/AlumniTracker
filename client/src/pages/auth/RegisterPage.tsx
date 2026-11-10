@@ -383,14 +383,11 @@ export default function RegisterPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-3">
         <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-ctu-blue py-1.5 px-2.5 -ml-1.5 rounded-lg hover:bg-slate-100 transition-colors">
           <ArrowLeftIcon className="w-4 h-4" />
           <span>Back to Home</span>
         </Link>
-        <span className="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80">
-          New Alumni
-        </span>
       </div>
 
       {/* Progress stepper */}

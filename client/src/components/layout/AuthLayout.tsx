@@ -20,16 +20,16 @@ export default function AuthLayout() {
   return (
     <div className="min-h-screen min-h-[100dvh] lg:h-screen lg:max-h-screen flex flex-col lg:flex-row overflow-x-hidden bg-slate-50/80 lg:bg-white">
       {/* Mobile Top Brand Bar (Visible on mobile only) */}
-      <div className="lg:hidden shrink-0 pt-6 pb-2 px-4 flex flex-col items-center text-center">
+      <div className="lg:hidden shrink-0 pt-3.5 pb-1 px-4 flex flex-col items-center text-center">
         <Link to="/" className="inline-flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-xl bg-white p-1.5 shadow-sm border border-slate-200 flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-white p-1.5 shadow-sm border border-slate-200 flex items-center justify-center shrink-0">
             <img src="/logo.png" alt="CTU-Naga Logo" className="w-full h-full object-contain" />
           </div>
           <div className="text-left">
-            <span className="block text-base font-bold text-ctu-charcoal font-display leading-tight tracking-tight">
+            <span className="block text-sm font-bold text-ctu-charcoal font-display leading-tight tracking-tight">
               CTU-Naga <span className="text-ctu-marigold">Alumni</span>
             </span>
-            <span className="block text-[11px] font-medium text-slate-400 leading-none mt-0.5">
+            <span className="block text-[10px] font-medium text-slate-400 leading-none mt-0.5">
               Cebu Technological University
             </span>
           </div>
@@ -69,8 +69,8 @@ export default function AuthLayout() {
       </motion.div>
 
       {/* Center: Form panel — scrollable independently when content overflows */}
-      <div className="flex-1 w-full min-h-full lg:h-full lg:max-h-screen overflow-y-auto flex flex-col justify-start lg:justify-center items-center px-3.5 py-4 sm:px-8 sm:py-8">
-        <div className="w-full max-w-md my-auto py-2 sm:py-6">
+      <div className="flex-1 w-full min-h-full lg:h-full lg:max-h-screen overflow-y-auto flex flex-col justify-start lg:justify-center items-center px-3.5 pt-1.5 pb-6 sm:px-8 sm:py-8">
+        <div className="w-full max-w-md mt-1 mb-auto lg:my-auto py-1 sm:py-6">
           <div className="bg-white rounded-2xl shadow-sm sm:shadow-none border border-slate-200/80 sm:border-0 p-5 sm:p-0 transition-all">
             <Outlet />
           </div>

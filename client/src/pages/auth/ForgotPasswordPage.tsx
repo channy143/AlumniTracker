@@ -107,14 +107,11 @@ export default function ForgotPasswordPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4">
         <Link to="/auth/login" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-ctu-blue py-1.5 px-2.5 -ml-1.5 rounded-lg hover:bg-slate-100 transition-colors">
           <ArrowLeftIcon className="w-4 h-4" />
           <span>Back to Sign In</span>
         </Link>
-        <span className="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md bg-blue-50 text-ctu-blue border border-blue-100/80">
-          Account Recovery
-        </span>
       </div>
 
       <AnimatePresence mode="wait">
