@@ -1074,11 +1074,13 @@ export default function ProfilePage() {
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
                         />
                       </div>
+                    </div>
+                  </div>
 
-                      {/* Proof of Employment for Q-Pro Accreditation */}
-                      <div data-tour="profile-proof-section" className="sm:col-span-2 pt-4 border-t border-gray-100">
-                        {/* Header with Title and Tooltip */}
-                        <div className="flex items-center justify-between gap-2 mb-1">
+                  {/* Proof of Employment for Q-Pro Accreditation */}
+                  <div data-tour="profile-proof-section" className="pt-4 border-t border-gray-100">
+                    {/* Header with Title and Tooltip */}
+                    <div className="flex items-center justify-between gap-2 mb-1">
                           <label className="text-xs text-gray-800 font-bold flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
                             <CheckBadgeIcon className="w-4 h-4 text-orange-600 shrink-0" />
                             <span>Proof of Employment <span className="text-gray-500 font-normal sm:font-bold text-[11px] sm:text-xs">(University Accreditation / Q-Pro)</span></span>
@@ -1307,8 +1309,6 @@ export default function ProfilePage() {
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
 
                   <div>
                     <SectionLine label="Skills" />
