@@ -2140,10 +2140,10 @@ export default function ProfilePage() {
       )}
 
       {/* Hero Card */}
-      <div data-tour="profile-header-card" className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 sm:p-8 mb-0 relative overflow-hidden">
+      <div data-tour="profile-header-card" className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-3.5 sm:p-6 md:p-8 mb-0 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-1/3 w-48 h-48 bg-white rounded-full translate-y-1/3" />
+          <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-1/3 w-36 h-36 sm:w-48 sm:h-48 bg-white rounded-full translate-y-1/3" />
         </div>
 
         {/* Mascot on the lower part of the orange banner with bouncy pop-up intro animation */}
@@ -2156,7 +2156,7 @@ export default function ProfilePage() {
             damping: 18,
             delay: 0.25,
           }}
-          className="absolute bottom-0 right-2 sm:right-8 md:right-14 pointer-events-none select-none z-0"
+          className="absolute bottom-0 right-1 sm:right-6 md:right-10 pointer-events-none select-none z-0"
         >
           {/* Pop-up greeting bubble */}
           <motion.div
@@ -2168,7 +2168,7 @@ export default function ProfilePage() {
               damping: 20,
               delay: 0.6,
             }}
-            className="hidden xs:flex absolute -top-5 right-2 sm:right-4 bg-white/95 text-orange-950 text-[10px] sm:text-xs font-bold py-0.5 px-2.5 rounded-full shadow-md border border-orange-200/80 items-center gap-1 whitespace-nowrap"
+            className="hidden sm:flex absolute -top-5 right-2 sm:right-4 bg-white/95 text-orange-950 text-[10px] sm:text-xs font-bold py-0.5 px-2 rounded-full shadow-md border border-orange-200/80 items-center gap-1 whitespace-nowrap"
           >
             <span>Mabuhay! 👋</span>
           </motion.div>
@@ -2176,39 +2176,39 @@ export default function ProfilePage() {
           <img
             src="/mascot.png"
             alt="Mascot"
-            className="w-24 xs:w-28 sm:w-44 md:w-56 lg:w-68 h-auto object-contain translate-y-[35%] drop-shadow-md"
+            className="w-16 sm:w-32 md:w-44 lg:w-56 h-auto object-contain translate-y-[30%] drop-shadow-md"
           />
         </motion.div>
 
-        <div className="relative z-10 flex flex-row items-start text-left gap-3.5 sm:gap-6">
-          {/* Avatar on the Left */}
-          <div className="relative shrink-0">
-            <div className="w-18 h-18 sm:w-28 sm:h-28 rounded-full border-4 border-white/60 shadow-lg overflow-hidden bg-white/20 flex items-center justify-center">
+        <div className="relative z-10 flex flex-row items-center sm:items-start text-left gap-3 sm:gap-5">
+          {/* Avatar on the Left (Strictly dimensioned to prevent image blowup on mobile) */}
+          <div className="relative shrink-0 w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28">
+            <div className="w-full h-full rounded-full border-2 sm:border-4 border-white/70 shadow-md overflow-hidden bg-white/20 flex items-center justify-center">
               {profile?.avatar_url ? (
                 <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
               ) : (
-                <span className="text-white text-2xl sm:text-4xl font-bold font-display">{initials}</span>
+                <span className="text-white text-xl sm:text-3xl md:text-4xl font-bold font-display">{initials}</span>
               )}
             </div>
             <button
               onClick={() => fileRef.current?.click()}
-              className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-9 sm:h-9 bg-white rounded-full flex items-center justify-center text-orange-600 hover:bg-orange-50 transition-colors shadow-md border-2 border-orange-500 cursor-pointer"
+              className="absolute -bottom-0.5 -right-0.5 w-6 h-6 sm:w-8 sm:h-8 bg-white rounded-full flex items-center justify-center text-orange-600 hover:bg-orange-50 transition-colors shadow-md border-2 border-orange-500 cursor-pointer"
               title="Change Photo"
             >
-              <CameraIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <CameraIcon className="w-3 h-3 sm:w-4 sm:h-4" />
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
           </div>
 
-          {/* Info on the Right (left-aligned on all screen sizes, matching Desktop Image 2) */}
-          <div className="min-w-0 flex-1 flex flex-col items-start text-left">
-            <h2 className="text-lg sm:text-2xl font-bold font-display text-white leading-tight truncate max-w-full">
+          {/* Info on the Right (left-aligned on all screen sizes, matching Desktop) */}
+          <div className="min-w-0 flex-1 flex flex-col items-start text-left pr-10 sm:pr-24">
+            <h2 className="text-base sm:text-xl md:text-2xl font-bold font-display text-white leading-tight truncate max-w-full">
               {fullName}
             </h2>
 
             {programInfo && (
-              <p className="text-orange-100 text-xs sm:text-sm mt-0.5 flex items-center gap-1.5 leading-snug">
-                <AcademicCapIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <p className="text-orange-100 text-xs sm:text-sm mt-0.5 flex items-center gap-1 leading-snug">
+                <AcademicCapIcon className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">{programInfo}{batchInfo ? ` · Class of ${batchInfo}` : ''}</span>
               </p>
             )}
@@ -2223,7 +2223,7 @@ export default function ProfilePage() {
                 const jobTitle = profile?.current_job_title;
                 const company = profile?.company_name;
                 return (
-                  <p className="text-xs sm:text-sm text-white/90 mt-1 flex items-center gap-1.5 leading-snug">
+                  <p className="text-xs sm:text-sm text-white/90 mt-0.5 flex items-center gap-1 leading-snug">
                     <BriefcaseIcon className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">
                       {jobTitle ? `${jobTitle} · Self-employed` : 'Self-employed / Freelance'}
@@ -2238,7 +2238,7 @@ export default function ProfilePage() {
               if (!position && !company) return null;
 
               return (
-                <p className="text-xs sm:text-sm text-white/90 mt-1 flex items-center gap-1.5 leading-snug">
+                <p className="text-xs sm:text-sm text-white/90 mt-0.5 flex items-center gap-1 leading-snug">
                   <BriefcaseIcon className="w-3.5 h-3.5 shrink-0" />
                   <span className="truncate">{position || 'Employed'}{company ? ` at ${company}` : ''}</span>
                 </p>
@@ -2246,14 +2246,14 @@ export default function ProfilePage() {
             })()}
 
             {(profile?.city || profile?.province) && (
-              <p className="text-xs text-white/70 mt-0.5 sm:mt-1 flex items-center gap-1 leading-snug">
+              <p className="text-xs text-white/70 mt-0.5 flex items-center gap-1 leading-snug">
                 <MapPinIcon className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">{[profile.city, profile.province].filter(Boolean).join(', ')}</span>
               </p>
             )}
 
             {/* Action buttons (Edit Profile + Resume) */}
-            <div className="mt-2.5 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-2.5">
+            <div className="mt-2 sm:mt-2.5 flex flex-wrap items-center gap-2 sm:gap-2.5">
               <button
                 data-tour="profile-edit-btn"
                 onClick={() => {
@@ -2266,15 +2266,15 @@ export default function ProfilePage() {
                   setEditing(true);
                   window.dispatchEvent(new CustomEvent('tour-edit-profile-clicked'));
                 }}
-                className="inline-flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 bg-white text-orange-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-orange-50 transition-colors shadow-sm cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 sm:px-4 py-1 sm:py-1.5 bg-white text-orange-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-orange-50 transition-colors shadow-sm cursor-pointer"
               >
-                <PencilIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Edit Profile
+                <PencilIcon className="w-3.5 h-3.5" /> Edit Profile
               </button>
 
               {/* Resume upload */}
               <input ref={resumeRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleResumeUpload} />
               {profile?.resume_url ? (
-                <div className="flex items-center gap-1.5 sm:gap-2 text-xs">
+                <div className="flex items-center gap-1.5 text-xs">
                   <a
                     href={profile.resume_url}
                     target="_blank"
@@ -2283,10 +2283,10 @@ export default function ProfilePage() {
                   >
                     View Resume
                   </a>
-                  <span className="text-white/30 text-xs">|</span>
+                  <span className="text-white/40">|</span>
                   <button
                     onClick={handleDeleteResume}
-                    className="text-white/60 hover:text-red-200 underline underline-offset-2 transition-colors font-light text-xs cursor-pointer"
+                    className="text-white/60 hover:text-red-200 underline underline-offset-2 transition-colors font-medium text-xs sm:text-sm cursor-pointer"
                   >
                     Remove
                   </button>
