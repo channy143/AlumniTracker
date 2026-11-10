@@ -471,7 +471,7 @@ export default function CurriculumInsights() {
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-3">
-              <KpiCard icon={CheckCircleIcon} label="Work Alignment Rate" value={`${overview.workAlignmentRate}%`} sub={`${overview.totalAlumni} alumni`} />
+              <KpiCard icon={CheckCircleIcon} label="Work Alignment Rate" value={`${overview.workAlignmentRate}%`} sub={overview.employedAlumni != null ? `${overview.alignedCount ?? 0} of ${overview.employedAlumni} working` : `${overview.totalAlumni || 0} alumni`} />
               <KpiCard icon={ClockIcon} label="Avg Time to Employment" value={formatMonths(overview.averageTimeToEmployment)} />
               <KpiCard icon={StarIcon} label="Avg Graduate Satisfaction" value={overview.averageSatisfaction ? `${overview.averageSatisfaction} / 5` : '—'} sub={overview.averageSatisfaction ? undefined : 'Not collected'} />
               <KpiCard icon={WrenchScrewdriverIcon} label="Skills Identified" value={String(overview.skillsIdentified)} />

@@ -4,6 +4,12 @@ import { supabase } from '../../services/supabase';
 function abbreviateProgram(name: string): string {
   const s = String(name || '').trim();
   if (!s) return s;
+  const lower = s.toLowerCase();
+  if (lower.includes('bsit') || lower.includes('information technology')) return 'BSIT';
+  if ((lower.includes('bit') && !lower.includes('orbit')) || lower.includes('industrial technology')) return 'BIT';
+  if (lower.includes('beed') || lower.includes('elementary education')) return 'BEEd';
+  if (lower.includes('bsed') || lower.includes('secondary education')) return 'BSEd-Math';
+  if (lower.includes('btled') || lower.includes('technology and livelihood education') || lower.includes('home economics')) return 'BTLED';
   if (/^[A-Z][A-Z0-9.\-]{1,8}$/.test(s)) return s;
   const stopwords = new Set(['of', 'in', 'and', 'the', 'a', 'an', 'for', 'with', 'at', 'on']);
   const words = s.split(/\s+/).filter((w) => w && !stopwords.has(w.toLowerCase()));
@@ -24,6 +30,14 @@ function alignmentCategory(value: string): string | null {
   if (v.includes('aligned')) return 'Aligned with Degree';
   return null;
 }
+
+const INDUSTRY_KEYWORDS = [
+  { keywords: ['education', 'teaching', 'school', 'training', 'academic', 'sped'], industries: ['Education', 'Academic', 'School', 'Educational Services'] },
+  { keywords: ['industrial technology', 'engineering', 'industrial', 'manufacturing', 'mechanical', 'civil', 'electrical'], industries: ['Technology', 'Industrial', 'Engineering', 'Manufacturing', 'Construction'] },
+  { keywords: ['information technology', 'computer', 'software', 'it', 'data', 'programming'], industries: ['Information Technology', 'IT', 'Software', 'Computer', 'Technology'] },
+  { keywords: ['accounting', 'business', 'finance', 'management', 'commerce', 'administration'], industries: ['Accounting', 'Business', 'Finance', 'Management'] },
+  { keywords: ['tourism', 'hospitality', 'hotel', 'restaurant', 'food'], industries: ['Tourism', 'Hospitality', 'Food and Beverage', 'Restaurant'] },
+];
 
 function cleanSkillName(raw: string): string {
   let s = String(raw || '').trim();
@@ -98,66 +112,64 @@ function toRanked(obj: Record<string, number>) {
 }
 
 function classifyAlignment(
-  mergedResp: any,
   eduPrograms: string[],
   currentEmp: any[],
   profileJob?: string,
-  profileIndustry?: string
+  profileIndustry?: string,
+  directCourseAlignment?: string
 ): 'Aligned with Degree' | 'Partially Aligned' | 'Not Aligned' {
   // 1. Direct survey course_alignment
-  const ca = alignmentCategory(mergedResp.course_alignment);
-  if (ca) return ca as any;
+  if (directCourseAlignment) {
+    const ca = alignmentCategory(directCourseAlignment);
+    if (ca) return ca as any;
+  }
 
-  // 2. Direct survey curriculumRelevance / curriculum_relevance
-  const cr = String(mergedResp.curriculumRelevance || mergedResp.curriculum_relevance || '').toLowerCase().trim();
-  if (cr.includes('extremely') || cr.includes('very')) return 'Aligned with Degree';
-  if (cr.includes('moderate') || cr.includes('somewhat')) return 'Partially Aligned';
-  if (cr.includes('slightly') || cr.includes('not')) return 'Not Aligned';
-
-  // 3. Program vs actual position / industry
-  const programStr = (eduPrograms.join(' ') + ' ' + (mergedResp.program || '')).toLowerCase();
-  const jobTitle = [
+  const prog = (eduPrograms[0] || '').toLowerCase().trim();
+  const ind = (currentEmp[0]?.company_industry || profileIndustry || '').trim().toLowerCase();
+  const job = [
     ...currentEmp.map((e) => e.position || ''),
     profileJob || '',
-    mergedResp.position || '',
-    mergedResp.currentJobTitle || '',
-  ].join(' ').toLowerCase();
+  ].join(' ').toLowerCase().trim();
 
-  const industry = [
-    ...currentEmp.map((e) => e.company_industry || ''),
-    profileIndustry || '',
-    mergedResp.industry || '',
-  ].join(' ').toLowerCase();
+  if (!prog || (!ind && !job)) return 'Partially Aligned';
 
-  const isIT = programStr.includes('it') || programStr.includes('information') || programStr.includes('computer');
-  const isEducation = programStr.includes('education') || programStr.includes('bsed') || programStr.includes('beed') || programStr.includes('teach');
+  const matchedKeywords = INDUSTRY_KEYWORDS
+    .filter((entry) => entry.keywords.some((kw) => prog.includes(kw)))
+    .flatMap((entry) => entry.industries.map((i) => i.toLowerCase()));
 
-  if (isIT) {
-    if (
-      /software|developer|engineer|programmer|web|systems?|database|network|cloud|tech|devops|full.?stack|analyst|code|coding/i.test(jobTitle) ||
-      /information technology|\bit\b|software|technology/i.test(industry)
-    ) {
+  const isAlignedIndustry = matchedKeywords.some((m) => ind.includes(m) || m.includes(ind));
+  if (isAlignedIndustry) return 'Aligned with Degree';
+
+  if (prog.includes('it') || prog.includes('information')) {
+    if (/software|developer|engineer|programmer|web|systems?|database|network|cloud|tech|devops|full.?stack|analyst|code|coding/i.test(job)) {
       return 'Aligned with Degree';
     }
-    if (/support|help.?desk|technical|technician|specialist|operations|assistant/i.test(jobTitle)) {
+    if (/support|help.?desk|technical|technician|specialist|operations|assistant/i.test(job)) {
       return 'Partially Aligned';
     }
-    if (jobTitle.trim() && !/unemployed/i.test(jobTitle)) {
+    if (job && !/unemployed/i.test(job)) {
       return 'Not Aligned';
     }
-  } else if (isEducation) {
-    if (/teacher|instructor|educator|professor|faculty|tutor|teaching/i.test(jobTitle) || /education|school|college|academic/i.test(industry)) {
+  } else if (prog.includes('education') || prog.includes('bsed') || prog.includes('beed')) {
+    if (/teacher|instructor|educator|professor|faculty|tutor|teaching/i.test(job)) {
       return 'Aligned with Degree';
     }
-    if (/coordinator|librarian|adviser|counselor/i.test(jobTitle)) {
+    if (/coordinator|librarian|adviser|counselor/i.test(job)) {
       return 'Partially Aligned';
     }
-    if (jobTitle.trim() && !/unemployed/i.test(jobTitle)) {
+    if (job && !/unemployed/i.test(job)) {
+      return 'Not Aligned';
+    }
+  } else if (prog.includes('bit') || prog.includes('industrial')) {
+    if (/technician|mechanic|engineer|electrician|operator|craft|supervisor|machinist/i.test(job)) {
+      return 'Aligned with Degree';
+    }
+    if (job && !/unemployed/i.test(job)) {
       return 'Not Aligned';
     }
   }
 
-  return 'Partially Aligned';
+  return 'Not Aligned';
 }
 
 const router = Router();
@@ -271,44 +283,63 @@ router.get('/statistics', async (req, res, next) => {
 
     const isCurrent = (e: any) => e.is_current === true;
     const employmentStatusOf = (p: any, mergedResp: any) => {
+      const currentEmp = (empByProfile.get(p.id) || []).find(isCurrent);
       const raw =
         p.employment_status ||
-        (empByProfile.get(p.id) || []).find(isCurrent)?.employment_status ||
-        mergedResp.employmentStatus ||
+        currentEmp?.employment_status ||
         mergedResp.employment_status ||
+        mergedResp.employmentStatus ||
         null;
-      const lower = String(raw || '').toLowerCase();
+      const lower = String(raw || '').toLowerCase().trim();
       if (raw === 'Employed' || lower === 'employed') return 'Employed';
-      if (lower === 'self-employed' || lower === 'entrepreneur') return 'Self-employed';
+      if (raw === 'Self-employed' || lower === 'self-employed' || lower === 'entrepreneur' || lower === 'freelance') return 'Self-employed';
       if (lower === 'student' || lower.includes('further studies')) return 'Pursuing Further Studies';
       return 'Unemployed';
+    };
+
+    const isWorkingAlumnus = (p: any, mergedResp: any) => {
+      const currentEmp = (empByProfile.get(p.id) || []).find(isCurrent);
+      const raw =
+        p.employment_status ||
+        currentEmp?.employment_status ||
+        mergedResp.employment_status ||
+        mergedResp.employmentStatus ||
+        '';
+      const lower = String(raw).toLowerCase().trim();
+      return ['employed', 'self-employed', 'entrepreneur', 'freelance'].includes(lower);
     };
 
     // Filter eligible profiles
     const eligibleProfiles = profiles.filter((p: any) => {
       if (academicYear && !academicYearUserIds.has(p.user_id)) return false;
       const edu = eduByProfile.get(p.id) || [];
-      if (batch && !edu.some((e: any) => String(e.year_graduated) === batch)) return false;
+      if (batch && !edu.some((e: any) => String(e.year_graduated) === String(batch))) return false;
       if (course && !edu.some((e: any) => abbreviateProgram(e.program) === course)) return false;
 
       const mergedResp = getMergedUserResponse(p.user_id, p.email);
       const status = employmentStatusOf(p, mergedResp);
-      if (statusFilter && status !== statusFilter) return false;
+      if (statusFilter && status.toLowerCase() !== statusFilter.toLowerCase()) return false;
 
       const currentEmp = (empByProfile.get(p.id) || []).filter(isCurrent);
       const eduPrograms = edu.map((e: any) => e.program || '');
-      const alignment = classifyAlignment(mergedResp, eduPrograms, currentEmp, p.current_job_title, p.industry);
-      if (alignmentFilter && alignment !== alignmentFilter) return false;
+      const isWorking = isWorkingAlumnus(p, mergedResp);
+
+      if (alignmentFilter) {
+        if (!isWorking) return false;
+        const alignment = classifyAlignment(eduPrograms, currentEmp, p.current_job_title, p.industry, mergedResp.course_alignment);
+        if (alignment !== alignmentFilter) return false;
+      }
 
       if (industryFilter) {
-        const industries = currentEmp
-          .map((e: any) => String(e.company_industry || '').trim())
-          .concat(p.industry || '', mergedResp.industry || '');
-        if (!industries.some((i: any) => i === industryFilter)) return false;
+        const ind = (currentEmp[0]?.company_industry || p.industry || mergedResp.industry || '').trim().toLowerCase();
+        if (ind !== industryFilter.trim().toLowerCase()) return false;
       }
 
       if (dateFrom || dateTo) {
-        const dates = currentEmp.map((e: any) => e.start_date || e.updated_at).filter(Boolean);
+        const dates = currentEmp
+          .map((e: any) => e.start_date || e.updated_at)
+          .concat(p.created_at, mergedResp.submitted_at)
+          .filter(Boolean);
         const inRange = dates.some((d: any) => {
           const t = new Date(d).getTime();
           if (dateFrom && t < new Date(dateFrom).getTime()) return false;
@@ -325,20 +356,20 @@ router.get('/statistics', async (req, res, next) => {
     const eligibleEmployment = employment.filter((e: any) => eligibleIds.has(e.profile_id));
     const eligibleSkills = skills.filter((s: any) => eligibleIds.has(s.profile_id));
 
-    // --- Degree Alignment ---
+    // --- Degree Alignment (evaluated accurately for working alumni) ---
     const alignmentCounts: Record<string, number> = { 'Aligned with Degree': 0, 'Partially Aligned': 0, 'Not Aligned': 0 };
     let alignmentTotal = 0;
+    let employedAlumniCount = 0;
     eligibleProfiles.forEach((p: any) => {
       const mergedResp = getMergedUserResponse(p.user_id, p.email);
       const edu = eduByProfile.get(p.id) || [];
       const currentEmp = (empByProfile.get(p.id) || []).filter(isCurrent);
       const eduPrograms = edu.map((e: any) => e.program || '');
-      const status = employmentStatusOf(p, mergedResp);
 
-      // Only count alumni who are employed or who provided survey feedback
-      const hasJob = currentEmp.length > 0 || p.current_job_title || mergedResp.position;
-      if (status !== 'Unemployed' || hasJob || mergedResp.curriculumRelevance || mergedResp.course_alignment) {
-        const cat = classifyAlignment(mergedResp, eduPrograms, currentEmp, p.current_job_title, p.industry);
+      const isWorking = isWorkingAlumnus(p, mergedResp);
+      if (isWorking) {
+        employedAlumniCount++;
+        const cat = classifyAlignment(eduPrograms, currentEmp, p.current_job_title, p.industry, mergedResp.course_alignment);
         alignmentCounts[cat] = (alignmentCounts[cat] || 0) + 1;
         alignmentTotal++;
       }
@@ -443,11 +474,16 @@ router.get('/statistics', async (req, res, next) => {
       });
     });
 
+    const totalSkillsReporting = eligibleProfiles.filter((p: any) => {
+      const resp = getMergedUserResponse(p.user_id, p.email);
+      return eligibleSkills.some((s: any) => s.profile_id === p.id) || resp.skills_list;
+    }).length || totalAlumni || 1;
+
     const skillsFrequentlyUsed = toRanked(skillCount)
       .map((s) => ({
         name: s.name,
         count: s.count,
-        percentage: totalAlumni > 0 ? Math.min(100, Math.round((s.count / Math.max(totalAlumni, 1)) * 100)) : 0,
+        percentage: Math.min(100, Math.round((s.count / totalSkillsReporting) * 100)),
       }))
       .slice(0, 12);
 
@@ -613,11 +649,12 @@ router.get('/statistics', async (req, res, next) => {
       }
     });
 
+    const totalIndustryReporting = Object.values(industryCount).reduce((a, b) => a + b, 0) || 1;
     const industryAlignment = toRanked(industryCount)
       .map((i) => ({
         industry: i.name,
         count: i.count,
-        percentage: totalAlumni > 0 ? Math.round((i.count / totalAlumni) * 100) : 0,
+        percentage: Math.round((i.count / totalIndustryReporting) * 100),
       }))
       .slice(0, 10);
 
@@ -681,6 +718,8 @@ router.get('/statistics', async (req, res, next) => {
     res.json({
       overview: {
         totalAlumni,
+        employedAlumni: employedAlumniCount,
+        alignedCount: alignmentCounts['Aligned with Degree'] + alignmentCounts['Partially Aligned'],
         workAlignmentRate,
         averageTimeToEmployment,
         averageSatisfaction,
