@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { adminApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
-import { MegaphoneIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { MegaphoneIcon, XMarkIcon, PhotoIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 const EMPTY_FORM = { title: '', content: '', image_url: '', document_url: '', is_pinned: false, send_to_all: true, linked_survey_id: '', status: 'published' };
 
@@ -16,8 +16,30 @@ export default function AnnouncementManagement() {
   const [form, setForm] = useState<any>({ ...EMPTY_FORM });
   const [availableSurveys, setAvailableSurveys] = useState<any[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const addNotification = useUIStore((s) => s.addNotification);
   const limit = 15;
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      addNotification('Please choose an image file (PNG, JPG, WEBP, GIF)', 'error');
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const res = await adminApi.announcementUploadImage(file);
+      setForm((f: any) => ({ ...f, image_url: res.url }));
+      addNotification('Image uploaded successfully', 'success');
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to upload image', 'error');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -260,14 +282,52 @@ export default function AnnouncementManagement() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">Content *</label>
                   <textarea value={form.content} onChange={(e) => setForm((f: any) => ({ ...f, content: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" rows={5} required />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Image URL</label>
-                    <input type="url" value={form.image_url} onChange={(e) => setForm((f: any) => ({ ...f, image_url: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" />
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Flyer / Cover Image</label>
+                    {form.image_url ? (
+                      <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50 p-2.5 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <img src={form.image_url} alt="Cover preview" className="w-14 h-14 object-cover rounded-lg shrink-0 border border-gray-200 shadow-2xs" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-gray-800">Cover Image Attached</p>
+                            <p className="text-[10px] text-gray-400 truncate max-w-[220px]">
+                              {form.image_url.startsWith('data:') ? 'Uploaded image file' : form.image_url}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setForm((f: any) => ({ ...f, image_url: '' }))}
+                          className="px-2.5 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 font-medium shrink-0"
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" /> Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="border-2 border-dashed border-gray-200 hover:border-orange-400 rounded-xl p-4 text-center cursor-pointer bg-gray-50/50 hover:bg-orange-50/30 transition-all group"
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                        <PhotoIcon className="w-6 h-6 mx-auto text-gray-400 group-hover:text-orange-500 transition-colors mb-1" />
+                        <p className="text-xs font-semibold text-gray-700 group-hover:text-orange-600">
+                          {uploadingImage ? 'Uploading image...' : 'Click to upload flyer / cover photo'}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">PNG, JPG, WEBP, or GIF up to 15MB</p>
+                      </div>
+                    )}
                   </div>
+
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Document URL</label>
-                    <input type="url" value={form.document_url} onChange={(e) => setForm((f: any) => ({ ...f, document_url: e.target.value }))} className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" />
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Document URL <span className="text-gray-400 font-normal">(optional PDF or link)</span></label>
+                    <input type="url" value={form.document_url} onChange={(e) => setForm((f: any) => ({ ...f, document_url: e.target.value }))} placeholder="https://..." className="text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 w-full" />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

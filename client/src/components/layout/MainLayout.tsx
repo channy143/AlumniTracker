@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
@@ -22,10 +22,36 @@ const mobileNavItems = [
 ];
 
 export default function MainLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
   const isAdminPath = location.pathname.startsWith('/admin');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const isAdmin = window.location.pathname.startsWith('/admin');
+    const key = isAdmin ? 'ctu_admin_sidebar_collapsed' : 'ctu_sidebar_collapsed';
+    const stored = localStorage.getItem(key);
+    if (stored !== null) return stored === 'true';
+    return isAdmin; // collapsed as default state for admin
+  });
+
+  // Sync collapsed state when switching between admin and user routes
+  useEffect(() => {
+    const key = isAdminPath ? 'ctu_admin_sidebar_collapsed' : 'ctu_sidebar_collapsed';
+    const stored = localStorage.getItem(key);
+    if (stored !== null) {
+      setSidebarCollapsed(stored === 'true');
+    } else {
+      setSidebarCollapsed(isAdminPath); // default true for admin, false for alumni
+    }
+  }, [isAdminPath]);
+
+  const handleToggleCollapse = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      const key = isAdminPath ? 'ctu_admin_sidebar_collapsed' : 'ctu_sidebar_collapsed';
+      localStorage.setItem(key, String(next));
+      return next;
+    });
+  };
 
   return (
     <div className="min-h-screen flex bg-gray-50">
@@ -34,7 +60,7 @@ export default function MainLayout() {
         mobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}
         collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+        onToggleCollapse={handleToggleCollapse}
       />
 
       <div className={`flex-1 flex flex-col min-w-0 transition-[margin] duration-300 ease-in-out ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>

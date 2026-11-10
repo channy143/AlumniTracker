@@ -1,8 +1,51 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 
 const router = Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
+
+// POST /api/admin/events/upload-image - upload event banner / poster image
+router.post('/upload-image', upload.single('image'), async (req, res, next) => {
+  try {
+    const file = req.file;
+    if (!file) throw new AppError('No image file uploaded', 400);
+
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/gif'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new AppError('Unsupported image format. Please upload JPG, PNG, WEBP, or GIF.', 400);
+    }
+
+    const ext = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `events/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+
+    let publicUrl: string | null = null;
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('profiles')
+        .upload(fileName, file.buffer, { contentType: file.mimetype, upsert: true });
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('profiles').getPublicUrl(fileName);
+        publicUrl = urlData.publicUrl;
+      }
+    } catch (storageErr) {
+      console.warn('[Event Upload] Storage upload fallback to data URL:', storageErr);
+    }
+
+    if (!publicUrl) {
+      publicUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    }
+
+    res.json({ url: publicUrl, file_name: file.originalname });
+  } catch (err) {
+    next(err);
+  }
+});
 
 let eventColumnsSupported: boolean | null = null;
 
@@ -23,6 +66,7 @@ function mapRow(e: any) {
     location: e.event_location || '',
     organizer: e.company || '',
     banner: e.image_url || '',
+    image_url: e.image_url || '',
     registration_link: e.job_url || '',
     gallery: e.event_gallery || [],
     created_at: e.created_at,
@@ -56,7 +100,7 @@ router.get('/', async (_req, res, next) => {
 // POST /api/admin/events - create an event as a feed post
 router.post('/', async (req, res, next) => {
   try {
-    const { name, description, date, time, location } = req.body || {};
+    const { name, description, date, time, location, banner, image_url } = req.body || {};
     if (!name) throw new AppError('Event name is required', 400);
 
     const payload: Record<string, any> = {
@@ -68,6 +112,7 @@ router.post('/', async (req, res, next) => {
       tag: 'Event',
       tag_color: 'bg-pink-50 text-pink-700',
       is_official: true,
+      image_url: banner || image_url || null,
     };
 
     if (await hasEventColumns()) {
@@ -86,13 +131,17 @@ router.post('/', async (req, res, next) => {
 // PUT /api/admin/events - update an event (id sent in body)
 router.put('/', async (req, res, next) => {
   try {
-    const { id, name, description, date, time, location } = req.body || {};
+    const { id, name, description, date, time, location, banner, image_url } = req.body || {};
     if (!id) throw new AppError('Event id is required', 400);
 
     const payload: Record<string, any> = {
       title: name,
       content: description || '',
     };
+
+    if (banner !== undefined || image_url !== undefined) {
+      payload.image_url = banner || image_url || null;
+    }
 
     if (await hasEventColumns()) {
       payload.event_date = date || null;

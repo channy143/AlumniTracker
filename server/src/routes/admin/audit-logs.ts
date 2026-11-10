@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
+import { logAudit } from '../../services/auditLogger';
+import { AuthenticatedRequest } from '../../types';
 
 const router = Router();
 
@@ -260,6 +262,202 @@ router.get('/export', async (req, res, next) => {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=audit-trail-${new Date().toISOString().slice(0, 10)}.csv`);
     res.send(csvContent);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/admin/audit-logs/reports - list alumni reported content
+router.get('/reports', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { data: reports, error } = await supabase
+      .from('feed_post_reports')
+      .select('*, feed_posts(*)')
+      .order('created_at', { ascending: false });
+
+    if (error && (error.code === '42P01' || error.code === 'PGRST205')) {
+      return res.json({ reports: [] });
+    }
+    if (error) throw new AppError(error.message, 500);
+
+    const reporterIds = [...new Set((reports || []).map((r: any) => r.user_id).filter(Boolean))];
+    const postUserIds = [...new Set((reports || []).map((r: any) => r.feed_posts?.user_id).filter(Boolean))];
+    const allUserIds = [...new Set([...reporterIds, ...postUserIds])];
+
+    const userMap = new Map();
+    const profileMap = new Map();
+
+    if (allUserIds.length > 0) {
+      const [{ data: users }, { data: profiles }] = await Promise.all([
+        supabase.from('users').select('id, email').in('id', allUserIds),
+        supabase.from('profiles').select('user_id, avatar_url, first_name, last_name, program, batch_year').in('user_id', allUserIds),
+      ]);
+      (users || []).forEach((u: any) => userMap.set(u.id, u));
+      (profiles || []).forEach((p: any) => profileMap.set(p.user_id, p));
+    }
+
+    const enriched = (reports || []).map((r: any) => {
+      const reporterUser = userMap.get(r.user_id);
+      const reporterProfile = profileMap.get(r.user_id);
+      const postUser = userMap.get(r.feed_posts?.user_id);
+      const postProfile = profileMap.get(r.feed_posts?.user_id);
+
+      return {
+        ...r,
+        reporter: {
+          id: r.user_id,
+          email: reporterUser?.email || null,
+          name: reporterProfile ? `${reporterProfile.first_name || ''} ${reporterProfile.last_name || ''}`.trim() : reporterUser?.email || 'Alumni Member',
+          avatar_url: reporterProfile?.avatar_url || null,
+          program: reporterProfile?.program || null,
+          batch_year: reporterProfile?.batch_year || null,
+        },
+        post: r.feed_posts ? {
+          ...r.feed_posts,
+          author_profile: postProfile ? {
+            name: `${postProfile.first_name || ''} ${postProfile.last_name || ''}`.trim(),
+            avatar_url: postProfile.avatar_url,
+            program: postProfile.program,
+            batch_year: postProfile.batch_year,
+          } : null,
+          author_email: postUser?.email || null,
+        } : null,
+      };
+    });
+
+    res.json({ reports: enriched });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/admin/audit-logs/reports/:id/status - resolve or dismiss an alumni report
+router.put('/reports/:id/status', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, adminNotes } = req.body || {};
+
+    if (!['pending', 'investigating', 'resolved', 'dismissed'].includes(status)) {
+      throw new AppError('Invalid report status', 400);
+    }
+
+    const { data: updated, error } = await supabase
+      .from('feed_post_reports')
+      .update({
+        status,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw new AppError(error.message, 500);
+
+    await logAudit(req, {
+      action: status === 'dismissed' ? 'DISMISSED_ALUMNI_REPORT' : 'RESOLVED_ALUMNI_REPORT',
+      entity: 'feed_post_reports',
+      entityId: id,
+      actorId: req.user?.userId,
+      actorName: req.user?.email || 'Administrator',
+      actorRole: 'admin',
+      details: {
+        reportId: id,
+        newStatus: status,
+        notes: adminNotes || null,
+      },
+      severity: 'info',
+    });
+
+    res.json({ message: `Report marked as ${status}`, report: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/admin/audit-logs/posts/:id - admin delete an alumni post and resolve reports
+router.delete('/posts/:id', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const reason = ((req.body && req.body.reason) || req.query.reason) as string | undefined;
+
+    // 1. Fetch post details for audit trail
+    const { data: post, error: findError } = await supabase
+      .from('feed_posts')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (findError || !post) {
+      throw new AppError('Post not found or already deleted', 404);
+    }
+
+    // 2. Log audit entry before deletion
+    await logAudit(req, {
+      action: 'ADMIN_DELETED_POST',
+      entity: 'feed_posts',
+      entityId: id,
+      actorId: req.user?.userId,
+      actorName: req.user?.email || 'Administrator',
+      actorRole: 'admin',
+      details: {
+        postId: post.id,
+        author: post.author,
+        authorUserId: post.user_id,
+        contentSnippet: post.content?.slice(0, 150),
+        title: post.title || null,
+        imageUrl: post.image_url || null,
+        moderationReason: reason || 'Deleted by administrator moderation review',
+      },
+      severity: 'warning',
+    });
+
+    // 3. Mark any associated reports as resolved
+    await supabase
+      .from('feed_post_reports')
+      .update({ status: 'resolved' })
+      .eq('post_id', id);
+
+    // 4. Delete the post (cascades to comments/likes)
+    const { error: deleteError } = await supabase
+      .from('feed_posts')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) throw new AppError(deleteError.message, 500);
+
+    res.json({ message: 'Post permanently deleted by administrator' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/admin/audit-logs/alumni-posts - list all alumni feed posts for moderation
+router.get('/alumni-posts', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const offset = (page - 1) * limit;
+    const search = (req.query.search as string) || '';
+    const type = (req.query.type as string) || '';
+
+    let query = supabase
+      .from('feed_posts')
+      .select('*', { count: 'exact' });
+
+    if (type && type !== 'all') {
+      query = query.eq('type', type);
+    }
+
+    if (search) {
+      const cleanSearch = sanitizeFilterInput(search);
+      query = query.or(`author.ilike.%${cleanSearch}%,content.ilike.%${cleanSearch}%,title.ilike.%${cleanSearch}%`);
+    }
+
+    query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+
+    const { data: posts, count, error } = await query;
+    if (error) throw new AppError(error.message, 500);
+
+    res.json({ posts: posts || [], total: count || 0, page, limit });
   } catch (err) {
     next(err);
   }

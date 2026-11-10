@@ -416,6 +416,16 @@ export const adminApi = {
 
   announcementList: (params: Record<string, any> = {}) => api.get<any>(`/admin/announcements?${toQuery(params)}`),
   announcementCreate: (data: any) => api.post<any>('/admin/announcements', data),
+  announcementUploadImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.upload<{ url: string; file_name: string }>('/admin/announcements/upload-image', formData);
+  },
+  eventUploadImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.upload<{ url: string; file_name: string }>('/admin/events/upload-image', formData);
+  },
   announcementUpdate: (id: string, data: any) => api.put<any>(`/admin/announcements/${id}`, data),
   announcementDelete: (id: string) => api.delete(`/admin/announcements/${id}`),
   announcementHardDelete: (id: string) => api.delete(`/admin/announcements/${id}?hard=true`),
@@ -486,6 +496,13 @@ export const adminApi = {
   auditLogs: (params: Record<string, any> = {}) => api.get<any>(`/admin/audit-logs?${toQuery(params)}`),
   auditLogStats: () => api.get<any>('/admin/audit-logs/stats'),
   exportAuditLogsUrl: (params: Record<string, any> = {}) => `/api/admin/audit-logs/export?${toQuery(params)}`,
+  auditReports: () => api.get<{ reports: any[] }>('/admin/audit-logs/reports'),
+  auditUpdateReportStatus: (id: string, status: string, adminNotes?: string) =>
+    api.put<any>(`/admin/audit-logs/reports/${id}/status`, { status, adminNotes }),
+  auditDeletePost: (id: string, reason?: string) =>
+    api.delete<any>(`/admin/audit-logs/posts/${id}${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`),
+  auditAlumniPosts: (params: Record<string, any> = {}) =>
+    api.get<{ posts: any[]; total: number; page: number; limit: number }>(`/admin/audit-logs/alumni-posts?${toQuery(params)}`),
 
   careerOverview: () => api.get<any>('/admin/analytics/career-overview'),
   careerProgression: () => api.get<any>('/admin/analytics/career-progression'),

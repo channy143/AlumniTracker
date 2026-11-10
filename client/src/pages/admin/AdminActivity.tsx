@@ -17,6 +17,10 @@ import {
   DocumentDuplicateIcon,
   CheckIcon,
   CalendarDaysIcon,
+  FlagIcon,
+  TrashIcon,
+  ChatBubbleOvalLeftIcon,
+  NoSymbolIcon,
 } from '@heroicons/react/24/outline';
 
 function timeAgo(dateStr: string) {
@@ -369,7 +373,27 @@ export default function AdminActivity() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
 
-  const [mainTab, setMainTab] = useState<'audit' | 'incidents'>('audit');
+  const [mainTab, setMainTab] = useState<'audit' | 'incidents' | 'moderation'>('audit');
+
+  // Alumni Reports & Moderation State
+  const [reports, setReports] = useState<any[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [moderationSubTab, setModerationSubTab] = useState<'reports' | 'posts'>('reports');
+  const [reportSearch, setReportSearch] = useState('');
+  const [reportStatusFilter, setReportStatusFilter] = useState('all');
+  const [reportReasonFilter, setReportReasonFilter] = useState('all');
+
+  // Alumni Posts Moderation State
+  const [alumniPosts, setAlumniPosts] = useState<any[]>([]);
+  const [loadingAlumniPosts, setLoadingAlumniPosts] = useState(false);
+  const [alumniPostsTotal, setAlumniPostsTotal] = useState(0);
+  const [alumniPostSearch, setAlumniPostSearch] = useState('');
+  const [alumniPostPage, setAlumniPostPage] = useState(1);
+
+  // Post Deletion Confirmation Modal
+  const [postToDelete, setPostToDelete] = useState<{ id: string; author?: string; snippet?: string } | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [isDeletingPost, setIsDeletingPost] = useState(false);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -401,9 +425,10 @@ export default function AdminActivity() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Load incidents on initial mount so tab badge is populated
+  // Load incidents and reports on initial mount so tab badges are populated
   useEffect(() => {
     loadIncidents();
+    loadReports();
   }, []);
 
   // Debounced search - only triggers when search actually changes, not on initial mount
@@ -562,6 +587,98 @@ export default function AdminActivity() {
     showToast('Security incident report exported as CSV');
   };
 
+  const loadReports = async () => {
+    setLoadingReports(true);
+    try {
+      const res = await adminApi.auditReports();
+      setReports(res.reports || []);
+    } catch (err: any) {
+      console.error('Failed to load alumni reports:', err);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const loadAlumniPosts = async (targetPage = 1, searchQuery = '') => {
+    setLoadingAlumniPosts(true);
+    try {
+      const res = await adminApi.auditAlumniPosts({ page: targetPage, limit: 15, search: searchQuery });
+      setAlumniPosts(res.posts || []);
+      setAlumniPostsTotal(res.total || 0);
+    } catch (err: any) {
+      console.error('Failed to load alumni posts:', err);
+    } finally {
+      setLoadingAlumniPosts(false);
+    }
+  };
+
+  const filteredReports = useMemo(() => {
+    return reports.filter((rep) => {
+      if (reportStatusFilter !== 'all' && rep.status !== reportStatusFilter) return false;
+      if (reportReasonFilter !== 'all' && (rep.reason || '').toLowerCase() !== reportReasonFilter.toLowerCase()) return false;
+      if (reportSearch.trim()) {
+        const q = reportSearch.toLowerCase().trim();
+        const reporterName = (rep.reporter?.name || '').toLowerCase();
+        const reporterEmail = (rep.reporter?.email || '').toLowerCase();
+        const authorName = (rep.post?.author || rep.post?.author_profile?.name || '').toLowerCase();
+        const authorEmail = (rep.post?.author_email || '').toLowerCase();
+        const reason = (rep.reason || '').toLowerCase();
+        const details = (rep.details || '').toLowerCase();
+        const content = (rep.post?.content || '').toLowerCase();
+        const title = (rep.post?.title || '').toLowerCase();
+        if (
+          !reporterName.includes(q) &&
+          !reporterEmail.includes(q) &&
+          !authorName.includes(q) &&
+          !authorEmail.includes(q) &&
+          !reason.includes(q) &&
+          !details.includes(q) &&
+          !content.includes(q) &&
+          !title.includes(q)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [reports, reportStatusFilter, reportReasonFilter, reportSearch]);
+
+  const handleUpdateReportStatus = async (reportId: string, status: string, notes?: string) => {
+    try {
+      await adminApi.auditUpdateReportStatus(reportId, status, notes);
+      showToast(`Report updated to ${status}`);
+      loadReports();
+    } catch (err: any) {
+      showToast('Failed to update report: ' + (err.message || 'Server error'));
+    }
+  };
+
+  const handleConfirmDeletePost = async () => {
+    if (!postToDelete) return;
+    setIsDeletingPost(true);
+    try {
+      await adminApi.auditDeletePost(postToDelete.id, deleteReason);
+      showToast('Alumni post permanently deleted and logged to audit trail.');
+      setPostToDelete(null);
+      setDeleteReason('');
+      loadReports();
+      loadAlumniPosts(alumniPostPage, alumniPostSearch);
+    } catch (err: any) {
+      showToast('Failed to delete post: ' + (err.message || 'Server error'));
+    } finally {
+      setIsDeletingPost(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mainTab === 'moderation' && moderationSubTab === 'posts') {
+      const timer = setTimeout(() => {
+        loadAlumniPosts(alumniPostPage, alumniPostSearch);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [mainTab, moderationSubTab, alumniPostPage, alumniPostSearch]);
+
   useEffect(() => {
     if (mainTab === 'audit') {
       loadData();
@@ -615,11 +732,19 @@ export default function AdminActivity() {
 
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => (mainTab === 'incidents' ? loadIncidents() : loadData(true))}
-            disabled={mainTab === 'incidents' ? loadingIncidents : refreshing}
+            onClick={() => {
+              if (mainTab === 'incidents') loadIncidents();
+              else if (mainTab === 'moderation') {
+                loadReports();
+                if (moderationSubTab === 'posts') loadAlumniPosts(alumniPostPage, alumniPostSearch);
+              } else {
+                loadData(true);
+              }
+            }}
+            disabled={mainTab === 'incidents' ? loadingIncidents : mainTab === 'moderation' ? (loadingReports || loadingAlumniPosts) : refreshing}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
           >
-            <ArrowPathIcon className={`w-3.5 h-3.5 ${(mainTab === 'incidents' ? loadingIncidents : refreshing) ? 'animate-spin text-orange-500' : 'text-gray-500'}`} />
+            <ArrowPathIcon className={`w-3.5 h-3.5 ${(mainTab === 'incidents' ? loadingIncidents : mainTab === 'moderation' ? (loadingReports || loadingAlumniPosts) : refreshing) ? 'animate-spin text-orange-500' : 'text-gray-500'}`} />
             Refresh
           </button>
           {mainTab === 'audit' && (
@@ -684,6 +809,30 @@ export default function AdminActivity() {
             </span>
           )}
         </button>
+
+        <button
+          onClick={() => {
+            setMainTab('moderation');
+            loadReports();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer shrink-0 ${
+            mainTab === 'moderation'
+              ? 'border-orange-500 text-orange-600'
+              : 'border-transparent text-gray-500 hover:text-gray-800'
+          }`}
+        >
+          <FlagIcon className="w-4 h-4 text-amber-500" />
+          <span>Alumni Reports &amp; Moderation</span>
+          {reports.filter((r) => r.status === 'pending' || r.status === 'investigating').length > 0 ? (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">
+              {reports.filter((r) => r.status === 'pending' || r.status === 'investigating').length} Active
+            </span>
+          ) : (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+              {reports.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Incidents KPI Cards */}
@@ -729,6 +878,53 @@ export default function AdminActivity() {
               {allIncidents.filter((i) => i.status === 'resolved').length}
             </p>
             <p className="text-[10px] text-gray-400 mt-0.5">Verified &amp; mitigated incidents</p>
+          </div>
+        </div>
+      )}
+
+      {/* Alumni Moderation KPI Cards */}
+      {mainTab === 'moderation' && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+            <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+              <FlagIcon className="w-4 h-4 text-amber-500" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Total Reports</span>
+            </div>
+            <p className="text-2xl font-black text-gray-900">{reports.length}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Alumni community flags</p>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+            <div className="flex items-center gap-1.5 text-amber-600 mb-1">
+              <ExclamationTriangleIcon className="w-4 h-4" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Pending Review</span>
+            </div>
+            <p className="text-2xl font-black text-amber-600">
+              {reports.filter((r) => r.status === 'pending').length}
+            </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Requires moderator action</p>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+            <div className="flex items-center gap-1.5 text-blue-600 mb-1">
+              <EyeIcon className="w-4 h-4" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Investigating</span>
+            </div>
+            <p className="text-2xl font-black text-blue-600">
+              {reports.filter((r) => r.status === 'investigating').length}
+            </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Under administrative review</p>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
+            <div className="flex items-center gap-1.5 text-emerald-600 mb-1">
+              <CheckCircleIcon className="w-4 h-4" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Resolved / Handled</span>
+            </div>
+            <p className="text-2xl font-black text-emerald-600">
+              {reports.filter((r) => r.status === 'resolved' || r.status === 'dismissed').length}
+            </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Deleted posts &amp; dismissed reports</p>
           </div>
         </div>
       )}
@@ -891,8 +1087,8 @@ export default function AdminActivity() {
         </div>
       )}
 
-      {/* Audit Log or Security Incidents Table */}
-      {mainTab === 'incidents' ? (
+      {/* Security Incidents Table */}
+      {mainTab === 'incidents' && (
         <div className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 bg-red-50/20">
             <div>
@@ -1088,7 +1284,10 @@ export default function AdminActivity() {
             </table>
           </div>
         </div>
-      ) : (
+      )}
+
+      {/* Audit Log Table */}
+      {mainTab === 'audit' && (
         <div className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden relative">
           {refreshing && (
             <div className="h-0.5 w-full bg-orange-100 overflow-hidden">
@@ -1238,6 +1437,407 @@ export default function AdminActivity() {
         </div>
       )}
 
+      {/* Alumni Reports & Content Moderation Section */}
+      {mainTab === 'moderation' && (
+        <div className="bg-white border border-gray-200 rounded-xl shadow-2xs overflow-hidden">
+          {/* Header & Sub-tab Bar */}
+          <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 bg-amber-50/20">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <FlagIcon className="w-4 h-4 text-amber-600" />
+                Alumni Community Reports &amp; Content Moderation
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Review flagged posts, remove community policy violations, and inspect live alumni activity.
+              </p>
+            </div>
+
+            <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50 text-xs font-semibold">
+              <button
+                onClick={() => setModerationSubTab('reports')}
+                className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                  moderationSubTab === 'reports'
+                    ? 'bg-white text-orange-600 shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Reported Content ({reports.length})
+              </button>
+              <button
+                onClick={() => {
+                  setModerationSubTab('posts');
+                  if (alumniPosts.length === 0) loadAlumniPosts(1, alumniPostSearch);
+                }}
+                className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
+                  moderationSubTab === 'posts'
+                    ? 'bg-white text-orange-600 shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                All Alumni Posts ({alumniPostsTotal || 'Browse'})
+              </button>
+            </div>
+          </div>
+
+          {/* Subtab 1: Reported Content */}
+          {moderationSubTab === 'reports' && (
+            <div className="p-4 space-y-4">
+              {/* Filter controls */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50/70 p-3 rounded-xl border border-gray-100">
+                <div className="relative flex-1 min-w-[220px] max-w-sm">
+                  <MagnifyingGlassIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search reporter, author, reason, or content..."
+                    value={reportSearch}
+                    onChange={(e) => setReportSearch(e.target.value)}
+                    className="w-full text-xs pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg outline-none focus:border-orange-400 bg-white"
+                  />
+                  {reportSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setReportSearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                    >
+                      <XMarkIcon className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={reportStatusFilter}
+                    onChange={(e) => setReportStatusFilter(e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="investigating">Investigating</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="dismissed">Dismissed</option>
+                  </select>
+
+                  <select
+                    value={reportReasonFilter}
+                    onChange={(e) => setReportReasonFilter(e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 bg-white"
+                  >
+                    <option value="all">All Reasons</option>
+                    <option value="spam">Spam</option>
+                    <option value="harassment">Harassment</option>
+                    <option value="inappropriate">Inappropriate</option>
+                    <option value="misinformation">Misinformation</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Reports List */}
+              {loadingReports ? (
+                <div className="py-12 text-center text-xs text-gray-500">
+                  <ArrowPathIcon className="w-6 h-6 animate-spin text-orange-500 mx-auto mb-2" />
+                  Loading alumni reports...
+                </div>
+              ) : filteredReports.length === 0 ? (
+                <div className="py-16 text-center text-xs">
+                  <FlagIcon className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="font-semibold text-gray-700">No reported alumni content</p>
+                  <p className="text-gray-400 mt-0.5">No reports match your current filter criteria.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredReports.map((rep) => {
+                    const statusClass =
+                      rep.status === 'pending'
+                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                        : rep.status === 'investigating'
+                        ? 'bg-blue-100 text-blue-800 border-blue-200'
+                        : rep.status === 'resolved'
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                        : 'bg-gray-100 text-gray-700 border-gray-200';
+
+                    return (
+                      <div
+                        key={rep.id}
+                        className="border border-gray-200 rounded-xl p-4 bg-white hover:border-gray-300 transition-all shadow-2xs space-y-3"
+                      >
+                        {/* Top row */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border uppercase tracking-wider ${statusClass}`}>
+                              {rep.status || 'pending'}
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                              <FlagIcon className="w-3 h-3 text-red-500" />
+                              Reason: {rep.reason || 'Flagged Content'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-gray-400" title={formatFullDate(rep.created_at)}>
+                            Reported {timeAgo(rep.created_at)}
+                          </span>
+                        </div>
+
+                        {/* Reporter & Note */}
+                        <div className="flex flex-wrap items-start justify-between gap-3 text-xs bg-amber-50/40 p-3 rounded-lg border border-amber-100">
+                          <div>
+                            <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Reported By</span>
+                            <p className="font-semibold text-gray-900">
+                              {rep.reporter?.name || 'Alumni Member'}{' '}
+                              <span className="text-gray-500 font-normal">({rep.reporter?.email || 'No email'})</span>
+                            </p>
+                            {(rep.reporter?.program || rep.reporter?.batch_year) && (
+                              <p className="text-[11px] text-gray-500">
+                                {rep.reporter.program} • Batch {rep.reporter.batch_year}
+                              </p>
+                            )}
+                          </div>
+                          {rep.details && (
+                            <div className="max-w-md w-full bg-white p-2.5 rounded-md border border-amber-200 text-gray-800 text-xs">
+                              <span className="text-[10px] text-amber-700 font-bold block uppercase tracking-wider mb-0.5">Reporter's Details:</span>
+                              <p className="italic font-medium">"{rep.details}"</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Reported Post Box */}
+                        {rep.post ? (
+                          <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-200 space-y-2.5">
+                            <div className="flex items-center justify-between gap-2 border-b border-gray-200/60 pb-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-full bg-orange-100 text-orange-700 font-bold text-xs flex items-center justify-center shrink-0">
+                                  {(rep.post.author || 'A').charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-gray-900">
+                                    {rep.post.author_profile?.name || rep.post.author || 'Alumni Author'}
+                                  </p>
+                                  <p className="text-[10px] text-gray-500">
+                                    {rep.post.author_email || 'Author'} • Posted {timeAgo(rep.post.created_at)}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-gray-200 text-gray-700">
+                                {rep.post.type || 'post'}
+                              </span>
+                            </div>
+
+                            {rep.post.title && (
+                              <h4 className="text-xs font-bold text-gray-900">{rep.post.title}</h4>
+                            )}
+
+                            <p className="text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+                              {rep.post.content}
+                            </p>
+
+                            {rep.post.image_url && (
+                              <div className="pt-1">
+                                <a
+                                  href={rep.post.image_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-block"
+                                >
+                                  <img
+                                    src={rep.post.image_url}
+                                    alt="Reported post attachment"
+                                    className="max-h-48 max-w-full rounded-lg object-cover border border-gray-200 hover:opacity-90 transition-opacity"
+                                  />
+                                </a>
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-4 pt-1 text-[11px] text-gray-400">
+                              <span>❤️ {rep.post.likes_count || 0} likes</span>
+                              <span>💬 {rep.post.comments_count || 0} comments</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-red-50/60 border border-red-200 rounded-xl p-3 text-xs text-red-700 flex items-center gap-2">
+                            <NoSymbolIcon className="w-4 h-4 shrink-0 text-red-500" />
+                            <span>This post has already been permanently deleted or is no longer accessible.</span>
+                          </div>
+                        )}
+
+                        {/* Moderation Actions */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100">
+                          <div className="flex items-center gap-2">
+                            {rep.status !== 'investigating' && (
+                              <button
+                                onClick={() => handleUpdateReportStatus(rep.id, 'investigating')}
+                                className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors cursor-pointer"
+                              >
+                                Mark Investigating
+                              </button>
+                            )}
+                            {rep.status !== 'resolved' && (
+                              <button
+                                onClick={() => handleUpdateReportStatus(rep.id, 'resolved')}
+                                className="text-xs px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold transition-colors cursor-pointer"
+                              >
+                                Mark Resolved
+                              </button>
+                            )}
+                            {rep.status !== 'dismissed' && (
+                              <button
+                                onClick={() => handleUpdateReportStatus(rep.id, 'dismissed')}
+                                className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 font-medium transition-colors cursor-pointer"
+                              >
+                                Dismiss Report
+                              </button>
+                            )}
+                            {(rep.status === 'resolved' || rep.status === 'dismissed') && (
+                              <button
+                                onClick={() => handleUpdateReportStatus(rep.id, 'pending')}
+                                className="text-xs px-2.5 py-1 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 font-medium transition-colors cursor-pointer"
+                              >
+                                Reopen
+                              </button>
+                            )}
+                          </div>
+
+                          {rep.post && (
+                            <button
+                              onClick={() =>
+                                setPostToDelete({
+                                  id: rep.post.id,
+                                  author: rep.post.author_profile?.name || rep.post.author,
+                                  snippet: rep.post.content?.slice(0, 100),
+                                })
+                              }
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                            >
+                              <TrashIcon className="w-3.5 h-3.5" />
+                              Delete Post &amp; Resolve
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Subtab 2: All Alumni Feed Posts */}
+          {moderationSubTab === 'posts' && (
+            <div className="p-4 space-y-4">
+              {/* Search input */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50/70 p-3 rounded-xl border border-gray-100">
+                <div className="relative flex-1 min-w-[220px] max-w-sm">
+                  <MagnifyingGlassIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search posts by author or content..."
+                    value={alumniPostSearch}
+                    onChange={(e) => {
+                      setAlumniPostSearch(e.target.value);
+                      setAlumniPostPage(1);
+                    }}
+                    className="w-full text-xs pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg outline-none focus:border-orange-400 bg-white"
+                  />
+                  {alumniPostSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAlumniPostSearch('');
+                        setAlumniPostPage(1);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                    >
+                      <XMarkIcon className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <span className="text-xs text-gray-500">
+                  Showing {alumniPosts.length} of {alumniPostsTotal} alumni posts
+                </span>
+              </div>
+
+              {/* Posts Table / Cards */}
+              {loadingAlumniPosts ? (
+                <div className="py-12 text-center text-xs text-gray-500">
+                  <ArrowPathIcon className="w-6 h-6 animate-spin text-orange-500 mx-auto mb-2" />
+                  Loading alumni posts...
+                </div>
+              ) : alumniPosts.length === 0 ? (
+                <div className="py-16 text-center text-xs text-gray-500">
+                  No alumni posts found.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                  {alumniPosts.map((post) => (
+                    <div key={post.id} className="p-4 bg-white hover:bg-gray-50/50 transition-colors flex flex-wrap items-start justify-between gap-4">
+                      <div className="space-y-1.5 flex-1 min-w-[260px]">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-gray-900">{post.author || 'Alumnus'}</span>
+                          <span className="text-[10px] text-gray-400">• {timeAgo(post.created_at)}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 uppercase font-bold">
+                            {post.type || 'post'}
+                          </span>
+                        </div>
+                        {post.title && <p className="text-xs font-semibold text-gray-800">{post.title}</p>}
+                        <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed">{post.content}</p>
+                        {post.image_url && (
+                          <div className="pt-1">
+                            <a href={post.image_url} target="_blank" rel="noopener noreferrer">
+                              <img src={post.image_url} alt="Attachment" className="h-16 rounded object-cover border border-gray-200" />
+                            </a>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 text-[11px] text-gray-400 pt-1">
+                          <span>❤️ {post.likes_count || 0}</span>
+                          <span>💬 {post.comments_count || 0}</span>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        <button
+                          onClick={() =>
+                            setPostToDelete({
+                              id: post.id,
+                              author: post.author,
+                              snippet: post.content?.slice(0, 100),
+                            })
+                          }
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" />
+                          Delete Post
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Pagination for alumni posts */}
+              {alumniPostsTotal > 15 && (
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    onClick={() => setAlumniPostPage((p) => Math.max(1, p - 1))}
+                    disabled={alumniPostPage <= 1}
+                    className="px-3 py-1 text-xs font-medium border border-gray-200 rounded-md bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 cursor-pointer"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs text-gray-500">
+                    Page {alumniPostPage} of {Math.ceil(alumniPostsTotal / 15)}
+                  </span>
+                  <button
+                    onClick={() => setAlumniPostPage((p) => p + 1)}
+                    disabled={alumniPostPage >= Math.ceil(alumniPostsTotal / 15)}
+                    className="px-3 py-1 text-xs font-medium border border-gray-200 rounded-md bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Incident Resolution Modal (Rule 6) */}
       {selectedIncident && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
@@ -1339,6 +1939,93 @@ export default function AdminActivity() {
                 className="px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-2xs cursor-pointer disabled:opacity-50"
               >
                 {updatingIncident ? 'Saving...' : 'Save Resolution'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permanent Delete Confirmation Modal */}
+      {postToDelete && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-gray-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <TrashIcon className="w-5 h-5 text-red-600" />
+                Delete Alumni Post
+              </h3>
+              <button
+                onClick={() => {
+                  setPostToDelete(null);
+                  setDeleteReason('');
+                }}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-800 space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  <ExclamationTriangleIcon className="w-4 h-4 text-red-600 shrink-0" />
+                  Irreversible Moderation Action
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  This action will permanently delete this post and its comments from the feed. Associated reports will be marked as resolved. An immutable audit record will be logged.
+                </p>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-gray-400">Target Post</span>
+                <p className="font-bold text-gray-900">Author: {postToDelete.author || 'Alumni Member'}</p>
+                {postToDelete.snippet && (
+                  <p className="text-gray-600 italic line-clamp-2">"{postToDelete.snippet}..."</p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-gray-700 font-semibold block mb-1">
+                  Reason for Deletion (Audit Trail Note):
+                </label>
+                <textarea
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Violates Community Guidelines - Spam / inappropriate content"
+                  className="w-full border border-gray-200 rounded-xl p-2.5 bg-white text-xs focus:ring-2 focus:ring-red-500/20 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setPostToDelete(null);
+                  setDeleteReason('');
+                }}
+                className="px-3.5 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeletePost}
+                disabled={isDeletingPost}
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-2xs cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {isDeletingPost ? (
+                  <>
+                    <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <TrashIcon className="w-3.5 h-3.5" />
+                    Confirm Delete
+                  </>
+                )}
               </button>
             </div>
           </div>

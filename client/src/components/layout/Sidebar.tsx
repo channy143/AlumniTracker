@@ -15,6 +15,7 @@ import {
   MegaphoneIcon,
   DocumentTextIcon,
   ChartBarIcon,
+  DocumentChartBarIcon,
   UserIcon,
   BookOpenIcon,
   AcademicCapIcon,
@@ -54,7 +55,7 @@ const adminNav: NavItem[] = [
   { name: 'Career Analytics', href: '/admin/analytics', icon: ChartBarIcon },
   { name: 'Curriculum Insights', href: '/admin/curriculum', icon: AcademicCapIcon },
   { name: 'Employer Insights', href: '/admin/employers', icon: BuildingOfficeIcon },
-  { name: 'Reports & Exports', href: '/admin/reports', icon: ChartBarIcon },
+  { name: 'Reports & Exports', href: '/admin/reports', icon: DocumentChartBarIcon },
   { name: 'Audit & Activity Log', href: '/admin/activity', icon: ShieldCheckIcon },
 ];
 

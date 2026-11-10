@@ -1,9 +1,52 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { createBroadcastNotification } from '../notifications';
 
 const router = Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
+
+// POST /api/admin/announcements/upload-image - upload announcement graphic / flyer
+router.post('/upload-image', upload.single('image'), async (req, res, next) => {
+  try {
+    const file = req.file;
+    if (!file) throw new AppError('No image file uploaded', 400);
+
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/gif'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new AppError('Unsupported image format. Please upload JPG, PNG, WEBP, or GIF.', 400);
+    }
+
+    const ext = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `announcements/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+
+    let publicUrl: string | null = null;
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('profiles')
+        .upload(fileName, file.buffer, { contentType: file.mimetype, upsert: true });
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('profiles').getPublicUrl(fileName);
+        publicUrl = urlData.publicUrl;
+      }
+    } catch (storageErr) {
+      console.warn('[Announcement Upload] Storage upload fallback to data URL:', storageErr);
+    }
+
+    if (!publicUrl) {
+      publicUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+    }
+
+    res.json({ url: publicUrl, file_name: file.originalname });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/', async (req, res, next) => {
   try {
