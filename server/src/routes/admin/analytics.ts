@@ -39,15 +39,25 @@ router.get('/employment-rate', async (req, res, next) => {
     const profileIds = education?.map((e) => e.profile_id) || [];
     if (profileIds.length === 0) return res.json({ employed: 0, unemployed: 0, rate: 0, total: 0 });
 
-    const { count: employed } = await supabase
-      .from('employment')
-      .select('*', { count: 'exact', head: true })
-      .in('profile_id', profileIds)
-      .eq('is_current', true);
+    const [{ data: profiles }, { data: employment }] = await Promise.all([
+      supabase.from('profiles').select('id, employment_status').in('id', profileIds),
+      supabase.from('employment').select('profile_id, employment_status, is_current').in('profile_id', profileIds).eq('is_current', true),
+    ]);
+
+    const empMap = new Map();
+    (employment || []).forEach((e: any) => empMap.set(e.profile_id, e.employment_status));
+
+    let employedCount = 0;
+    (profiles || []).forEach((p: any) => {
+      const raw = p.employment_status || empMap.get(p.id) || '';
+      const lower = String(raw).toLowerCase().trim();
+      if (['employed', 'self-employed', 'entrepreneur', 'freelance'].includes(lower)) {
+        employedCount++;
+      }
+    });
 
     const total = profileIds.length;
-    const empCount = employed || 0;
-    res.json({ employed: empCount, unemployed: total - empCount, rate: total > 0 ? Math.round((empCount / total) * 100) : 0, total });
+    res.json({ employed: employedCount, unemployed: total - employedCount, rate: total > 0 ? Math.round((employedCount / total) * 100) : 0, total });
   } catch (err) {
     next(err);
   }
@@ -57,10 +67,23 @@ router.get('/employment-by-course', async (req, res, next) => {
   try {
     const format = (req.query.format as string) || 'json';
     const year = req.query.year as string;
-    const { data: education } = await supabase.from('education').select('profile_id, program, year_graduated');
-    const { data: employment } = await supabase.from('employment').select('profile_id, is_current').eq('is_current', true);
+    const [{ data: education }, { data: profiles }, { data: employment }] = await Promise.all([
+      supabase.from('education').select('profile_id, program, year_graduated'),
+      supabase.from('profiles').select('id, employment_status'),
+      supabase.from('employment').select('profile_id, employment_status, is_current').eq('is_current', true),
+    ]);
 
-    const empIds = new Set(employment?.map((e) => e.profile_id) || []);
+    const empMap = new Map();
+    (employment || []).forEach((e: any) => empMap.set(e.profile_id, e.employment_status));
+    const profMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+    const isEmployed = (profileId: string) => {
+      const p = profMap.get(profileId);
+      const raw = p?.employment_status || empMap.get(profileId) || '';
+      const lower = String(raw).toLowerCase().trim();
+      return ['employed', 'self-employed', 'entrepreneur', 'freelance'].includes(lower);
+    };
+
     const courseStats: Record<string, { total: number; employed: number }> = {};
 
     education?.forEach((e) => {
@@ -68,7 +91,7 @@ router.get('/employment-by-course', async (req, res, next) => {
       if (year && String(e.year_graduated) !== year) return;
       if (!courseStats[e.program]) courseStats[e.program] = { total: 0, employed: 0 };
       courseStats[e.program].total++;
-      if (empIds.has(e.profile_id)) courseStats[e.program].employed++;
+      if (isEmployed(e.profile_id)) courseStats[e.program].employed++;
     });
 
     const data = Object.entries(courseStats).map(([course, stats]) => ({
@@ -95,10 +118,23 @@ router.get('/employment-by-course', async (req, res, next) => {
 
 router.get('/employment-by-batch', async (_req, res, next) => {
   try {
-    const { data: education } = await supabase.from('education').select('profile_id, year_graduated');
-    const { data: employment } = await supabase.from('employment').select('profile_id, is_current').eq('is_current', true);
+    const [{ data: education }, { data: profiles }, { data: employment }] = await Promise.all([
+      supabase.from('education').select('profile_id, year_graduated'),
+      supabase.from('profiles').select('id, employment_status'),
+      supabase.from('employment').select('profile_id, employment_status, is_current').eq('is_current', true),
+    ]);
 
-    const empIds = new Set(employment?.map((e) => e.profile_id) || []);
+    const empMap = new Map();
+    (employment || []).forEach((e: any) => empMap.set(e.profile_id, e.employment_status));
+    const profMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+    const isEmployed = (profileId: string) => {
+      const p = profMap.get(profileId);
+      const raw = p?.employment_status || empMap.get(profileId) || '';
+      const lower = String(raw).toLowerCase().trim();
+      return ['employed', 'self-employed', 'entrepreneur', 'freelance'].includes(lower);
+    };
+
     const batchStats: Record<string, { total: number; employed: number }> = {};
 
     education?.forEach((e) => {
@@ -106,7 +142,7 @@ router.get('/employment-by-batch', async (_req, res, next) => {
       const year = String(e.year_graduated);
       if (!batchStats[year]) batchStats[year] = { total: 0, employed: 0 };
       batchStats[year].total++;
-      if (empIds.has(e.profile_id)) batchStats[year].employed++;
+      if (isEmployed(e.profile_id)) batchStats[year].employed++;
     });
 
     const data = Object.entries(batchStats).map(([year, stats]) => ({
@@ -342,31 +378,61 @@ router.get('/avg-time-employment', async (_req, res, next) => {
 
 router.get('/career-overview', async (_req, res, next) => {
   try {
-    const { data: employment } = await supabase.from('employment').select('employment_status, is_current, salary_range, profile_id');
-    const { data: profiles } = await supabase.from('profiles').select('id, country');
-    const { data: users } = await supabase.from('users').select('id').eq('role', 'alumni');
+    const [
+      { data: employment },
+      { data: profiles },
+      { data: users }
+    ] = await Promise.all([
+      supabase.from('employment').select('employment_status, is_current, salary_range, profile_id'),
+      supabase.from('profiles').select('id, user_id, country, employment_status'),
+      supabase.from('users').select('id').eq('role', 'alumni')
+    ]);
 
+    const alumniUserIds = new Set((users || []).map((u: any) => u.id));
+    const alumniProfiles = (profiles || []).filter((p: any) => alumniUserIds.has(p.user_id));
     const totalAlumni = users?.length || 0;
-    const totalProfiles = profiles?.length || 0;
-    const currentEmployment = employment?.filter((e: any) => e.is_current) || [];
-    const allEmployment = employment || [];
+    const totalProfiles = alumniProfiles.length || 0;
 
-    const employed = currentEmployment.filter((e: any) => e.employment_status === 'employed').length;
-    const selfEmployed = currentEmployment.filter((e: any) => ['self-employed', 'entrepreneur'].includes(e.employment_status)).length;
-    const unemployed = currentEmployment.filter((e: any) => ['unemployed', 'seeking'].includes(e.employment_status)).length;
+    const empByProfile = new Map<string, any[]>();
+    (employment || []).forEach((e: any) => {
+      if (!empByProfile.has(e.profile_id)) empByProfile.set(e.profile_id, []);
+      empByProfile.get(e.profile_id)!.push(e);
+    });
 
-    const profileCountry = new Map((profiles || []).map((p: any) => [p.id, p.country]));
+    let strictlyEmployed = 0;
+    let selfEmployed = 0;
+    let unemployed = 0;
+
+    alumniProfiles.forEach((p: any) => {
+      const emps = empByProfile.get(p.id) || [];
+      const currentEmp = emps.find((e: any) => e.is_current);
+      const rawStatus = p.employment_status || currentEmp?.employment_status || null;
+      const lower = String(rawStatus || '').toLowerCase().trim();
+
+      if (rawStatus === 'Employed' || lower === 'employed') strictlyEmployed++;
+      else if (rawStatus === 'Self-employed' || ['self-employed', 'entrepreneur', 'freelance'].includes(lower)) selfEmployed++;
+      else unemployed++;
+    });
+
+    const profileCountry = new Map((alumniProfiles || []).map((p: any) => [p.id, p.country]));
     const isOverseas = (profileId: string) => {
       const country = String(profileCountry.get(profileId) || '').trim().toLowerCase();
       if (!country) return null;
       return !['philippines', 'ph', 'pilipinas', 'rp'].includes(country);
     };
-    const employedCurrent = currentEmployment.filter((e: any) => e.employment_status === 'employed');
-    const localEmployed = employedCurrent.filter((e: any) => isOverseas(e.profile_id) === false).length;
-    const overseasEmployed = employedCurrent.filter((e: any) => isOverseas(e.profile_id) === true).length;
-    const employedCountryUnknown = employedCurrent.filter((e: any) => isOverseas(e.profile_id) === null).length;
 
-    const salaries = allEmployment
+    const employedProfiles = alumniProfiles.filter((p: any) => {
+      const emps = empByProfile.get(p.id) || [];
+      const currentEmp = emps.find((e: any) => e.is_current);
+      const rawStatus = p.employment_status || currentEmp?.employment_status || null;
+      return rawStatus === 'Employed' || String(rawStatus || '').toLowerCase().trim() === 'employed';
+    });
+
+    const localEmployed = employedProfiles.filter((p: any) => isOverseas(p.id) === false).length;
+    const overseasEmployed = employedProfiles.filter((p: any) => isOverseas(p.id) === true).length;
+    const employedCountryUnknown = employedProfiles.filter((p: any) => isOverseas(p.id) === null).length;
+
+    const salaries = (employment || [])
       .filter((e: any) => e.is_current && e.salary_range)
       .map((e: any) => {
         const clean = String(e.salary_range).replace(/[₱,,\s]/g, '');
@@ -380,10 +446,10 @@ router.get('/career-overview', async (_req, res, next) => {
     res.json({
       totalAlumni,
       totalProfiles,
-      employmentRate: totalAlumni > 0 ? Math.round(((employed + selfEmployed) / totalAlumni) * 100) : 0,
+      employmentRate: totalAlumni > 0 ? Math.round(((strictlyEmployed + selfEmployed) / totalAlumni) * 100) : 0,
       unemploymentRate: totalAlumni > 0 ? Math.round((unemployed / totalAlumni) * 100) : 0,
       selfEmployedRate: totalAlumni > 0 ? Math.round((selfEmployed / totalAlumni) * 100) : 0,
-      employed,
+      employed: strictlyEmployed,
       unemployed,
       selfEmployed,
       localEmployed,

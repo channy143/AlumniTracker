@@ -338,7 +338,7 @@ export const adminApi = {
   exportData: (format: string) => api.get<Blob>(`/admin/export?format=${format}`),
 
   dashboardStats: (year?: number) => api.get<any>(`/admin/dashboard/stats${year ? `?year=${year}` : ''}`),
-  dashboardCharts: () => api.get<any>('/admin/dashboard/charts'),
+  dashboardCharts: (year?: number) => api.get<any>(`/admin/dashboard/charts${year ? `?year=${year}` : ''}`),
   dashboardUpcomingEvents: () => api.get<any[]>('/admin/dashboard/upcoming-events'),
 
   alumniList: (params: Record<string, any> = {}) => api.get<any>(`/admin/alumni?${toQuery(params)}`),

@@ -100,9 +100,9 @@ function MiniDoughnut({ data, colors }: { data: { label: string; value: number }
 function aggregateEmploymentStatus(data: any[]) {
   let employed = 0, selfEmployed = 0, unemployed = 0;
   (data || []).forEach((d: any) => {
-    const s = String(d.status || '').toLowerCase();
-    if (['employed', 'entrepreneur'].includes(s) || s.includes('employed')) employed += d.count || 0;
-    else if (s.includes('self-employed')) selfEmployed += d.count || 0;
+    const s = String(d.status || '').toLowerCase().trim();
+    if (s === 'self-employed' || s.includes('self-employed')) selfEmployed += d.count || 0;
+    else if (['employed', 'entrepreneur'].includes(s) || s === 'employed' || s.includes('employed')) employed += d.count || 0;
     else unemployed += d.count || 0;
   });
   return [
@@ -316,7 +316,10 @@ export default function AdminDashboard() {
 
   const handleYearChange = (year: number) => {
     setSelectedYear(year);
-    adminApi.dashboardStats(year).then(setStats).catch(() => {});
+    Promise.all([
+      adminApi.dashboardStats(year).then(setStats).catch(() => {}),
+      adminApi.dashboardCharts(year).then(setCharts).catch(() => {}),
+    ]);
   };
 
   useEffect(() => {
@@ -330,7 +333,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     Promise.all([
       adminApi.dashboardStats(selectedYear).then(setStats).catch(() => {}),
-      adminApi.dashboardCharts().then(setCharts).catch(() => {}),
+      adminApi.dashboardCharts(selectedYear).then(setCharts).catch(() => {}),
       adminApi.surveyList().then(setSurveys).catch(() => {}),
       adminApi.dashboardUpcomingEvents().then(setEvents).catch(() => {}),
       activitiesApi.list(5).then(setActivities).catch(() => {}),
@@ -359,7 +362,7 @@ export default function AdminDashboard() {
       border: 'border-emerald-100',
       badge: 'Active',
       badgeBg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
-      subtitle: stats?.employedCount != null ? `${stats.employedCount} employed alumni` : 'Current employment',
+      subtitle: stats?.employedCount != null ? `${stats.employedCount} of ${stats?.totalAlumni || 0} employed alumni` : 'Current employment',
       href: '/admin/analytics',
     },
     {
