@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
+import { formatProgramLongName } from '../../utils/formatProgram';
 
 const router = Router();
 
@@ -87,9 +88,9 @@ router.get('/upcoming-events', async (_req, res, next) => {
 router.get('/stats', async (req, res, next) => {
   try {
     const currentYear = new Date().getFullYear();
-    const rawYear = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
-    const selectedYear = rawYear && !isNaN(rawYear) ? rawYear : currentYear;
-    const isFiltered = rawYear !== undefined && !isNaN(rawYear);
+    const rawYear = req.query.year as string | undefined;
+    const isFiltered = rawYear !== undefined && rawYear !== '' && rawYear !== 'all' && !isNaN(parseInt(rawYear, 10));
+    const selectedYear = isFiltered ? parseInt(rawYear!, 10) : undefined;
 
     const partnershipTracked = await hasPartnershipColumn();
     const [
@@ -126,25 +127,30 @@ router.get('/stats', async (req, res, next) => {
     // All profiles corresponding to alumni users
     const alumniProfiles = (allProfiles || []).filter((p: any) => alumniUserMap.has(p.user_id));
 
-    // Calculate alumni registered in the selected year
+    // Collect distinct graduation batches from education
+    const distinctBatches = [...new Set((allEducation || []).map((e: any) => Number(e.year_graduated)).filter((y: number) => !isNaN(y) && y > 0))].sort((a, b) => b - a);
+
+    // Calculate alumni registered in the selected year (or currentYear if 'all')
+    const yearToCheck = selectedYear ?? currentYear;
     const registeredInSelectedYear = (allAlumniUsers || []).filter((u: any) => {
       if (!u.created_at) return false;
       const d = new Date(u.created_at);
-      return d.getFullYear() === selectedYear;
+      return d.getFullYear() === yearToCheck;
     }).length;
 
     // Filter cohort if year is selected
     const targetAlumniProfiles = isFiltered
       ? alumniProfiles.filter((p: any) => {
+          const edus = eduByProfile.get(p.id) || [];
+          if (edus.length > 0) {
+            return edus.some((e: any) => Number(e.year_graduated) === selectedYear);
+          }
           const u = alumniUserMap.get(p.user_id);
-          const edu = eduByProfile.get(p.id) || [];
-          const hasGradYear = edu.some((e: any) => Number(e.year_graduated) <= selectedYear);
-          const hasRegYear = u?.created_at && new Date(u.created_at).getFullYear() <= selectedYear;
-          return hasGradYear || hasRegYear;
+          return u?.created_at && new Date(u.created_at).getFullYear() === selectedYear;
         })
       : alumniProfiles;
 
-    const resolvedTotalAlumni = targetAlumniProfiles.length || (allAlumniUsers || []).length;
+    const resolvedTotalAlumni = targetAlumniProfiles.length;
     const resolvedVerifiedAlumni = targetAlumniProfiles.filter((p: any) => {
       const u = alumniUserMap.get(p.user_id);
       return u?.is_verified;
@@ -154,7 +160,7 @@ router.get('/stats', async (req, res, next) => {
     const partnerCompaniesCount = (allCompanies || []).filter((c: any) => {
       const isPartner = c.partnership_status === 'partner' || c.employer_type === 'partner';
       if (!isPartner) return false;
-      if (!isFiltered) return true;
+      if (!isFiltered || selectedYear === undefined) return true;
       const cDate = c.agreement_start_date ? new Date(c.agreement_start_date) : (c.created_at ? new Date(c.created_at) : null);
       if (!cDate) return true;
       return cDate.getFullYear() <= selectedYear;
@@ -301,8 +307,9 @@ router.get('/stats', async (req, res, next) => {
     }
 
     res.json({
-      selectedYear,
-      isCurrentYear: selectedYear === currentYear,
+      selectedYear: isFiltered ? selectedYear : 'all',
+      isCurrentYear: !isFiltered || selectedYear === currentYear,
+      availableYears: ['all', ...distinctBatches],
       totalAlumni: resolvedTotalAlumni,
       verifiedAlumni: resolvedVerifiedAlumni,
       activeAlumni: targetAlumniProfiles.length || 0,
@@ -333,16 +340,16 @@ router.get('/stats', async (req, res, next) => {
 
 router.get('/charts', async (req, res, next) => {
   try {
-    const rawYear = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
-    const isFiltered = rawYear !== undefined && !isNaN(rawYear);
-    const selectedYear = rawYear || new Date().getFullYear();
+    const rawYear = req.query.year as string | undefined;
+    const isFiltered = rawYear !== undefined && rawYear !== '' && rawYear !== 'all' && !isNaN(parseInt(rawYear, 10));
+    const selectedYear = isFiltered ? parseInt(rawYear!, 10) : undefined;
 
     const [employment, education, users, profiles, alumniSkills] = await Promise.all([
       safeData(supabase.from('employment').select('id, company_name, company_industry, is_current, salary_range, profile_id, employment_status, job_type, start_date')),
       safeData(supabase.from('education').select('program, year_graduated, profile_id')),
       safeData(supabase.from('users').select('id, created_at').eq('role', 'alumni')),
       safeData(supabase.from('profiles').select('id, user_id, first_name, last_name, employment_status, current_job_title, company_name, industry, salary_range, city, province, country')),
-      safeData(supabase.from('skills').select('name')),
+      safeData(supabase.from('skills').select('name, profile_id')),
     ]);
 
     const alumniUserMap = new Map((users || []).map((u: any) => [u.id, u]));
@@ -361,15 +368,20 @@ router.get('/charts', async (req, res, next) => {
     const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
     const alumniProfiles = (profiles || []).filter((p: any) => alumniUserMap.has(p.user_id));
 
+    const distinctBatches = [...new Set((education || []).map((e: any) => Number(e.year_graduated)).filter((y: number) => !isNaN(y) && y > 0))].sort((a, b) => b - a);
+
     const targetProfiles = isFiltered
       ? alumniProfiles.filter((p: any) => {
+          const edus = eduByProfile.get(p.id) || [];
+          if (edus.length > 0) {
+            return edus.some((e: any) => Number(e.year_graduated) === selectedYear);
+          }
           const u = alumniUserMap.get(p.user_id);
-          const edu = eduByProfile.get(p.id) || [];
-          const hasGradYear = edu.some((e: any) => Number(e.year_graduated) <= selectedYear);
-          const hasRegYear = u?.created_at && new Date(u.created_at).getFullYear() <= selectedYear;
-          return hasGradYear || hasRegYear;
+          return u?.created_at && new Date(u.created_at).getFullYear() === selectedYear;
         })
       : alumniProfiles;
+
+    const targetProfileIds = new Set(targetProfiles.map((p: any) => p.id));
 
     // Status distribution
     let strictlyEmployed = 0;
@@ -406,8 +418,9 @@ router.get('/charts', async (req, res, next) => {
     // Alumni by course
     const alumniByCourse: Record<string, number> = {};
     education?.forEach((e: any) => {
-      if (e.program && profileMap.has(e.profile_id)) {
-        alumniByCourse[e.program] = (alumniByCourse[e.program] || 0) + 1;
+      if (e.program && targetProfileIds.has(e.profile_id)) {
+        const prog = formatProgramLongName(e.program);
+        alumniByCourse[prog] = (alumniByCourse[prog] || 0) + 1;
       }
     });
 
@@ -437,13 +450,17 @@ router.get('/charts', async (req, res, next) => {
     // Salary distribution
     const salaryDistribution: Record<string, number> = {};
     employment.forEach((e: any) => {
-      if (e.salary_range) salaryDistribution[e.salary_range] = (salaryDistribution[e.salary_range] || 0) + 1;
+      if (e.salary_range && targetProfileIds.has(e.profile_id)) {
+        salaryDistribution[e.salary_range] = (salaryDistribution[e.salary_range] || 0) + 1;
+      }
     });
 
-    // Batch employment data
+    // Batch employment data (across all alumni users for historical trend)
     const batchData: Record<string, { employed: number; total: number }> = {};
     education?.forEach((e: any) => {
       if (!e.year_graduated) return;
+      const prof = profileMap.get(e.profile_id);
+      if (!prof || !alumniUserMap.has(prof.user_id)) return;
       const year = String(e.year_graduated);
       if (!batchData[year]) batchData[year] = { employed: 0, total: 0 };
       batchData[year].total++;
@@ -461,7 +478,9 @@ router.get('/charts', async (req, res, next) => {
 
     const skillsInDemand: Record<string, number> = {};
     alumniSkills?.forEach((s: any) => {
-      if (s.name) skillsInDemand[s.name] = (skillsInDemand[s.name] || 0) + 1;
+      if (s.name && (!isFiltered || targetProfileIds.has(s.profile_id))) {
+        skillsInDemand[s.name] = (skillsInDemand[s.name] || 0) + 1;
+      }
     });
 
     const geographicDistribution: Record<string, number> = {};
@@ -506,6 +525,7 @@ router.get('/charts', async (req, res, next) => {
 
     const timeBuckets = { under3: 0, m3to6: 0, m6to12: 0, over12: 0 };
     employment.forEach((emp: any) => {
+      if (!targetProfileIds.has(emp.profile_id)) return;
       const edus = eduByProfile.get(emp.profile_id) || [];
       const edu = edus[0];
       if (edu && edu.year_graduated && emp.start_date) {
@@ -530,6 +550,9 @@ router.get('/charts', async (req, res, next) => {
     const totalGeo = Object.values(geographicDistribution).reduce((a, b) => a + b, 0) || 1;
 
     res.json({
+      selectedYear: isFiltered ? selectedYear : 'all',
+      isCurrentYear: !isFiltered || selectedYear === (new Date().getFullYear()),
+      availableYears: ['all', ...distinctBatches],
       statusDistribution,
       alumniByCourse: sortByValue(alumniByCourse).slice(0, 10).map(([course, count]) => ({ course, count })),
       industryDistribution: sortByValue(industryDistribution).map(([industry, count]) => ({ industry, count })),

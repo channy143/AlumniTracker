@@ -303,7 +303,7 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
 
 export default function AdminDashboard() {
   const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>({});
@@ -312,20 +312,35 @@ export default function AdminDashboard() {
   const [events, setEvents] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
 
-  const availableYears = useMemo(() => {
-    const list: number[] = [];
-    for (let y = currentYear + 2; y >= currentYear - 6; y--) {
-      list.push(y);
+  const availableYears: (number | 'all')[] = useMemo(() => {
+    if (stats?.availableYears && Array.isArray(stats.availableYears) && stats.availableYears.length > 0) {
+      return stats.availableYears;
     }
-    return list;
-  }, [currentYear]);
+    return ['all', 2027, 2026, 2025, 2024, 2023, 2022, 2014];
+  }, [stats?.availableYears]);
 
-  const handleYearChange = (year: number) => {
+  const handleYearChange = (year: number | 'all') => {
     setSelectedYear(year);
     Promise.all([
       adminApi.dashboardStats(year).then(setStats).catch(() => {}),
       adminApi.dashboardCharts(year).then(setCharts).catch(() => {}),
     ]);
+  };
+
+  const currentIdx = availableYears.indexOf(selectedYear);
+  const canGoPrev = currentIdx !== -1 && currentIdx < availableYears.length - 1;
+  const canGoNext = currentIdx > 0;
+
+  const handlePrevYear = () => {
+    if (canGoPrev) {
+      handleYearChange(availableYears[currentIdx + 1]);
+    }
+  };
+
+  const handleNextYear = () => {
+    if (canGoNext) {
+      handleYearChange(availableYears[currentIdx - 1]);
+    }
   };
 
   useEffect(() => {
@@ -338,8 +353,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     Promise.all([
-      adminApi.dashboardStats(selectedYear).then(setStats).catch(() => {}),
-      adminApi.dashboardCharts(selectedYear).then(setCharts).catch(() => {}),
+      adminApi.dashboardStats('all').then(setStats).catch(() => {}),
+      adminApi.dashboardCharts('all').then(setCharts).catch(() => {}),
       adminApi.surveyList().then(setSurveys).catch(() => {}),
       adminApi.dashboardUpcomingEvents().then(setEvents).catch(() => {}),
       activitiesApi.list(5).then(setActivities).catch(() => {}),
@@ -420,15 +435,15 @@ export default function AdminDashboard() {
       href: '/admin/surveys',
     },
     {
-      label: selectedYear === currentYear ? 'Alumni Registered This Year' : `Alumni Registered in ${selectedYear}`,
+      label: selectedYear === 'all' ? 'Alumni Registered This Year' : `Alumni Registered in ${selectedYear}`,
       value: stats?.registeredThisYear != null ? stats.registeredThisYear.toLocaleString() : '—',
       icon: UserPlusIcon,
       color: 'text-cyan-600',
       bg: 'bg-cyan-50',
       border: 'border-cyan-100',
-      badge: selectedYear === currentYear ? `${currentYear} YTD` : `Year ${selectedYear}`,
+      badge: selectedYear === 'all' ? `${currentYear} YTD` : `Year ${selectedYear}`,
       badgeBg: 'bg-cyan-50 text-cyan-700 border border-cyan-200/60',
-      subtitle: selectedYear === currentYear ? 'New alumni registrations' : `Registrations for ${selectedYear}`,
+      subtitle: selectedYear === 'all' ? 'New alumni registrations' : `Registrations for ${selectedYear}`,
       href: '/admin/alumni',
     },
     {
@@ -462,13 +477,18 @@ export default function AdminDashboard() {
           <p className="text-xs text-gray-500 mt-0.5">Executive overview of alumni, employment, surveys, and system activity.</p>
         </div>
 
-        {/* Year Selector: < "year" > */}
+        {/* Year / Batch Selector */}
         <div className="inline-flex items-center gap-1 self-start sm:self-auto bg-white border border-gray-200/90 rounded-xl px-2 py-1 shadow-2xs">
           <button
             type="button"
-            onClick={() => handleYearChange(selectedYear - 1)}
-            className="p-1 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer"
-            title="Previous Year"
+            onClick={handlePrevYear}
+            disabled={!canGoPrev}
+            className={`p-1 rounded-lg transition-colors ${
+              canGoPrev
+                ? 'text-gray-500 hover:text-orange-600 hover:bg-orange-50 cursor-pointer'
+                : 'text-gray-300 cursor-not-allowed opacity-40'
+            }`}
+            title="Previous Batch / Year"
           >
             <ChevronLeftIcon className="w-4 h-4" />
           </button>
@@ -481,9 +501,9 @@ export default function AdminDashboard() {
                 setYearDropdownOpen((prev) => !prev);
               }}
               className="px-2.5 py-1 rounded-lg text-xs font-bold text-gray-800 hover:text-orange-600 hover:bg-orange-50 transition-colors flex items-center gap-1 cursor-pointer"
-              title="Select Year"
+              title="Select Batch / Year"
             >
-              <span>"{selectedYear}"</span>
+              <span>{selectedYear === 'all' ? 'All Years' : selectedYear}</span>
               <ChevronDownIcon className="w-3.5 h-3.5 text-gray-400" />
             </button>
 
@@ -506,7 +526,7 @@ export default function AdminDashboard() {
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    "{yr}"
+                    {yr === 'all' ? 'All Years' : yr}
                   </button>
                 ))}
               </div>
@@ -515,9 +535,14 @@ export default function AdminDashboard() {
 
           <button
             type="button"
-            onClick={() => handleYearChange(selectedYear + 1)}
-            className="p-1 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer"
-            title="Next Year"
+            onClick={handleNextYear}
+            disabled={!canGoNext}
+            className={`p-1 rounded-lg transition-colors ${
+              canGoNext
+                ? 'text-gray-500 hover:text-orange-600 hover:bg-orange-50 cursor-pointer'
+                : 'text-gray-300 cursor-not-allowed opacity-40'
+            }`}
+            title="Next Batch / Year"
           >
             <ChevronRightIcon className="w-4 h-4" />
           </button>

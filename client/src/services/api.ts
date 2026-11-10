@@ -337,8 +337,8 @@ export const adminApi = {
   updateUser: (id: string, data: any) => api.put<any>(`/admin/users/${id}`, data),
   exportData: (format: string) => api.get<Blob>(`/admin/export?format=${format}`),
 
-  dashboardStats: (year?: number) => api.get<any>(`/admin/dashboard/stats${year ? `?year=${year}` : ''}`),
-  dashboardCharts: (year?: number) => api.get<any>(`/admin/dashboard/charts${year ? `?year=${year}` : ''}`),
+  dashboardStats: (year?: number | string) => api.get<any>(`/admin/dashboard/stats${year && year !== 'all' ? `?year=${year}` : ''}`),
+  dashboardCharts: (year?: number | string) => api.get<any>(`/admin/dashboard/charts${year && year !== 'all' ? `?year=${year}` : ''}`),
   dashboardUpcomingEvents: () => api.get<any[]>('/admin/dashboard/upcoming-events'),
 
   alumniList: (params: Record<string, any> = {}) => api.get<any>(`/admin/alumni?${toQuery(params)}`),
