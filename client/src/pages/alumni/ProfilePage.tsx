@@ -2146,7 +2146,7 @@ export default function ProfilePage() {
           <div className="absolute bottom-0 left-1/3 w-36 h-36 sm:w-48 sm:h-48 bg-white rounded-full translate-y-1/3" />
         </div>
 
-        {/* Mascot on the lower part of the orange banner with bouncy pop-up intro animation */}
+        {/* Mascot on the lower part of the orange banner with bouncy pop-up intro animation (60% upper body visible) */}
         <motion.div
           initial={{ y: 90, scale: 0.5, opacity: 0 }}
           animate={{ y: 0, scale: 1, opacity: 1 }}
@@ -2156,7 +2156,7 @@ export default function ProfilePage() {
             damping: 18,
             delay: 0.25,
           }}
-          className="absolute bottom-0 right-0.5 sm:right-4 md:right-8 pointer-events-none select-none z-0"
+          className="absolute bottom-0 right-0 sm:right-4 md:right-8 pointer-events-none select-none z-0"
         >
           {/* Pop-up greeting bubble */}
           <motion.div
@@ -2168,7 +2168,7 @@ export default function ProfilePage() {
               damping: 20,
               delay: 0.6,
             }}
-            className="hidden sm:flex absolute -top-5 right-2 sm:right-4 bg-white/95 text-orange-950 text-[10px] sm:text-xs font-bold py-0.5 px-2 rounded-full shadow-md border border-orange-200/80 items-center gap-1 whitespace-nowrap"
+            className="hidden sm:flex absolute top-[12%] right-2 sm:right-6 bg-white/95 text-orange-950 text-[10px] sm:text-xs font-bold py-0.5 px-2.5 rounded-full shadow-md border border-orange-200/80 items-center gap-1 whitespace-nowrap z-10"
           >
             <span>Mabuhay! 👋</span>
           </motion.div>
@@ -2176,7 +2176,7 @@ export default function ProfilePage() {
           <img
             src="/mascot.png"
             alt="Mascot"
-            className="w-24 sm:w-36 md:w-48 lg:w-56 h-auto object-contain translate-y-[15%] sm:translate-y-[20%] drop-shadow-md"
+            className="w-32 xs:w-36 sm:w-48 md:w-60 lg:w-72 h-auto object-contain translate-y-[40%] drop-shadow-md"
           />
         </motion.div>
 
@@ -2255,7 +2255,7 @@ export default function ProfilePage() {
             )}
 
             {/* Action buttons (Edit Profile + Resume) - with right padding to clear the mascot */}
-            <div className="mt-2.5 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-2.5 pr-20 sm:pr-28">
+            <div className="mt-2.5 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-2.5 pr-28 sm:pr-44 md:pr-56">
               <button
                 data-tour="profile-edit-btn"
                 onClick={() => {
