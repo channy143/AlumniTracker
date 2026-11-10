@@ -2140,7 +2140,7 @@ export default function ProfilePage() {
       )}
 
       {/* Hero Card */}
-      <div data-tour="profile-header-card" className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-3.5 sm:p-6 md:p-8 mb-0 relative overflow-hidden">
+      <div data-tour="profile-header-card" className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 sm:p-6 md:p-8 mb-0 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 pointer-events-none">
           <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-1/3 w-36 h-36 sm:w-48 sm:h-48 bg-white rounded-full translate-y-1/3" />
@@ -2156,7 +2156,7 @@ export default function ProfilePage() {
             damping: 18,
             delay: 0.25,
           }}
-          className="absolute bottom-0 right-1 sm:right-6 md:right-10 pointer-events-none select-none z-0"
+          className="absolute bottom-0 right-0.5 sm:right-4 md:right-8 pointer-events-none select-none z-0"
         >
           {/* Pop-up greeting bubble */}
           <motion.div
@@ -2176,11 +2176,11 @@ export default function ProfilePage() {
           <img
             src="/mascot.png"
             alt="Mascot"
-            className="w-16 sm:w-32 md:w-44 lg:w-56 h-auto object-contain translate-y-[30%] drop-shadow-md"
+            className="w-24 sm:w-36 md:w-48 lg:w-56 h-auto object-contain translate-y-[15%] sm:translate-y-[20%] drop-shadow-md"
           />
         </motion.div>
 
-        <div className="relative z-10 flex flex-row items-center sm:items-start text-left gap-3 sm:gap-5">
+        <div className="relative z-10 flex flex-row items-start text-left gap-3.5 sm:gap-5">
           {/* Avatar on the Left (Strictly dimensioned to prevent image blowup on mobile) */}
           <div className="relative shrink-0 w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28">
             <div className="w-full h-full rounded-full border-2 sm:border-4 border-white/70 shadow-md overflow-hidden bg-white/20 flex items-center justify-center">
@@ -2201,15 +2201,17 @@ export default function ProfilePage() {
           </div>
 
           {/* Info on the Right (left-aligned on all screen sizes, matching Desktop) */}
-          <div className="min-w-0 flex-1 flex flex-col items-start text-left pr-10 sm:pr-24">
-            <h2 className="text-base sm:text-xl md:text-2xl font-bold font-display text-white leading-tight truncate max-w-full">
+          <div className="min-w-0 flex-1 flex flex-col items-start text-left">
+            <h2 className="text-base sm:text-xl md:text-2xl font-bold font-display text-white leading-tight">
               {fullName}
             </h2>
 
             {programInfo && (
-              <p className="text-orange-100 text-xs sm:text-sm mt-0.5 flex items-center gap-1 leading-snug">
-                <AcademicCapIcon className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{programInfo}{batchInfo ? ` · Class of ${batchInfo}` : ''}</span>
+              <p className="text-orange-100 text-xs sm:text-sm mt-0.5 flex items-start gap-1 leading-snug">
+                <AcademicCapIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 mt-0.5" />
+                <span className="leading-snug break-words">
+                  {programInfo}{batchInfo ? ` · Class of ${batchInfo}` : ''}
+                </span>
               </p>
             )}
 
@@ -2223,9 +2225,9 @@ export default function ProfilePage() {
                 const jobTitle = profile?.current_job_title;
                 const company = profile?.company_name;
                 return (
-                  <p className="text-xs sm:text-sm text-white/90 mt-0.5 flex items-center gap-1 leading-snug">
-                    <BriefcaseIcon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">
+                  <p className="text-xs sm:text-sm text-white/90 mt-0.5 flex items-start gap-1 leading-snug">
+                    <BriefcaseIcon className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span className="leading-snug break-words">
                       {jobTitle ? `${jobTitle} · Self-employed` : 'Self-employed / Freelance'}
                       {company ? ` (${company})` : ''}
                     </span>
@@ -2238,9 +2240,9 @@ export default function ProfilePage() {
               if (!position && !company) return null;
 
               return (
-                <p className="text-xs sm:text-sm text-white/90 mt-0.5 flex items-center gap-1 leading-snug">
-                  <BriefcaseIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{position || 'Employed'}{company ? ` at ${company}` : ''}</span>
+                <p className="text-xs sm:text-sm text-white/90 mt-0.5 flex items-start gap-1 leading-snug">
+                  <BriefcaseIcon className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span className="leading-snug break-words">{position || 'Employed'}{company ? ` at ${company}` : ''}</span>
                 </p>
               );
             })()}
@@ -2252,8 +2254,8 @@ export default function ProfilePage() {
               </p>
             )}
 
-            {/* Action buttons (Edit Profile + Resume) */}
-            <div className="mt-2 sm:mt-2.5 flex flex-wrap items-center gap-2 sm:gap-2.5">
+            {/* Action buttons (Edit Profile + Resume) - with right padding to clear the mascot */}
+            <div className="mt-2.5 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-2.5 pr-20 sm:pr-28">
               <button
                 data-tour="profile-edit-btn"
                 onClick={() => {
@@ -2266,7 +2268,7 @@ export default function ProfilePage() {
                   setEditing(true);
                   window.dispatchEvent(new CustomEvent('tour-edit-profile-clicked'));
                 }}
-                className="inline-flex items-center gap-1 px-2.5 sm:px-4 py-1 sm:py-1.5 bg-white text-orange-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-orange-50 transition-colors shadow-sm cursor-pointer"
+                className="inline-flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 bg-white text-orange-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-orange-50 transition-colors shadow-sm cursor-pointer shrink-0"
               >
                 <PencilIcon className="w-3.5 h-3.5" /> Edit Profile
               </button>
@@ -2274,7 +2276,7 @@ export default function ProfilePage() {
               {/* Resume upload */}
               <input ref={resumeRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={handleResumeUpload} />
               {profile?.resume_url ? (
-                <div className="flex items-center gap-1.5 text-xs">
+                <div className="flex items-center gap-1.5 text-xs shrink-0">
                   <a
                     href={profile.resume_url}
                     target="_blank"
@@ -2295,7 +2297,7 @@ export default function ProfilePage() {
                 <button
                   onClick={() => resumeRef.current?.click()}
                   disabled={uploadingResume}
-                  className="text-xs sm:text-sm text-white/80 hover:text-white underline underline-offset-2 transition-colors disabled:opacity-50 font-medium cursor-pointer"
+                  className="text-xs sm:text-sm text-white/80 hover:text-white underline underline-offset-2 transition-colors disabled:opacity-50 font-medium cursor-pointer shrink-0"
                 >
                   {uploadingResume ? 'Uploading...' : 'Add Resume'}
                 </button>
