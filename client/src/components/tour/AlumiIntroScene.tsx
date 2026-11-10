@@ -102,18 +102,12 @@ export default function AlumiIntroScene({ onStart, onSkip }: AlumiIntroSceneProp
             </p>
           </div>
 
-          {/* Duration hint */}
-          <div className="mt-3.5 py-1.5 px-3 bg-orange-50/80 rounded-xl border border-orange-100 flex items-center justify-between text-[11px] text-orange-900">
-            <span className="font-semibold">⏱ Takes only ~1 minute</span>
-            <span className="text-orange-600 font-medium">Interactive Walkthrough</span>
-          </div>
-
           {/* Action Buttons */}
           <div className="mt-4 pt-3.5 border-t border-gray-100 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={onSkip}
-              className="text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors cursor-pointer px-2 py-1"
+              className="text-xs font-semibold text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer px-2.5 py-1.5 rounded-lg shrink-0"
             >
               Skip for now
             </button>
@@ -123,10 +117,10 @@ export default function AlumiIntroScene({ onStart, onSkip }: AlumiIntroSceneProp
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.96 }}
               onClick={onStart}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/35 transition-all cursor-pointer active:scale-95"
+              className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-md shadow-orange-500/25 hover:shadow-orange-500/35 transition-all cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
             >
               <span>Let's Go, Alumi!</span>
-              <ArrowRightIcon className="w-4 h-4" />
+              <ArrowRightIcon className="w-4 h-4 shrink-0" />
             </motion.button>
           </div>
         </motion.div>

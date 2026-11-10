@@ -325,28 +325,28 @@ export default function CoachMarkTooltip({
         </AnimatePresence>
 
         {/* Action Buttons */}
-        <div className={`flex items-center justify-between gap-2 pt-2 ${isFinalStep ? '' : 'border-t border-gray-100'}`}>
+        <div className={`flex items-center justify-between gap-2 pt-3 sm:pt-3.5 ${isFinalStep ? '' : 'border-t border-gray-100'}`}>
           <div>
             {!isFinalStep ? (
               <button
                 type="button"
                 onClick={onSkip}
-                className="text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors cursor-pointer px-1 py-1"
+                className="text-xs font-semibold text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer px-2.5 py-1.5 rounded-lg shrink-0"
               >
                 Skip Tour
               </button>
             ) : (
               /* Non-interfering spacer on the left above the bottom-left mascot */
-              <div className="w-24 sm:w-36 h-4" />
+              <div className="w-24 sm:w-36 h-4 shrink-0" />
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {!isFirstStep && !isFinalStep && (
               <button
                 type="button"
                 onClick={onPrev}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer shrink-0"
               >
                 <ChevronLeftIcon className="w-3.5 h-3.5" />
                 <span>Back</span>
@@ -356,10 +356,12 @@ export default function CoachMarkTooltip({
             <button
               type="button"
               onClick={onNext}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-md shadow-orange-500/20 hover:shadow-orange-500/30 transition-all cursor-pointer active:scale-95"
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-md shadow-orange-500/20 hover:shadow-orange-500/30 transition-all cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
             >
-              <span>{step.actionText || (isFinalStep ? 'Get Started' : 'Next Step')}</span>
-              {!isFinalStep && <ArrowRightIcon className="w-3.5 h-3.5" />}
+              <span className="truncate max-w-[140px] xs:max-w-[190px] sm:max-w-none">
+                {step.actionText || (isFinalStep ? 'Get Started' : 'Next Step')}
+              </span>
+              {!isFinalStep && <ArrowRightIcon className="w-3.5 h-3.5 shrink-0" />}
             </button>
           </div>
         </div>

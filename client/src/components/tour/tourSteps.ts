@@ -41,7 +41,7 @@ export const ALUMNI_TOUR_STEPS: TourStep[] = [
     content:
       'This meter measures the 4 essential parts of your profile: Personal Information, Education History, Skills Inventory, and Employment Status. Reaching 100% unlocks verified alumni credentials and prioritizes your profile for job referrals and partner hiring events.',
     pointingDirection: 'left',
-    actionText: 'Go to My Profile →',
+    actionText: 'Go to My Profile',
   },
   {
     id: 'profile-header',
@@ -63,7 +63,7 @@ export const ALUMNI_TOUR_STEPS: TourStep[] = [
     content:
       'Whenever your career situation changes, click "Edit Profile". Here you can update your status to Employed, Self-employed, or Seeking Opportunities, along with your position, company, and accreditation placement proof.',
     pointingDirection: 'bottom',
-    actionText: 'Open Edit Form →',
+    actionText: 'Open Edit Form',
   },
   {
     id: 'profile-edit-modal-status',
@@ -74,7 +74,7 @@ export const ALUMNI_TOUR_STEPS: TourStep[] = [
     content:
       'Inside this editor, maintain your active career record. Select whether you are Employed, Self-employed, or Seeking Opportunities, and input your position, employer, industry sector, and compensation bracket.',
     pointingDirection: 'bottom',
-    actionText: 'Next: Q-Pro Accreditation →',
+    actionText: 'Next: Q-Pro Proof',
   },
   {
     id: 'profile-edit-modal-proof',
