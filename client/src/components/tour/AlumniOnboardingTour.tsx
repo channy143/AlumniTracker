@@ -163,20 +163,24 @@ export default function AlumniOnboardingTour() {
           resizeObserver.observe(element);
         }
 
+        // If highlighting the profile hero banner at top of /profile, immediately reset scroll to top
+        if (currentStep.route === '/profile' && currentStep.id === 'profile-header') {
+          if (window.scrollY > 0) {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+          }
+          setTargetRect(element.getBoundingClientRect());
+          return;
+        }
+
         // Scroll target comfortably into view if outside comfortable viewport bounds
         const navbarHeight = 68;
         const isOffscreen = rect.top < navbarHeight + 20 || rect.bottom > window.innerHeight - 60;
         if (isOffscreen) {
-          // If highlighting the profile hero banner at top of /profile, scroll to top leaving room below navbar
-          if (currentStep.route === '/profile' && currentStep.id === 'profile-header') {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          } else {
-            try {
-              element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-            } catch {
-              const targetY = window.scrollY + rect.top - 120;
-              window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
-            }
+          try {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+          } catch {
+            const targetY = window.scrollY + rect.top - 120;
+            window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
           }
         }
 

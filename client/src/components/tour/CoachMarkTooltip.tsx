@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, ChevronLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { TourStep } from './tourSteps';
@@ -33,7 +33,20 @@ export default function CoachMarkTooltip({
   const isFirstStep = currentStepIndex === 0;
 
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const [actualHeight, setActualHeight] = useState(450);
+  const [actualHeight, setActualHeight] = useState(240);
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800,
+  });
+
+  // Track window resizing dynamically
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Continuously track actual rendered height of tooltip content
   useLayoutEffect(() => {
@@ -46,17 +59,19 @@ export default function CoachMarkTooltip({
   });
 
   // Collision-Avoidance Placement Solver
-  // Guarantees the modal NEVER covers or overlays targetRect
+  // Guarantees the modal NEVER covers or overlays targetRect and centers properly when standalone
   const placement = useMemo(() => {
-    const tooltipWidth = Math.min(390, window.innerWidth - 32);
-    const estimatedHeight = Math.max(actualHeight, 430);
-    const vpWidth = window.innerWidth;
-    const vpHeight = window.innerHeight;
+    const isCenterModal = !targetRect || step.pointingDirection === 'none';
+    const vpWidth = windowSize.width;
+    const vpHeight = windowSize.height;
+    const tooltipWidth = Math.min(isCenterModal ? 440 : 390, vpWidth - 32);
+    const estimatedHeight = actualHeight > 50 ? actualHeight : 240;
 
-    if (!targetRect || step.pointingDirection === 'none') {
+    // Standalone centered modal (e.g. final celebration guide)
+    if (isCenterModal) {
       return {
-        x: Math.max(12, (vpWidth - tooltipWidth) / 2),
-        y: Math.max(12, (vpHeight - estimatedHeight) / 2),
+        x: Math.max(16, Math.round((vpWidth - tooltipWidth) / 2)),
+        y: Math.max(16, Math.round((vpHeight - estimatedHeight) / 2)),
         width: tooltipWidth,
         direction: 'none' as const,
       };
@@ -72,10 +87,10 @@ export default function CoachMarkTooltip({
       const boxBottom = y + estimatedHeight;
 
       // Expand target by small margin for safety
-      const safeTargetLeft = targetRect.left - 10;
-      const safeTargetRight = targetRect.right + 10;
-      const safeTargetTop = targetRect.top - 10;
-      const safeTargetBottom = targetRect.bottom + 10;
+      const safeTargetLeft = targetRect.left - 8;
+      const safeTargetRight = targetRect.right + 8;
+      const safeTargetTop = targetRect.top - 8;
+      const safeTargetBottom = targetRect.bottom + 8;
 
       const overlapX = boxLeft < safeTargetRight && boxRight > safeTargetLeft;
       const overlapY = boxTop < safeTargetBottom && boxBottom > safeTargetTop;
@@ -112,9 +127,18 @@ export default function CoachMarkTooltip({
         y = targetRect.top + targetRect.height / 2 - estimatedHeight / 2;
       }
 
-      // Clamp into viewport
+      // Clamp X into viewport
       const clampedX = Math.max(12, Math.min(vpWidth - tooltipWidth - 12, x));
-      const clampedY = Math.max(12, Math.min(vpHeight - estimatedHeight - 12, y));
+
+      // Clamp Y into viewport while NEVER clamping into targetRect
+      let clampedY: number;
+      if (direction === 'bottom') {
+        clampedY = Math.max(targetRect.bottom + 8, Math.min(vpHeight - estimatedHeight - 12, y));
+      } else if (direction === 'top') {
+        clampedY = Math.min(targetRect.top - estimatedHeight - 8, Math.max(12, y));
+      } else {
+        clampedY = Math.max(12, Math.min(vpHeight - estimatedHeight - 12, y));
+      }
 
       return { x: clampedX, y: clampedY, rawX: x, rawY: y, direction };
     };
@@ -154,16 +178,27 @@ export default function CoachMarkTooltip({
       }
     }
 
-    // 3. Fallback: if element is huge and covers almost entire viewport, pick the position
-    // with the least overlap, or place at the screen edge opposite the target center
+    // 3. Fallback: guarantee it respects the preferred side without encroaching on the target
     if (!chosen) {
-      const targetCenterY = targetRect.top + targetRect.height / 2;
-      if (targetCenterY > vpHeight / 2) {
-        // Target is in lower half of screen -> place at top
-        chosen = { x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left)), y: 16, direction: 'top' as const };
+      if (step.pointingDirection === 'bottom') {
+        chosen = {
+          x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left + (targetRect.width - tooltipWidth) / 2)),
+          y: targetRect.bottom + 12,
+          direction: 'bottom' as const,
+        };
+      } else if (step.pointingDirection === 'top') {
+        chosen = {
+          x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left + (targetRect.width - tooltipWidth) / 2)),
+          y: Math.max(12, targetRect.top - estimatedHeight - 12),
+          direction: 'top' as const,
+        };
       } else {
-        // Target is in upper half of screen -> place at bottom
-        chosen = { x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left)), y: vpHeight - estimatedHeight - 16, direction: 'bottom' as const };
+        const targetCenterY = targetRect.top + targetRect.height / 2;
+        if (targetCenterY > vpHeight / 2) {
+          chosen = { x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left)), y: 16, direction: 'top' as const };
+        } else {
+          chosen = { x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left)), y: Math.max(targetRect.bottom + 12, vpHeight - estimatedHeight - 16), direction: 'bottom' as const };
+        }
       }
     }
 
@@ -173,7 +208,7 @@ export default function CoachMarkTooltip({
       width: tooltipWidth,
       direction: chosen.direction,
     };
-  }, [targetRect, step.pointingDirection, isFinalStep, actualHeight]);
+  }, [targetRect, step.pointingDirection, isFinalStep, actualHeight, windowSize]);
 
   return (
     <motion.div
@@ -190,10 +225,10 @@ export default function CoachMarkTooltip({
         maxHeight: 'calc(100vh - 32px)',
         zIndex: 100005,
       }}
-      className="bg-white rounded-2xl shadow-2xl border border-orange-200/90 overflow-y-auto select-none text-left scrollbar-none"
+      className="bg-white rounded-2xl shadow-2xl border border-orange-200/90 overflow-hidden select-none text-left scrollbar-none relative"
     >
       {/* Top gradient progress line */}
-      <div className="h-1.5 w-full bg-orange-100/70 overflow-hidden shrink-0">
+      <div className="h-1.5 w-full bg-orange-100/70 overflow-hidden shrink-0 relative z-10">
         <motion.div
           className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-r-full"
           animate={{ width: `${((currentStepIndex + 1) / totalSteps) * 100}%` }}
@@ -201,7 +236,28 @@ export default function CoachMarkTooltip({
         />
       </div>
 
-      <div className="p-4 sm:p-5">
+      {/* Alumi Mascot on Bottom-Left for Final Celebration Guide (Upper 60% visible, bottom 40% clipped) */}
+      {isFinalStep && (
+        <motion.div
+          initial={{ y: 35, opacity: 0, scale: 0.85 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          transition={{
+            type: 'spring',
+            stiffness: 280,
+            damping: 20,
+            delay: 0.12,
+          }}
+          className="absolute bottom-0 left-2 sm:left-4 pointer-events-none select-none z-0"
+        >
+          <img
+            src="/image/mascot1.png"
+            alt="Alumi Mascot"
+            className="w-20 sm:w-24 h-auto object-contain translate-y-[40%] drop-shadow-md"
+          />
+        </motion.div>
+      )}
+
+      <div className="p-4 sm:p-5 relative z-10">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={currentStepIndex}
@@ -271,7 +327,7 @@ export default function CoachMarkTooltip({
         {/* Action Buttons */}
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
           <div>
-            {!isFinalStep && (
+            {!isFinalStep ? (
               <button
                 type="button"
                 onClick={onSkip}
@@ -279,6 +335,9 @@ export default function CoachMarkTooltip({
               >
                 Skip Tour
               </button>
+            ) : (
+              /* Non-interfering spacer on the left above the bottom-left mascot */
+              <div className="w-16 sm:w-20 h-4" />
             )}
           </div>
 
