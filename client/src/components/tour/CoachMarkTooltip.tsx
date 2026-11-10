@@ -175,15 +175,6 @@ export default function CoachMarkTooltip({
     };
   }, [targetRect, step.pointingDirection, isFinalStep, actualHeight]);
 
-  // Dynamic hand arrow pointing at the highlighted target
-  const getPointerEmoji = () => {
-    if (placement.direction === 'bottom') return '👆'; // Tooltip is below -> points UP at target
-    if (placement.direction === 'top') return '👇';    // Tooltip is above -> points DOWN at target
-    if (placement.direction === 'left') return '👉';   // Tooltip is to the left -> points RIGHT at target
-    if (placement.direction === 'right') return '👈';  // Tooltip is to the right -> points LEFT at target
-    return '🎯';
-  };
-
   return (
     <motion.div
       ref={tooltipRef}
@@ -219,25 +210,11 @@ export default function CoachMarkTooltip({
             exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
           >
-            {/* If celebration step, show Alumi happily celebrating */}
-            {isFinalStep && (
-              <div className="flex justify-center -mt-1 mb-3">
-                <img
-                  src="/image/mascot.png"
-                  alt="Alumi Celebrating"
-                  className="w-24 sm:w-32 h-auto object-contain drop-shadow-lg"
-                />
-              </div>
-            )}
-
-            {/* Meta Bar: Badge, Step Counter, Close Button */}
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-1">
-                  <div className="w-4 h-4 rounded-full overflow-hidden bg-orange-200 ring-1 ring-orange-300 shrink-0">
-                    <img src="/image/mascot.png" alt="Alumi" className="w-full h-full object-cover scale-125" />
-                  </div>
-                  <span>{step.badge}</span>
+            {/* Meta Bar: Badge Capsule, Step Counter, Close Button */}
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200 tracking-wide">
+                  {step.badge}
                 </span>
 
                 <span className="text-[11px] font-bold text-gray-500">
@@ -268,9 +245,7 @@ export default function CoachMarkTooltip({
             {/* Pointing Coach Direction Indicator */}
             {step.pointingDirection !== 'none' && targetRect && (
               <div className="flex items-center gap-2 mb-3 px-2.5 py-1.5 bg-orange-50 border border-orange-100 rounded-lg text-[11px] text-orange-800 font-medium">
-                <span className="animate-bounce inline-block text-sm">
-                  {getPointerEmoji()}
-                </span>
+                <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse shrink-0" />
                 <span>Highlighted on your screen</span>
               </div>
             )}
