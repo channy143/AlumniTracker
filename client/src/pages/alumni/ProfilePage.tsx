@@ -2156,7 +2156,7 @@ export default function ProfilePage() {
             damping: 18,
             delay: 0.25,
           }}
-          className="absolute bottom-0 right-0 sm:right-4 md:right-8 pointer-events-none select-none z-0"
+          className="absolute bottom-0 right-0 sm:right-4 md:right-[42px] pointer-events-none select-none z-0"
         >
           {/* Pop-up greeting bubble */}
           <motion.div
