@@ -366,11 +366,71 @@ export default function RegisterPage() {
 
   const years = generateYears(2014, new Date().getFullYear());
 
+  const steps: { key: Step; label: string; number: number }[] = REQUIRE_ALUMNI_VERIFICATION
+    ? [
+        { key: 'verify', label: 'Identity', number: 1 },
+        { key: 'form', label: 'Profile', number: 2 },
+        { key: 'captcha', label: 'Security', number: 3 },
+        { key: 'otp', label: 'Verify', number: 4 },
+      ]
+    : [
+        { key: 'form', label: 'Details', number: 1 },
+        { key: 'captcha', label: 'Security', number: 2 },
+        { key: 'otp', label: 'Verify', number: 3 },
+      ];
+
+  const currentStepIndex = Math.max(0, steps.findIndex((s) => s.key === step));
+
   return (
     <div>
-      <Link to="/" className="inline-flex w-9 h-9 items-center justify-center rounded-xl text-gray-400 hover:text-ctu-blue hover:bg-gray-100 transition-all mb-4">
-        <ArrowLeftIcon className="w-5 h-5" />
-      </Link>
+      <div className="flex items-center justify-between mb-3">
+        <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-ctu-blue py-1.5 px-2.5 -ml-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+          <ArrowLeftIcon className="w-4 h-4" />
+          <span>Back to Home</span>
+        </Link>
+        <span className="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80">
+          New Alumni
+        </span>
+      </div>
+
+      {/* Progress stepper */}
+      <div className="flex items-center justify-between gap-1 mb-5 sm:mb-6 px-0.5">
+        {steps.map((s, idx) => {
+          const isCurrent = s.key === step;
+          const isCompleted = currentStepIndex > idx;
+          return (
+            <div key={s.key} className="flex-1 flex items-center">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
+                    isCurrent
+                      ? 'bg-ctu-blue text-white ring-2 ring-blue-100 shadow-sm'
+                      : isCompleted
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-slate-100 text-slate-400'
+                  }`}
+                >
+                  {isCompleted ? <CheckIcon className="w-3.5 h-3.5 stroke-[2.5]" /> : s.number}
+                </div>
+                <span
+                  className={`text-[11px] sm:text-xs font-semibold truncate ${
+                    isCurrent ? 'text-ctu-blue' : isCompleted ? 'text-slate-700' : 'text-slate-400'
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </div>
+              {idx < steps.length - 1 && (
+                <div
+                  className={`flex-1 h-0.5 mx-1.5 sm:mx-2 rounded-full transition-colors ${
+                    isCompleted ? 'bg-emerald-500' : 'bg-slate-200'
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       <AnimatePresence mode="wait">
         {step === 'verify' ? (
@@ -381,19 +441,18 @@ export default function RegisterPage() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.25 }}
           >
-            <div className="text-3xl font-bold text-ctu-charcoal mb-2 flex items-center gap-3">
-              Join the Community
-            </div>
-            <p className="text-gray-500 mb-2">First, let's confirm your alumni identity.</p>
-            <p className="text-gray-400 text-sm mb-6">
-              Enter your name, graduation day, and batch year from your alumni record to begin.
+            <h2 className="text-2xl sm:text-3xl font-bold text-ctu-charcoal tracking-tight mb-1.5">
+              Confirm Alumni Record
+            </h2>
+            <p className="text-slate-500 text-xs sm:text-sm mb-5">
+              Enter your name, graduation day, and batch year from your official CTU record to continue.
             </p>
 
-            <form onSubmit={handleVerifyIdentity} className="space-y-4">
+            <form onSubmit={handleVerifyIdentity} className="space-y-3.5 sm:space-y-4">
               {/* Last Name & First Name */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${identityErrors.lastName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${identityErrors.lastName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                     Last Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -406,13 +465,13 @@ export default function RegisterPage() {
                         setIdentityErrors((p) => ({ ...p, lastName: false }));
                       }
                     }}
-                    className={`input-field ${identityErrors.lastName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${identityErrors.lastName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     placeholder="e.g. Dela Cruz"
                     required
                   />
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${identityErrors.firstName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${identityErrors.firstName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                     First Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -425,7 +484,7 @@ export default function RegisterPage() {
                         setIdentityErrors((p) => ({ ...p, firstName: false }));
                       }
                     }}
-                    className={`input-field ${identityErrors.firstName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${identityErrors.firstName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     placeholder="e.g. Juan"
                     required
                   />
@@ -434,22 +493,22 @@ export default function RegisterPage() {
 
               {/* Middle Name (Optional) */}
               <div>
-                <label className="block text-sm font-medium mb-1.5 text-ctu-charcoal">
+                <label className="block text-xs sm:text-sm font-medium mb-1.5 text-ctu-charcoal">
                   Middle Name <span className="text-gray-400 font-normal">(Optional)</span>
                 </label>
                 <input
                   type="text"
                   value={identity.middleName}
                   onChange={(e) => setIdentity((p) => ({ ...p, middleName: e.target.value }))}
-                  className="input-field"
+                  className="input-field text-base sm:text-sm h-11 sm:h-10"
                   placeholder="e.g. Santos"
                 />
               </div>
 
               {/* Graduation Day & Batch Year */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${identityErrors.graduationDate ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${identityErrors.graduationDate ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                     Graduation Day <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -462,12 +521,12 @@ export default function RegisterPage() {
                         setIdentityErrors((p) => ({ ...p, graduationDate: false }));
                       }
                     }}
-                    className={`input-field ${identityErrors.graduationDate ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${identityErrors.graduationDate ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     required
                   />
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${identityErrors.batchYear ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${identityErrors.batchYear ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                     Batch Year <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -479,7 +538,7 @@ export default function RegisterPage() {
                         setIdentityErrors((p) => ({ ...p, batchYear: false }));
                       }
                     }}
-                    className={`input-field ${identityErrors.batchYear ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${identityErrors.batchYear ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     required
                   >
                     <option value="">Select batch year</option>
@@ -496,7 +555,7 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={loading || rateLimitCooldown > 0}
-                className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+                className="btn-primary w-full h-11 font-semibold flex items-center justify-center shadow-sm active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading
                   ? 'Verifying...'
@@ -515,31 +574,31 @@ export default function RegisterPage() {
             transition={{ duration: 0.25 }}
           >
             {REQUIRE_ALUMNI_VERIFICATION ? (
-              <>
+              <div className="mb-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <IdentificationIcon className="w-5 h-5 text-green-600" />
-                  <h2 className="text-xl font-bold text-ctu-charcoal">Identity Confirmed</h2>
+                  <IdentificationIcon className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <h2 className="text-xl sm:text-2xl font-bold text-ctu-charcoal">Identity Confirmed</h2>
                 </div>
-                <p className="text-gray-500 mb-4 text-sm">
-                  Welcome, <span className="font-semibold">{formData.firstName} {formData.lastName}</span> (Batch {formData.batchYear || identity.batchYear}). Now complete your registration.
+                <p className="text-slate-500 text-xs sm:text-sm">
+                  Welcome, <span className="font-semibold text-ctu-charcoal">{formData.firstName} {formData.lastName}</span> (Batch {formData.batchYear || identity.batchYear}). Now set up your account.
                 </p>
-              </>
+              </div>
             ) : (
-              <>
-                <div className="text-3xl font-bold text-ctu-charcoal mb-2 flex items-center gap-3">
+              <div className="mb-4">
+                <h2 className="text-2xl sm:text-3xl font-bold text-ctu-charcoal tracking-tight mb-1">
                   Join the Community
-                </div>
-                <p className="text-gray-500 mb-6 text-sm">
-                  Create your account to connect with fellow CTU alumni, explore career opportunities, and more.
+                </h2>
+                <p className="text-slate-500 text-xs sm:text-sm">
+                  Create your profile to connect with CTU-Naga alumni and career leads.
                 </p>
-              </>
+              </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-3.5 sm:space-y-4">
               {/* Row 1: Last Name & First Name */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.lastName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${formErrors.lastName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                     Last Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -547,13 +606,13 @@ export default function RegisterPage() {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleChange}
-                    className={`input-field ${formErrors.lastName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${formErrors.lastName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     placeholder="e.g. Dela Cruz"
                     required
                   />
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.firstName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${formErrors.firstName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                     First Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -561,7 +620,7 @@ export default function RegisterPage() {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleChange}
-                    className={`input-field ${formErrors.firstName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${formErrors.firstName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     placeholder="e.g. Juan"
                     required
                   />
@@ -569,9 +628,9 @@ export default function RegisterPage() {
               </div>
 
               {/* Row 2: Middle Name & Email Address */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-ctu-charcoal">
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5 text-ctu-charcoal">
                     Middle Name <span className="text-gray-400 font-normal">(Optional)</span>
                   </label>
                   <input
@@ -579,20 +638,22 @@ export default function RegisterPage() {
                     name="middleName"
                     value={formData.middleName}
                     onChange={handleChange}
-                    className="input-field"
+                    className="input-field text-base sm:text-sm h-11 sm:h-10"
                     placeholder="e.g. Santos"
                   />
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.email ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${formErrors.email ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                     Email Address <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
+                    inputMode="email"
+                    autoComplete="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`input-field ${formErrors.email ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${formErrors.email ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     placeholder="alumni@ctu.edu.ph"
                     required
                   />
@@ -600,16 +661,16 @@ export default function RegisterPage() {
               </div>
 
               {/* Row 3: Degree & Batch Year */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.program ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${formErrors.program ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                     Degree <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="program"
                     value={formData.program}
                     onChange={handleChange}
-                    className={`input-field ${formErrors.program ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${formErrors.program ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     required
                   >
                     <option value="">Select degree</option>
@@ -621,7 +682,7 @@ export default function RegisterPage() {
                   </select>
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.batchYear || formErrors.yearGraduated ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${formErrors.batchYear || formErrors.yearGraduated ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                     Batch Year <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -631,7 +692,7 @@ export default function RegisterPage() {
                       setFormData((p) => ({ ...p, batchYear: e.target.value, yearGraduated: e.target.value }));
                       setFormErrors((p) => ({ ...p, batchYear: false, yearGraduated: false, message: null }));
                     }}
-                    className={`input-field ${formErrors.batchYear || formErrors.yearGraduated ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${formErrors.batchYear || formErrors.yearGraduated ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     required
                   >
                     <option value="">Select year</option>
@@ -644,7 +705,7 @@ export default function RegisterPage() {
 
               {/* Row 4: Graduation Day */}
               <div>
-                <label className={`block text-sm font-medium mb-1.5 ${formErrors.graduationDate ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${formErrors.graduationDate ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                   Graduation Day {REQUIRE_ALUMNI_VERIFICATION ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal">(Optional)</span>}
                 </label>
                 <input
@@ -652,24 +713,25 @@ export default function RegisterPage() {
                   name="graduationDate"
                   value={formData.graduationDate}
                   onChange={handleChange}
-                  className={`input-field ${formErrors.graduationDate ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                  className={`input-field text-base sm:text-sm h-11 sm:h-10 ${formErrors.graduationDate ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                   required={REQUIRE_ALUMNI_VERIFICATION}
                 />
               </div>
 
-              {/* Password & Confirm Password with red highlight on mismatch or error */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="group">
-                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.password ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                    Password
+              {/* Password & Confirm Password */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                <div>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${formErrors.password ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                    Password <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
-                      className={`input-field pr-11 ${formErrors.password ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                      className={`input-field text-base sm:text-sm h-11 sm:h-10 pr-12 ${formErrors.password ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                       placeholder="Create strong password"
                       required
                     />
@@ -677,7 +739,7 @@ export default function RegisterPage() {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       onMouseDown={(e) => e.preventDefault()}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-ctu-blue p-1 rounded-lg hover:bg-gray-100/70 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-ctu-blue active:scale-95 transition-all rounded-lg hover:bg-slate-100"
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                       tabIndex={-1}
                     >
@@ -686,17 +748,18 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <div className="group">
-                  <label className={`block text-sm font-medium mb-1.5 ${formErrors.confirmPassword ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                    Confirm Password
+                <div>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${formErrors.confirmPassword ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                    Confirm Password <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <input
                       type={showConfirmPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleChange}
-                      className={`input-field pr-11 ${formErrors.confirmPassword ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                      className={`input-field text-base sm:text-sm h-11 sm:h-10 pr-12 ${formErrors.confirmPassword ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                       placeholder="Re-enter password"
                       required
                     />
@@ -704,7 +767,7 @@ export default function RegisterPage() {
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       onMouseDown={(e) => e.preventDefault()}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-ctu-blue p-1 rounded-lg hover:bg-gray-100/70 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-ctu-blue active:scale-95 transition-all rounded-lg hover:bg-slate-100"
                       aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                       tabIndex={-1}
                     >
@@ -714,22 +777,28 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* Inline error alert matching user screenshot */}
+              {/* Inline error alert */}
               <FieldErrorAlert message={formErrors.message} />
 
-              {/* Inline Sleek Password Strength Indicator (compact, doesn't trigger scroll) */}
+              {/* Inline Sleek Password Strength Indicator */}
               {formData.password && (
                 <InlinePasswordStrength password={formData.password} />
               )}
 
-              <button type="button" onClick={handleCreateAccount} disabled={loading} className="btn-primary w-full">
-                {loading ? 'Sending verification code...' : 'Continue'}
+              <button
+                type="button"
+                onClick={handleCreateAccount}
+                disabled={loading}
+                className="btn-primary w-full h-11 font-semibold flex items-center justify-center shadow-sm active:scale-[0.99] transition-all"
+              >
+                {loading ? 'Sending verification code...' : 'Continue to Security Check'}
               </button>
+
               {REQUIRE_ALUMNI_VERIFICATION && (
                 <button
                   type="button"
                   onClick={() => { setStep('verify'); setFormErrors({}); }}
-                  className="w-full text-sm text-gray-400 hover:text-ctu-blue transition-colors text-center"
+                  className="w-full text-xs sm:text-sm text-slate-400 hover:text-ctu-blue transition-colors text-center py-1"
                 >
                   ← Back to identity verification
                 </button>
@@ -744,21 +813,23 @@ export default function RegisterPage() {
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.25 }}
           >
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-3 mb-1.5">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
                 <ShieldCheckIcon className="w-5 h-5 text-blue-600" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-xl font-bold text-ctu-charcoal">Security Check</h2>
-                <p className="text-sm text-gray-500 truncate">{formData.email}</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-ctu-charcoal">Security Check</h2>
+                <p className="text-xs sm:text-sm text-slate-500 truncate">{formData.email}</p>
               </div>
             </div>
-            <p className="text-gray-400 text-sm mt-4 mb-6">Please complete the security check to continue with registration.</p>
+            <p className="text-slate-500 text-xs sm:text-sm mt-3 mb-5">
+              Please complete the security check below to verify you are a genuine human registrant.
+            </p>
 
-            <div className="space-y-5">
-              <div className="flex justify-center overflow-x-auto max-w-full" ref={captchaContainerRef} />
+            <div className="space-y-4 sm:space-y-5">
+              <div className="flex justify-center items-center overflow-x-hidden max-w-full py-1 min-h-[70px]" ref={captchaContainerRef} />
               {!widgetRendered && (
-                <p className="text-xs text-gray-400 text-center">Loading security check...</p>
+                <p className="text-xs text-slate-400 text-center animate-pulse">Loading security challenge...</p>
               )}
 
               <FieldErrorAlert message={captchaError} />
@@ -767,7 +838,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => { setStep('form'); setCaptchaError(null); }}
-                  className="btn-secondary flex-1"
+                  className="btn-secondary flex-1 h-11 font-semibold flex items-center justify-center"
                 >
                   Back
                 </button>
@@ -775,7 +846,7 @@ export default function RegisterPage() {
                   type="button"
                   onClick={handleCaptchaSubmit}
                   disabled={loading || !turnstileToken || rateLimitCooldown > 0}
-                  className="btn-primary flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="btn-primary flex-1 h-11 font-semibold flex items-center justify-center shadow-sm active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {loading
                     ? 'Sending OTP...'
@@ -794,32 +865,35 @@ export default function RegisterPage() {
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.25 }}
           >
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                <CheckIcon className="w-5 h-5 text-green-600" />
+            <div className="flex items-center gap-3 mb-1.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                <CheckIcon className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-xl font-bold text-ctu-charcoal">Verify Your Email</h2>
-                <p className="text-sm text-gray-500 truncate">{formData.email}</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-ctu-charcoal">Verify Your Email</h2>
+                <p className="text-xs sm:text-sm text-slate-500 truncate">{formData.email}</p>
               </div>
             </div>
-            <p className="text-gray-400 text-sm mt-4 mb-8">
-              We sent a 6-digit code to your email. Enter it below to activate your account.
+            <p className="text-slate-500 text-xs sm:text-sm mt-3 mb-6">
+              We sent a 6-digit confirmation code to your email. Enter it below to activate your account.
             </p>
 
-            <form onSubmit={handleVerifyOtp} className="space-y-6">
+            <form onSubmit={handleVerifyOtp} className="space-y-4 sm:space-y-5">
               <div>
-                <label className={`block text-sm font-medium mb-2 ${otpError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                  One-Time Password
+                <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${otpError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                  One-Time Password (OTP)
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
                   value={otp}
                   onChange={(e) => {
                     setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
                     if (otpError) setOtpError(null);
                   }}
-                  className={`input-field text-center text-2xl sm:text-3xl tracking-[0.3em] sm:tracking-[0.5em] font-mono ${
+                  className={`input-field text-center text-2xl sm:text-3xl tracking-[0.25em] sm:tracking-[0.5em] font-mono h-12 ${
                     otpError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''
                   }`}
                   placeholder="000000"
@@ -833,16 +907,16 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-primary w-full"
+                className="btn-primary w-full h-11 font-semibold flex items-center justify-center shadow-sm active:scale-[0.99] transition-all"
               >
-                {loading ? 'Verifying...' : 'Confirm & Activate Account'}
+                {loading ? 'Activating...' : 'Confirm & Activate Account'}
               </button>
 
               <button
                 type="button"
                 onClick={handleResendOtp}
                 disabled={loading || rateLimitCooldown > 0}
-                className="w-full text-sm text-ctu-blue hover:underline disabled:opacity-50 text-center"
+                className="w-full text-xs sm:text-sm text-ctu-blue hover:underline disabled:opacity-50 text-center py-1"
               >
                 {rateLimitCooldown > 0
                   ? `Resend OTP in ${rateLimitCooldown}s`
@@ -854,7 +928,7 @@ export default function RegisterPage() {
               <button
                 type="button"
                 onClick={() => { setStep('form'); setOtpError(null); }}
-                className="w-full text-sm text-gray-400 hover:text-ctu-blue transition-colors text-center"
+                className="w-full text-xs sm:text-sm text-slate-400 hover:text-ctu-blue transition-colors text-center py-1"
               >
                 ← Back to registration form
               </button>
@@ -864,10 +938,12 @@ export default function RegisterPage() {
       </AnimatePresence>
 
       {(step === 'verify' || (!REQUIRE_ALUMNI_VERIFICATION && step === 'form')) && (
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Already have an account?{' '}
-          <Link to="/auth/login" className="text-ctu-blue font-medium hover:underline">Sign in</Link>
-        </p>
+        <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+          <p className="text-xs sm:text-sm text-slate-500">
+            Already have an account?{' '}
+            <Link to="/auth/login" className="text-ctu-blue font-semibold hover:underline">Sign in</Link>
+          </p>
+        </div>
       )}
     </div>
   );

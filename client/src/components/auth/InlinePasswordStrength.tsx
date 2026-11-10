@@ -71,17 +71,17 @@ export default function InlinePasswordStrength({
         })}
       </div>
 
-      {/* Compact 2-column checklist with circular badges */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 pt-0.5 text-[11px]">
+      {/* Compact checklist without clipping or ellipses */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 pt-1 text-[11px] sm:text-xs">
         {requirements.map((req) => (
           <div
             key={req.id}
-            className={`flex items-center gap-2 transition-colors duration-150 ${
-              req.met ? 'text-gray-800 font-medium' : 'text-gray-400'
+            className={`flex items-start sm:items-center gap-2 transition-colors duration-150 ${
+              req.met ? 'text-gray-800 font-medium' : 'text-gray-500'
             }`}
           >
             <div
-              className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+              className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 transition-colors ${
                 req.met
                   ? 'bg-blue-600 text-white'
                   : 'border border-gray-300 bg-transparent'
@@ -93,7 +93,7 @@ export default function InlinePasswordStrength({
                 <span className="w-1 h-1 rounded-full bg-transparent" />
               )}
             </div>
-            <span className="truncate">{req.label}</span>
+            <span className="leading-tight">{req.label}</span>
           </div>
         ))}
       </div>

@@ -107,81 +107,123 @@ export default function ForgotPasswordPage() {
 
   return (
     <div>
-      <Link to="/auth/login" className="inline-flex w-9 h-9 items-center justify-center rounded-xl text-gray-400 hover:text-ctu-blue hover:bg-gray-100 transition-all mb-4">
-        <ArrowLeftIcon className="w-5 h-5" />
-      </Link>
+      <div className="flex items-center justify-between mb-4">
+        <Link to="/auth/login" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-ctu-blue py-1.5 px-2.5 -ml-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+          <ArrowLeftIcon className="w-4 h-4" />
+          <span>Back to Sign In</span>
+        </Link>
+        <span className="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md bg-blue-50 text-ctu-blue border border-blue-100/80">
+          Account Recovery
+        </span>
+      </div>
 
       <AnimatePresence mode="wait">
         {step === 'email' ? (
           <motion.div key="email" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
-            <h2 className="text-3xl font-bold text-ctu-charcoal mb-2">Forgot Password?</h2>
-            <p className="text-gray-500 mb-8">Enter your email and we'll send a reset code.</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-ctu-charcoal tracking-tight mb-1.5">Forgot Password?</h2>
+            <p className="text-slate-500 text-xs sm:text-sm mb-6">Enter your email and we'll send a 6-digit reset code.</p>
 
-            {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">{error}</div>}
+            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl mb-5 text-xs">{error}</div>}
 
-            <div className="space-y-5">
+            <div className="space-y-4 sm:space-y-5">
               <div>
-                <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">Email Address</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" placeholder="alumni@ctu.edu.ph" required />
+                <label className="block text-xs sm:text-sm font-medium text-ctu-charcoal mb-1.5">Email Address</label>
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="input-field text-base sm:text-sm h-11 sm:h-10"
+                  placeholder="alumni@ctu.edu.ph"
+                  required
+                />
               </div>
-              <div className="flex justify-center overflow-x-auto max-w-full" ref={captchaContainerRef} />
-              <button type="button" onClick={handleSendCode} disabled={loading} className="btn-primary w-full">
+              <div className="flex justify-center items-center overflow-x-hidden max-w-full py-1 min-h-[70px]" ref={captchaContainerRef} />
+              <button
+                type="button"
+                onClick={handleSendCode}
+                disabled={loading}
+                className="btn-primary w-full h-11 font-semibold flex items-center justify-center shadow-sm active:scale-[0.99] transition-all"
+              >
                 {loading ? 'Sending code...' : 'Send Reset Code'}
               </button>
             </div>
           </motion.div>
         ) : step === 'otp' ? (
           <motion.div key="otp" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }}>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                <CheckIcon className="w-5 h-5 text-green-600" />
+            <div className="flex items-center gap-3 mb-1.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                <CheckIcon className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-xl font-bold text-ctu-charcoal">Verify Your Email</h2>
-                <p className="text-sm text-gray-500 truncate">{email}</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-ctu-charcoal">Verify Your Email</h2>
+                <p className="text-xs sm:text-sm text-slate-500 truncate">{email}</p>
               </div>
             </div>
-            <p className="text-gray-400 text-sm mt-4 mb-8">Enter the 6-digit code sent to your email.</p>
+            <p className="text-slate-500 text-xs sm:text-sm mt-3 mb-6">Enter the 6-digit code sent to your email.</p>
 
-            {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">{error}</div>}
+            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl mb-5 text-xs">{error}</div>}
 
-            <div className="space-y-5">
+            <div className="space-y-4 sm:space-y-5">
               <div>
-                <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">Reset Code</label>
-                <input type="text" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} className="input-field text-center text-2xl sm:text-3xl tracking-[0.3em] sm:tracking-[0.5em] font-mono" placeholder="000000" maxLength={6} required autoFocus />
+                <label className="block text-xs sm:text-sm font-medium text-ctu-charcoal mb-1.5">Reset Code</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="input-field text-center text-2xl sm:text-3xl tracking-[0.25em] sm:tracking-[0.5em] font-mono h-12"
+                  placeholder="000000"
+                  maxLength={6}
+                  required
+                  autoFocus
+                />
               </div>
-              <button type="button" onClick={handleVerifyOtp} className="btn-primary w-full">
+              <button
+                type="button"
+                onClick={handleVerifyOtp}
+                className="btn-primary w-full h-11 font-semibold flex items-center justify-center shadow-sm active:scale-[0.99] transition-all"
+              >
                 Verify Code
               </button>
-              <button type="button" onClick={() => { setStep('email'); setError(''); }} className="w-full text-sm text-gray-400 hover:text-ctu-blue transition-colors text-center">
+              <button
+                type="button"
+                onClick={() => { setStep('email'); setError(''); }}
+                className="w-full text-xs sm:text-sm text-slate-400 hover:text-ctu-blue transition-colors text-center py-1"
+              >
                 ← Back to email entry
               </button>
             </div>
           </motion.div>
         ) : (
           <motion.div key="password" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }}>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                <CheckIcon className="w-5 h-5 text-green-600" />
+            <div className="flex items-center gap-3 mb-1.5">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+                <KeyIcon className="w-5 h-5 text-blue-600" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-xl font-bold text-ctu-charcoal">Reset Your Password</h2>
-                <p className="text-sm text-gray-500 truncate">{email}</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-ctu-charcoal">Reset Your Password</h2>
+                <p className="text-xs sm:text-sm text-slate-500 truncate">{email}</p>
               </div>
             </div>
-            <p className="text-gray-400 text-sm mt-4 mb-8">Choose a new password for your account.</p>
+            <p className="text-slate-500 text-xs sm:text-sm mt-3 mb-6">Choose a new strong password for your account.</p>
 
-            {error && <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">{error}</div>}
+            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl mb-5 text-xs">{error}</div>}
 
             <form onSubmit={handleReset} className="space-y-4">
-              <div className="group">
-                <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">New Password</label>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-ctu-charcoal mb-1.5">New Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="input-field pr-11"
+                    className="input-field text-base sm:text-sm h-11 sm:h-10 pr-12"
+                    placeholder="Create new strong password"
                     required
                     autoFocus
                   />
@@ -189,7 +231,7 @@ export default function ForgotPasswordPage() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     onMouseDown={(e) => e.preventDefault()}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-ctu-blue p-1 rounded-lg hover:bg-gray-100/70 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-ctu-blue active:scale-95 transition-all rounded-lg hover:bg-slate-100"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     tabIndex={-1}
                   >
@@ -197,21 +239,23 @@ export default function ForgotPasswordPage() {
                   </button>
                 </div>
               </div>
-              <div className="group">
-                <label className="block text-sm font-medium text-ctu-charcoal mb-1.5">Confirm Password</label>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-ctu-charcoal mb-1.5">Confirm Password</label>
                 <div className="relative">
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="input-field pr-11"
+                    className="input-field text-base sm:text-sm h-11 sm:h-10 pr-12"
+                    placeholder="Re-enter new password"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     onMouseDown={(e) => e.preventDefault()}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-ctu-blue p-1 rounded-lg hover:bg-gray-100/70 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-ctu-blue active:scale-95 transition-all rounded-lg hover:bg-slate-100"
                     aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                     tabIndex={-1}
                   >
@@ -219,10 +263,18 @@ export default function ForgotPasswordPage() {
                   </button>
                 </div>
               </div>
-              <button type="submit" disabled={loading} className="btn-primary w-full">
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary w-full h-11 font-semibold flex items-center justify-center shadow-sm active:scale-[0.99] transition-all"
+              >
                 {loading ? 'Resetting...' : 'Reset Password'}
               </button>
-              <button type="button" onClick={() => { setStep('otp'); setError(''); }} className="w-full text-sm text-gray-400 hover:text-ctu-blue transition-colors text-center">
+              <button
+                type="button"
+                onClick={() => { setStep('otp'); setError(''); }}
+                className="w-full text-xs sm:text-sm text-slate-400 hover:text-ctu-blue transition-colors text-center py-1"
+              >
                 ← Back to code entry
               </button>
             </form>

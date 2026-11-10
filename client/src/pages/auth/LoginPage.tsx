@@ -193,32 +193,41 @@ export default function LoginPage() {
   if (mfaRequired) {
     return (
       <div>
-        <Link to="/" className="inline-flex w-9 h-9 items-center justify-center rounded-xl text-gray-400 hover:text-ctu-blue hover:bg-gray-100 transition-all mb-4">
-          <ArrowLeftIcon className="w-5 h-5" />
-        </Link>
-        <h2 className="text-3xl font-bold text-ctu-charcoal mb-2">Two-Factor Authentication</h2>
-        <p className="text-gray-500 mb-6">Enter the code sent to your email to verify and remember this device.</p>
+        <div className="flex items-center justify-between mb-4">
+          <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-ctu-blue py-1.5 px-2.5 -ml-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+            <ArrowLeftIcon className="w-4 h-4" />
+            <span>Back to Home</span>
+          </Link>
+          <span className="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md bg-blue-50 text-ctu-blue border border-blue-100/80">
+            Security Check
+          </span>
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-bold text-ctu-charcoal tracking-tight mb-1.5">Two-Factor Authentication</h2>
+        <p className="text-slate-500 text-xs sm:text-sm mb-5">Enter the code sent to your email to verify and remember this device.</p>
 
-        <div className="flex items-start gap-2.5 bg-blue-50/70 border border-blue-200/70 text-blue-800 px-3.5 py-3 rounded-xl mb-6 text-xs leading-relaxed">
+        <div className="flex items-start gap-2.5 bg-blue-50/70 border border-blue-200/70 text-blue-800 px-3.5 py-3 rounded-xl mb-5 text-xs leading-relaxed">
           <ShieldCheckIcon className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
           <span>
             <strong>First time on this device:</strong> Once verified, this device will be remembered so you won't need to enter a code on future logins from this browser.
           </span>
         </div>
 
-        <form onSubmit={handleMfaSubmit} className="space-y-5">
+        <form onSubmit={handleMfaSubmit} className="space-y-4 sm:space-y-5">
           <div>
-            <label className={`block text-sm font-medium mb-1.5 ${mfaError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+            <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${mfaError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
               Verification Code
             </label>
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="one-time-code"
               value={otp}
               onChange={(e) => {
                 setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
                 if (mfaError) setMfaError(null);
               }}
-              className={`input-field text-center text-2xl sm:text-3xl tracking-[0.3em] sm:tracking-[0.5em] font-mono ${
+              className={`input-field text-center text-2xl sm:text-3xl tracking-[0.25em] sm:tracking-[0.5em] font-mono h-12 ${
                 mfaError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''
               }`}
               placeholder="000000"
@@ -232,7 +241,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || rateLimitCooldown > 0}
-            className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+            className="btn-primary w-full h-11 font-semibold flex items-center justify-center shadow-sm active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading
               ? 'Verifying...'
@@ -245,7 +254,7 @@ export default function LoginPage() {
             type="button"
             onClick={() => sendMfaCode()}
             disabled={mfaSending || mfaCooldownSeconds > 0}
-            className="w-full text-sm text-ctu-blue hover:underline disabled:opacity-50 text-center"
+            className="w-full text-xs sm:text-sm text-ctu-blue hover:underline disabled:opacity-50 text-center py-1"
           >
             {mfaCooldownSeconds > 0
               ? `Resend code in ${mfaCooldownSeconds}s`
@@ -255,55 +264,66 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Want to go back?{' '}
-          <Link to="/auth/register" className="text-ctu-blue font-medium hover:underline">Register here</Link>
-        </p>
+        <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+          <p className="text-xs sm:text-sm text-slate-500">
+            Want to go back?{' '}
+            <Link to="/auth/register" className="text-ctu-blue font-semibold hover:underline">Register here</Link>
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div>
-      <Link to="/" className="inline-flex w-9 h-9 items-center justify-center rounded-xl text-gray-400 hover:text-ctu-blue hover:bg-gray-100 transition-all mb-4">
-        <ArrowLeftIcon className="w-5 h-5" />
-      </Link>
-      <h2 className="text-3xl font-bold text-ctu-charcoal mb-2">Welcome Back</h2>
-      <p className="text-gray-500 mb-8">Sign in to your alumni account</p>
+      <div className="flex items-center justify-between mb-4">
+        <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-ctu-blue py-1.5 px-2.5 -ml-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+          <ArrowLeftIcon className="w-4 h-4" />
+          <span>Back to Home</span>
+        </Link>
+        <span className="text-[11px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md bg-blue-50 text-ctu-blue border border-blue-100/80">
+          Alumni Portal
+        </span>
+      </div>
+      <h2 className="text-2xl sm:text-3xl font-bold text-ctu-charcoal tracking-tight mb-1.5">Welcome Back</h2>
+      <p className="text-slate-500 text-xs sm:text-sm mb-6 sm:mb-8">Sign in to your CTU-Naga alumni account</p>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
         {/* Username / Email textfield with red highlight on error */}
         <div>
-          <label className={`block text-sm font-medium mb-1.5 ${hasError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+          <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${hasError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
             Email Address
           </label>
           <input
-            type="text"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
               clearCredentialsError();
             }}
-            className={`input-field ${hasError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+            className={`input-field text-base sm:text-sm h-11 sm:h-10 ${hasError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
             placeholder="alumni@ctu.edu.ph"
             required
           />
         </div>
 
         {/* Password textfield with red highlight on error */}
-        <div className="group">
-          <label className={`block text-sm font-medium mb-1.5 ${hasError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+        <div>
+          <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${hasError ? 'text-red-600' : 'text-ctu-charcoal'}`}>
             Enter your password
           </label>
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
                 clearCredentialsError();
               }}
-              className={`input-field pr-11 ${hasError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+              className={`input-field text-base sm:text-sm h-11 sm:h-10 pr-12 ${hasError ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
               placeholder="Enter your password"
               required
             />
@@ -311,7 +331,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               onMouseDown={(e) => e.preventDefault()}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-ctu-blue p-1 rounded-lg hover:bg-gray-100/70 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-slate-400 hover:text-ctu-blue active:scale-95 transition-all rounded-lg hover:bg-slate-100"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
               tabIndex={-1}
             >
@@ -347,17 +367,17 @@ export default function LoginPage() {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 -mt-3">
-          <label className="flex items-center gap-2 cursor-pointer">
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          <label className="flex items-center gap-2 cursor-pointer select-none py-1">
             <input
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
               className="w-4 h-4 rounded border-gray-300 text-ctu-blue focus:ring-ctu-blue/20"
             />
-            <span className="text-sm text-gray-500">Remember me</span>
+            <span className="text-xs sm:text-sm text-slate-600">Remember me</span>
           </label>
-          <Link to="/auth/forgot-password" className="text-sm text-ctu-blue hover:text-ctu-marigold transition-colors font-medium">
+          <Link to="/auth/forgot-password" className="text-xs sm:text-sm text-ctu-blue hover:text-ctu-marigold transition-colors font-medium py-1">
             Forgot Password?
           </Link>
         </div>
@@ -365,7 +385,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading || rateLimitCooldown > 0}
-          className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
+          className="btn-primary w-full h-11 font-semibold flex items-center justify-center shadow-sm active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading
             ? 'Signing in...'
@@ -375,12 +395,14 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-gray-500">
-        Don't have an account?{' '}
-        <Link to="/auth/register" className="text-ctu-blue font-medium hover:underline">
-          Register here
-        </Link>
-      </p>
+      <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+        <p className="text-xs sm:text-sm text-slate-500">
+          Don't have an account?{' '}
+          <Link to="/auth/register" className="text-ctu-blue font-semibold hover:underline">
+            Register here
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
