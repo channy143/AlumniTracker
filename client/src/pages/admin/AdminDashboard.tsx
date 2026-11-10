@@ -395,7 +395,9 @@ export default function AdminDashboard() {
       border: 'border-purple-100',
       badge: 'Tracer',
       badgeBg: 'bg-purple-50 text-purple-700 border border-purple-200/60',
-      subtitle: stats?.surveyResponsesCount != null && stats?.surveyTargetCount ? `${stats.surveyResponsesCount} of ${stats.surveyTargetCount} responded` : 'Tracer study responses',
+      subtitle: stats?.surveyResponsesCount != null && stats?.surveyTargetCount != null
+        ? `${stats.surveyResponsesCount} of ${stats.surveyTargetCount} responded`
+        : 'Tracer study responses',
       href: '/admin/surveys',
     },
     {
@@ -613,17 +615,31 @@ export default function AdminDashboard() {
           </SummaryCard>
 
           <SummaryCard title="Survey Progress" icon={DocumentTextIcon} footer={{ label: 'Manage Surveys', to: '/admin/surveys' }}>
-            {activeSurvey ? (
+            {activeSurvey || stats?.activeSurveyTitle ? (
               <div>
-                <p className="text-xs text-gray-700 mb-2 font-medium line-clamp-1">{activeSurvey.title}</p>
+                <p className="text-xs text-gray-700 mb-2 font-medium line-clamp-1">{stats?.activeSurveyTitle || activeSurvey?.title}</p>
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-gray-500">Responses</span>
-                  <span className="font-medium text-gray-900">{activeSurvey.responseCount || 0} / {activeSurvey.targetCount || 1}</span>
+                  <span className="text-gray-500">
+                    {selectedYear === 'all' ? 'Responses (All Batches)' : `Responses (Batch ${selectedYear})`}
+                  </span>
+                  <span className="font-medium text-gray-900">
+                    {stats?.surveyResponsesCount != null ? stats.surveyResponsesCount : (activeSurvey?.responseCount || 0)} / {stats?.surveyTargetCount != null ? stats.surveyTargetCount : (activeSurvey?.targetCount || 1)}
+                  </span>
                 </div>
                 <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
-                  <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width: `${Math.min(100, surveyCompletion)}%` }} />
+                  <div
+                    className="h-full bg-orange-500 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, stats?.tracerSurveyCompletionRate != null ? stats.tracerSurveyCompletionRate : surveyCompletion)}%`
+                    }}
+                  />
                 </div>
-                <p className="text-xs text-gray-500">Completion: <span className="font-medium text-gray-900">{surveyCompletion}%</span></p>
+                <p className="text-xs text-gray-500">
+                  Completion:{' '}
+                  <span className="font-medium text-gray-900">
+                    {stats?.tracerSurveyCompletionRate != null ? stats.tracerSurveyCompletionRate : surveyCompletion}%
+                  </span>
+                </p>
               </div>
             ) : (
               <p className="text-xs text-gray-400 text-center py-6">No active Graduate Tracer Survey.</p>

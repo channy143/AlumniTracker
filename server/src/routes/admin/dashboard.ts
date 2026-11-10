@@ -101,8 +101,8 @@ router.get('/stats', async (req, res, next) => {
       allCompanies,
       activeSurveys,
     ] = await Promise.all([
-      safeData(supabase.from('users').select('id, created_at, is_verified').eq('role', 'alumni')),
-      safeData(supabase.from('profiles').select('id, user_id, first_name, last_name, employment_status, current_job_title, company_name, industry, salary_range, city, province, country')),
+      safeData(supabase.from('users').select('id, email, created_at, is_verified').eq('role', 'alumni')),
+      safeData(supabase.from('profiles').select('id, user_id, email, first_name, last_name, employment_status, current_job_title, company_name, industry, salary_range, city, province, country')),
       safeData(supabase.from('employment').select('id, profile_id, employment_status, company_name, company_industry, salary_range, is_current, start_date')),
       safeData(supabase.from('education').select('profile_id, program, year_graduated')),
       partnershipTracked
@@ -296,14 +296,38 @@ router.get('/stats', async (req, res, next) => {
     const activeList = (activeSurveys || []).filter((s: any) => s.is_active);
     let tracerSurveyCompletionRate = 0;
     let surveyResponsesCount = 0;
-    if (activeList.length > 0) {
+    const targetCohortCount = resolvedTotalAlumni || 0;
+
+    if (activeList.length > 0 && targetCohortCount > 0) {
       const active = activeList[0];
-      const respondents = await safeCount(
-        supabase.from('survey_responses').select('*', { count: 'exact', head: true }).eq('survey_id', active.id)
+      const surveyResponses = await safeData(
+        supabase.from('survey_responses').select('id, user_id, responses').eq('survey_id', active.id)
       );
-      surveyResponsesCount = respondents;
-      const target = resolvedTotalAlumni || 0;
-      tracerSurveyCompletionRate = target > 0 ? Math.round((respondents / target) * 100) : 0;
+
+      const targetUserIds = new Set(targetAlumniProfiles.map((p: any) => p.user_id));
+      const targetEmails = new Set(
+        targetAlumniProfiles
+          .map((p: any) => {
+            const u = alumniUserMap.get(p.user_id);
+            return (u?.email || p.email || '').toLowerCase().trim();
+          })
+          .filter(Boolean)
+      );
+
+      const respondingUserIds = new Set<string>();
+      (surveyResponses || []).forEach((r: any) => {
+        if (r.user_id && targetUserIds.has(r.user_id)) {
+          respondingUserIds.add(r.user_id);
+        } else {
+          const respEmail = String(r.responses?.email || '').toLowerCase().trim();
+          if (respEmail && targetEmails.has(respEmail)) {
+            respondingUserIds.add(respEmail);
+          }
+        }
+      });
+
+      surveyResponsesCount = respondingUserIds.size;
+      tracerSurveyCompletionRate = Math.min(100, Math.round((surveyResponsesCount / targetCohortCount) * 100));
     }
 
     res.json({
@@ -329,9 +353,10 @@ router.get('/stats', async (req, res, next) => {
       workAlignmentTotal: alignmentTotal,
       tracerSurveyCompletionRate,
       surveyResponsesCount,
-      surveyTargetCount: resolvedTotalAlumni,
+      surveyTargetCount: targetCohortCount,
       partnerCompanies: partnerCompaniesCount,
       activeSurveyCount: activeList.length,
+      activeSurveyTitle: activeList[0]?.title || null,
     });
   } catch (err) {
     next(err);
