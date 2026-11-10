@@ -57,9 +57,9 @@ function calcProfileCompletion(profile: any): number {
 
 function SectionLine({ label }: { label: string }) {
   return (
-    <span className="text-black text-xs uppercase tracking-[0.25em] font-semibold flex items-center gap-3 mb-3">
-      <span className="w-6 h-px bg-black/20" />
-      {label}
+    <span className="text-gray-900 text-xs uppercase tracking-wider font-bold flex items-center gap-2 sm:gap-2.5 mb-3">
+      <span className="w-4 sm:w-5 h-0.5 bg-orange-500 rounded-full shrink-0" />
+      <span>{label}</span>
     </span>
   );
 }
@@ -851,22 +851,26 @@ export default function ProfilePage() {
   const renderEditModal = () => {
     if (!editing) return null;
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setEditing(false)}>
-        <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150" onClick={() => setEditing(false)}>
+        <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[92vh] sm:max-h-[90vh] animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
-          <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+          <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
-                <UserCircleIcon className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                <UserCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-sm sm:text-base font-bold text-white leading-tight truncate">Edit Alumni Profile</h2>
-                <p className="text-[11px] sm:text-xs text-orange-100 mt-0.5 truncate">Manage personal information, career details, and account security</p>
+                <h2 className="text-sm sm:text-base font-bold text-white leading-tight">Edit Alumni Profile</h2>
+                <p className="text-[11px] sm:text-xs text-orange-100 mt-0.5 truncate">
+                  <span className="sm:hidden">Personal, career &amp; privacy settings</span>
+                  <span className="hidden sm:inline">Manage personal information, career details, and account security</span>
+                </p>
               </div>
             </div>
             <button
               onClick={() => setEditing(false)}
               className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer shrink-0"
+              aria-label="Close modal"
             >
               <XMarkIcon className="w-5 h-5" />
             </button>
@@ -875,41 +879,44 @@ export default function ProfilePage() {
           {/* Body */}
           <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
             {/* Sidebar / Mobile Top Tabs */}
-            <div className="w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-gray-100 bg-gray-50/50 p-2.5 md:p-4 flex md:flex-col gap-1.5 overflow-x-auto scrollbar-none">
+            <div className="w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-gray-100 bg-gray-50/70 p-1.5 sm:p-2.5 md:p-4 flex md:flex-col gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none">
               <button
                 onClick={() => setEditSection('personal')}
-                className={`flex items-center justify-center md:justify-start gap-2 px-3 py-2 md:py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'personal'
+                className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 md:py-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'personal'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
                   }`}
               >
-                <UserIcon className="w-4 h-4 shrink-0" />
-                <span>Personal Info</span>
+                <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="hidden sm:inline">Personal Info</span>
+                <span className="sm:hidden">Personal</span>
               </button>
               <button
                 onClick={() => setEditSection('security')}
-                className={`flex items-center justify-center md:justify-start gap-2 px-3 py-2 md:py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'security'
+                className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 md:py-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'security'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
                   }`}
               >
-                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                <span>Security &amp; Password</span>
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                <span className="hidden sm:inline">Security &amp; Password</span>
+                <span className="sm:hidden">Security</span>
               </button>
               <button
                 onClick={() => setEditSection('privacy')}
-                className={`flex items-center justify-center md:justify-start gap-2 px-3 py-2 md:py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'privacy'
+                className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 md:py-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'privacy'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
                   }`}
               >
-                <ShieldCheckIcon className="w-4 h-4 shrink-0" />
-                <span>Privacy &amp; Data</span>
+                <ShieldCheckIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="hidden sm:inline">Privacy &amp; Data</span>
+                <span className="sm:hidden">Privacy</span>
               </button>
             </div>
 
             {/* Form Content */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+            <div className="flex-1 overflow-y-auto p-3.5 sm:p-6">
               {editSection === 'personal' ? (
                 <div className="space-y-6">
                   <div>
@@ -1071,112 +1078,113 @@ export default function ProfilePage() {
                       {/* Proof of Employment for Q-Pro Accreditation */}
                       <div data-tour="profile-proof-section" className="sm:col-span-2 pt-4 border-t border-gray-100">
                         {/* Header with Title and Tooltip */}
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-xs text-gray-800 font-bold flex items-center gap-1.5">
-                            <CheckBadgeIcon className="w-4 h-4 text-orange-600" />
-                            <span>Proof of Employment (University Accreditation / Q-Pro Dossier)</span>
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <label className="text-xs text-gray-800 font-bold flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                            <CheckBadgeIcon className="w-4 h-4 text-orange-600 shrink-0" />
+                            <span>Proof of Employment <span className="text-gray-500 font-normal sm:font-bold text-[11px] sm:text-xs">(University Accreditation / Q-Pro)</span></span>
                           </label>
-                            <div className="relative">
-                              <button
-                                type="button"
-                                onClick={() => setShowQProTooltip(!showQProTooltip)}
-                                onMouseEnter={() => setShowQProTooltip(true)}
-                                onMouseLeave={() => setShowQProTooltip(false)}
-                                className="text-gray-400 hover:text-orange-600 transition-colors p-0.5 rounded-full hover:bg-orange-50 cursor-pointer"
-                                title="Learn more about Q-Pro Dossier"
-                              >
-                                <QuestionMarkCircleIcon className="w-4 h-4" />
-                              </button>
-                              {showQProTooltip && (
-                                <div className="absolute right-0 bottom-full mb-2 w-72 bg-gray-900 text-white text-[11px] rounded-lg p-3 shadow-xl z-50 leading-relaxed border border-gray-800">
-                                  <p className="font-semibold text-orange-300 mb-1">What is Q-Pro Dossier?</p>
-                                  CTU-Naga is mandated by CHED, AACCUP, and PESO to verify graduate employment outcomes. Providing official placement proof validates university accreditation metrics. All submitted records are held strictly confidential under Republic Act 10173 (Data Privacy Act of 2012).
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <p className="text-[11px] text-gray-500 mb-3">
-                            Submit verified evidence of your placement (COE, payslip, contract, or ID) for institutional quality assurance.
-                          </p>
-
-                          {(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') && (
-                            <div className="mb-3 p-2.5 rounded-lg bg-orange-50/80 border border-orange-100 text-[11px] text-orange-800 flex items-center gap-2">
-                              <span>💡 When you secure employment or freelance work, submit your Certificate of Employment (COE), Company ID, or Contract here for institutional Q-Pro verification.</span>
-                            </div>
-                          )}
-
-                          {/* Proof Type & Specification */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                            <div>
-                              <label className="text-[11px] text-gray-600 font-medium mb-1 block">Proof Document Type</label>
-                              <select
-                                value={form.proof_type || 'coe'}
-                                onChange={(e) => setForm((prev: any) => ({ ...prev, proof_type: e.target.value }))}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
-                              >
-                                <option value="coe">Certificate of Employment (COE)</option>
-                                <option value="welcome_email_payslip">First-day Payslip / Welcome Email</option>
-                                <option value="affidavit">Affidavit of Employment / Declaration of Status</option>
-                                <option value="company_id">Official Company ID</option>
-                                <option value="contract">Job Contract / Appointment Letter</option>
-                                <option value="dti_sec">Business Permit / DTI / SEC (Self-employed / Freelance)</option>
-                                <option value="other">Other (Please specify)</option>
-                              </select>
-                            </div>
-                            {form.proof_type === 'other' ? (
-                              <div>
-                                <label className="text-[11px] text-gray-600 font-medium mb-1 block">Please specify document type</label>
-                                <input
-                                  type="text"
-                                  value={form.proof_type_other || ''}
-                                  onChange={(e) => setForm((prev: any) => ({ ...prev, proof_type_other: e.target.value }))}
-                                  placeholder="e.g. Appointment Letter, OEC, Consultancy Agreement"
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
-                                />
-                              </div>
-                            ) : (
-                              <div className="flex items-end">
-                                <span className="text-[11px] text-gray-500 italic pb-2">
-                                  {form.proof_type === 'coe' && 'Standard HR certificate confirming active or past tenure.'}
-                                  {form.proof_type === 'welcome_email_payslip' && 'Useful if newly hired and official COE is not yet released.'}
-                                  {form.proof_type === 'affidavit' && 'Notarized sworn statement of freelancing, gig, or remote work.'}
-                                  {form.proof_type === 'company_id' && 'Official corporate badge showing your name and company.'}
-                                  {form.proof_type === 'contract' && 'Signed job offer or appointment agreement.'}
-                                  {form.proof_type === 'dti_sec' && 'Registered trade name, DTI certificate, or SEC registration.'}
-                                </span>
+                          <div className="relative shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setShowQProTooltip(!showQProTooltip)}
+                              onMouseEnter={() => setShowQProTooltip(true)}
+                              onMouseLeave={() => setShowQProTooltip(false)}
+                              className="text-gray-400 hover:text-orange-600 transition-colors p-0.5 rounded-full hover:bg-orange-50 cursor-pointer"
+                              title="Learn more about Q-Pro Dossier"
+                              aria-label="Learn more about Q-Pro Dossier"
+                            >
+                              <QuestionMarkCircleIcon className="w-4 h-4" />
+                            </button>
+                            {showQProTooltip && (
+                              <div className="absolute right-0 bottom-full mb-2 w-64 sm:w-72 max-w-[85vw] bg-gray-900 text-white text-[11px] rounded-lg p-3 shadow-xl z-50 leading-relaxed border border-gray-800">
+                                <p className="font-semibold text-orange-300 mb-1">What is Q-Pro Dossier?</p>
+                                CTU-Naga is mandated by CHED, AACCUP, and PESO to verify graduate employment outcomes. Providing official placement proof validates university accreditation metrics. All submitted records are held strictly confidential under Republic Act 10173 (Data Privacy Act of 2012).
                               </div>
                             )}
                           </div>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mb-3">
+                          Submit verified evidence of your placement (COE, payslip, contract, or ID) for institutional quality assurance.
+                        </p>
 
-                          {/* Submission Method Tabs: Direct Upload vs Cloud Link */}
-                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                            <div className="flex items-center gap-2 mb-3 border-b border-gray-200 pb-2">
-                              <span className="text-[11px] font-semibold text-gray-700">Submission Method:</span>
-                              <div className="inline-flex rounded-lg bg-gray-200/80 p-0.5 text-xs font-medium">
-                                <button
-                                  type="button"
-                                  onClick={() => setProofSubmissionTab('upload')}
-                                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${proofSubmissionTab === 'upload'
-                                      ? 'bg-white text-orange-700 shadow-xs font-semibold'
-                                      : 'text-gray-600 hover:text-gray-900'
-                                    }`}
-                                >
-                                  <DocumentArrowUpIcon className="w-3.5 h-3.5" />
-                                  Direct File Upload
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setProofSubmissionTab('link')}
-                                  className={`px-3 py-1 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${proofSubmissionTab === 'link'
-                                      ? 'bg-white text-orange-700 shadow-xs font-semibold'
-                                      : 'text-gray-600 hover:text-gray-900'
-                                    }`}
-                                >
-                                  <LinkIcon className="w-3.5 h-3.5" />
-                                  Provide Cloud Link
-                                </button>
-                              </div>
+                        {(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') && (
+                          <div className="mb-3 p-2.5 rounded-lg bg-orange-50/80 border border-orange-100 text-[11px] text-orange-800 flex items-center gap-2">
+                            <span>💡 When you secure employment or freelance work, submit your Certificate of Employment (COE), Company ID, or Contract here for institutional Q-Pro verification.</span>
+                          </div>
+                        )}
+
+                        {/* Proof Type & Specification */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                          <div>
+                            <label className="text-[11px] text-gray-600 font-medium mb-1 block">Proof Document Type</label>
+                            <select
+                              value={form.proof_type || 'coe'}
+                              onChange={(e) => setForm((prev: any) => ({ ...prev, proof_type: e.target.value }))}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                            >
+                              <option value="coe">Certificate of Employment (COE)</option>
+                              <option value="welcome_email_payslip">First-day Payslip / Welcome Email</option>
+                              <option value="affidavit">Affidavit of Employment / Declaration of Status</option>
+                              <option value="company_id">Official Company ID</option>
+                              <option value="contract">Job Contract / Appointment Letter</option>
+                              <option value="dti_sec">Business Permit / DTI / SEC (Self-employed / Freelance)</option>
+                              <option value="other">Other (Please specify)</option>
+                            </select>
+                          </div>
+                          {form.proof_type === 'other' ? (
+                            <div>
+                              <label className="text-[11px] text-gray-600 font-medium mb-1 block">Please specify document type</label>
+                              <input
+                                type="text"
+                                value={form.proof_type_other || ''}
+                                onChange={(e) => setForm((prev: any) => ({ ...prev, proof_type_other: e.target.value }))}
+                                placeholder="e.g. Appointment Letter, OEC, Consultancy Agreement"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                              />
                             </div>
+                          ) : (
+                            <div className="flex items-end">
+                              <span className="text-[11px] text-gray-500 italic pb-2">
+                                {form.proof_type === 'coe' && 'Standard HR certificate confirming active or past tenure.'}
+                                {form.proof_type === 'welcome_email_payslip' && 'Useful if newly hired and official COE is not yet released.'}
+                                {form.proof_type === 'affidavit' && 'Notarized sworn statement of freelancing, gig, or remote work.'}
+                                {form.proof_type === 'company_id' && 'Official corporate badge showing your name and company.'}
+                                {form.proof_type === 'contract' && 'Signed job offer or appointment agreement.'}
+                                {form.proof_type === 'dti_sec' && 'Registered trade name, DTI certificate, or SEC registration.'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Submission Method Tabs: Direct Upload vs Cloud Link */}
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-gray-200 pb-2.5">
+                            <span className="text-[11px] font-semibold text-gray-700">Submission Method:</span>
+                            <div className="grid grid-cols-2 sm:inline-flex rounded-lg bg-gray-200/80 p-0.5 text-xs font-medium w-full sm:w-auto">
+                              <button
+                                type="button"
+                                onClick={() => setProofSubmissionTab('upload')}
+                                className={`px-2.5 sm:px-3 py-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center text-[11px] sm:text-xs ${proofSubmissionTab === 'upload'
+                                    ? 'bg-white text-orange-700 shadow-xs font-semibold'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                  }`}
+                              >
+                                <DocumentArrowUpIcon className="w-3.5 h-3.5 shrink-0" />
+                                <span>Direct Upload</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setProofSubmissionTab('link')}
+                                className={`px-2.5 sm:px-3 py-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center text-[11px] sm:text-xs ${proofSubmissionTab === 'link'
+                                    ? 'bg-white text-orange-700 shadow-xs font-semibold'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                  }`}
+                              >
+                                <LinkIcon className="w-3.5 h-3.5 shrink-0" />
+                                <span>Cloud Link</span>
+                              </button>
+                            </div>
+                          </div>
 
                             {/* TAB 1: Direct File Upload */}
                             {proofSubmissionTab === 'upload' && (
@@ -1377,26 +1385,28 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5 pt-4 border-t border-gray-100">
+                  <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 sm:gap-2.5 pt-4 border-t border-gray-100">
                     <button
-                      onClick={handleSave}
-                      disabled={saving}
-                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer"
-                    >
-                      {saving ? 'Saving...' : 'Save Profile Changes'}
-                    </button>
-                    <button
+                      type="button"
                       onClick={() => setEditing(false)}
-                      className="px-4 py-2 bg-white border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer"
+                      className="w-full sm:w-auto px-4 py-2.5 bg-white border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-2xs cursor-pointer text-center"
                     >
                       Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer text-center"
+                    >
+                      {saving ? 'Saving...' : 'Save Profile Changes'}
                     </button>
                   </div>
                 </div>
               ) : editSection === 'security' ? (
                 <div className="space-y-6">
                   {/* Change Password */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 sm:p-5">
                     <SectionLine label="Change Password" />
                     <div className="space-y-4 mt-3 max-w-md">
                       <div>
@@ -1437,7 +1447,7 @@ export default function ProfilePage() {
                         <button
                           onClick={handleChangePassword}
                           disabled={saving || !passwordForm.currentPassword || !passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmPassword}
-                          className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer"
+                          className="w-full sm:w-auto px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer text-center"
                         >
                           {saving ? 'Updating Password...' : 'Update Password'}
                         </button>
@@ -1446,7 +1456,7 @@ export default function ProfilePage() {
                   </div>
 
                   {/* Two-Factor Authentication (MFA) */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 sm:p-5">
                     <SectionLine label="Two-Factor Authentication (MFA)" />
                     <p className="text-xs text-gray-500 mb-3 max-w-md">
                       Adding MFA protects your account by requiring a verification code when signing in from an unrecognized device.
@@ -1458,7 +1468,7 @@ export default function ProfilePage() {
                             <p className="text-sm font-medium text-green-700">MFA is enabled</p>
                             <p className="text-xs text-gray-500">Recognized devices sign in directly. A code is only required on new devices.</p>
                           </div>
-                          <button onClick={handleDisableMfa} disabled={mfaLoading} className="px-4 py-2 border border-gray-200 bg-white text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs self-start sm:self-auto shrink-0">
+                          <button onClick={handleDisableMfa} disabled={mfaLoading} className="w-full sm:w-auto px-4 py-2 border border-gray-200 bg-white text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs self-start sm:self-auto shrink-0 text-center">
                             {mfaLoading ? 'Disabling...' : 'Disable MFA'}
                           </button>
                         </div>
@@ -1477,16 +1487,16 @@ export default function ProfilePage() {
                     ) : (
                       <div className="space-y-3 max-w-md">
                         <div className="flex items-center gap-2">
-                          <button onClick={handleSendMfaCode} disabled={mfaLoading} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer">
+                          <button onClick={handleSendMfaCode} disabled={mfaLoading} className="w-full sm:w-auto px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer text-center">
                             {mfaLoading ? 'Sending...' : 'Send Verification Code'}
                           </button>
                         </div>
                         <div className="flex flex-col sm:flex-row sm:items-end gap-2">
-                          <div className="flex-1">
+                          <div className="flex-1 w-full">
                             <label className="block text-xs text-gray-500 mb-1">Verification Code</label>
                             <input type="text" value={mfaOtp} onChange={(e) => setMfaOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} maxLength={6} placeholder="000000" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500" />
                           </div>
-                          <button onClick={handleEnableMfa} disabled={mfaLoading || mfaOtp.length !== 6} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer">
+                          <button onClick={handleEnableMfa} disabled={mfaLoading || mfaOtp.length !== 6} className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer text-center">
                             {mfaLoading ? 'Enabling...' : 'Enable MFA'}
                           </button>
                         </div>
@@ -1497,16 +1507,16 @@ export default function ProfilePage() {
               ) : (
                 <div className="space-y-6">
                   {/* Privacy Settings in Modal */}
-                  <div data-tour="profile-privacy-section" className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                  <div data-tour="profile-privacy-section" className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 sm:p-5">
                     <SectionLine label="Directory Visibility Preferences" />
-                    <p className="text-xs text-gray-500 mb-4">
+                    <p className="text-xs text-gray-500 mb-4 leading-relaxed">
                       Control which information is visible to other registered alumni in the alumni directory.
                     </p>
-                    <div className="space-y-3.5 divide-y divide-gray-200/70">
-                      <div className="flex items-center justify-between pt-1">
-                        <div>
+                    <div className="space-y-3 divide-y divide-gray-200/70">
+                      <div className="flex items-center justify-between gap-3 pt-1">
+                        <div className="min-w-0 pr-1">
                           <p className="text-xs font-semibold text-gray-800">Show Email Address</p>
-                          <p className="text-[11px] text-gray-500">Allow peer alumni in the directory to view your email</p>
+                          <p className="text-[11px] text-gray-500 leading-tight">Allow peer alumni in the directory to view your email</p>
                         </div>
                         <button
                           type="button"
@@ -1517,18 +1527,18 @@ export default function ProfilePage() {
                               show_email: !prev.privacy_settings?.show_email,
                             },
                           }))}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_email ? 'bg-orange-600' : 'bg-gray-200'
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_email ? 'bg-orange-600' : 'bg-gray-200'
                             }`}
                         >
-                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_email ? 'translate-x-4' : 'translate-x-0'
+                          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_email ? 'translate-x-5' : 'translate-x-0'
                             }`} />
                         </button>
                       </div>
 
-                      <div className="flex items-center justify-between pt-3">
-                        <div>
+                      <div className="flex items-center justify-between gap-3 pt-3">
+                        <div className="min-w-0 pr-1">
                           <p className="text-xs font-semibold text-gray-800">Show Phone Number</p>
-                          <p className="text-[11px] text-gray-500">Allow peer alumni in the directory to view your phone number</p>
+                          <p className="text-[11px] text-gray-500 leading-tight">Allow peer alumni in the directory to view your phone number</p>
                         </div>
                         <button
                           type="button"
@@ -1539,18 +1549,18 @@ export default function ProfilePage() {
                               show_phone: !prev.privacy_settings?.show_phone,
                             },
                           }))}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_phone ? 'bg-orange-600' : 'bg-gray-200'
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_phone ? 'bg-orange-600' : 'bg-gray-200'
                             }`}
                         >
-                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_phone ? 'translate-x-4' : 'translate-x-0'
+                          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_phone ? 'translate-x-5' : 'translate-x-0'
                             }`} />
                         </button>
                       </div>
 
-                      <div className="flex items-center justify-between pt-3">
-                        <div>
+                      <div className="flex items-center justify-between gap-3 pt-3">
+                        <div className="min-w-0 pr-1">
                           <p className="text-xs font-semibold text-gray-800">Show Home Address</p>
-                          <p className="text-[11px] text-gray-500">Allow peer alumni in the directory to view your street address</p>
+                          <p className="text-[11px] text-gray-500 leading-tight">Allow peer alumni in the directory to view your street address</p>
                         </div>
                         <button
                           type="button"
@@ -1561,18 +1571,18 @@ export default function ProfilePage() {
                               show_address: !prev.privacy_settings?.show_address,
                             },
                           }))}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_address ? 'bg-orange-600' : 'bg-gray-200'
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_address ? 'bg-orange-600' : 'bg-gray-200'
                             }`}
                         >
-                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_address ? 'translate-x-4' : 'translate-x-0'
+                          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_address ? 'translate-x-5' : 'translate-x-0'
                             }`} />
                         </button>
                       </div>
 
-                      <div className="flex items-center justify-between pt-3">
-                        <div>
+                      <div className="flex items-center justify-between gap-3 pt-3">
+                        <div className="min-w-0 pr-1">
                           <p className="text-xs font-semibold text-gray-800">Show Employment History</p>
-                          <p className="text-[11px] text-gray-500">Display company and job titles (salary is always redacted)</p>
+                          <p className="text-[11px] text-gray-500 leading-tight">Display company and job titles (salary is always redacted)</p>
                         </div>
                         <button
                           type="button"
@@ -1583,10 +1593,10 @@ export default function ProfilePage() {
                               show_employment: !prev.privacy_settings?.show_employment,
                             },
                           }))}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_employment !== false ? 'bg-orange-600' : 'bg-gray-200'
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_employment !== false ? 'bg-orange-600' : 'bg-gray-200'
                             }`}
                         >
-                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_employment !== false ? 'translate-x-4' : 'translate-x-0'
+                          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_employment !== false ? 'translate-x-5' : 'translate-x-0'
                             }`} />
                         </button>
                       </div>
@@ -1597,7 +1607,7 @@ export default function ProfilePage() {
                         type="button"
                         onClick={handleSave}
                         disabled={saving}
-                        className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer"
+                        className="w-full sm:w-auto px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer text-center"
                       >
                         {saving ? 'Saving...' : 'Save Privacy Changes'}
                       </button>
