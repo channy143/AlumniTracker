@@ -405,19 +405,21 @@ export default function LandingPage() {
       {/* ═══ Navigation ═══ */}
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          showHeader
-            ? 'bg-white/95 backdrop-blur-xl shadow-[0_1px_20px_rgba(0,0,0,0.06)]'
-            : 'bg-transparent'
+          mobileMenuOpen
+            ? 'bg-transparent text-white'
+            : showHeader
+              ? 'bg-white/95 backdrop-blur-xl shadow-[0_1px_20px_rgba(0,0,0,0.06)]'
+              : 'bg-transparent'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <button onClick={scrollToTop} className="flex items-center gap-3 text-left group">
             <img src="/logo.png" alt="CTU-Naga Alumni" className="w-10 h-10 object-contain rounded-xl shadow-md shrink-0 bg-white/10 p-0.5" />
             <div>
-              <h1 className={`text-xl font-bold font-display transition-colors duration-300 ${showHeader ? 'text-ctu-blue group-hover:text-ctu-marigold' : 'text-white'}`}>
+              <h1 className={`text-xl font-bold font-display transition-colors duration-300 ${!mobileMenuOpen && showHeader ? 'text-ctu-blue group-hover:text-ctu-marigold' : 'text-white'}`}>
                 CTU-Naga Alumni
               </h1>
-              <p className={`text-xs -mt-0.5 transition-colors duration-300 ${showHeader ? 'text-gray-400' : 'text-white/60'}`}>
+              <p className={`text-xs -mt-0.5 transition-colors duration-300 ${!mobileMenuOpen && showHeader ? 'text-gray-400' : 'text-white/60'}`}>
                 Bridging Education to Eternity
               </p>
             </div>
@@ -468,7 +470,7 @@ export default function LandingPage() {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={`lg:hidden p-2 rounded-xl transition-all ${
-                showHeader ? 'text-ctu-charcoal hover:bg-gray-100' : 'text-white hover:bg-white/10'
+                !mobileMenuOpen && showHeader ? 'text-ctu-charcoal hover:bg-gray-100' : 'text-white hover:bg-white/10'
               }`}
             >
               {mobileMenuOpen ? <XMarkIcon className="w-5 h-5" /> : <Bars3Icon className="w-5 h-5" />}
@@ -481,11 +483,11 @@ export default function LandingPage() {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-            className="fixed inset-0 z-40 bg-white/98 backdrop-blur-xl pt-20 lg:hidden overflow-y-auto"
+            className="fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-2xl pt-24 lg:hidden overflow-y-auto"
           >
             <div className="flex flex-col items-center justify-center min-h-full gap-5 sm:gap-6 px-6 pb-16">
               {NAV_SECTIONS.map((section) => (
@@ -494,25 +496,25 @@ export default function LandingPage() {
                   onClick={() => scrollTo(section.id)}
                   className={`text-2xl sm:text-3xl font-display font-bold transition-all ${
                     activeSection === section.id
-                      ? 'text-ctu-marigold scale-110'
-                      : 'text-ctu-charcoal/60 hover:text-ctu-charcoal hover:scale-105'
+                      ? 'text-ctu-marigold scale-110 drop-shadow-sm'
+                      : 'text-white/75 hover:text-white hover:scale-105'
                   }`}
                 >
                   {section.label}
                 </button>
               ))}
-              <div className="flex flex-col gap-4 mt-10 w-full max-w-xs">
+              <div className="flex flex-col gap-3.5 mt-8 w-full max-w-xs">
                 <Link
                   to="/auth/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-3 rounded-xl border-2 border-ctu-blue/20 text-ctu-blue font-medium hover:bg-ctu-blue/5 transition-all"
+                  className="w-full text-center py-3 rounded-xl border border-white/30 text-white font-semibold hover:bg-white/10 hover:border-white/50 transition-all shadow-sm"
                 >
                   Sign In
                 </Link>
                 <Link
                   to="/auth/register"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-3 rounded-xl bg-ctu-blue text-white font-medium hover:bg-blue-900 shadow-lg shadow-ctu-blue/20 transition-all"
+                  className="w-full text-center py-3 rounded-xl bg-ctu-blue text-white font-semibold hover:bg-blue-900 border border-blue-400/30 shadow-lg shadow-ctu-blue/30 transition-all"
                 >
                   Join Now
                 </Link>
