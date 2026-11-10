@@ -19,6 +19,7 @@ import {
   HandThumbUpIcon as ThumbUpOutline,
   TrashIcon,
   XMarkIcon,
+  ArrowsPointingOutIcon,
 } from '@heroicons/react/24/outline';
 import { HandThumbUpIcon as ThumbUpSolid } from '@heroicons/react/24/solid';
 import { decodeUnicode, setBackgroundInterval } from '@/utils/helpers';
@@ -78,7 +79,7 @@ function InfoCard({ post, onViewDetails }: { post: FeedPost; onViewDetails: () =
         </p>
 
         {post.image_url && (
-          <img src={post.image_url} alt="" className="w-full rounded-lg mb-2 max-h-80 object-cover" />
+          <img src={post.image_url} alt="" className="w-full h-auto rounded-lg mb-2 max-h-80 md:max-h-none object-cover md:object-contain" />
         )}
 
         <div className="flex items-center gap-2 mt-2">
@@ -121,6 +122,7 @@ function PostDetailView({
   const [submittingComment, setSubmittingComment] = useState(false);
   const [liked, setLiked] = useState(!!post.liked);
   const [likeCount, setLikeCount] = useState(post.like_count || 0);
+  const [showDetailImageLightbox, setShowDetailImageLightbox] = useState(false);
 
   // Live refresh for post details, comments, and likes
   useEffect(() => {
@@ -327,8 +329,25 @@ function PostDetailView({
 
         {/* Post Image */}
         {post.image_url && (
-          <div className="rounded-xl overflow-hidden mb-3 max-h-96 bg-gray-50 flex items-center justify-center border border-gray-100">
-            <img src={post.image_url} alt="" className="w-full object-cover max-h-96" />
+          <div className="relative group rounded-xl overflow-hidden mb-3 bg-gray-50 flex items-center justify-center border border-gray-100 max-h-96 md:max-h-none">
+            <img
+              src={post.image_url}
+              alt=""
+              className="w-full h-auto max-h-96 md:max-h-none object-cover md:object-contain cursor-pointer hover:opacity-95 transition-opacity"
+              onClick={() => setShowDetailImageLightbox(true)}
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDetailImageLightbox(true);
+              }}
+              className="hidden md:flex absolute top-2.5 right-2.5 items-center gap-1.5 px-2.5 py-1 bg-black/60 hover:bg-black/80 text-white text-[11px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-xs shadow-md cursor-pointer border border-white/20"
+              title="View full size image"
+            >
+              <ArrowsPointingOutIcon className="w-3.5 h-3.5" />
+              <span>Full Size</span>
+            </button>
           </div>
         )}
 
@@ -459,6 +478,40 @@ function PostDetailView({
       </div>
         </div>
       </div>
+
+      {/* Lightbox / Fullscreen Image Viewer Modal */}
+      {showDetailImageLightbox && post.image_url && (
+        <div
+          className="fixed inset-0 bg-black/85 backdrop-blur-xs z-[10001] flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
+          onClick={() => setShowDetailImageLightbox(false)}
+        >
+          <div className="relative max-w-5xl max-h-[92vh] flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
+              <a
+                href={post.image_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 text-xs bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors border border-white/20 shadow-md backdrop-blur-xs"
+              >
+                Open original ↗
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowDetailImageLightbox(false)}
+                className="p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors border border-white/20 shadow-md cursor-pointer"
+                aria-label="Close"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+            <img
+              src={post.image_url}
+              alt=""
+              className="max-h-[88vh] max-w-full w-auto h-auto object-contain rounded-xl shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );

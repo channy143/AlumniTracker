@@ -18,6 +18,7 @@ import {
   PhotoIcon,
   ArrowUpTrayIcon,
   FaceSmileIcon,
+  ArrowsPointingOutIcon,
 } from '@heroicons/react/24/outline';
 import { feedApi, connectionsApi, messagesApi, directoryApi } from '@/services/api';
 import { decodeUnicode, setBackgroundInterval } from '@/utils/helpers';
@@ -191,6 +192,7 @@ export default function FeedPostCard({
   // Options menu
   const [menuOpen, setMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showImageLightbox, setShowImageLightbox] = useState(false);
 
   const isAuthor = Boolean(currentUserId && currentPost.user_id && currentUserId === currentPost.user_id);
   const canDelete = isAuthor || currentUserRole === 'admin';
@@ -837,13 +839,31 @@ export default function FeedPostCard({
 
       {/* Post Photo */}
       {currentPost.image_url && (
-        <div className="mt-2 bg-gray-50 max-h-96 flex items-center justify-center overflow-hidden border-y border-gray-100">
+        <div className="relative group mt-2 bg-gray-50 flex items-center justify-center overflow-hidden border-y border-gray-100 max-h-96 md:max-h-none">
           <img
             src={currentPost.image_url}
             alt=""
-            className="w-full object-cover max-h-96 hover:opacity-95 transition-opacity cursor-pointer"
-            onClick={() => onViewDetails?.(currentPost)}
+            className="w-full h-auto max-h-96 md:max-h-none object-cover md:object-contain hover:opacity-95 transition-opacity cursor-pointer"
+            onClick={() => {
+              if (onViewDetails) {
+                onViewDetails(currentPost);
+              } else {
+                setShowImageLightbox(true);
+              }
+            }}
           />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowImageLightbox(true);
+            }}
+            className="hidden md:flex absolute top-2.5 right-2.5 items-center gap-1.5 px-2.5 py-1 bg-black/60 hover:bg-black/80 text-white text-[11px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-xs shadow-md cursor-pointer border border-white/20"
+            title="View full size image"
+          >
+            <ArrowsPointingOutIcon className="w-3.5 h-3.5" />
+            <span>Full Size</span>
+          </button>
         </div>
       )}
 
@@ -1737,6 +1757,41 @@ export default function FeedPostCard({
         <div className="fixed bottom-6 right-6 z-60 bg-gray-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-xl animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2">
           <span>{toastMessage}</span>
         </div>
+      )}
+
+      {/* Lightbox / Fullscreen Image Viewer Modal */}
+      {showImageLightbox && currentPost.image_url && createPortal(
+        <div
+          className="fixed inset-0 bg-black/85 backdrop-blur-xs z-[10000] flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
+          onClick={() => setShowImageLightbox(false)}
+        >
+          <div className="relative max-w-5xl max-h-[92vh] flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
+              <a
+                href={currentPost.image_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 text-xs bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors border border-white/20 shadow-md backdrop-blur-xs"
+              >
+                Open original ↗
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowImageLightbox(false)}
+                className="p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors border border-white/20 shadow-md cursor-pointer"
+                aria-label="Close"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+            <img
+              src={currentPost.image_url}
+              alt=""
+              className="max-h-[88vh] max-w-full w-auto h-auto object-contain rounded-xl shadow-2xl"
+            />
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
