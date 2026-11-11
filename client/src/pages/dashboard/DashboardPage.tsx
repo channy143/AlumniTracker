@@ -23,7 +23,7 @@ import {
   FaceSmileIcon,
 } from '@heroicons/react/24/outline';
 import { HandThumbUpIcon as ThumbUpSolid } from '@heroicons/react/24/solid';
-import { decodeUnicode, setBackgroundInterval } from '@/utils/helpers';
+import { decodeUnicode, setBackgroundInterval, dedupeCommentTree, countAllComments } from '@/utils/helpers';
 import { formatExperience } from '@/utils/formatExperience';
 import { supabase, isSupabaseConfigured } from '@/services/supabase';
 import CreatePostBox from '@/components/dashboard/CreatePostBox';
@@ -119,9 +119,11 @@ function PostDetailView({
   onPostUpdated?: (updated: any) => void;
 }) {
   const [comments, setComments] = useState<any[]>([]);
+  const [hasLoadedComments, setHasLoadedComments] = useState(false);
   const [loadingComments, setLoadingComments] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const submittingCommentRef = useRef(false);
   const [liked, setLiked] = useState(!!post.liked);
   const [likeCount, setLikeCount] = useState(post.like_count || 0);
   const [showDetailImageLightbox, setShowDetailImageLightbox] = useState(false);
@@ -129,18 +131,35 @@ function PostDetailView({
   const [replyingToAuthorName, setReplyingToAuthorName] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
+  const submittingReplyRef = useRef(false);
   const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState(false);
   const [activeCommentReactionPickerId, setActiveCommentReactionPickerId] = useState<string | null>(null);
   const commentPickerTimeoutRef = useRef<any>(null);
+  const commentMutationSeqRef = useRef(0);
+
+  const totalCommentCount = hasLoadedComments ? countAllComments(comments) : (post.comment_count || 0);
+  const lastSyncedCountRef = useRef<number | null>(null);
+
+  // Sync accurate comment count back to parent card only when it actually changes
+  useEffect(() => {
+    if (hasLoadedComments) {
+      const nextCount = countAllComments(comments);
+      if (lastSyncedCountRef.current !== nextCount) {
+        lastSyncedCountRef.current = nextCount;
+        onPostUpdated?.({ id: post.id, comment_count: nextCount });
+      }
+    }
+  }, [comments, hasLoadedComments, post.id, onPostUpdated]);
 
   // Live refresh for post details, comments, and likes
   useEffect(() => {
     let isCancelled = false;
 
     const refreshPostDetails = async () => {
+      const seqBefore = commentMutationSeqRef.current;
       try {
         const fullPost = await feedApi.get(post.id);
-        if (isCancelled || !fullPost) return;
+        if (isCancelled || !fullPost || commentMutationSeqRef.current !== seqBefore) return;
 
         if (typeof fullPost.liked === 'boolean') {
           setLiked(fullPost.liked);
@@ -149,11 +168,13 @@ function PostDetailView({
           setLikeCount(fullPost.like_count);
         }
         if (fullPost.comments) {
+          const cleaned = dedupeCommentTree(fullPost.comments);
+          setHasLoadedComments(true);
           setComments((prev) => {
-            if (JSON.stringify(prev) === JSON.stringify(fullPost.comments)) {
+            if (JSON.stringify(prev) === JSON.stringify(cleaned)) {
               return prev;
             }
-            return fullPost.comments;
+            return cleaned;
           });
         }
       } catch {
@@ -175,6 +196,11 @@ function PostDetailView({
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'feed_post_comments', filter: `post_id=eq.${post.id}` },
+            () => { refreshPostDetails(); }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'feed_comment_reactions' },
             () => { refreshPostDetails(); }
           )
           .on(
@@ -231,42 +257,55 @@ function PostDetailView({
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentText.trim() || submittingComment) return;
+    if (!commentText.trim() || submittingComment || submittingCommentRef.current) return;
+    submittingCommentRef.current = true;
     setSubmittingComment(true);
+    commentMutationSeqRef.current += 1;
     try {
       const newComment = await feedApi.addComment(post.id, commentText.trim());
-      setComments((prev) => [...prev, newComment]);
+      commentMutationSeqRef.current += 1;
+      setHasLoadedComments(true);
+      setComments((prev) => dedupeCommentTree([...prev, newComment]));
       setCommentText('');
-      onPostUpdated?.({ id: post.id, comment_count: comments.length + 1 });
     } catch (err: any) {
       alert(err.message || 'Failed to post comment.');
     } finally {
+      submittingCommentRef.current = false;
       setSubmittingComment(false);
     }
   };
 
   const handleAddReply = async (commentId: string) => {
-    if (!replyText.trim() || submittingReply) return;
+    if (!replyText.trim() || submittingReply || submittingReplyRef.current) return;
 
+    submittingReplyRef.current = true;
     setSubmittingReply(true);
+    commentMutationSeqRef.current += 1;
     try {
       const newReply = await feedApi.addComment(post.id, replyText.trim(), commentId);
+      commentMutationSeqRef.current += 1;
+      setHasLoadedComments(true);
       setComments((prev) =>
-        prev.map((c) => (c.id === commentId ? { ...c, replies: [...(c.replies || []), newReply] } : c))
+        dedupeCommentTree(
+          prev.map((c) =>
+            c.id === commentId ? { ...c, replies: [...(c.replies || []), newReply] } : c
+          )
+        )
       );
       setReplyText('');
       setReplyingToCommentId(null);
       setReplyingToAuthorName(null);
       setShowReplyEmojiPicker(false);
-      onPostUpdated?.({ id: post.id, comment_count: comments.length + 1 });
     } catch (err: any) {
       alert(err.message || 'Failed to post reply.');
     } finally {
+      submittingReplyRef.current = false;
       setSubmittingReply(false);
     }
   };
 
   const handleReactComment = async (commentId: string, emoji = '👍') => {
+    commentMutationSeqRef.current += 1;
     // Instant optimistic update
     setComments((prev) =>
       prev.map((c) => {
@@ -300,6 +339,7 @@ function PostDetailView({
 
     try {
       const res = await feedApi.reactComment(commentId, emoji);
+      commentMutationSeqRef.current += 1;
       setComments((prev) =>
         prev.map((c) => {
           if (c.id === commentId) {
@@ -338,8 +378,11 @@ function PostDetailView({
   };
 
   const handleDeleteComment = async (commentId: string) => {
+    commentMutationSeqRef.current += 1;
     try {
       await feedApi.deleteComment(commentId);
+      commentMutationSeqRef.current += 1;
+      setHasLoadedComments(true);
       setComments((prev) =>
         prev
           .filter((c) => c.id !== commentId)
@@ -348,7 +391,6 @@ function PostDetailView({
             replies: (c.replies || []).filter((r: any) => r.id !== commentId),
           }))
       );
-      onPostUpdated?.({ id: post.id, comment_count: Math.max(0, comments.length - 1) });
     } catch (err: any) {
       alert(err.message || 'Failed to delete comment.');
     }
@@ -490,7 +532,7 @@ function PostDetailView({
             </button>
             <div className="flex items-center gap-1.5 px-2 py-1 text-gray-600 text-xs font-medium">
               <ChatBubbleOvalLeftIcon className="w-4 h-4 text-gray-400" />
-              <span>{comments.length} Comments</span>
+              <span>{totalCommentCount} Comments</span>
             </div>
           </div>
 
@@ -512,7 +554,7 @@ function PostDetailView({
       {/* Comments section */}
       <div className="p-4 bg-gray-50/70 border-t border-gray-100">
         <h4 className="text-xs font-bold text-gray-800 mb-3">
-          Discussion & Comments ({comments.length})
+          Discussion & Comments ({totalCommentCount})
         </h4>
 
         {/* Add comment input */}

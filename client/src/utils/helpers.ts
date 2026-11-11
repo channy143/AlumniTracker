@@ -192,3 +192,35 @@ export const jobTypeLabels: Record<string, string> = {
   freelance: 'Freelance',
   internship: 'Internship',
 };
+
+export function dedupeCommentTree<T extends { id: string; parent_id?: string | null; replies?: any[] }>(
+  list: T[]
+): T[] {
+  const seenComments = new Set<string>();
+  const result: T[] = [];
+
+  for (const c of list || []) {
+    if (!c || !c.id || c.parent_id || seenComments.has(c.id)) continue;
+    seenComments.add(c.id);
+
+    const rawReplies = Array.isArray(c.replies) ? c.replies : [];
+    const seenReplies = new Set<string>();
+    const dedupedReplies: any[] = [];
+    for (const r of rawReplies) {
+      if (!r || !r.id || seenReplies.has(r.id)) continue;
+      seenReplies.add(r.id);
+      dedupedReplies.push(r);
+    }
+
+    result.push({ ...c, replies: dedupedReplies });
+  }
+
+  return result;
+}
+
+export function countAllComments(list: Array<{ replies?: any[] }>): number {
+  return (list || []).reduce(
+    (sum, c) => sum + 1 + (Array.isArray(c.replies) ? c.replies.length : 0),
+    0
+  );
+}

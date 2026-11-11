@@ -22,6 +22,7 @@ import { communityApi, eventsApi, profileApi } from '@/services/api';
 import { useChatStore } from '@/store/chatStore';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { REAL_REACTIONS } from '@/components/dashboard/FeedPostCard';
+import { dedupeCommentTree, countAllComments } from '@/utils/helpers';
 
 const FORUM_TAGS = [
   'Job Opportunity',
@@ -74,9 +75,11 @@ export default function CommunityPage() {
   const [expandedPostIds, setExpandedPostIds] = useState<Record<string, boolean>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [submittingCommentMap, setSubmittingCommentMap] = useState<Record<string, boolean>>({});
+  const submittingCommentKeysRef = useRef<Set<string>>(new Set());
   const [replyingCommentMap, setReplyingCommentMap] = useState<Record<string, { parentCommentId: string; authorName: string } | null>>({});
   const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
   const [submittingReplyMap, setSubmittingReplyMap] = useState<Record<string, boolean>>({});
+  const submittingReplyKeysRef = useRef<Set<string>>(new Set());
   const [activeCommentReactionPickerId, setActiveCommentReactionPickerId] = useState<string | null>(null);
   const commentPickerTimeoutRef = useRef<any>(null);
   const [joiningGroupMap, setJoiningGroupMap] = useState<Record<string, boolean>>({});
@@ -247,8 +250,9 @@ export default function CommunityPage() {
 
   const handleAddComment = async (postId: string) => {
     const text = (commentInputs[postId] || '').trim();
-    if (!text || submittingCommentMap[postId]) return;
+    if (!text || submittingCommentMap[postId] || submittingCommentKeysRef.current.has(postId)) return;
 
+    submittingCommentKeysRef.current.add(postId);
     setSubmittingCommentMap((prev) => ({ ...prev, [postId]: true }));
     try {
       const res = await communityApi.addComment(postId, text);
@@ -259,7 +263,7 @@ export default function CommunityPage() {
           p.id === postId
             ? {
                 ...p,
-                comments: res.comments || [...(p.comments || []), res.comment],
+                comments: dedupeCommentTree(res.comments || [...(p.comments || []), res.comment]),
                 comment_count: res.comment_count,
                 comments_count: res.comment_count,
               }
@@ -267,17 +271,19 @@ export default function CommunityPage() {
         )
       );
     } catch {
-      alert('Failed to post reply.');
+      alert('Failed to post comment.');
     } finally {
+      submittingCommentKeysRef.current.delete(postId);
       setSubmittingCommentMap((prev) => ({ ...prev, [postId]: false }));
     }
   };
 
   const handleAddReply = async (postId: string, parentCommentId: string, replyText: string) => {
     const text = (replyText || '').trim();
-    if (!text) return;
-
     const replyKey = `${postId}-${parentCommentId}`;
+    if (!text || submittingReplyMap[replyKey] || submittingReplyKeysRef.current.has(replyKey)) return;
+
+    submittingReplyKeysRef.current.add(replyKey);
     setSubmittingReplyMap((prev) => ({ ...prev, [replyKey]: true }));
     try {
       const res = await communityApi.addComment(postId, text, parentCommentId);
@@ -288,7 +294,7 @@ export default function CommunityPage() {
           p.id === postId
             ? {
                 ...p,
-                comments: res.comments || p.comments,
+                comments: dedupeCommentTree(res.comments || p.comments || []),
                 comment_count: res.comment_count,
                 comments_count: res.comment_count,
               }
@@ -298,6 +304,7 @@ export default function CommunityPage() {
     } catch {
       alert('Failed to post reply.');
     } finally {
+      submittingReplyKeysRef.current.delete(replyKey);
       setSubmittingReplyMap((prev) => ({ ...prev, [replyKey]: false }));
     }
   };
@@ -723,8 +730,8 @@ export default function CommunityPage() {
                         >
                           <ChatBubbleOvalLeftIcon className="w-4 h-4" />
                           <span>
-                            {commentsList.length}{' '}
-                            {commentsList.length === 1 ? 'Reply' : 'Replies'}
+                            {countAllComments(commentsList)}{' '}
+                            {countAllComments(commentsList) === 1 ? 'Reply' : 'Replies'}
                           </span>
                         </button>
                       </div>

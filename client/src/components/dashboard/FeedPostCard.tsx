@@ -21,7 +21,7 @@ import {
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/outline';
 import { feedApi, connectionsApi, messagesApi, directoryApi } from '@/services/api';
-import { decodeUnicode, setBackgroundInterval } from '@/utils/helpers';
+import { decodeUnicode, setBackgroundInterval, dedupeCommentTree, countAllComments } from '@/utils/helpers';
 import { supabase, isSupabaseConfigured } from '@/services/supabase';
 import { useChatStore } from '@/store/chatStore';
 import EmojiPicker from '@/components/ui/EmojiPicker';
@@ -156,16 +156,22 @@ export default function FeedPostCard({
   // Comments state
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState<CommentItem[]>([]);
+  const [hasLoadedComments, setHasLoadedComments] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const submittingCommentRef = useRef(false);
 
   // Replying to a specific comment
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [replyingToAuthorName, setReplyingToAuthorName] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
+  const submittingReplyRef = useRef(false);
   const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState(false);
+
+  // Mutation sequence counter to prevent stale polls/realtime from clobbering or duplicating mutations
+  const commentMutationSeqRef = useRef(0);
 
   // Floating reaction picker for comments/replies
   const [activeCommentReactionPickerId, setActiveCommentReactionPickerId] = useState<string | null>(null);
@@ -227,24 +233,31 @@ export default function FeedPostCard({
     }
   }, [post, showEditModal]);
 
+  // Keep commentCount accurately synced whenever comments tree is loaded/mutated
+  useEffect(() => {
+    if (hasLoadedComments) {
+      setCommentCount(countAllComments(comments));
+    }
+  }, [comments, hasLoadedComments]);
+
   // Live refresh for inline comments when expanded
   useEffect(() => {
     if (!commentsOpen) return;
 
     let isCancelled = false;
     const refreshInlineComments = async () => {
+      const seqBefore = commentMutationSeqRef.current;
       try {
         const fullPost = await feedApi.get(currentPost.id);
-        if (isCancelled || !fullPost?.comments) return;
+        if (isCancelled || !fullPost?.comments || commentMutationSeqRef.current !== seqBefore) return;
+        const cleaned = dedupeCommentTree<CommentItem>(fullPost.comments);
+        setHasLoadedComments(true);
         setComments((prev) => {
-          if (JSON.stringify(prev) === JSON.stringify(fullPost.comments)) {
+          if (JSON.stringify(prev) === JSON.stringify(cleaned)) {
             return prev;
           }
-          return fullPost.comments;
+          return cleaned;
         });
-        if (typeof fullPost.comment_count === 'number') {
-          setCommentCount(fullPost.comment_count);
-        }
       } catch {
         // Non-blocking live refresh
       }
@@ -364,10 +377,12 @@ export default function FeedPostCard({
     if (!commentsOpen) {
       setCommentsOpen(true);
       setLoadingComments(true);
+      const seqBefore = commentMutationSeqRef.current;
       try {
         const fullPost = await feedApi.get(currentPost.id);
-        if (fullPost?.comments) {
-          setComments(fullPost.comments);
+        if (fullPost?.comments && commentMutationSeqRef.current === seqBefore) {
+          setComments(dedupeCommentTree<CommentItem>(fullPost.comments));
+          setHasLoadedComments(true);
         }
       } catch {
         // Fallback
@@ -382,32 +397,43 @@ export default function FeedPostCard({
   // Add Comment
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentText.trim() || submittingComment) return;
+    if (!commentText.trim() || submittingComment || submittingCommentRef.current) return;
 
+    submittingCommentRef.current = true;
     setSubmittingComment(true);
+    commentMutationSeqRef.current += 1;
     try {
       const newComment = await feedApi.addComment(currentPost.id, commentText.trim());
-      setComments((prev) => [...prev, newComment]);
-      setCommentCount((prev) => prev + 1);
+      commentMutationSeqRef.current += 1;
+      setHasLoadedComments(true);
+      setComments((prev) => dedupeCommentTree([...prev, newComment]));
       setCommentText('');
     } catch (err: any) {
       alert(err.message || 'Failed to post comment.');
     } finally {
+      submittingCommentRef.current = false;
       setSubmittingComment(false);
     }
   };
 
   // Reply to Comment
   const handleAddReply = async (commentId: string) => {
-    if (!replyText.trim() || submittingReply) return;
+    if (!replyText.trim() || submittingReply || submittingReplyRef.current) return;
 
+    submittingReplyRef.current = true;
     setSubmittingReply(true);
+    commentMutationSeqRef.current += 1;
     try {
       const newReply = await feedApi.addComment(currentPost.id, replyText.trim(), commentId);
+      commentMutationSeqRef.current += 1;
+      setHasLoadedComments(true);
       setComments((prev) =>
-        prev.map((c) => (c.id === commentId ? { ...c, replies: [...(c.replies || []), newReply] } : c))
+        dedupeCommentTree(
+          prev.map((c) =>
+            c.id === commentId ? { ...c, replies: [...(c.replies || []), newReply] } : c
+          )
+        )
       );
-      setCommentCount((prev) => prev + 1);
       setReplyText('');
       setReplyingToCommentId(null);
       setReplyingToAuthorName(null);
@@ -415,12 +441,14 @@ export default function FeedPostCard({
     } catch (err: any) {
       alert(err.message || 'Failed to post reply.');
     } finally {
+      submittingReplyRef.current = false;
       setSubmittingReply(false);
     }
   };
 
   // React to Comment
   const handleReactComment = async (commentId: string, emoji = '👍') => {
+    commentMutationSeqRef.current += 1;
     // Instant optimistic update
     setComments((prev) =>
       prev.map((c) => {
@@ -454,6 +482,7 @@ export default function FeedPostCard({
 
     try {
       const res = await feedApi.reactComment(commentId, emoji);
+      commentMutationSeqRef.current += 1;
       setComments((prev) =>
         prev.map((c) => {
           if (c.id === commentId) {
@@ -493,8 +522,11 @@ export default function FeedPostCard({
 
   // Delete Comment
   const handleDeleteComment = async (commentId: string) => {
+    commentMutationSeqRef.current += 1;
     try {
       await feedApi.deleteComment(commentId);
+      commentMutationSeqRef.current += 1;
+      setHasLoadedComments(true);
       setComments((prev) =>
         prev
           .filter((c) => c.id !== commentId)
@@ -503,7 +535,6 @@ export default function FeedPostCard({
             replies: (c.replies || []).filter((r) => r.id !== commentId),
           }))
       );
-      setCommentCount((prev) => Math.max(0, prev - 1));
     } catch (err: any) {
       alert(err.message || 'Failed to delete comment.');
     }
