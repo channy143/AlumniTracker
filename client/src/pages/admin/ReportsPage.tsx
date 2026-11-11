@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { adminApi } from '@/services/api';
+import { getCached } from '@/utils/apiCache';
+import { SkeletonTableRows } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/store/uiStore';
 import {
   DocumentTextIcon,
@@ -55,8 +57,9 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<'reports' | 'history'>('reports');
 
   // Live Summary Stats
-  const [stats, setStats] = useState<any>(null);
-  const [loadingStats, setLoadingStats] = useState(false);
+  const initialStats = getCached<any>('/admin/reports/stats');
+  const [stats, setStats] = useState<any>(initialStats ?? null);
+  const [loadingStats, setLoadingStats] = useState(!initialStats);
 
   // Global filters for live reports
   const [selectedCourse, setSelectedCourse] = useState<string>('');
@@ -85,18 +88,31 @@ export default function ReportsPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
 
   // Export Audit History
-  const [history, setHistory] = useState<any[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  const initialHistory = getCached<any[]>('/admin/reports/export-history');
+  const [history, setHistory] = useState<any[]>(Array.isArray(initialHistory) ? initialHistory : []);
+  const [loadingHistory, setLoadingHistory] = useState(!Array.isArray(initialHistory));
   const [historySearch, setHistorySearch] = useState('');
   const [historyFormatFilter, setHistoryFormatFilter] = useState('');
 
   // Surveys list for survey response report selector
-  const [surveysList, setSurveysList] = useState<any[]>([]);
-  const [selectedSurveyId, setSelectedSurveyId] = useState<string>('');
+  const initialSurveysRes = getCached<any>('/admin/reports/surveys?format=json');
+  const initialSurveysList = Array.isArray(initialSurveysRes?.data || initialSurveysRes)
+    ? (initialSurveysRes?.data || initialSurveysRes)
+    : [];
+  const [surveysList, setSurveysList] = useState<any[]>(initialSurveysList);
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string>(
+    initialSurveysList[0]?.['Survey ID'] || initialSurveysList[0]?.id || ''
+  );
 
   // Load summary stats
   const loadStats = useCallback(async () => {
-    setLoadingStats(true);
+    const cached = getCached<any>('/admin/reports/stats');
+    if (cached) {
+      setStats(cached);
+      setLoadingStats(false);
+    } else {
+      setLoadingStats(true);
+    }
     try {
       const data = await adminApi.reportStats();
       setStats(data);
@@ -109,12 +125,18 @@ export default function ReportsPage() {
 
   // Load export audit history
   const loadHistory = useCallback(async () => {
-    setLoadingHistory(true);
+    const cached = getCached<any[]>('/admin/reports/export-history');
+    if (Array.isArray(cached)) {
+      setHistory(cached);
+      setLoadingHistory(false);
+    } else {
+      setLoadingHistory(true);
+    }
     try {
       const data = await adminApi.exportHistory();
       setHistory(data || []);
     } catch {
-      addNotification('Failed to load export history', 'error');
+      if (!Array.isArray(cached)) addNotification('Failed to load export history', 'error');
     } finally {
       setLoadingHistory(false);
     }
@@ -295,6 +317,12 @@ export default function ReportsPage() {
   const openPreview = async (reportId: string, title: string, subtitle: string, fetchFn: () => Promise<any>) => {
     setPreviewLoading(true);
     setPreviewSearch('');
+    setPreviewModal({
+      reportId,
+      title,
+      subtitle,
+      data: [],
+    });
     try {
       const res = await fetchFn();
       const rows = Array.isArray(res) ? res : res.data || [];
@@ -305,6 +333,7 @@ export default function ReportsPage() {
         data: rows,
       });
     } catch (err: any) {
+      setPreviewModal(null);
       addNotification(err.message || 'Failed to load preview data', 'error');
     } finally {
       setPreviewLoading(false);
@@ -638,7 +667,7 @@ export default function ReportsPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs">
           <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Alumni Registered</p>
           <p className="text-xl font-bold text-gray-900 mt-1">
-            {loadingStats ? '...' : (stats?.totalAlumni || 0).toLocaleString()}
+            {loadingStats && !stats ? <span className="inline-block h-6 w-12 bg-gray-200 rounded animate-pulse align-middle" /> : (stats?.totalAlumni || 0).toLocaleString()}
           </p>
           <span className="inline-block mt-1 text-[10px] text-orange-600 font-medium bg-orange-50 px-1.5 py-0.5 rounded">
             Live Database
@@ -648,7 +677,7 @@ export default function ReportsPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs">
           <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Employed Graduates</p>
           <p className="text-xl font-bold text-emerald-600 mt-1">
-            {loadingStats ? '...' : (stats?.totalEmployed || 0).toLocaleString()}
+            {loadingStats && !stats ? <span className="inline-block h-6 w-12 bg-gray-200 rounded animate-pulse align-middle" /> : (stats?.totalEmployed || 0).toLocaleString()}
           </p>
           <span className="inline-block mt-1 text-[10px] text-emerald-700 font-medium bg-emerald-50 px-1.5 py-0.5 rounded">
             Active Records
@@ -658,7 +687,7 @@ export default function ReportsPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs">
           <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Partner Employers</p>
           <p className="text-xl font-bold text-blue-600 mt-1">
-            {loadingStats ? '...' : (stats?.totalCompanies || 0).toLocaleString()}
+            {loadingStats && !stats ? <span className="inline-block h-6 w-12 bg-gray-200 rounded animate-pulse align-middle" /> : (stats?.totalCompanies || 0).toLocaleString()}
           </p>
           <span className="inline-block mt-1 text-[10px] text-blue-700 font-medium bg-blue-50 px-1.5 py-0.5 rounded">
             Verified Companies
@@ -668,7 +697,7 @@ export default function ReportsPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs">
           <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Tracer Surveys</p>
           <p className="text-xl font-bold text-purple-600 mt-1">
-            {loadingStats ? '...' : (stats?.totalSurveys || 0).toLocaleString()}
+            {loadingStats && !stats ? <span className="inline-block h-6 w-12 bg-gray-200 rounded animate-pulse align-middle" /> : (stats?.totalSurveys || 0).toLocaleString()}
           </p>
           <span className="inline-block mt-1 text-[10px] text-purple-700 font-medium bg-purple-50 px-1.5 py-0.5 rounded">
             {stats?.totalSurveyResponses || 0} Submissions
@@ -678,7 +707,7 @@ export default function ReportsPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs">
           <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Active Job Posts</p>
           <p className="text-xl font-bold text-cyan-600 mt-1">
-            {loadingStats ? '...' : (stats?.totalJobPostings || 0).toLocaleString()}
+            {loadingStats && !stats ? <span className="inline-block h-6 w-12 bg-gray-200 rounded animate-pulse align-middle" /> : (stats?.totalJobPostings || 0).toLocaleString()}
           </p>
           <span className="inline-block mt-1 text-[10px] text-cyan-700 font-medium bg-cyan-50 px-1.5 py-0.5 rounded">
             Market Demand
@@ -688,7 +717,7 @@ export default function ReportsPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs">
           <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Audit Logged Exports</p>
           <p className="text-xl font-bold text-gray-700 mt-1">
-            {loadingStats ? '...' : (stats?.totalExportsLogged || 0).toLocaleString()}
+            {loadingStats && !stats ? <span className="inline-block h-6 w-12 bg-gray-200 rounded animate-pulse align-middle" /> : (stats?.totalExportsLogged || 0).toLocaleString()}
           </p>
           <span className="inline-block mt-1 text-[10px] text-gray-600 font-medium bg-gray-100 px-1.5 py-0.5 rounded">
             RA 10173 Compliant
@@ -1001,10 +1030,16 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredHistory.length === 0 ? (
+                {loadingHistory && filteredHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-0">
+                      <SkeletonTableRows rows={5} cols={8} />
+                    </td>
+                  </tr>
+                ) : filteredHistory.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="text-center py-10 text-gray-400">
-                      {loadingHistory ? 'Loading audit trail records...' : 'No matching report exports found.'}
+                      No matching report exports found.
                     </td>
                   </tr>
                 ) : (
@@ -1109,7 +1144,11 @@ export default function ReportsPage() {
 
             {/* Table Content */}
             <div className="flex-1 overflow-auto p-4 sm:p-6">
-              {previewRows.length === 0 ? (
+              {previewLoading && previewRows.length === 0 ? (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <SkeletonTableRows rows={6} cols={5} />
+                </div>
+              ) : previewRows.length === 0 ? (
                 <div className="text-center py-16 text-gray-400 text-xs">
                   No records match your search criteria.
                 </div>

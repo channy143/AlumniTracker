@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { adminApi } from '@/services/api';
+import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
+import { SkeletonSurveyCard, SkeletonTableRows, SkeletonChartPanel } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/store/uiStore';
 import { generateYears } from '@/utils/helpers';
 import {
@@ -26,8 +28,9 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function GraduateTracerSurveys() {
-  const [surveys, setSurveys] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialSurveys = getCached<any[]>('/admin/surveys');
+  const [surveys, setSurveys] = useState<any[]>(Array.isArray(initialSurveys) ? initialSurveys : []);
+  const [loading, setLoading] = useState(!Array.isArray(initialSurveys));
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
@@ -39,14 +42,21 @@ export default function GraduateTracerSurveys() {
   const years = generateYears(2014, new Date().getFullYear()).map(String);
 
   const load = async (filters?: Record<string, string>) => {
-    setLoading(true);
+    const params: Record<string, string> = {};
+    if (filters?.status) params.status = filters.status;
+    if (filters?.year) params.academic_year = filters.year;
+    if (filters?.batch) params.target_batch = filters.batch;
+    const cacheKey = buildQueryEndpoint('/admin/surveys', params);
+    const cached = getCached<any[]>(cacheKey);
+    if (Array.isArray(cached)) {
+      setSurveys(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
-      const params: Record<string, string> = {};
-      if (filters?.status) params.status = filters.status;
-      if (filters?.year) params.academic_year = filters.year;
-      if (filters?.batch) params.target_batch = filters.batch;
       setSurveys(await adminApi.surveyList(params));
-    } catch { addNotification('Failed to load surveys', 'error'); }
+    } catch { if (!cached) addNotification('Failed to load surveys', 'error'); }
     finally { setLoading(false); }
   };
 
@@ -284,17 +294,7 @@ export default function GraduateTracerSurveys() {
       {loading ? (
         <div data-tour="surveys-list" className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white border border-gray-200 animate-pulse p-4">
-              <div className="h-4 bg-gray-200 rounded w-2/3 mb-3" />
-              <div className="h-3 bg-gray-200 rounded w-1/3 mb-4" />
-              <div className="flex gap-2 mb-3">
-                {[1, 2, 3, 4].map((j) => <div key={j} className="flex-1 h-14 bg-gray-200 rounded" />)}
-              </div>
-              <div className="h-2 bg-gray-200 rounded w-full mb-3" />
-              <div className="flex gap-1">
-                {[1, 2, 3].map((j) => <div key={j} className="h-6 bg-gray-200 rounded w-12" />)}
-              </div>
-            </div>
+            <SkeletonSurveyCard key={i} />
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -1246,18 +1246,29 @@ function ResponseDetailModal({ response, onClose }: { response: any; onClose: ()
 }
 
 function SurveyResponses({ survey }: { survey: any }) {
-  const [responses, setResponses] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
+  const limit = 15;
+  const initialKey = buildQueryEndpoint(`/admin/surveys/${survey.id}/responses`, { page: 1, limit, search: '' });
+  const initialRes = getCached<any>(initialKey);
+
+  const [responses, setResponses] = useState<any[]>(initialRes?.data ?? []);
+  const [total, setTotal] = useState(initialRes?.total ?? 0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialRes);
   const [search, setSearch] = useState('');
   const [selectedResponse, setSelectedResponse] = useState<any>(null);
-  const limit = 15;
 
   const isOnboarding = survey.id === '00000000-0000-0000-0000-000000000001' || survey.title?.includes('Registration');
 
   useEffect(() => {
-    setLoading(true);
+    const cacheKey = buildQueryEndpoint(`/admin/surveys/${survey.id}/responses`, { page, limit, search });
+    const cached = getCached<any>(cacheKey);
+    if (cached) {
+      setResponses(cached.data || []);
+      setTotal(cached.total || 0);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     adminApi.surveyResponses(survey.id, { page, limit, search }).then((res) => {
       setResponses(res.data || []);
       setTotal(res.total || 0);
@@ -1275,8 +1286,8 @@ function SurveyResponses({ survey }: { survey: any }) {
       </div>
 
       {loading ? (
-        <div className="bg-white border border-gray-200">
-          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-10 bg-gray-100 animate-pulse border-b border-gray-200 last:border-0" />)}
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <SkeletonTableRows rows={6} cols={6} />
         </div>
       ) : responses.length === 0 ? (
         <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200">No responses yet.</div>
@@ -1358,14 +1369,29 @@ function SurveyResponses({ survey }: { survey: any }) {
 }
 
 function SurveyAnalytics({ surveyId }: { surveyId: string }) {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedAnalytics = getCached<any>(`/admin/surveys/${surveyId}/analytics`);
+  const [data, setData] = useState<any>(cachedAnalytics ?? null);
+  const [loading, setLoading] = useState(!cachedAnalytics);
 
   useEffect(() => {
+    const cached = getCached<any>(`/admin/surveys/${surveyId}/analytics`);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     adminApi.surveyAnalytics(surveyId).then(setData).catch(() => {}).finally(() => setLoading(false));
   }, [surveyId]);
 
-  if (loading) return <div className="bg-white border border-gray-200 p-6 text-center text-xs text-gray-400">Loading analytics...</div>;
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SkeletonChartPanel />
+        <SkeletonChartPanel />
+      </div>
+    );
+  }
   if (!data || data.total === 0) return <div className="bg-white border border-gray-200 p-6 text-center text-xs text-gray-400">No data to analyze yet.</div>;
 
   // Onboarding Survey Visual Analytics

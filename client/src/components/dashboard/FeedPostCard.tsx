@@ -22,6 +22,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { feedApi, connectionsApi, messagesApi, directoryApi } from '@/services/api';
 import { decodeUnicode, setBackgroundInterval, dedupeCommentTree, countAllComments } from '@/utils/helpers';
+import { getCached } from '@/utils/apiCache';
+import { SkeletonCommentList, SkeletonReactionUserList, SkeletonRow } from '@/components/ui/Skeleton';
 import { supabase, isSupabaseConfigured } from '@/services/supabase';
 import { useChatStore } from '@/store/chatStore';
 import EmojiPicker from '@/components/ui/EmojiPicker';
@@ -248,7 +250,7 @@ export default function FeedPostCard({
     const refreshInlineComments = async () => {
       const seqBefore = commentMutationSeqRef.current;
       try {
-        const fullPost = await feedApi.get(currentPost.id);
+        const fullPost = await feedApi.get(currentPost.id, { force: true });
         if (isCancelled || !fullPost?.comments || commentMutationSeqRef.current !== seqBefore) return;
         const cleaned = dedupeCommentTree<CommentItem>(fullPost.comments);
         setHasLoadedComments(true);
@@ -360,8 +362,14 @@ export default function FeedPostCard({
 
   // Open Reactions Modal
   const handleOpenReactionsModal = async () => {
+    const cachedReactions = getCached<any[]>(`/feed/${currentPost.id}/reactions`);
+    if (cachedReactions !== undefined) {
+      setReactionsList(cachedReactions);
+      setLoadingReactions(false);
+    } else {
+      setLoadingReactions(true);
+    }
     setShowReactionsModal(true);
-    setLoadingReactions(true);
     try {
       const list = await feedApi.getReactions(currentPost.id);
       setReactionsList(list || []);
@@ -376,10 +384,17 @@ export default function FeedPostCard({
   const handleToggleComments = async () => {
     if (!commentsOpen) {
       setCommentsOpen(true);
-      setLoadingComments(true);
+      const cachedPost = getCached<any>(`/feed/${currentPost.id}`);
+      if (cachedPost?.comments) {
+        setComments(dedupeCommentTree<CommentItem>(cachedPost.comments));
+        setHasLoadedComments(true);
+        setLoadingComments(false);
+      } else {
+        setLoadingComments(true);
+      }
       const seqBefore = commentMutationSeqRef.current;
       try {
-        const fullPost = await feedApi.get(currentPost.id);
+        const fullPost = await feedApi.get(currentPost.id, { force: true });
         if (fullPost?.comments && commentMutationSeqRef.current === seqBefore) {
           setComments(dedupeCommentTree<CommentItem>(fullPost.comments));
           setHasLoadedComments(true);
@@ -1190,7 +1205,9 @@ export default function FeedPostCard({
 
           {/* Comments List */}
           {loadingComments ? (
-            <div className="py-3 text-center text-xs text-gray-400">Loading comments...</div>
+            <div className="py-1">
+              <SkeletonCommentList count={2} compact />
+            </div>
           ) : comments.length === 0 ? (
             <div className="py-2 text-center text-xs text-gray-400">
               No comments yet. Be the first to share your thoughts!
@@ -1565,7 +1582,7 @@ export default function FeedPostCard({
             {/* Reactions Users List */}
             <div className="p-3 space-y-2 max-h-60 overflow-y-auto">
               {loadingReactions ? (
-                <p className="text-xs text-gray-400 text-center py-6">Loading reactions...</p>
+                <SkeletonReactionUserList count={4} />
               ) : reactionsList.length === 0 ? (
                 <p className="text-xs text-gray-400 text-center py-6">No reactions yet.</p>
               ) : (
@@ -1941,7 +1958,11 @@ export default function FeedPostCard({
 
                 <div className="space-y-1.5 max-h-56 overflow-y-auto">
                   {loadingAlumni ? (
-                    <p className="text-xs text-gray-400 text-center py-4">Loading alumni...</p>
+                    <div className="space-y-1">
+                      <SkeletonRow />
+                      <SkeletonRow />
+                      <SkeletonRow />
+                    </div>
                   ) : alumniList.filter((a) => {
                       if (!searchRecipient.trim()) return true;
                       const q = searchRecipient.toLowerCase();

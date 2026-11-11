@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { User } from '@/types';
 import { authApi } from '@/services/api';
+import { clearAllCache } from '@/utils/apiCache';
 
 const STORAGE_KEY = 'access_token';
 
@@ -31,6 +32,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   loading: true,
   setUser: (user) => set({ user }),
   setToken: (token, persist = true) => {
+    clearAllCache();
     setStoredToken(token, persist);
     set({ token });
   },
@@ -44,6 +46,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (err) {
       console.warn('[authStore] Backend logout notification failed (local session cleared):', err);
     } finally {
+      clearAllCache();
       removeStoredToken();
       set({ user: null, token: null });
     }
@@ -54,6 +57,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set((state) => {
       if (stored !== state.token) {
         changed = true;
+        clearAllCache();
         return { token: stored, user: stored ? null : null, loading: stored ? true : false };
       }
       return {};

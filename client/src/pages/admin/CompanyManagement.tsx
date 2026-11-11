@@ -28,7 +28,8 @@ import {
   EyeIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolid } from '@heroicons/react/24/solid';
-import { SkeletonStatCard } from '@/components/ui/Skeleton';
+import { SkeletonStatCard, SkeletonTableRows } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 
 const INDUSTRIES = [
   'Technology / IT',
@@ -89,15 +90,26 @@ function formatDate(dateStr?: string | null): string {
   }
 }
 
+function computeCompanyStats(raw: Company[]) {
+  const partners = raw.filter((c) => c.partnership_status === 'partner' || c.employer_type === 'partner').length;
+  const verified = raw.filter((c) => c.is_verified || c.agreement_verification_status === 'verified').length;
+  const alumniAtPartners = raw
+    .filter((c) => c.partnership_status === 'partner' || c.employer_type === 'partner')
+    .reduce((acc: number, c) => acc + (c.alumniCount || 0), 0);
+  return { total: raw.length, partners, verified, alumniAtPartners };
+}
+
 export default function CompanyManagement() {
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    total: 0,
-    partners: 0,
-    verified: 0,
-    alumniAtPartners: 0,
-  });
+  const initialCompaniesRes = getCached<any>('/admin/companies?limit=200');
+  const initialList: Company[] = initialCompaniesRes?.data || [];
+  const [companies, setCompanies] = useState<Company[]>(initialList);
+  const [loading, setLoading] = useState(!initialCompaniesRes);
+  const [stats, setStats] = useState<{
+    total: number;
+    partners: number;
+    verified: number;
+    alumniAtPartners: number;
+  }>(initialCompaniesRes?.stats || computeCompanyStats(initialList));
 
   // Filters & Search
   const [searchParams, setSearchParams] = useSearchParams();
@@ -150,28 +162,22 @@ export default function CompanyManagement() {
   };
 
   const fetchCompanies = async () => {
-    setLoading(true);
+    const cached = getCached<any>('/admin/companies?limit=200');
+    if (cached) {
+      const raw: Company[] = cached?.data || [];
+      setCompanies(raw);
+      setStats(cached?.stats || computeCompanyStats(raw));
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
       const res = await adminApi.companyList({ limit: 200 });
-      setCompanies(res?.data || []);
-      if (res?.stats) {
-        setStats(res.stats);
-      } else {
-        const raw: Company[] = res?.data || [];
-        const partners = raw.filter((c) => c.partnership_status === 'partner' || c.employer_type === 'partner').length;
-        const verified = raw.filter((c) => c.is_verified || c.agreement_verification_status === 'verified').length;
-        const alumniAtPartners = raw
-          .filter((c) => c.partnership_status === 'partner' || c.employer_type === 'partner')
-          .reduce((acc: number, c) => acc + (c.alumniCount || 0), 0);
-        setStats({
-          total: raw.length,
-          partners,
-          verified,
-          alumniAtPartners,
-        });
-      }
+      const raw: Company[] = res?.data || [];
+      setCompanies(raw);
+      setStats(res?.stats || computeCompanyStats(raw));
     } catch (err: any) {
-      showNotification(err?.message || 'Failed to load companies', 'error');
+      if (!cached) showNotification(err?.message || 'Failed to load companies', 'error');
     } finally {
       setLoading(false);
     }
@@ -730,11 +736,39 @@ export default function CompanyManagement() {
       {/* Content View */}
       <div data-tour="companies-list">
       {loading ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-8 space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-10 bg-gray-100 rounded-xl animate-pulse" />
-          ))}
-        </div>
+        viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white border border-gray-200/90 rounded-2xl p-5 animate-pulse space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-gray-200 shrink-0" />
+                    <div className="space-y-1.5">
+                      <div className="h-4 w-36 bg-gray-200 rounded" />
+                      <div className="h-3 w-24 bg-gray-100 rounded" />
+                    </div>
+                  </div>
+                  <div className="h-5 w-16 bg-emerald-100/70 rounded-full" />
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="h-3 bg-gray-100 rounded w-3/4" />
+                  <div className="h-3 bg-gray-100 rounded w-2/3" />
+                </div>
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <div className="h-3 w-20 bg-gray-100 rounded" />
+                  <div className="flex gap-1.5">
+                    <div className="h-6 w-14 bg-gray-100 rounded-lg" />
+                    <div className="h-6 w-14 bg-gray-100 rounded-lg" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-2xs">
+            <SkeletonTableRows rows={6} cols={6} />
+          </div>
+        )
       ) : filteredCompanies.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center space-y-3 shadow-2xs">
           <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto border border-orange-100">

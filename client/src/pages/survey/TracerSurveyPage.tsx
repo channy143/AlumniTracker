@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { surveyApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { getCached } from '@/utils/apiCache';
 import {
   DocumentTextIcon,
   CheckCircleIcon,
@@ -16,11 +17,13 @@ import {
 export default function TracerSurveyPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [loading, setLoading] = useState(true);
-  const [activeData, setActiveData] = useState<{ survey: any; completed: boolean } | null>(null);
+  const initialActive = getCached<{ survey: any; completed: boolean }>('/surveys/active');
+  const [loading, setLoading] = useState(() => initialActive === undefined);
+  const [activeData, setActiveData] = useState<{ survey: any; completed: boolean } | null>(() => initialActive ?? null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (getCached('/surveys/active') === undefined) setLoading(true);
     surveyApi
       .getActive()
       .then((data) => setActiveData(data))
@@ -30,9 +33,36 @@ export default function TracerSurveyPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4 py-4 animate-pulse">
-        <div className="h-20 bg-gray-100 rounded-2xl" />
-        <div className="h-64 bg-gray-100 rounded-2xl" />
+      <div className="max-w-4xl mx-auto space-y-6 animate-pulse">
+        <div className="flex items-center justify-between gap-4 pb-2 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-orange-100 shrink-0" />
+            <div className="space-y-1.5">
+              <div className="h-5 w-48 bg-gray-200 rounded" />
+              <div className="h-3 w-64 bg-gray-100 rounded" />
+            </div>
+          </div>
+          <div className="h-6 w-28 bg-orange-100 rounded-full" />
+        </div>
+        <div className="bg-gradient-to-br from-orange-400/70 via-orange-500/70 to-amber-500/70 rounded-2xl p-6 sm:p-8 space-y-4">
+          <div className="h-5 w-28 bg-white/30 rounded-full" />
+          <div className="h-7 w-72 max-w-full bg-white/40 rounded" />
+          <div className="space-y-1.5">
+            <div className="h-3.5 w-full bg-white/25 rounded" />
+            <div className="h-3.5 w-3/4 bg-white/25 rounded" />
+          </div>
+          <div className="h-10 w-44 bg-white/50 rounded-xl mt-2" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
+              <div className="w-8 h-8 rounded-lg bg-gray-100" />
+              <div className="h-4 w-32 bg-gray-200 rounded" />
+              <div className="h-3 w-full bg-gray-100 rounded" />
+              <div className="h-3 w-4/5 bg-gray-100 rounded" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

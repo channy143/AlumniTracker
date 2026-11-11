@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { adminApi } from '@/services/api';
-import { SkeletonAuditKpi, SkeletonAuditTableRow } from '@/components/ui/Skeleton';
+import { getCached, buildQueryEndpoint, invalidateCachePrefixes } from '@/utils/apiCache';
+import { SkeletonAuditKpi, SkeletonAuditTableRow, SkeletonRow } from '@/components/ui/Skeleton';
 import {
   ShieldCheckIcon,
   ShieldExclamationIcon,
@@ -366,17 +367,26 @@ function AuditDetailModal({ log, onClose }: { log: any; onClose: () => void }) {
 }
 
 export default function AdminActivity() {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const limit = 25;
+  const initialLogsKey = buildQueryEndpoint('/admin/audit-logs', { page: 1, limit });
+  const initialLogsRes = getCached<any>(initialLogsKey);
+  const initialStats = getCached<any>('/admin/audit-logs/stats');
+  const initialIncidents = getCached<any[]>('/admin/security-incidents');
+  const initialReports = getCached<{ reports: any[] }>('/admin/audit-logs/reports');
+  const initialPostsKey = buildQueryEndpoint('/admin/audit-logs/alumni-posts', { page: 1, limit: 15 });
+  const initialPostsRes = getCached<any>(initialPostsKey);
+
+  const [logs, setLogs] = useState<any[]>(initialLogsRes?.data ?? []);
+  const [totalCount, setTotalCount] = useState(initialLogsRes?.total ?? 0);
+  const [stats, setStats] = useState<any>(initialStats ?? null);
+  const [loading, setLoading] = useState(!initialLogsRes);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
 
   const [mainTab, setMainTab] = useState<'audit' | 'incidents' | 'moderation'>('audit');
 
   // Alumni Reports & Moderation State
-  const [reports, setReports] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>(initialReports?.reports ?? []);
   const [loadingReports, setLoadingReports] = useState(false);
   const [moderationSubTab, setModerationSubTab] = useState<'reports' | 'posts'>('reports');
   const [reportSearch, setReportSearch] = useState('');
@@ -384,9 +394,9 @@ export default function AdminActivity() {
   const [reportReasonFilter, setReportReasonFilter] = useState('all');
 
   // Alumni Posts Moderation State
-  const [alumniPosts, setAlumniPosts] = useState<any[]>([]);
+  const [alumniPosts, setAlumniPosts] = useState<any[]>(initialPostsRes?.posts ?? []);
   const [loadingAlumniPosts, setLoadingAlumniPosts] = useState(false);
-  const [alumniPostsTotal, setAlumniPostsTotal] = useState(0);
+  const [alumniPostsTotal, setAlumniPostsTotal] = useState(initialPostsRes?.total ?? 0);
   const [alumniPostSearch, setAlumniPostSearch] = useState('');
   const [alumniPostPage, setAlumniPostPage] = useState(1);
 
@@ -403,10 +413,9 @@ export default function AdminActivity() {
   const [status, setStatus] = useState('all');
   const [datePreset, setDatePreset] = useState('all');
   const [page, setPage] = useState(1);
-  const limit = 25;
 
   // Security Incidents State (Rule 6)
-  const [allIncidents, setAllIncidents] = useState<any[]>([]);
+  const [allIncidents, setAllIncidents] = useState<any[]>(Array.isArray(initialIncidents) ? initialIncidents : []);
   const [loadingIncidents, setLoadingIncidents] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
   const [incidentSearch, setIncidentSearch] = useState('');
@@ -443,28 +452,45 @@ export default function AdminActivity() {
 
   const loadData = async (isRefresh = false) => {
     const currentQueryId = ++queryIdRef.current;
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+
+    const params: Record<string, any> = { page, limit };
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (category !== 'all') params.category = category;
+    if (severity !== 'all') params.severity = severity;
+    if (status !== 'all') params.status = status;
+
+    if (datePreset === 'today') {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      params.from = start.toISOString();
+    } else if (datePreset === '7days') {
+      const start = new Date(Date.now() - 7 * 86400000);
+      params.from = start.toISOString();
+    } else if (datePreset === '30days') {
+      const start = new Date(Date.now() - 30 * 86400000);
+      params.from = start.toISOString();
+    }
+
+    if (isRefresh) {
+      invalidateCachePrefixes('/admin/audit-logs');
+    }
+
+    const cacheKey = buildQueryEndpoint('/admin/audit-logs', params);
+    const cachedLogs = isRefresh ? undefined : getCached<any>(cacheKey);
+    const cachedStats = isRefresh ? undefined : getCached<any>('/admin/audit-logs/stats');
+
+    if (cachedLogs) {
+      setLogs(cachedLogs.data || []);
+      setTotalCount(cachedLogs.total || 0);
+      if (cachedStats) setStats(cachedStats);
+      setLoading(false);
+    } else if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
     try {
-      const params: Record<string, any> = { page, limit };
-      if (debouncedSearch) params.search = debouncedSearch;
-      if (category !== 'all') params.category = category;
-      if (severity !== 'all') params.severity = severity;
-      if (status !== 'all') params.status = status;
-
-      if (datePreset === 'today') {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        params.from = start.toISOString();
-      } else if (datePreset === '7days') {
-        const start = new Date(Date.now() - 7 * 86400000);
-        params.from = start.toISOString();
-      } else if (datePreset === '30days') {
-        const start = new Date(Date.now() - 30 * 86400000);
-        params.from = start.toISOString();
-      }
-
       const shouldFetchStats = !stats || isRefresh;
       const [logRes, statsRes] = await Promise.all([
         adminApi.auditLogs(params),
@@ -478,7 +504,7 @@ export default function AdminActivity() {
       setTotalCount(logRes.total || 0);
       if (statsRes) setStats(statsRes);
     } catch {
-      if (currentQueryId === queryIdRef.current) {
+      if (currentQueryId === queryIdRef.current && !cachedLogs) {
         setLogs([]);
         setTotalCount(0);
       }
@@ -491,7 +517,13 @@ export default function AdminActivity() {
   };
 
   const loadIncidents = async () => {
-    setLoadingIncidents(true);
+    const cached = getCached<any[]>('/admin/security-incidents');
+    if (Array.isArray(cached)) {
+      setAllIncidents(cached);
+      setLoadingIncidents(false);
+    } else {
+      setLoadingIncidents(true);
+    }
     try {
       const data = await adminApi.securityIncidents();
       setAllIncidents(data || []);
@@ -588,7 +620,13 @@ export default function AdminActivity() {
   };
 
   const loadReports = async () => {
-    setLoadingReports(true);
+    const cached = getCached<{ reports: any[] }>('/admin/audit-logs/reports');
+    if (cached) {
+      setReports(cached.reports || []);
+      setLoadingReports(false);
+    } else {
+      setLoadingReports(true);
+    }
     try {
       const res = await adminApi.auditReports();
       setReports(res.reports || []);
@@ -600,7 +638,15 @@ export default function AdminActivity() {
   };
 
   const loadAlumniPosts = async (targetPage = 1, searchQuery = '') => {
-    setLoadingAlumniPosts(true);
+    const cacheKey = buildQueryEndpoint('/admin/audit-logs/alumni-posts', { page: targetPage, limit: 15, search: searchQuery });
+    const cached = getCached<any>(cacheKey);
+    if (cached) {
+      setAlumniPosts(cached.posts || []);
+      setAlumniPostsTotal(cached.total || 0);
+      setLoadingAlumniPosts(false);
+    } else {
+      setLoadingAlumniPosts(true);
+    }
     try {
       const res = await adminApi.auditAlumniPosts({ page: targetPage, limit: 15, search: searchQuery });
       setAlumniPosts(res.posts || []);
@@ -1188,11 +1234,17 @@ export default function AdminActivity() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {loadingIncidents ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-12 text-gray-400">
-                      Loading security incidents...
-                    </td>
-                  </tr>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="px-4 py-3"><div className="h-3 w-20 bg-gray-200 rounded" /></td>
+                      <td className="px-3 py-3"><div className="h-3 w-28 bg-gray-200 rounded" /></td>
+                      <td className="px-3 py-3"><div className="h-3 w-24 bg-gray-100 rounded" /></td>
+                      <td className="px-3 py-3"><div className="h-4 w-14 bg-amber-100 rounded-full" /></td>
+                      <td className="px-3 py-3"><div className="h-4 w-16 bg-gray-100 rounded-full" /></td>
+                      <td className="px-3 py-3"><div className="h-3 w-40 bg-gray-100 rounded" /></td>
+                      <td className="px-4 py-3 text-right"><div className="h-6 w-14 bg-gray-200 rounded ml-auto" /></td>
+                    </tr>
+                  ))
                 ) : filteredIncidents.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center py-12 text-gray-400">
@@ -1534,9 +1586,20 @@ export default function AdminActivity() {
 
               {/* Reports List */}
               {loadingReports ? (
-                <div className="py-12 text-center text-xs text-gray-500">
-                  <ArrowPathIcon className="w-6 h-6 animate-spin text-orange-500 mx-auto mb-2" />
-                  Loading alumni reports...
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 animate-pulse space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="h-5 w-20 bg-amber-100 rounded-full" />
+                          <div className="h-3.5 w-32 bg-gray-200 rounded" />
+                        </div>
+                        <div className="h-3 w-24 bg-gray-100 rounded" />
+                      </div>
+                      <div className="h-3 bg-gray-100 rounded w-5/6" />
+                      <div className="h-12 bg-gray-50 rounded-lg border border-gray-100" />
+                    </div>
+                  ))}
                 </div>
               ) : filteredReports.length === 0 ? (
                 <div className="py-16 text-center text-xs">
@@ -1756,9 +1819,8 @@ export default function AdminActivity() {
 
               {/* Posts Table / Cards */}
               {loadingAlumniPosts ? (
-                <div className="py-12 text-center text-xs text-gray-500">
-                  <ArrowPathIcon className="w-6 h-6 animate-spin text-orange-500 mx-auto mb-2" />
-                  Loading alumni posts...
+                <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden bg-white p-4 space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
                 </div>
               ) : alumniPosts.length === 0 ? (
                 <div className="py-16 text-center text-xs text-gray-500">

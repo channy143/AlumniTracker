@@ -15,7 +15,7 @@ import {
 import { directoryApi, connectionsApi, profileApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
-import { SkeletonRow } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 import { formatProgramLongName } from '@/utils/formatProgram';
 
 
@@ -93,31 +93,69 @@ function FilterDropdown({ label, options, selected, onChange }: {
   );
 }
 
+function buildConnMap(conns: any[]) {
+  const map: Record<string, { id: string; status: 'pending' | 'accepted' | 'declined'; requester_id: string; recipient_id: string }> = {};
+  if (!Array.isArray(conns)) return map;
+  conns.forEach((c) => {
+    if (c.status === 'declined') return;
+    const entry = {
+      id: c.id,
+      status: c.status,
+      requester_id: c.requester_id || c.requester?.id,
+      recipient_id: c.recipient_id || c.recipient?.id,
+    };
+    if (c.recipient_id) map[c.recipient_id] = entry;
+    if (c.requester_id) map[c.requester_id] = entry;
+    if (c.recipient?.id) map[c.recipient.id] = entry;
+    if (c.requester?.id) map[c.requester.id] = entry;
+  });
+  return map;
+}
+
 export default function DirectoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(() => getCached<any>('/profile')?.id || null);
 
   const query = searchParams.get('q') || '';
-  const [results, setResults] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [stats, setStats] = useState<any>(null);
-
-  // Filter state from URL
   const [programs, setPrograms] = useState<string[]>(searchParams.get('program')?.split(',').filter(Boolean) || []);
   const [batches, setBatches] = useState<string[]>(searchParams.get('batch')?.split(',').filter(Boolean) || []);
   const [employmentStatuses, setEmploymentStatuses] = useState<string[]>(searchParams.get('employment_status')?.split(',').filter(Boolean) || []);
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'name');
 
-  const [programOptions, setProgramOptions] = useState<string[]>([]);
-  const [batchOptions, setBatchOptions] = useState<string[]>([]);
+  const buildSearchEndpoint = () => {
+    const qObj: Record<string, any> = {
+      q: query,
+      page: 1,
+      limit: 50,
+      program: programs.join(','),
+      batch: batches.join(','),
+      employment_status: employmentStatuses.join(','),
+      sort: sortBy,
+    };
+    const qs = new URLSearchParams();
+    Object.entries(qObj).forEach(([k, v]) => { if (v) qs.set(k, v.toString()); });
+    return `/directory/search?${qs.toString()}`;
+  };
+
+  const initialSearchCached = getCached<any>(buildSearchEndpoint());
+
+  const [results, setResults] = useState<any[]>(() => initialSearchCached?.data || []);
+  const [loading, setLoading] = useState(() => initialSearchCached === undefined);
+  const [total, setTotal] = useState(() => initialSearchCached?.total || 0);
+  const [stats, setStats] = useState<any>(() => getCached('/directory/stats') || null);
+
+  const [programOptions, setProgramOptions] = useState<string[]>(() => getCached('/directory/programs') || []);
+  const [batchOptions, setBatchOptions] = useState<string[]>(() => {
+    const rows = initialSearchCached?.data || [];
+    return [...new Set(rows.map((p: any) => p.education?.year_graduated?.toString()).filter(Boolean))] as string[];
+  });
   const employmentStatusOptions = ['Employed', 'Self-employed', 'Unemployed', 'Seeking Opportunities', 'Retired'];
 
   const [connectionsMap, setConnectionsMap] = useState<
     Record<string, { id: string; status: 'pending' | 'accepted' | 'declined'; requester_id: string; recipient_id: string }>
-  >({});
+  >(() => buildConnMap(getCached<any[]>('/connections') || []));
   const [requestingMap, setRequestingMap] = useState<Record<string, boolean>>({});
   const [openUnfriendId, setOpenUnfriendId] = useState<string | null>(null);
 
@@ -127,21 +165,7 @@ export default function DirectoryPage() {
     directoryApi.programs().then(setProgramOptions).catch(() => {});
     connectionsApi.list().then((conns: any[]) => {
       if (Array.isArray(conns)) {
-        const map: Record<string, { id: string; status: 'pending' | 'accepted' | 'declined'; requester_id: string; recipient_id: string }> = {};
-        conns.forEach((c) => {
-          if (c.status === 'declined') return;
-          const entry = {
-            id: c.id,
-            status: c.status,
-            requester_id: c.requester_id || c.requester?.id,
-            recipient_id: c.recipient_id || c.recipient?.id,
-          };
-          if (c.recipient_id) map[c.recipient_id] = entry;
-          if (c.requester_id) map[c.requester_id] = entry;
-          if (c.recipient?.id) map[c.recipient.id] = entry;
-          if (c.requester?.id) map[c.requester.id] = entry;
-        });
-        setConnectionsMap(map);
+        setConnectionsMap(buildConnMap(conns));
       }
     }).catch(() => {});
   }, []);
@@ -217,7 +241,15 @@ export default function DirectoryPage() {
     if (sortBy !== 'name') params.set('sort', sortBy);
     setSearchParams(params, { replace: true });
 
-    setLoading(true);
+    const cachedSearch = getCached<any>(buildSearchEndpoint());
+    if (cachedSearch !== undefined) {
+      setResults(cachedSearch.data || []);
+      setTotal(cachedSearch.total || 0);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     directoryApi.search({
       q: query,
       page: 1,
@@ -306,7 +338,24 @@ export default function DirectoryPage() {
       <div data-tour="directory-grid">
       {loading && (
         <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-lg px-3.5 sm:px-4 py-3 flex items-center gap-3 animate-pulse">
+              <div className="w-10 h-10 rounded-full bg-gray-200 shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-3.5 w-36 bg-gray-200 rounded" />
+                  <div className="h-4 w-16 bg-emerald-100 rounded-full" />
+                </div>
+                <div className="h-3 w-48 bg-gray-100 rounded" />
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="h-2.5 w-32 bg-gray-100 rounded" />
+                  <div className="h-2.5 w-28 bg-gray-100 rounded" />
+                  <div className="h-2.5 w-20 bg-gray-100 rounded" />
+                </div>
+              </div>
+              <div className="h-7 w-20 bg-gray-100 rounded-lg shrink-0" />
+            </div>
+          ))}
         </div>
       )}
 

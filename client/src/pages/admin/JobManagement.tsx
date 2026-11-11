@@ -23,7 +23,8 @@ import {
   PhotoIcon,
   ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
-import { SkeletonStatCard } from '@/components/ui/Skeleton';
+import { SkeletonStatCard, SkeletonJobCard } from '@/components/ui/Skeleton';
+import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
 
 const EMPTY_FORM = {
   employer_id: '', company_name: '', position: '', description: '', location: '', job_type: 'full-time',
@@ -39,23 +40,28 @@ function daysLeft(expiresAt: string): number {
 export default function JobManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('q') || '';
-  const [data, setData] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const limit = 15;
+  const initialJobsKey = buildQueryEndpoint('/admin/jobs', { page: 1, limit, search });
+  const initialJobsRes = getCached<any>(initialJobsKey);
+  const initialEmployers = getCached<any[]>('/admin/jobs/employers');
+  const initialSkills = getCached<string[]>('/jobs/skills');
+
+  const [data, setData] = useState<any[]>(initialJobsRes?.data ?? []);
+  const [total, setTotal] = useState(initialJobsRes?.total ?? 0);
+  const [loading, setLoading] = useState(!initialJobsRes);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<any>({ ...EMPTY_FORM });
   const [formError, setFormError] = useState('');
-  const [employers, setEmployers] = useState<any[]>([]);
+  const [employers, setEmployers] = useState<any[]>(Array.isArray(initialEmployers) ? initialEmployers : []);
   const [showNewEmployer, setShowNewEmployer] = useState(false);
   const [newEmployer, setNewEmployer] = useState({ company_name: '', industry: '', contact_person: '', contact_email: '' });
   const [creatingEmployer, setCreatingEmployer] = useState(false);
-  const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<string[]>(Array.isArray(initialSkills) ? initialSkills : []);
   const [skillInput, setSkillInput] = useState('');
   const addNotification = useUIStore((s) => s.addNotification);
-  const limit = 15;
 
   const stats = useMemo(() => {
     const activeCount = data.filter((j) => new Date(j.expires_at).getTime() >= Date.now()).length;
@@ -87,12 +93,20 @@ export default function JobManagement() {
   };
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const cacheKey = buildQueryEndpoint('/admin/jobs', { page, limit, search, status });
+    const cached = getCached<any>(cacheKey);
+    if (cached) {
+      setData(cached.data ?? []);
+      setTotal(cached.total ?? 0);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
       const res = await adminApi.jobList({ page, limit, search, status });
       setData(res.data);
       setTotal(res.total);
-    } catch { addNotification('Failed to load jobs', 'error'); }
+    } catch { if (!cached) addNotification('Failed to load jobs', 'error'); }
     finally { setLoading(false); }
   }, [page, search, status]);
 
@@ -380,17 +394,7 @@ export default function JobManagement() {
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gray-200" />
-                <div className="space-y-2 flex-1">
-                  <div className="h-4 bg-gray-200 rounded w-1/3" />
-                  <div className="h-3 bg-gray-200 rounded w-1/4" />
-                </div>
-              </div>
-              <div className="h-3 bg-gray-100 rounded w-3/4" />
-              <div className="h-8 bg-gray-100 rounded" />
-            </div>
+            <SkeletonJobCard key={i} />
           ))}
         </div>
       ) : data.length === 0 ? (

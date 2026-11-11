@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarDaysIcon, MapPinIcon, ClockIcon, UserIcon, LinkIcon, XMarkIcon, PhotoIcon, ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { eventsApi } from '@/services/api';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 
 
 
 export default function EventsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialEventsRaw = getCached<any>('/events');
+  const initialEvents = Array.isArray(initialEventsRaw) ? initialEventsRaw : (Array.isArray(initialEventsRaw?.data) ? initialEventsRaw.data : []);
+  const [events, setEvents] = useState<any[]>(() => initialEvents);
+  const [loading, setLoading] = useState(() => initialEventsRaw === undefined);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
 
@@ -33,6 +35,7 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
+    if (getCached('/events') === undefined) setLoading(true);
     eventsApi.list()
       .then((data: any) => {
         const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
@@ -225,7 +228,29 @@ export default function EventsPage() {
 
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-lg overflow-hidden animate-pulse">
+              <div className="w-full h-32 sm:h-40 bg-gray-100" />
+              <div className="px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-orange-50 shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-16 bg-emerald-100 rounded" />
+                      <div className="h-4 w-48 bg-gray-200 rounded" />
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <div className="h-3 w-28 bg-gray-100 rounded" />
+                      <div className="h-3 w-20 bg-gray-100 rounded" />
+                      <div className="h-3 w-32 bg-gray-100 rounded" />
+                    </div>
+                    <div className="h-3 w-full bg-gray-100 rounded" />
+                    <div className="h-3 w-20 bg-orange-100 rounded" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg p-6">

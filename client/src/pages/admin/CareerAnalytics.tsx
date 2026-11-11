@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { adminApi, careerTrendsApi } from '@/services/api';
+import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
 import { Link, useSearchParams } from 'react-router-dom';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { SkeletonStatCard, SkeletonChartPanel } from '@/components/ui/Skeleton';
 import { formatExperience } from '@/utils/formatExperience';
 import QProAnalyticsView from '@/pages/career-trends/QProAnalyticsView';
 import {
@@ -238,7 +239,8 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
   const initialTab = tabParam === 'qpro' || (!tabParam && defaultTab === 'qpro') ? 'qpro' : 'analytics';
   const [activeTab, setActiveTab] = useState<'analytics' | 'qpro'>(initialTab);
 
-  const [qproData, setQproData] = useState<any>(null);
+  const initialQproData = getCached<any>('/career-trends');
+  const [qproData, setQproData] = useState<any>(initialQproData ?? null);
   const [qproLoading, setQproLoading] = useState(false);
   const [qproProgram, setQproProgram] = useState<string | null>(null);
   const [qproBatch, setQproBatch] = useState<string | null>(null);
@@ -254,10 +256,17 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
 
   useEffect(() => {
     if (activeTab === 'qpro') {
-      setQproLoading(true);
       const params: Record<string, any> = {};
       if (qproProgram) params.program = qproProgram;
       if (qproBatch) params.batch = qproBatch;
+      const cacheKey = buildQueryEndpoint('/career-trends', params);
+      const cachedQpro = getCached<any>(cacheKey);
+      if (cachedQpro) {
+        setQproData(cachedQpro);
+        setQproLoading(false);
+      } else {
+        setQproLoading(true);
+      }
       careerTrendsApi.list(params)
         .then((res) => setQproData(res))
         .catch(() => {})
@@ -276,11 +285,7 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
     setSearchParams(next, { replace: true });
   };
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [filters, setFilters] = useState({
+  const defaultFilters = {
     academic_year: '',
     batch: '',
     course: '',
@@ -289,14 +294,23 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
     industry: '',
     date_from: '',
     date_to: '',
-  });
-  const dataRef = useRef<any>(null);
+  };
+  const initialAnalyticsKey = buildQueryEndpoint('/admin/analytics/career-statistics', defaultFilters);
+  const initialAnalyticsData = getCached<any>(initialAnalyticsKey);
+
+  const [loading, setLoading] = useState(!initialAnalyticsData);
+  const [refreshing, setRefreshing] = useState(false);
+  const [data, setData] = useState<any>(initialAnalyticsData ?? null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [filters, setFilters] = useState(defaultFilters);
+  const dataRef = useRef<any>(initialAnalyticsData ?? null);
   const cacheRef = useRef(new Map<string, any>());
 
   const filterKey = JSON.stringify(filters);
 
   useEffect(() => {
-    const cached = cacheRef.current.get(filterKey);
+    const endpointKey = buildQueryEndpoint('/admin/analytics/career-statistics', filters);
+    const cached = cacheRef.current.get(filterKey) || getCached<any>(endpointKey);
     if (cached) {
       dataRef.current = cached;
       setData(cached);
@@ -502,11 +516,11 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
         qproLoading && !qproData ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[1, 2, 3, 4].map((i) => <KpiSkeleton key={i} />)}
+              {[1, 2, 3, 4].map((i) => <SkeletonStatCard key={i} />)}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <SkeletonCard className="h-64" />
-              <SkeletonCard className="h-64" />
+              <SkeletonChartPanel />
+              <SkeletonChartPanel />
             </div>
           </div>
         ) : (
@@ -583,17 +597,17 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
       {loading ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
-            {[1, 2, 3, 4, 5, 6, 7].map((i) => <KpiSkeleton key={i} />)}
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => <SkeletonStatCard key={i} />)}
           </div>
           <div className="lg:flex lg:gap-3 lg:items-start mt-3">
             <div className="flex-1 min-w-0 space-y-3">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
+                {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonChartPanel key={i} />)}
               </div>
-              <SkeletonCard />
+              <SkeletonChartPanel />
             </div>
             <aside className="lg:w-80 xl:w-88 shrink-0 space-y-3 mt-3 lg:mt-0">
-              {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+              {[1, 2, 3, 4].map((i) => <SkeletonChartPanel key={i} />)}
             </aside>
           </div>
         </>
@@ -884,10 +898,10 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
         <aside className="lg:w-80 xl:w-88 shrink-0 space-y-3 mt-3 lg:mt-0">
           {loading ? (
             <>
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
+              <SkeletonChartPanel />
+              <SkeletonChartPanel />
+              <SkeletonChartPanel />
+              <SkeletonChartPanel />
             </>
           ) : data ? (
             <>

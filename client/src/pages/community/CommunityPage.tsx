@@ -20,9 +20,10 @@ import {
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import { communityApi, eventsApi, profileApi } from '@/services/api';
 import { useChatStore } from '@/store/chatStore';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { SkeletonForumPostCard, SkeletonEventItem } from '@/components/ui/Skeleton';
 import { REAL_REACTIONS } from '@/components/dashboard/FeedPostCard';
 import { dedupeCommentTree, countAllComments } from '@/utils/helpers';
+import { getCached } from '@/utils/apiCache';
 
 const FORUM_TAGS = [
   'Job Opportunity',
@@ -46,18 +47,21 @@ export default function CommunityPage() {
   const navigate = useNavigate();
   const { openChat, setHeaderDropdownOpen } = useChatStore();
 
-  const [loading, setLoading] = useState(true);
+  const cachedGroups = getCached<any[]>('/community/groups');
+  const cachedPosts = getCached<any[]>('/community/posts');
+
+  const [loading, setLoading] = useState(() => cachedGroups === undefined || cachedPosts === undefined);
   const [error, setError] = useState('');
-  const [groups, setGroups] = useState<any[]>([]);
+  const [groups, setGroups] = useState<any[]>(() => cachedGroups || []);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>(() => cachedPosts || []);
   const [postsLoading, setPostsLoading] = useState(false);
 
   const [showPostModal, setShowPostModal] = useState(false);
   const [postForm, setPostForm] = useState({
-    group_id: '',
+    group_id: cachedGroups?.[0]?.id || '',
     title: '',
     content: '',
     tags: ['Job Opportunity'] as string[],
@@ -83,8 +87,8 @@ export default function CommunityPage() {
   const [activeCommentReactionPickerId, setActiveCommentReactionPickerId] = useState<string | null>(null);
   const commentPickerTimeoutRef = useRef<any>(null);
   const [joiningGroupMap, setJoiningGroupMap] = useState<Record<string, boolean>>({});
-  const [myProfileId, setMyProfileId] = useState<string | null>(null);
-  const [events, setEvents] = useState<any[]>([]);
+  const [myProfileId, setMyProfileId] = useState<string | null>(() => getCached<any>('/profile')?.id || null);
+  const [events, setEvents] = useState<any[]>(() => getCached<any[]>('/events') || []);
 
   useEffect(() => {
     profileApi
@@ -104,7 +108,9 @@ export default function CommunityPage() {
 
   const initForum = async () => {
     try {
-      setLoading(true);
+      if (getCached('/community/groups') === undefined || getCached('/community/posts') === undefined) {
+        setLoading(true);
+      }
       setError('');
       const [grpData, postData] = await Promise.all([
         communityApi.groups(),
@@ -114,26 +120,35 @@ export default function CommunityPage() {
       setGroups(groupList);
       setPosts(postData || []);
       if (groupList.length > 0) {
-        setPostForm((prev) => ({ ...prev, group_id: groupList[0].id }));
+        setPostForm((prev) => ({ ...prev, group_id: prev.group_id || groupList[0].id }));
       }
     } catch {
-      setError('Failed to load Alumni Forum discussions.');
+      if (groups.length === 0 && posts.length === 0) {
+        setError('Failed to load Alumni Forum discussions.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const loadPostsForGroup = async (groupId: string) => {
+    const endpoint = groupId === 'all' ? '/community/posts' : `/community/groups/${groupId}/posts`;
+    const hit = getCached<any[]>(endpoint);
     try {
-      setPostsLoading(true);
       setSelectedGroup(groupId);
-      const data = await communityApi.forums(groupId);
-      setPosts(data || []);
+      if (hit !== undefined) {
+        setPosts(hit);
+        setPostsLoading(false);
+      } else {
+        setPostsLoading(true);
+      }
       if (groupId !== 'all') {
         setPostForm((prev) => ({ ...prev, group_id: groupId }));
       }
+      const data = await communityApi.forums(groupId);
+      setPosts(data || []);
     } catch {
-      setError('Failed to load discussions for this channel.');
+      if (hit === undefined) setError('Failed to load discussions for this channel.');
     } finally {
       setPostsLoading(false);
     }
@@ -396,14 +411,38 @@ export default function CommunityPage() {
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto space-y-5">
-        <div className="h-24 bg-white border border-gray-200 rounded-2xl p-5 animate-pulse" />
+        <div className="h-32 bg-gradient-to-r from-orange-400/70 via-orange-500/70 to-amber-500/70 rounded-2xl p-6 animate-pulse flex flex-col justify-between">
+          <div className="h-5 w-48 bg-white/30 rounded-full" />
+          <div className="space-y-2">
+            <div className="h-6 w-64 bg-white/40 rounded" />
+            <div className="h-3.5 w-96 max-w-full bg-white/25 rounded" />
+          </div>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-4">
-            <SkeletonCard />
-            <SkeletonCard />
+            <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-2.5 animate-pulse">
+              <div className="h-9 bg-gray-100 rounded-lg" />
+              <div className="flex gap-2">
+                {[1, 2, 3, 4].map((i) => <div key={i} className="h-6 w-20 bg-gray-100 rounded-lg" />)}
+              </div>
+            </div>
+            <SkeletonForumPostCard />
+            <SkeletonForumPostCard />
           </div>
-          <div>
-            <SkeletonCard />
+          <div className="space-y-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 animate-pulse">
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                <div className="h-4 w-28 bg-gray-200 rounded" />
+                <div className="h-6 w-20 bg-orange-100 rounded-lg" />
+              </div>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-10 bg-gray-100 rounded-xl" />
+              ))}
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+              <SkeletonEventItem />
+              <SkeletonEventItem />
+            </div>
           </div>
         </div>
       </div>
@@ -561,8 +600,8 @@ export default function CommunityPage() {
           {/* Discussions List */}
           {postsLoading ? (
             <div className="space-y-3">
-              <SkeletonCard />
-              <SkeletonCard />
+              <SkeletonForumPostCard />
+              <SkeletonForumPostCard />
             </div>
           ) : filteredPosts.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-xl text-center py-12 px-4 shadow-2xs">

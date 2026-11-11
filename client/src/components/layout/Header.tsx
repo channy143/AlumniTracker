@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { getInitials, playTing, setBackgroundInterval } from '@/utils/helpers';
+import { getCached } from '@/utils/apiCache';
 import { resolveNotificationLink, getNotificationActionLabel } from '@/utils/notificationHelpers';
 import { profileApi, notificationsApi } from '@/services/api';
 import {
@@ -66,14 +67,18 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [blobMood, setBlobMood] = useState<'neutral' | 'happy' | 'sad'>('neutral');
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const initialNotifications = getCached<any[]>('/notifications?limit=10') ?? [];
+  const initialUnread = getCached<{ count: number }>('/notifications/unread-count')?.count ?? 0;
+  const initialAvatar = getCached<any>('/profile')?.avatar_url || null;
+
+  const [notifications, setNotifications] = useState<any[]>(initialNotifications);
+  const [unreadCount, setUnreadCount] = useState(initialUnread);
   const [isNotifRinging, setIsNotifRinging] = useState(false);
-  const lastNotifIdRef = useRef<string | null>(null);
-  const lastNotifCountRef = useRef<number | null>(null);
+  const lastNotifIdRef = useRef<string | null>(initialNotifications[0]?.id ? String(initialNotifications[0].id) : null);
+  const lastNotifCountRef = useRef<number | null>(initialNotifications.length ? initialUnread : null);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
 
   const { isWarningActive, secondsRemaining, resetActivity } = useIdleTimer();
 
@@ -165,7 +170,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const fetchNotifications = useCallback(async () => {
     try {
       const [data, { count }] = await Promise.all([
-        notificationsApi.list(10),
+        notificationsApi.list(10, { force: true }),
         notificationsApi.unreadCount(),
       ]);
       const currentCount = count || 0;

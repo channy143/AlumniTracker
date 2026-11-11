@@ -22,6 +22,8 @@ import {
 } from '@heroicons/react/24/solid';
 import { feedApi, connectionsApi } from '@/services/api';
 import EmojiPicker from '@/components/ui/EmojiPicker';
+import { SkeletonRow } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 
 interface CreatePostBoxProps {
   onPostCreated: (newPost: any) => void;
@@ -196,6 +198,15 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
   // Load connections for tagging
   const loadFriends = async () => {
     if (availableFriends.length > 0) return;
+    const cachedConns = getCached<any[]>('/connections');
+    if (cachedConns !== undefined) {
+      const list = (cachedConns || []).map((c: any) => {
+        const partner = c.recipient_id === (currentProfile?.id || currentUser?.id) ? c.requester : c.recipient;
+        return partner ? { id: partner.id, name: `${partner.first_name} ${partner.last_name}`, avatar: partner.avatar_url, headline: partner.headline } : null;
+      }).filter(Boolean);
+      setAvailableFriends(list);
+      return;
+    }
     setLoadingFriends(true);
     try {
       const conns = await connectionsApi.list();
@@ -931,7 +942,11 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
 
             <div className="space-y-1.5 max-h-56 overflow-y-auto">
               {loadingFriends ? (
-                <p className="text-xs text-gray-400 text-center py-4">Loading alumni connections...</p>
+                <div className="space-y-1">
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </div>
               ) : availableFriends.filter((f) => f.name.toLowerCase().includes(friendSearch.toLowerCase())).length === 0 ? (
                 <p className="text-xs text-gray-400 text-center py-4">No connections found.</p>
               ) : (

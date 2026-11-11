@@ -10,7 +10,8 @@ import {
   ChatBubbleBottomCenterTextIcon, DocumentArrowUpIcon, DocumentTextIcon,
   ArrowTopRightOnSquareIcon, TrashIcon, ArrowPathIcon, QuestionMarkCircleIcon
 } from '@heroicons/react/24/outline';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { SkeletonCard, SkeletonProfilePage } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 import { playTing } from '@/utils/helpers';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
 import { formatProgramLongName } from '@/utils/formatProgram';
@@ -90,9 +91,9 @@ export function formatProofType(type?: string): string {
 }
 
 export default function ProfilePage() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => getCached('/profile') === undefined);
   const [error, setError] = useState('');
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(() => getCached('/profile') || null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -129,13 +130,16 @@ export default function ProfilePage() {
 
   // Posts management on profile
   const { user } = useAuthStore();
-  const [myPosts, setMyPosts] = useState<PostItem[]>([]);
+  const [myPosts, setMyPosts] = useState<PostItem[]>(() => {
+    const cached = getCached<any>('/feed/mine');
+    return Array.isArray(cached) ? cached : cached?.posts || [];
+  });
   const [loadingPosts, setLoadingPosts] = useState(false);
-  const [postsLoaded, setPostsLoaded] = useState(false);
+  const [postsLoaded, setPostsLoaded] = useState(() => getCached('/feed/mine') !== undefined);
 
   const loadMyPosts = useCallback(async () => {
     try {
-      setLoadingPosts(true);
+      if (getCached('/feed/mine') === undefined) setLoadingPosts(true);
       const res = await feedApi.mine();
       setMyPosts(Array.isArray(res) ? res : (res as any)?.posts || []);
       setPostsLoaded(true);
@@ -242,7 +246,7 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     try {
-      setLoading(true);
+      if (getCached('/profile') === undefined && !profile) setLoading(true);
       const data = await profileApi.get();
       setProfile(data);
       let currentJobType = '';
@@ -727,20 +731,7 @@ export default function ProfilePage() {
   };
 
   if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white text-sm font-bold">
-            <UserIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-bold text-black">My Profile</h1>
-            <p className="text-xs text-black/60">Loading profile...</p>
-          </div>
-        </div>
-        <SkeletonCard />
-      </div>
-    );
+    return <SkeletonProfilePage />;
   }
 
   if (error && !profile) {

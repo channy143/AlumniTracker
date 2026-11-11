@@ -16,6 +16,8 @@ import {
 import { messagesApi, connectionsApi, profileApi } from '@/services/api';
 import { useChatStore, ChatContact } from '@/store/chatStore';
 import { playTing, setBackgroundInterval } from '@/utils/helpers';
+import { getCached } from '@/utils/apiCache';
+import { SkeletonRow } from '@/components/ui/Skeleton';
 
 interface ConversationItem {
   profile_id: string;
@@ -100,8 +102,30 @@ export default function ChatDropdown() {
     setConversationsCache,
   } = useChatStore();
 
-  const [conversations, setConversations] = useState<ConversationItem[]>(() => conversationsCache || []);
-  const [connectedAlumni, setConnectedAlumni] = useState<ConnectedAlumni[]>([]);
+  const [conversations, setConversations] = useState<ConversationItem[]>(
+    () => conversationsCache || getCached<ConversationItem[]>('/messages/conversations') || []
+  );
+  const [connectedAlumni, setConnectedAlumni] = useState<ConnectedAlumni[]>(() => {
+    const cachedConns = getCached<any[]>('/connections?status=accepted');
+    const cachedProf = getCached<any>('/profile');
+    if (!Array.isArray(cachedConns) || !cachedProf?.id) return [];
+    const uniqueMap = new Map<string, ConnectedAlumni>();
+    cachedConns.forEach((conn: any) => {
+      const other = conn.requester_id === cachedProf.id ? conn.recipient : conn.requester;
+      if (other && other.id && !uniqueMap.has(other.id)) {
+        uniqueMap.set(other.id, {
+          id: other.id,
+          first_name: other.first_name || '',
+          last_name: other.last_name || '',
+          avatar_url: other.avatar_url,
+          headline: other.headline,
+          is_online: false,
+          last_active_at: null,
+        });
+      }
+    });
+    return Array.from(uniqueMap.values());
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [composeSearch, setComposeSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'groups'>('all');
@@ -209,8 +233,9 @@ export default function ChatDropdown() {
   // Load conversations, groups, and connected alumni when dropdown is opened
   useEffect(() => {
     if (isHeaderDropdownOpen) {
-      if (conversations.length === 0) setLoading(true);
-      if (connectedAlumni.length === 0) setLoadingConnections(true);
+      const cachedConvs = getCached<ConversationItem[]>('/messages/conversations');
+      if (conversations.length === 0 && !cachedConvs?.length) setLoading(true);
+      if (connectedAlumni.length === 0 && !getCached<any[]>('/connections?status=accepted')) setLoadingConnections(true);
 
       // 1. Fetch conversations
       messagesApi.conversations()
@@ -729,10 +754,8 @@ export default function ChatDropdown() {
               {/* Connected Alumni List with Checkboxes */}
               <div className="flex-1 overflow-y-auto px-2 py-2 max-h-[220px]">
                 {loadingConnections ? (
-                  <div className="space-y-2 p-3 animate-pulse">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-9 bg-gray-100 rounded-lg" />
-                    ))}
+                  <div className="space-y-2 p-3">
+                    {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
                   </div>
                 ) : connectedAlumni.length === 0 ? (
                   <div className="py-6 px-4 text-center">
@@ -837,15 +860,7 @@ export default function ChatDropdown() {
               <div className="flex-1 overflow-y-auto px-2 py-2">
                 {loadingConnections ? (
                   <div className="space-y-3 p-4">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="flex items-center gap-3 animate-pulse">
-                        <div className="w-10 h-10 bg-gray-200 rounded-full shrink-0" />
-                        <div className="flex-1 space-y-1.5">
-                          <div className="h-3.5 bg-gray-200 rounded w-1/3" />
-                          <div className="h-3 bg-gray-100 rounded w-2/3" />
-                        </div>
-                      </div>
-                    ))}
+                    {[1, 2, 3].map((i) => <SkeletonRow key={i} />)}
                   </div>
                 ) : connectedAlumni.length === 0 ? (
                   <div className="py-10 px-6 text-center">
@@ -1023,15 +1038,7 @@ export default function ChatDropdown() {
               <div className="flex-1 overflow-y-auto px-2 py-1.5 divide-y divide-transparent">
                 {loading ? (
                   <div className="space-y-3 p-4">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="flex items-center gap-3 animate-pulse">
-                        <div className="w-12 h-12 bg-gray-200 rounded-full shrink-0" />
-                        <div className="flex-1 space-y-1.5">
-                          <div className="h-3.5 bg-gray-200 rounded w-1/2" />
-                          <div className="h-3 bg-gray-100 rounded w-3/4" />
-                        </div>
-                      </div>
-                    ))}
+                    {[1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)}
                   </div>
                 ) : itemsToDisplay.length > 0 ? (
                   itemsToDisplay.map((item) => {

@@ -5,7 +5,8 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { careerTrendsApi, jobsApi } from '@/services/api';
 import { formatExperience } from '@/utils/formatExperience';
 import { formatProgramLongName } from '@/utils/formatProgram';
-import { SkeletonCard, SkeletonText, SkeletonStatCard } from '@/components/ui/Skeleton';
+import { SkeletonChartPanel, SkeletonStatCard } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 import { isJobMatch } from '@/utils/isJobMatch';
 
 const INDUSTRY_COLORS = ['#059669', '#2563eb', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#6b7280'];
@@ -13,9 +14,11 @@ const INDUSTRY_COLORS = ['#059669', '#2563eb', '#d97706', '#7c3aed', '#dc2626', 
 export default function CareerInsightsPage() {
   const { position } = useParams<{ position: string }>();
   const navigate = useNavigate();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [myApplications, setMyApplications] = useState<any[]>([]);
+  const cacheKey = position ? `/career-trends/${encodeURIComponent(position)}` : '';
+  const initialData = cacheKey ? getCached<any>(cacheKey) : undefined;
+  const [data, setData] = useState<any>(() => initialData || null);
+  const [loading, setLoading] = useState(() => Boolean(position) && initialData === undefined);
+  const [myApplications, setMyApplications] = useState<any[]>(() => getCached<any[]>('/jobs/my-applications') || []);
 
   useEffect(() => {
     jobsApi.myApplications()
@@ -25,7 +28,13 @@ export default function CareerInsightsPage() {
 
   useEffect(() => {
     if (!position) return;
-    setLoading(true);
+    const hit = getCached<any>(`/career-trends/${encodeURIComponent(position)}`);
+    if (hit !== undefined) {
+      setData(hit);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     careerTrendsApi.get(position)
       .then((res) => setData(res))
       .catch(() => {})
@@ -49,8 +58,8 @@ export default function CareerInsightsPage() {
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <SkeletonCard className="h-64" />
-          <SkeletonCard className="h-64" />
+          <SkeletonChartPanel />
+          <SkeletonChartPanel />
         </div>
       </div>
     );

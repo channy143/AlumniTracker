@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { adminApi } from '@/services/api';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
+import { SkeletonStatCard, SkeletonChartPanel } from '@/components/ui/Skeleton';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -44,17 +45,25 @@ function StatBox({ label, value }: { label: string; value: string }) {
 export default function EmployerDetail() {
   const { name } = useParams<{ name: string }>();
   const navigate = useNavigate();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = name ? `/admin/employer-insights/employer/${encodeURIComponent(name)}` : null;
+  const cachedDetail = cacheKey ? getCached<any>(cacheKey) : undefined;
+  const [data, setData] = useState<any>(cachedDetail ?? null);
+  const [loading, setLoading] = useState(!cachedDetail);
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState(false);
 
   const load = () => {
     if (!name) return;
-    setLoading(true);
+    const cached = getCached<any>(`/admin/employer-insights/employer/${encodeURIComponent(name)}`);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     adminApi.employerDetail(name)
       .then(setData)
-      .catch((e: any) => setError(e?.message || 'Failed to load employer details'))
+      .catch((e: any) => { if (!cached) setError(e?.message || 'Failed to load employer details'); })
       .finally(() => setLoading(false));
   };
 
@@ -77,10 +86,29 @@ export default function EmployerDetail() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-4"><div className="h-5 w-40 bg-gray-200 animate-pulse rounded mb-1" /><div className="h-3 w-56 bg-gray-200 animate-pulse rounded" /></div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+      <div className="max-w-7xl mx-auto space-y-4">
+        <div className="flex items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gray-200" />
+            <div className="space-y-1.5">
+              <div className="h-4 w-48 bg-gray-200 rounded" />
+              <div className="h-3 w-64 bg-gray-100 rounded" />
+            </div>
+          </div>
+          <div className="h-8 w-32 bg-gray-200 rounded-lg" />
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4 animate-pulse space-y-3">
+          <div className="h-3 w-32 bg-gray-200 rounded" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[1, 2, 3, 4].map((i) => <div key={i} className="h-12 bg-gray-100 rounded-lg" />)}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => <SkeletonStatCard key={i} />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <SkeletonChartPanel />
+          <SkeletonChartPanel />
         </div>
       </div>
     );

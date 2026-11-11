@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BriefcaseIcon, BuildingOfficeIcon, UserGroupIcon, ChartBarIcon, ArrowRightIcon, ClockIcon, XMarkIcon, AcademicCapIcon, SparklesIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
 import { careerTrendsApi, jobsApi } from '@/services/api';
+import { getCached } from '@/utils/apiCache';
 import { formatExperience } from '@/utils/formatExperience';
 import { formatProgramLongName } from '@/utils/formatProgram';
 import CareerLeaderboardNav, { type RankCard } from './CareerLeaderboardNav';
@@ -245,28 +246,46 @@ function matchQuery(text: string, query: string): boolean {
   return text.toLowerCase().includes(query.toLowerCase());
 }
 
+const EMPTY_TRENDS = {
+  overview: null,
+  topCareers: [],
+  topEmployers: [],
+  topIndustries: [],
+  industryDistribution: [],
+  skillsDistribution: [],
+  batchDistribution: [],
+  statusDistribution: [],
+  fastestGrowing: [],
+  topBatches: [],
+  qproAnalytics: null,
+};
+
+function buildTrendsEndpoint(params: Record<string, any> = {}) {
+  const qs = Object.entries(params)
+    .filter(([, v]) => v !== '' && v !== undefined && v !== null)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join('&');
+  return qs ? `/career-trends?${qs}` : '/career-trends';
+}
+
 export default function CareerTrendsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [loading, setLoading] = useState(true);
   const [qproProgram, setQproProgram] = useState<string | null>(null);
   const [qproBatch, setQproBatch] = useState<string | null>(null);
 
-  const [data, setData] = useState<any>({
-    overview: null,
-    topCareers: [],
-    topEmployers: [],
-    topIndustries: [],
-    industryDistribution: [],
-    skillsDistribution: [],
-    batchDistribution: [],
-    statusDistribution: [],
-    fastestGrowing: [],
-    topBatches: [],
-    qproAnalytics: null,
-  });
+  const initialTrends = getCached<any>('/career-trends');
+  const [loading, setLoading] = useState(() => initialTrends === undefined);
+  const [data, setData] = useState<any>(() => initialTrends || EMPTY_TRENDS);
 
   const fetchTrends = useCallback((params: Record<string, any> = {}) => {
-    setLoading(true);
+    const endpoint = buildTrendsEndpoint(params);
+    const hit = getCached<any>(endpoint);
+    if (hit !== undefined) {
+      setData(hit);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     careerTrendsApi.list(params)
       .then((res) => { setData(res); })
       .catch(() => {})

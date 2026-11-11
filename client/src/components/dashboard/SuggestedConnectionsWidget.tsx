@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   UserPlusIcon,
@@ -8,6 +8,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { connectionsApi } from '@/services/api';
 import { useChatStore } from '@/store/chatStore';
+import { useCachedQuery } from '@/hooks/useCachedQuery';
+import { SkeletonSuggestionItem } from '@/components/ui/Skeleton';
 
 interface SuggestedPerson {
   id: string;
@@ -20,20 +22,14 @@ interface SuggestedPerson {
 export default function SuggestedConnectionsWidget() {
   const navigate = useNavigate();
   const { openChat } = useChatStore();
-  const [suggestions, setSuggestions] = useState<SuggestedPerson[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: suggestions, loading } = useCachedQuery<SuggestedPerson[]>(
+    '/connections/suggestions',
+    () => connectionsApi.suggestions(),
+    { initialData: [] }
+  );
   const [requestedMap, setRequestedMap] = useState<Record<string, boolean>>({});
   const [connectionIdMap, setConnectionIdMap] = useState<Record<string, string>>({});
   const [submittingMap, setSubmittingMap] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    connectionsApi.suggestions()
-      .then((data) => {
-        setSuggestions(data || []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
 
   const handleConnect = async (person: SuggestedPerson) => {
     setSubmittingMap((prev) => ({ ...prev, [person.id]: true }));
@@ -83,11 +79,15 @@ export default function SuggestedConnectionsWidget() {
 
   if (loading) {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-4 animate-pulse">
-        <div className="h-4 bg-gray-200 rounded w-1/2 mb-3" />
-        <div className="space-y-3">
-          <div className="h-10 bg-gray-100 rounded-lg" />
-          <div className="h-10 bg-gray-100 rounded-lg" />
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
+        <div className="flex items-center justify-between mb-3 animate-pulse">
+          <div className="h-3.5 bg-gray-200 rounded w-36" />
+          <div className="h-4 bg-gray-100 rounded-full w-16" />
+        </div>
+        <div className="space-y-1.5">
+          <SkeletonSuggestionItem />
+          <SkeletonSuggestionItem />
+          <SkeletonSuggestionItem />
         </div>
       </div>
     );

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { SkeletonCard, SkeletonCommentList } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 import { useAuthStore } from '@/store/authStore';
 import { feedApi, careerTrendsApi, profileApi, surveyApi } from '@/services/api';
 import {
@@ -118,9 +119,18 @@ function PostDetailView({
   currentProfile?: any;
   onPostUpdated?: (updated: any) => void;
 }) {
-  const [comments, setComments] = useState<any[]>([]);
-  const [hasLoadedComments, setHasLoadedComments] = useState(false);
-  const [loadingComments, setLoadingComments] = useState(true);
+  const [comments, setComments] = useState<any[]>(() => {
+    const cachedPost = getCached<any>(`/feed/${post.id}`);
+    return cachedPost?.comments ? dedupeCommentTree(cachedPost.comments) : [];
+  });
+  const [hasLoadedComments, setHasLoadedComments] = useState<boolean>(() => {
+    const cachedPost = getCached<any>(`/feed/${post.id}`);
+    return Boolean(cachedPost?.comments);
+  });
+  const [loadingComments, setLoadingComments] = useState<boolean>(() => {
+    const cachedPost = getCached<any>(`/feed/${post.id}`);
+    return !cachedPost?.comments;
+  });
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const submittingCommentRef = useRef(false);
@@ -158,7 +168,7 @@ function PostDetailView({
     const refreshPostDetails = async () => {
       const seqBefore = commentMutationSeqRef.current;
       try {
-        const fullPost = await feedApi.get(post.id);
+        const fullPost = await feedApi.get(post.id, { force: true });
         if (isCancelled || !fullPost || commentMutationSeqRef.current !== seqBefore) return;
 
         if (typeof fullPost.liked === 'boolean') {
@@ -585,7 +595,9 @@ function PostDetailView({
 
         {/* Comments list */}
         {loadingComments ? (
-          <div className="py-6 text-center text-xs text-gray-400">Loading comments...</div>
+          <div className="py-2">
+            <SkeletonCommentList count={3} />
+          </div>
         ) : comments.length === 0 ? (
           <div className="py-6 text-center text-xs text-gray-400 bg-white rounded-xl border border-gray-100 p-4">
             No comments yet. Be the first to join the conversation!
@@ -937,9 +949,11 @@ function PostDetailView({
 
 function SurveyBanner() {
   const navigate = useNavigate();
-  const [active, setActive] = useState<{ survey: any; completed: boolean } | null>(null);
+  const [active, setActive] = useState<{ survey: any; completed: boolean } | null>(
+    () => getCached<{ survey: any; completed: boolean }>('/surveys/active') ?? null
+  );
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => getCached('/surveys/active') === undefined);
 
   useEffect(() => {
     surveyApi.getActive()
@@ -1020,73 +1034,131 @@ const statusMap: Record<string, string> = {
   'Retired': 'Retired',
 };
 
+function extractFeedSidebarData(data: any[]) {
+  const ann = (data || [])
+    .filter((p: any) => p.type === 'announcement')
+    .slice(0, 3)
+    .map((a: any) => ({
+      id: a.id,
+      title: a.title,
+      date: a.created_at ? new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+    }));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const evts = (data || [])
+    .filter((p: any) => {
+      if (p.type !== 'event') return false;
+      const eventTime = p.event_date ? new Date(p.event_date).getTime() : (p.created_at ? new Date(p.created_at).getTime() : 0);
+      return eventTime >= today.getTime();
+    })
+    .slice(0, 3)
+    .map((e: any) => ({
+      id: e.id,
+      name: e.title,
+      date: e.event_date
+        ? new Date(e.event_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+        : e.created_at
+        ? new Date(e.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '',
+    }));
+  return { ann, evts };
+}
+
+function extractTrendsSidebarData(data: any) {
+  if (!data) return null;
+  const snapshot = {
+    totalAlumni: data.overview?.totalAlumni || 0,
+    employmentRate: data.overview?.employmentRate || 0,
+    companiesHiring: data.topEmployers?.length || 0,
+    registeredThisYear: data.overview?.registeredThisYear || 0,
+  };
+  const employers = (data.topEmployers || []).slice(0, 5).map((e: any) => ({ name: e.name, count: e.alumniCount }));
+  const highlights = {
+    mostCommonCareer: data.overview?.topCareerPct != null && data.overview.topCareerPct < 40 ? 'Various' : (data.overview?.topCareer || 'N/A'),
+    fastestGrowing: data.fastestGrowing?.[0]?.position || 'N/A',
+    topIndustry: data.overview?.topIndustryPct != null && data.overview.topIndustryPct < 40 ? 'Various' : (data.overview?.topIndustry || 'N/A'),
+    averageExperience: data.overview?.averageExperienceYears ? formatExperience(data.overview.averageExperienceYears) : 'N/A',
+  };
+  let statusDist: any[] = [];
+  if (data.statusDistribution?.length) {
+    const grouped: Record<string, number> = {};
+    data.statusDistribution.forEach((s: any) => {
+      const key = statusMap[s.status] || s.status;
+      grouped[key] = (grouped[key] || 0) + s.count;
+    });
+    const total = Object.values(grouped).reduce((a: number, b: number) => a + b, 0);
+    statusDist = Object.entries(grouped).map(([status, count]) => ({
+      status,
+      percentage: total > 0 ? Math.round((count as number / total) * 100) : 0,
+    }));
+  }
+  return { snapshot, employers, highlights, statusDist };
+}
+
+function extractProfileCompletionData(p: any) {
+  if (!p) return { pct: 0, personal: false, edu: false, skills: false, employment: false };
+  const personalFields = [p.first_name, p.last_name, p.email, p.phone, p.city, p.bio, p.employment_status, p.headline];
+  const personalFilled = personalFields.filter(Boolean).length;
+  const hasEducation = !!(p.education?.length);
+  const hasSkills = !!(p.skills?.length);
+  const hasEmployment = !!(p.current_job_title || p.company_name || p.employment_status);
+  const total = 8 + 3;
+  const score = personalFilled + (hasEducation ? 1 : 0) + (hasSkills ? 1 : 0) + (hasEmployment ? 1 : 0);
+  const pct = Math.min(100, Math.round((score / total) * 100));
+  const personal = !!(p.first_name && p.last_name);
+  return { pct, personal, edu: hasEducation, skills: hasSkills, employment: hasEmployment };
+}
+
 function RightSidebar({ refreshKey }: { refreshKey?: number }) {
   const navigate = useNavigate();
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
-  const [employers, setEmployers] = useState<any[]>([]);
-  const [highlights, setHighlights] = useState<any>({});
-  const [statusDist, setStatusDist] = useState<any[]>([]);
-  const [snapshot, setSnapshot] = useState<any>({});
-  const [profileCompletion, setProfileCompletion] = useState({ pct: 0, personal: false, edu: false, skills: false, employment: false });
+  const [announcements, setAnnouncements] = useState<any[]>(() => {
+    const cached = getCached<any[]>('/feed');
+    return cached ? extractFeedSidebarData(cached).ann : [];
+  });
+  const [events, setEvents] = useState<any[]>(() => {
+    const cached = getCached<any[]>('/feed');
+    return cached ? extractFeedSidebarData(cached).evts : [];
+  });
+  const [employers, setEmployers] = useState<any[]>(() => {
+    const cached = getCached<any>('/career-trends');
+    return cached ? extractTrendsSidebarData(cached)?.employers || [] : [];
+  });
+  const [highlights, setHighlights] = useState<any>(() => {
+    const cached = getCached<any>('/career-trends');
+    return cached ? extractTrendsSidebarData(cached)?.highlights || {} : {};
+  });
+  const [statusDist, setStatusDist] = useState<any[]>(() => {
+    const cached = getCached<any>('/career-trends');
+    return cached ? extractTrendsSidebarData(cached)?.statusDist || [] : [];
+  });
+  const [snapshot, setSnapshot] = useState<any>(() => {
+    const cached = getCached<any>('/career-trends');
+    return cached ? extractTrendsSidebarData(cached)?.snapshot || {} : {};
+  });
+  const [profileCompletion, setProfileCompletion] = useState(() => {
+    const cached = getCached<any>('/profile');
+    return extractProfileCompletionData(cached);
+  });
 
   useEffect(() => {
     Promise.all([
       feedApi.list().then((data: any) => {
         if (!data) return;
-        const ann = data.filter((p: any) => p.type === 'announcement').slice(0, 3);
-        if (ann?.length) setAnnouncements(ann.map((a: any) => ({ id: a.id, title: a.title, date: a.created_at ? new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '' })));
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const evts = data
-          .filter((p: any) => {
-            if (p.type !== 'event') return false;
-            const eventTime = p.event_date ? new Date(p.event_date).getTime() : (p.created_at ? new Date(p.created_at).getTime() : 0);
-            return eventTime >= today.getTime();
-          })
-          .slice(0, 3);
-        if (evts?.length) setEvents(evts.map((e: any) => ({ id: e.id, name: e.title, date: e.event_date ? new Date(e.event_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : e.created_at ? new Date(e.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '' })));
+        const { ann, evts } = extractFeedSidebarData(data);
+        if (ann.length) setAnnouncements(ann);
+        if (evts.length) setEvents(evts);
       }).catch(() => {}),
       careerTrendsApi.list().then((data: any) => {
-        if (!data) return;
-        setSnapshot({
-          totalAlumni: data.overview?.totalAlumni || 0,
-          employmentRate: data.overview?.employmentRate || 0,
-          companiesHiring: data.topEmployers?.length || 0,
-          registeredThisYear: data.overview?.registeredThisYear || 0,
-        });
-        setEmployers((data.topEmployers || []).slice(0, 5).map((e: any) => ({ name: e.name, count: e.alumniCount })));
-        setHighlights({
-          mostCommonCareer: data.overview?.topCareerPct != null && data.overview.topCareerPct < 40 ? 'Various' : (data.overview?.topCareer || 'N/A'),
-          fastestGrowing: data.fastestGrowing?.[0]?.position || 'N/A',
-          topIndustry: data.overview?.topIndustryPct != null && data.overview.topIndustryPct < 40 ? 'Various' : (data.overview?.topIndustry || 'N/A'),
-          averageExperience: data.overview?.averageExperienceYears ? formatExperience(data.overview.averageExperienceYears) : 'N/A',
-        });
-        if (data.statusDistribution?.length) {
-          const grouped: Record<string, number> = {};
-          data.statusDistribution.forEach((s: any) => {
-            const key = statusMap[s.status] || s.status;
-            grouped[key] = (grouped[key] || 0) + s.count;
-          });
-          const total = Object.values(grouped).reduce((a: number, b: number) => a + b, 0);
-          setStatusDist(Object.entries(grouped).map(([status, count]) => ({
-            status,
-            percentage: total > 0 ? Math.round((count as number / total) * 100) : 0,
-          })));
-        }
+        const parsed = extractTrendsSidebarData(data);
+        if (!parsed) return;
+        setSnapshot(parsed.snapshot);
+        setEmployers(parsed.employers);
+        setHighlights(parsed.highlights);
+        if (parsed.statusDist.length) setStatusDist(parsed.statusDist);
       }).catch(() => {}),
       profileApi.get().then((p: any) => {
         if (!p) return;
-        const personalFields = [p.first_name, p.last_name, p.email, p.phone, p.city, p.bio, p.employment_status, p.headline];
-        const personalFilled = personalFields.filter(Boolean).length;
-        const hasEducation = !!(p.education?.length);
-        const hasSkills = !!(p.skills?.length);
-        const hasEmployment = !!(p.current_job_title || p.company_name || p.employment_status);
-        const total = 8 + 3;
-        const score = personalFilled + (hasEducation ? 1 : 0) + (hasSkills ? 1 : 0) + (hasEmployment ? 1 : 0);
-        const pct = Math.min(100, Math.round((score / total) * 100));
-        const personal = !!(p.first_name && p.last_name);
-        setProfileCompletion({ pct, personal, edu: hasEducation, skills: hasSkills, employment: hasEmployment });
+        setProfileCompletion(extractProfileCompletionData(p));
       }).catch(() => {}),
     ]);
   }, [refreshKey]);
@@ -1315,14 +1387,14 @@ function RightSidebar({ refreshKey }: { refreshKey?: number }) {
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [feedPosts, setFeedPosts] = useState<FeedPost[]>(() => getCached<FeedPost[]>('/feed') || []);
+  const [loading, setLoading] = useState(() => getCached('/feed') === undefined);
   const [greeting, setGreeting] = useState('Welcome');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(() => getCached('/profile') || null);
 
   const targetPostId = searchParams.get('post');
 
@@ -1407,9 +1479,9 @@ export default function DashboardPage() {
     else setGreeting('Good evening');
   }, []);
 
-  const refreshFeedData = useCallback(async () => {
+  const refreshFeedData = useCallback(async (force = false) => {
     try {
-      const data = await feedApi.list();
+      const data = await feedApi.list(undefined, force ? { force: true } : undefined);
       if (!data || !Array.isArray(data)) return;
 
       setFeedPosts((prev) => {
@@ -1463,8 +1535,10 @@ export default function DashboardPage() {
 
   // Live real-time subscription & resilient background refresh
   useEffect(() => {
-    setLoading(true);
-    refreshFeedData().finally(() => setLoading(false));
+    if (getCached('/feed') === undefined) {
+      setLoading(true);
+    }
+    refreshFeedData(false).finally(() => setLoading(false));
 
     // Supabase Realtime WebSocket channel for instant home page updates (if configured)
     let channel: any = null;
@@ -1475,23 +1549,23 @@ export default function DashboardPage() {
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'feed_posts' },
-            () => { refreshFeedData(); }
+            () => { refreshFeedData(true); }
           )
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'feed_post_likes' },
-            () => { refreshFeedData(); }
+            () => { refreshFeedData(true); }
           )
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'feed_post_comments' },
-            () => { refreshFeedData(); }
+            () => { refreshFeedData(true); }
           )
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'announcements' },
             () => {
-              refreshFeedData();
+              refreshFeedData(true);
               setSidebarRefreshKey((k) => k + 1);
             }
           )
@@ -1502,11 +1576,11 @@ export default function DashboardPage() {
     }
 
     // Background interval poll every 3.5 seconds
-    const stopInterval = setBackgroundInterval(refreshFeedData, 3500);
+    const stopInterval = setBackgroundInterval(() => refreshFeedData(true), 3500);
 
     // Instant refresh when user returns to tab
     const handleFocus = () => {
-      refreshFeedData();
+      refreshFeedData(true);
     };
     window.addEventListener('focus', handleFocus);
 

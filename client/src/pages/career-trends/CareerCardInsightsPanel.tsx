@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon, BriefcaseIcon, BuildingOfficeIcon, UserGroupIcon, CurrencyDollarIcon, MapPinIcon, AcademicCapIcon, ClockIcon, TagIcon } from '@heroicons/react/24/outline';
 import { careerTrendsApi } from '@/services/api';
+import { getCached } from '@/utils/apiCache';
 import { formatProgramLongName } from '@/utils/formatProgram';
 import type { RankCard } from './CareerLeaderboardNav';
 
@@ -47,12 +48,20 @@ export default function CareerCardInsightsPanel({
 }) {
   const navigate = useNavigate();
   const meta = KIND_META[card.kind] || { label: 'Details', type: 'position' };
-  const [data, setData] = useState<any>({ alumni: [], summary: {}, activeJobs: [] });
-  const [loading, setLoading] = useState(true);
+  const endpointKey = `/career-trends/alumni?type=${encodeURIComponent(meta.type)}&value=${encodeURIComponent(card.name)}`;
+  const initialCached = getCached<any>(endpointKey);
+  const [data, setData] = useState<any>(() => initialCached || { alumni: [], summary: {}, activeJobs: [] });
+  const [loading, setLoading] = useState(() => initialCached === undefined);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const hit = getCached<any>(endpointKey);
+    if (hit !== undefined) {
+      setData(hit);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     careerTrendsApi.alumni(meta.type, card.name)
       .then((res) => {
         if (!cancelled) {
@@ -62,7 +71,7 @@ export default function CareerCardInsightsPanel({
       .catch(() => { })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [card.name, card.kind, meta.type]);
+  }, [card.name, card.kind, meta.type, endpointKey]);
 
   const summary = data.summary || {};
 

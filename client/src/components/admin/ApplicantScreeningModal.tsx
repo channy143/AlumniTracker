@@ -20,6 +20,8 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { adminApi } from '@/services/api';
+import { getCached } from '@/utils/apiCache';
+import { SkeletonRow } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/store/uiStore';
 import { formatProgramLongName } from '@/utils/formatProgram';
 
@@ -160,7 +162,17 @@ export default function ApplicantScreeningModal({
   });
 
   const fetchApplicants = useCallback(async () => {
-    setLoading(true);
+    const cachedRes = getCached<any>(`/admin/jobs/${jobId}/applicants`);
+    const cachedList = cachedRes
+      ? (Array.isArray(cachedRes?.applicants) ? cachedRes.applicants : Array.isArray(cachedRes) ? cachedRes : [])
+      : null;
+    if (cachedList) {
+      setApplicants(cachedList);
+      if (cachedList.length > 0 && !selectedId) setSelectedId(cachedList[0].id);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     setError('');
     try {
       const res: any = await adminApi.jobApplicants(jobId);
@@ -170,19 +182,25 @@ export default function ApplicantScreeningModal({
         setSelectedId(list[0].id);
       }
     } catch {
-      setError('Failed to load applicants.');
+      if (!cachedList) setError('Failed to load applicants.');
     } finally {
       setLoading(false);
     }
   }, [jobId, selectedId]);
 
   const fetchCompanyFiles = useCallback(async () => {
-    setLoadingFiles(true);
+    const cachedFiles = getCached<any[]>(`/admin/jobs/${jobId}/company-files`);
+    if (Array.isArray(cachedFiles)) {
+      setCompanyFiles(cachedFiles);
+      setLoadingFiles(false);
+    } else {
+      setLoadingFiles(true);
+    }
     try {
       const files = await adminApi.getCompanyFiles(jobId);
       setCompanyFiles(Array.isArray(files) ? files : []);
     } catch {
-      setCompanyFiles([]);
+      if (!Array.isArray(cachedFiles)) setCompanyFiles([]);
     } finally {
       setLoadingFiles(false);
     }
@@ -190,9 +208,16 @@ export default function ApplicantScreeningModal({
 
   useEffect(() => {
     if (isOpen && jobId) {
+      const cachedRes = getCached<any>(`/admin/jobs/${jobId}/applicants`);
+      const cachedList = cachedRes
+        ? (Array.isArray(cachedRes?.applicants) ? cachedRes.applicants : Array.isArray(cachedRes) ? cachedRes : [])
+        : [];
+      const cachedFiles = getCached<any[]>(`/admin/jobs/${jobId}/company-files`);
+      setApplicants(cachedList);
+      setSelectedId(cachedList[0]?.id ?? null);
+      setCompanyFiles(Array.isArray(cachedFiles) ? cachedFiles : []);
       fetchApplicants();
       fetchCompanyFiles();
-      setSelectedId(null);
       setMatchedSkills([]);
       setNotes('');
       setBatchFilter('');
@@ -1209,7 +1234,9 @@ export default function ApplicantScreeningModal({
                     </h4>
 
                     {loadingFiles ? (
-                      <div className="text-xs text-gray-400 py-3">Loading attached files...</div>
+                      <div className="space-y-2 py-2">
+                        {[1, 2].map((i) => <SkeletonRow key={i} />)}
+                      </div>
                     ) : companyFiles.length === 0 ? (
                       <p className="text-xs text-gray-400 italic bg-gray-50 rounded-xl p-3 border border-gray-100">
                         No company files attached yet. When the employer sends back their evaluation sheet or document,

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarDaysIcon, DocumentTextIcon, ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { announcementsApi } from '@/services/api';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { SkeletonAnnouncementCard } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 
 
 
@@ -33,8 +34,10 @@ function formatDate(dateStr: string) {
 
 export default function AnnouncementsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialAnnRaw = getCached<any>('/announcements');
+  const initialAnn = Array.isArray(initialAnnRaw) ? initialAnnRaw : (Array.isArray(initialAnnRaw?.data) ? initialAnnRaw.data : []);
+  const [announcements, setAnnouncements] = useState<any[]>(() => initialAnn);
+  const [loading, setLoading] = useState(() => initialAnnRaw === undefined);
   const search = searchParams.get('q') || '';
   const targetId = searchParams.get('id');
   const [yearFilter, setYearFilter] = useState<string>('all');
@@ -42,6 +45,7 @@ export default function AnnouncementsPage() {
   const [selected, setSelected] = useState<any>(null);
 
   useEffect(() => {
+    if (getCached('/announcements') === undefined) setLoading(true);
     announcementsApi.list()
       .then((data: any) => {
         const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
@@ -183,7 +187,7 @@ export default function AnnouncementsPage() {
 
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+          {[1, 2, 3, 4].map((i) => <SkeletonAnnouncementCard key={i} />)}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">

@@ -19,6 +19,8 @@ import { useChatStore } from '@/store/chatStore';
 import { messagesApi, profileApi, connectionsApi } from '@/services/api';
 import EmojiPicker from '@/components/ui/EmojiPicker';
 import { playTing, setBackgroundInterval } from '@/utils/helpers';
+import { getCached } from '@/utils/apiCache';
+import { SkeletonChatMessages } from '@/components/ui/Skeleton';
 
 const MESSENGER_REACTIONS = [
   { emoji: '❤️', label: 'Love' },
@@ -470,7 +472,12 @@ export default function DockedChatBox() {
 
   useEffect(() => {
     if (activeChat?.profileId && isOpen) {
-      const cached = useChatStore.getState().messagesByChat[activeChat.profileId] || [];
+      const storeCached = useChatStore.getState().messagesByChat[activeChat.profileId];
+      const apiEndpoint = activeChat.isGroup
+        ? `/messages/groups/${activeChat.profileId}/messages`
+        : `/messages/${activeChat.profileId}`;
+      const apiCached = getCached<any[]>(apiEndpoint);
+      const cached = (storeCached && storeCached.length > 0 ? storeCached : apiCached) || [];
       setMessages(cached);
       setLoadingChat(cached.length === 0);
       setInputText('');
@@ -508,6 +515,13 @@ export default function DockedChatBox() {
   // Load connected alumni when opening group details/add member
   useEffect(() => {
     if (showAddAlumni && activeChat?.isGroup) {
+      const cachedConns = getCached<any[]>('/connections?status=accepted');
+      if (Array.isArray(cachedConns) && cachedConns.length > 0 && connectedAlumni.length === 0) {
+        const list = cachedConns.map((conn: any) =>
+          conn.requester_id === currentProfileId ? conn.recipient : conn.requester
+        ).filter(Boolean);
+        setConnectedAlumni(list);
+      }
       connectionsApi.list('accepted')
         .then((conns) => {
           const list = (conns || []).map((conn: any) => {
@@ -1277,25 +1291,7 @@ export default function DockedChatBox() {
                 className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2.5 bg-gradient-to-b from-gray-50/50 to-white"
               >
                 {loadingChat && messages.length === 0 ? (
-                  <div className="space-y-3 py-2 animate-pulse">
-                    <div className="flex items-start gap-2">
-                      <div className="w-7 h-7 rounded-full bg-gray-200 shrink-0" />
-                      <div className="space-y-1.5 flex-1">
-                        <div className="h-2.5 w-20 bg-gray-200 rounded" />
-                        <div className="h-9 w-2/3 bg-gray-200/80 rounded-2xl rounded-tl-xs" />
-                      </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <div className="h-9 w-1/2 bg-orange-200/70 rounded-2xl rounded-br-xs" />
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <div className="w-7 h-7 rounded-full bg-gray-200 shrink-0" />
-                      <div className="space-y-1.5 flex-1">
-                        <div className="h-2.5 w-16 bg-gray-200 rounded" />
-                        <div className="h-12 w-3/4 bg-gray-200/80 rounded-2xl rounded-tl-xs" />
-                      </div>
-                    </div>
-                  </div>
+                  <SkeletonChatMessages />
                 ) : messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-4">
                     <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-xl font-bold mb-2 shadow-inner">

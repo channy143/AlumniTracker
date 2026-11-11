@@ -27,7 +27,8 @@ import { useChatStore } from '@/store/chatStore';
 import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
-import { SkeletonCard, SkeletonRow, SkeletonText } from '@/components/ui/Skeleton';
+import { SkeletonCard, SkeletonProfilePage } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 import { formatProgramLongName } from '@/utils/formatProgram';
 
 function normalizeStatus(s?: string): string {
@@ -80,12 +81,17 @@ export default function DirectoryProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user: currentUser } = useAuthStore();
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedProfile = id ? getCached<any>(`/directory/${id}`) : undefined;
+  const cachedTargetUserId = cachedProfile?.user_id || cachedProfile?.id;
+  const cachedUserPostsRaw = cachedTargetUserId ? getCached<any>(`/feed/user/${cachedTargetUserId}`) : undefined;
+  const cachedUserPosts = Array.isArray(cachedUserPostsRaw) ? cachedUserPostsRaw : cachedUserPostsRaw?.posts || [];
+
+  const [profile, setProfile] = useState<any>(() => cachedProfile || null);
+  const [loading, setLoading] = useState(() => !cachedProfile);
   const [activeTab, setActiveTab] = useState<'overview' | 'posts'>('overview');
-  const [posts, setPosts] = useState<PostItem[]>([]);
+  const [posts, setPosts] = useState<PostItem[]>(() => cachedUserPosts);
   const [loadingPosts, setLoadingPosts] = useState(false);
-  const [postsLoaded, setPostsLoaded] = useState(false);
+  const [postsLoaded, setPostsLoaded] = useState(() => cachedUserPostsRaw !== undefined);
   const [connectionLoading, setConnectionLoading] = useState(false);
   const [showUnfriendMenu, setShowUnfriendMenu] = useState(false);
 
@@ -167,9 +173,14 @@ export default function DirectoryProfilePage() {
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    setProfile(null);
-    setPosts([]);
+    const hit = getCached<any>(`/directory/${id}`);
+    if (hit) {
+      setProfile(hit);
+      setLoading(false);
+    } else {
+      setLoading(true);
+      setProfile(null);
+    }
     setPostsLoaded(false);
     directoryApi.get(id)
       .then((data: any) => {
@@ -183,7 +194,20 @@ export default function DirectoryProfilePage() {
   useEffect(() => {
     const targetUserId = profile?.user_id || profile?.id;
     if (targetUserId) {
-      setLoadingPosts(true);
+      const hitPosts = getCached<any>(`/feed/user/${targetUserId}`);
+      if (hitPosts !== undefined) {
+        const list = Array.isArray(hitPosts) ? hitPosts : hitPosts?.posts || [];
+        setPosts(
+          list.filter((p: any) =>
+            (profile?.user_id && p.user_id === profile.user_id) || (profile?.id && p.user_id === profile.id)
+          )
+        );
+        setPostsLoaded(true);
+        setLoadingPosts(false);
+      } else {
+        setLoadingPosts(true);
+      }
+
       feedApi.userPosts(targetUserId)
         .then((res: any) => {
           const list = Array.isArray(res) ? res : (res as any)?.posts || [];
@@ -198,7 +222,7 @@ export default function DirectoryProfilePage() {
         })
         .catch((err) => {
           console.error('Failed to load user posts:', err);
-          setPosts([]);
+          if (hitPosts === undefined) setPosts([]);
         })
         .finally(() => setLoadingPosts(false));
     } else {
@@ -218,27 +242,7 @@ export default function DirectoryProfilePage() {
     return (
       <div className="max-w-6xl mx-auto space-y-4">
         <div className="h-4 w-28 bg-gray-200 animate-pulse rounded" />
-        <div className="bg-white border border-gray-200 rounded-xl p-5 sm:p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gray-200 animate-pulse shrink-0" />
-            <div className="space-y-2 flex-1">
-              <div className="h-5 w-52 bg-gray-200 animate-pulse rounded" />
-              <div className="h-3.5 w-36 bg-gray-200 animate-pulse rounded" />
-              <div className="h-3 w-28 bg-gray-200 animate-pulse rounded" />
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-col lg:flex-row gap-5 items-start">
-          <div className="flex-1 space-y-4 w-full">
-            <SkeletonCard className="h-64" />
-            <SkeletonCard className="h-56" />
-          </div>
-          <div className="w-full lg:w-80 xl:w-96 space-y-4 shrink-0">
-            <SkeletonCard className="h-56" />
-            <SkeletonCard className="h-36" />
-            <SkeletonCard className="h-36" />
-          </div>
-        </div>
+        <SkeletonProfilePage />
       </div>
     );
   }

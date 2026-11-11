@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { adminApi, activitiesApi } from '@/services/api';
 import { Link } from 'react-router-dom';
 import { formatMonths } from '@/utils/formatExperience';
-import { SkeletonCard, SkeletonStatCard } from '@/components/ui/Skeleton';
+import { SkeletonStatCard, SkeletonEventItem, SkeletonActivityItem } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 import {
   BriefcaseIcon,
   UserGroupIcon,
@@ -305,12 +306,19 @@ export default function AdminDashboard() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<any>({});
-  const [charts, setCharts] = useState<any>({});
-  const [surveys, setSurveys] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
-  const [activities, setActivities] = useState<any[]>([]);
+
+  const initialStats = getCached<any>('/admin/dashboard/stats');
+  const initialCharts = getCached<any>('/admin/dashboard/charts');
+  const initialSurveys = getCached<any[]>('/admin/surveys') || getCached<any[]>('/admin/surveys?');
+  const initialEvents = getCached<any[]>('/admin/dashboard/upcoming-events');
+  const initialActivities = getCached<any[]>('/activities?limit=5');
+
+  const [loading, setLoading] = useState(!initialStats);
+  const [stats, setStats] = useState<any>(initialStats ?? {});
+  const [charts, setCharts] = useState<any>(initialCharts ?? {});
+  const [surveys, setSurveys] = useState<any[]>(initialSurveys ?? []);
+  const [events, setEvents] = useState<any[]>(initialEvents ?? []);
+  const [activities, setActivities] = useState<any[]>(initialActivities ?? []);
 
   const availableYears: (number | 'all')[] = useMemo(() => {
     if (stats?.availableYears && Array.isArray(stats.availableYears) && stats.availableYears.length > 0) {
@@ -321,6 +329,12 @@ export default function AdminDashboard() {
 
   const handleYearChange = (year: number | 'all') => {
     setSelectedYear(year);
+    const statsKey = year && year !== 'all' ? `/admin/dashboard/stats?year=${year}` : '/admin/dashboard/stats';
+    const chartsKey = year && year !== 'all' ? `/admin/dashboard/charts?year=${year}` : '/admin/dashboard/charts';
+    const cachedYearStats = getCached<any>(statsKey);
+    const cachedYearCharts = getCached<any>(chartsKey);
+    if (cachedYearStats) setStats(cachedYearStats);
+    if (cachedYearCharts) setCharts(cachedYearCharts);
     Promise.all([
       adminApi.dashboardStats(year).then(setStats).catch(() => {}),
       adminApi.dashboardCharts(year).then(setCharts).catch(() => {}),
@@ -604,7 +618,99 @@ export default function AdminDashboard() {
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} className="h-44" />)}
+          {/* Employment Status & Work Alignment Doughnut Skeletons */}
+          {[0, 1].map((idx) => (
+            <div key={idx} className="bg-white border border-gray-200/90 rounded-xl p-4 animate-pulse flex flex-col justify-between">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 bg-gray-100 rounded-lg" />
+                <div className="h-3.5 w-32 bg-gray-200 rounded" />
+              </div>
+              <div className="flex items-center justify-center gap-5 py-2">
+                <div className="w-24 h-24 rounded-full border-[10px] border-gray-200 bg-white shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-2.5 w-24 bg-gray-100 rounded" />
+                  <div className="h-2.5 w-20 bg-gray-100 rounded" />
+                  <div className="h-2.5 w-16 bg-gray-100 rounded" />
+                </div>
+              </div>
+              <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+                <div className="h-3 w-36 bg-orange-100 rounded" />
+                <div className="h-3 w-3 bg-gray-200 rounded" />
+              </div>
+            </div>
+          ))}
+          {/* Survey Progress Skeleton */}
+          <div className="bg-white border border-gray-200/90 rounded-xl p-4 animate-pulse flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 bg-gray-100 rounded-lg" />
+                <div className="h-3.5 w-28 bg-gray-200 rounded" />
+              </div>
+              <div className="h-3.5 w-48 bg-gray-200 rounded mb-3" />
+              <div className="flex justify-between mb-1.5">
+                <div className="h-2.5 w-28 bg-gray-100 rounded" />
+                <div className="h-2.5 w-12 bg-gray-200 rounded" />
+              </div>
+              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+                <div className="h-full w-3/5 bg-orange-200 rounded-full" />
+              </div>
+              <div className="h-2.5 w-24 bg-gray-100 rounded" />
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+              <div className="h-3 w-28 bg-orange-100 rounded" />
+              <div className="h-3 w-3 bg-gray-200 rounded" />
+            </div>
+          </div>
+          {/* Upcoming Events Skeleton */}
+          <div className="bg-white border border-gray-200/90 rounded-xl p-4 animate-pulse flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 bg-gray-100 rounded-lg" />
+                <div className="h-3.5 w-32 bg-gray-200 rounded" />
+              </div>
+              <div className="space-y-2.5">
+                {[0, 1, 2].map((i) => <SkeletonEventItem key={i} />)}
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+              <div className="h-3 w-28 bg-orange-100 rounded" />
+              <div className="h-3 w-3 bg-gray-200 rounded" />
+            </div>
+          </div>
+          {/* Recent Activity Skeleton */}
+          <div className="bg-white border border-gray-200/90 rounded-xl p-4 animate-pulse flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 bg-gray-100 rounded-lg" />
+                <div className="h-3.5 w-40 bg-gray-200 rounded" />
+              </div>
+              <div className="space-y-2.5">
+                {[0, 1, 2].map((i) => <SkeletonActivityItem key={i} />)}
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+              <div className="h-3 w-32 bg-orange-100 rounded" />
+              <div className="h-3 w-3 bg-gray-200 rounded" />
+            </div>
+          </div>
+          {/* Top Skills Snapshot Skeleton */}
+          <div className="bg-white border border-gray-200/90 rounded-xl p-4 animate-pulse flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 bg-gray-100 rounded-lg" />
+                <div className="h-3.5 w-36 bg-gray-200 rounded" />
+              </div>
+              <div className="flex flex-wrap gap-2 py-2">
+                {[64, 80, 72, 88, 60, 76].map((w, i) => (
+                  <div key={i} className="h-6 bg-orange-100/70 rounded-full" style={{ width: `${w}px` }} />
+                ))}
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+              <div className="h-3 w-36 bg-orange-100 rounded" />
+              <div className="h-3 w-3 bg-gray-200 rounded" />
+            </div>
+          </div>
         </div>
       ) : (
         <div data-tour="admin-summary-widgets" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { jobsApi, profileApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { SkeletonJobCard } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 import { calculateMatchScore } from '@/utils/matchScoring';
 import {
   MapPinIcon,
@@ -995,16 +996,16 @@ export default function JobsPage() {
     setQueryFilter(urlFilter);
   }, [urlFilter]);
 
-  const [loading, setLoading] = useState(true);
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(() => getCached('/jobs') === undefined);
+  const [jobs, setJobs] = useState<any[]>(() => getCached<any[]>('/jobs') || []);
+  const [userProfile, setUserProfile] = useState<any>(() => getCached('/profile') || null);
   const [activeTab, setActiveTab] = useState<'opportunities' | 'saved'>('opportunities');
   const [filter, setFilter] = useState<JobFilter>('all');
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const addNotification = useUIStore((s) => s.addNotification);
 
   useEffect(() => {
-    setLoading(true);
+    if (getCached('/jobs') === undefined) setLoading(true);
     Promise.all([
       jobsApi.list().catch(() => []),
       profileApi.get().catch(() => null),
@@ -1307,10 +1308,10 @@ export default function JobsPage() {
         <div data-tour="jobs-grid" className="flex-1 min-w-0 space-y-3">
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <SkeletonCard className="h-64 rounded-3xl" />
-              <SkeletonCard className="h-64 rounded-3xl" />
-              <SkeletonCard className="h-64 rounded-3xl" />
-              <SkeletonCard className="h-64 rounded-3xl" />
+              <SkeletonJobCard />
+              <SkeletonJobCard />
+              <SkeletonJobCard />
+              <SkeletonJobCard />
             </div>
           ) : activeTab === 'saved' ? (
             /* Saved Jobs View */

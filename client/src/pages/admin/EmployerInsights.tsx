@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { adminApi } from '@/services/api';
+import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
 import { Link } from 'react-router-dom';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { SkeletonStatCard, SkeletonChartPanel } from '@/components/ui/Skeleton';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line,
@@ -318,11 +319,7 @@ function EmployerDirectoryModal({ open, onClose, directory, filteredDirectory, d
 }
 
 export default function EmployerInsights() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [filters, setFilters] = useState({
+  const defaultFilters = {
     academic_year: '',
     batch: '',
     course: '',
@@ -331,17 +328,26 @@ export default function EmployerInsights() {
     employment_type: '',
     date_from: '',
     date_to: '',
-  });
+  };
+  const initialCacheKey = buildQueryEndpoint('/admin/employer-insights/statistics', defaultFilters);
+  const initialData = getCached<any>(initialCacheKey);
+
+  const [loading, setLoading] = useState(!initialData);
+  const [refreshing, setRefreshing] = useState(false);
+  const [data, setData] = useState<any>(initialData ?? null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [filters, setFilters] = useState(defaultFilters);
   const [sortBy, setSortBy] = useState<'alumni' | 'recent' | 'alpha'>('alumni');
   const [dirQuery, setDirQuery] = useState('');
   const [dirOpen, setDirOpen] = useState(false);
-  const dataRef = useRef<any>(null);
+  const dataRef = useRef<any>(initialData ?? null);
   const cacheRef = useRef(new Map<string, any>());
 
   const filterKey = JSON.stringify(filters);
 
   useEffect(() => {
-    const cached = cacheRef.current.get(filterKey);
+    const endpointKey = buildQueryEndpoint('/admin/employer-insights/statistics', filters);
+    const cached = cacheRef.current.get(filterKey) || getCached<any>(endpointKey);
     if (cached) {
       dataRef.current = cached;
       setData(cached);
@@ -553,13 +559,13 @@ export default function EmployerInsights() {
         {loading ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => <KpiSkeleton key={i} />)}
+              {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonStatCard key={i} />)}
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+              {[1, 2, 3, 4].map((i) => <SkeletonChartPanel key={i} />)}
             </div>
             <div className="grid grid-cols-1 gap-3">
-              {[1, 2].map((i) => <SkeletonCard key={i} />)}
+              {[1, 2].map((i) => <SkeletonChartPanel key={i} />)}
             </div>
           </>
         ) : !data ? (
@@ -649,8 +655,8 @@ export default function EmployerInsights() {
               <aside className="lg:w-80 shrink-0 space-y-3 mt-3 lg:mt-0">
                 {loading ? (
                   <>
-                    <SkeletonCard />
-                    <SkeletonCard />
+                    <SkeletonChartPanel />
+                    <SkeletonChartPanel />
                   </>
                 ) : data ? (
                   <>

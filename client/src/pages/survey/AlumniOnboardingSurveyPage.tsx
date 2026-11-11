@@ -5,6 +5,8 @@ import { CheckCircleIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/store/authStore';
 import { surveyApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
+import { getCached } from '@/utils/apiCache';
+import { SkeletonSurveyForm } from '@/components/ui/Skeleton';
 
 interface ConsentData {
   agreed: boolean;
@@ -20,8 +22,11 @@ export default function AlumniOnboardingSurveyPage() {
   const { user, setUser } = useAuthStore();
   const addNotification = useUIStore((s) => s.addNotification);
 
+  const cachedOnboarding = getCached<any>('/surveys/onboarding');
+  const cachedProf = cachedOnboarding?.profile;
+
   const [step, setStep] = useState<number>(1);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(!cachedOnboarding);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string>('');
@@ -38,25 +43,25 @@ export default function AlumniOnboardingSurveyPage() {
 
   // Step 2: Personal & Contact Details
   const [personalInfo, setPersonalInfo] = useState({
-    firstName: '',
-    lastName: '',
-    middleName: '',
-    studentId: '',
-    email: '',
-    phone: '',
-    gender: 'Prefer not to say',
-    civilStatus: 'Single',
-    address: '',
-    city: '',
-    province: 'Cebu',
+    firstName: cachedProf?.firstName || '',
+    lastName: cachedProf?.lastName || '',
+    middleName: cachedProf?.middleName || '',
+    studentId: cachedProf?.studentId || '',
+    email: cachedProf?.email || '',
+    phone: cachedProf?.phone || '',
+    gender: cachedProf?.gender || 'Prefer not to say',
+    civilStatus: cachedProf?.civilStatus || 'Single',
+    address: cachedProf?.address || '',
+    city: cachedProf?.city || '',
+    province: cachedProf?.province || 'Cebu',
     currentResidenceLocation: 'Within Cebu / Naga City',
   });
 
   // Step 3: Academic Background
   const [academicInfo, setAcademicInfo] = useState({
-    program: '',
-    yearGraduated: '',
-    honors: '',
+    program: cachedProf?.program || '',
+    yearGraduated: cachedProf?.yearGraduated ? String(cachedProf.yearGraduated) : '',
+    honors: cachedProf?.honors && cachedProf.honors !== 'None' ? cachedProf.honors : '',
     licensureStatus: 'Not Applicable',
     licensureExamName: '',
     reasonsForEnrolling: [] as string[],
@@ -70,12 +75,14 @@ export default function AlumniOnboardingSurveyPage() {
   });
 
   const [employmentInfo, setEmploymentInfo] = useState({
-    employmentStatus: 'Unemployed',
-    currentJobTitle: '',
-    companyName: '',
-    industry: '',
-    salaryRange: '',
-    jobType: 'Full-time',
+    employmentStatus: cachedProf?.employment_status || 'Unemployed',
+    currentJobTitle: cachedProf?.current_job_title || '',
+    companyName: cachedProf?.company_name || '',
+    industry: cachedProf?.industry || '',
+    salaryRange: cachedProf?.salary_range || '',
+    jobType: cachedProf?.job_type
+      ? cachedProf.job_type.charAt(0).toUpperCase() + cachedProf.job_type.slice(1)
+      : 'Full-time',
   });
 
   // Step 5: CTU Institutional Feedback & Engagement
@@ -372,10 +379,9 @@ export default function AlumniOnboardingSurveyPage() {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-gray-500">Loading survey...</p>
+      <div className="min-h-screen w-full overflow-y-auto bg-gray-50 flex flex-col justify-center items-center p-3 sm:p-4">
+        <div className="max-w-2xl w-full my-auto">
+          <SkeletonSurveyForm />
         </div>
       </div>
     );

@@ -4,6 +4,8 @@ import { notificationsApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { useChatStore } from '@/store/chatStore';
 import { resolveNotificationLink, getNotificationActionLabel } from '@/utils/notificationHelpers';
+import { SkeletonNotificationRow } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 import {
   BellIcon,
   CheckCircleIcon,
@@ -198,13 +200,26 @@ function timeAgo(dateString: string): string {
 export default function NotificationsPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
   const [typeFilter, setTypeFilter] = useState('all');
+
+  const getNotifEndpoint = useCallback(() => {
+    const p: Record<string, any> = { limit: 100 };
+    if (typeFilter !== 'all') p.type = typeFilter;
+    if (activeTab === 'unread') p.unread = true;
+    const qs = Object.entries(p)
+      .filter(([, v]) => v !== '' && v !== undefined && v !== null)
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join('&');
+    return `/notifications?envelope=true&${qs}`;
+  }, [typeFilter, activeTab]);
+
+  const initialNotifCached = getCached<{ notifications: any[]; total: number }>('/notifications?envelope=true&limit=100');
+  const [notifications, setNotifications] = useState<any[]>(() => initialNotifCached?.notifications || []);
+  const [totalCount, setTotalCount] = useState(() => initialNotifCached?.total || 0);
+  const [loading, setLoading] = useState(() => initialNotifCached === undefined);
+  const [refreshing, setRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -213,6 +228,15 @@ export default function NotificationsPage() {
   };
 
   const fetchNotifications = useCallback(async () => {
+    const endpoint = getNotifEndpoint();
+    const hit = getCached<{ notifications: any[]; total: number }>(endpoint);
+    if (hit !== undefined) {
+      setNotifications(hit.notifications || []);
+      setTotalCount(hit.total || 0);
+      setLoading(false);
+    } else if (notifications.length === 0) {
+      setLoading(true);
+    }
     try {
       setRefreshing(true);
       const res = await notificationsApi.listDetailed({
@@ -228,7 +252,7 @@ export default function NotificationsPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [typeFilter, activeTab]);
+  }, [typeFilter, activeTab, getNotifEndpoint]);
 
   useEffect(() => {
     fetchNotifications();
@@ -464,10 +488,7 @@ export default function NotificationsPage() {
       {/* Notifications List */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-2xs overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center space-y-3">
-            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-gray-400">Loading notifications...</p>
-          </div>
+          <SkeletonNotificationRow count={6} />
         ) : filteredNotifications.length === 0 ? (
           <div className="py-16 px-4 text-center space-y-3">
             <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center mx-auto border border-orange-100">

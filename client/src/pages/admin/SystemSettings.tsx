@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { adminApi } from '@/services/api';
+import { getCached } from '@/utils/apiCache';
 import { useUIStore } from '@/store/uiStore';
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
 
 export default function SystemSettings() {
-  const [settings, setSettings] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const initialSettings = getCached<any>('/admin/settings');
+  const [settings, setSettings] = useState<any>(initialSettings ?? null);
+  const [loading, setLoading] = useState(!initialSettings);
   const [saving, setSaving] = useState(false);
   const addNotification = useUIStore((s) => s.addNotification);
 
@@ -14,10 +16,17 @@ export default function SystemSettings() {
   }, []);
 
   const load = async () => {
+    const cached = getCached<any>('/admin/settings');
+    if (cached) {
+      setSettings(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
       const data = await adminApi.settingsGet();
       setSettings(data);
-    } catch { addNotification('Failed to load settings', 'error'); }
+    } catch { if (!cached) addNotification('Failed to load settings', 'error'); }
     finally { setLoading(false); }
   };
 

@@ -1,25 +1,31 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { adminApi } from '@/services/api';
+import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
+import { SkeletonAnnouncementCard } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/store/uiStore';
 import { MegaphoneIcon, XMarkIcon, PhotoIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 const EMPTY_FORM = { title: '', content: '', image_url: '', document_url: '', is_pinned: false, send_to_all: true, linked_survey_id: '', status: 'published' };
 
 export default function AnnouncementManagement() {
-  const [data, setData] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const limit = 15;
+  const initialKey = buildQueryEndpoint('/admin/announcements', { page: 1, limit });
+  const initialRes = getCached<any>(initialKey);
+  const initialSurveys = getCached<any[]>('/admin/surveys?status=active');
+
+  const [data, setData] = useState<any[]>(initialRes?.data ?? []);
+  const [total, setTotal] = useState(initialRes?.total ?? 0);
+  const [loading, setLoading] = useState(!initialRes);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<any>({ ...EMPTY_FORM });
-  const [availableSurveys, setAvailableSurveys] = useState<any[]>([]);
+  const [availableSurveys, setAvailableSurveys] = useState<any[]>(Array.isArray(initialSurveys) ? initialSurveys : []);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addNotification = useUIStore((s) => s.addNotification);
-  const limit = 15;
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,14 +48,22 @@ export default function AnnouncementManagement() {
   };
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const params: Record<string, any> = { page, limit };
+    if (statusFilter !== 'all') params.status = statusFilter;
+    const cacheKey = buildQueryEndpoint('/admin/announcements', params);
+    const cached = getCached<any>(cacheKey);
+    if (cached) {
+      setData(cached.data ?? []);
+      setTotal(cached.total ?? 0);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
-      const params: Record<string, any> = { page, limit };
-      if (statusFilter !== 'all') params.status = statusFilter;
       const res = await adminApi.announcementList(params);
       setData(res.data);
       setTotal(res.total);
-    } catch { addNotification('Failed to load announcements', 'error'); }
+    } catch { if (!cached) addNotification('Failed to load announcements', 'error'); }
     finally { setLoading(false); }
   }, [page, statusFilter]);
 
@@ -179,22 +193,9 @@ export default function AnnouncementManagement() {
       </div>
 
       {loading ? (
-        <div data-tour="announcements-list" className="space-y-2">
+        <div data-tour="announcements-list" className="space-y-2.5">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-lg p-3.5 animate-pulse flex items-start justify-between">
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-4 bg-gray-200 rounded w-1/3" />
-                  <div className="h-3 w-14 bg-gray-200 rounded-full" />
-                </div>
-                <div className="h-3 bg-gray-100 rounded w-3/4" />
-                <div className="h-2.5 bg-gray-100 rounded w-1/4" />
-              </div>
-              <div className="flex gap-1.5 ml-3 shrink-0">
-                <div className="h-6 w-12 bg-gray-100 rounded" />
-                <div className="h-6 w-12 bg-gray-100 rounded" />
-              </div>
-            </div>
+            <SkeletonAnnouncementCard key={i} />
           ))}
         </div>
       ) : data.length === 0 ? (

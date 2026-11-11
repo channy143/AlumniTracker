@@ -16,6 +16,7 @@ import {
 import { connectionsApi, directoryApi, profileApi } from '@/services/api';
 import { formatProgramLongName } from '@/utils/formatProgram';
 import { useChatStore } from '@/store/chatStore';
+import { getCached } from '@/utils/apiCache';
 
 type TabType = 'friends' | 'received' | 'sent';
 
@@ -39,19 +40,19 @@ export default function ConnectionsPage() {
 
   const [activeTab, setActiveTab] = useState<TabType>('friends');
   const [results, setResults] = useState<Profile[]>([]);
-  const [connections, setConnections] = useState<any[]>([]);
-  const [suggestions, setSuggestions] = useState<Profile[]>([]);
+  const [connections, setConnections] = useState<any[]>(() => getCached<any[]>('/connections') || []);
+  const [suggestions, setSuggestions] = useState<Profile[]>(() => getCached<Profile[]>('/connections/suggestions') || []);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => getCached('/connections') === undefined);
   const [searching, setSearching] = useState(false);
   const [page, setPage] = useState(1);
-  const [myProfileId, setMyProfileId] = useState<string | null>(null);
+  const [myProfileId, setMyProfileId] = useState<string | null>(() => getCached<any>('/profile')?.id || null);
   const [actionLoadingMap, setActionLoadingMap] = useState<Record<string, boolean>>({});
   const [openUnfriendId, setOpenUnfriendId] = useState<string | null>(null);
   const limit = 20;
 
   const fetchConnections = useCallback(async () => {
-    setLoading(true);
+    if (getCached('/connections') === undefined) setLoading(true);
     try {
       const [connData, suggData] = await Promise.all([
         connectionsApi.list(),
@@ -60,8 +61,10 @@ export default function ConnectionsPage() {
       setConnections(connData || []);
       setSuggestions(suggData || []);
     } catch {
-      setConnections([]);
-      setSuggestions([]);
+      if (getCached('/connections') === undefined) {
+        setConnections([]);
+        setSuggestions([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -73,15 +76,25 @@ export default function ConnectionsPage() {
       setTotal(0);
       return;
     }
-    setSearching(true);
+    const qs = new URLSearchParams({ q: q.trim(), page: String(p), limit: String(limit) }).toString();
+    const cachedSearch = getCached<any>(`/directory/search?${qs}`);
+    if (cachedSearch) {
+      setResults(cachedSearch.data || []);
+      setTotal(cachedSearch.total || 0);
+      setSearching(false);
+    } else {
+      setSearching(true);
+    }
     setPage(p);
     try {
       const res = await directoryApi.search({ q: q.trim(), page: p, limit });
       setResults(res.data || []);
       setTotal(res.total || 0);
     } catch {
-      setResults([]);
-      setTotal(0);
+      if (!cachedSearch) {
+        setResults([]);
+        setTotal(0);
+      }
     } finally {
       setSearching(false);
     }
@@ -517,12 +530,19 @@ export default function ConnectionsPage() {
               {loading ? (
                 <div className="space-y-2.5">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 animate-pulse">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-200" />
-                        <div className="flex-1 space-y-2">
-                          <div className="h-4 bg-gray-200 rounded w-1/3" />
-                          <div className="h-3 bg-gray-100 rounded w-1/2" />
+                    <div key={i} className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs animate-pulse">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-11 h-11 rounded-full bg-gray-200 shrink-0" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-gray-200 rounded w-40" />
+                            <div className="h-3 bg-gray-100 rounded w-56 max-w-full" />
+                            <div className="h-2.5 bg-gray-100 rounded w-32" />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="h-8 w-24 bg-gray-100 rounded-lg" />
+                          <div className="h-8 w-20 bg-gray-200 rounded-lg" />
                         </div>
                       </div>
                     </div>

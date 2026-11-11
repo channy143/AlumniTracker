@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
 import { mentorshipApi } from '@/services/api';
+import { getCached } from '@/utils/apiCache';
+import { SkeletonDirectoryCard } from '@/components/ui/Skeleton';
 
 export default function MentorshipPage() {
-  const [loading, setLoading] = useState(true);
+  const initialMentorships = getCached<any[]>('/mentorship');
+  const initialDiscover = getCached<any[]>('/mentorship/discover');
+  const [loading, setLoading] = useState(!initialMentorships && !initialDiscover);
   const [error, setError] = useState('');
-  const [myMentorships, setMyMentorships] = useState<any[]>([]);
-  const [availableMentors, setAvailableMentors] = useState<any[]>([]);
+  const [myMentorships, setMyMentorships] = useState<any[]>(Array.isArray(initialMentorships) ? initialMentorships : []);
+  const [availableMentors, setAvailableMentors] = useState<any[]>(Array.isArray(initialDiscover) ? initialDiscover : []);
   const [activeTab, setActiveTab] = useState<'find' | 'my'>('find');
   const [applying, setApplying] = useState<string | null>(null);
 
   useEffect(() => {
-    loadMyMentorships();
-    loadAvailableMentors();
+    Promise.all([loadMyMentorships(), loadAvailableMentors()]).finally(() => setLoading(false));
   }, []);
 
   const loadMyMentorships = async () => {
@@ -47,9 +50,12 @@ export default function MentorshipPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div><h1 className="section-title">Mentorship Platform</h1><p className="text-gray-500 mt-1">Loading...</p></div>
+        <div>
+          <h1 className="section-title">Mentorship Platform</h1>
+          <p className="text-gray-500 mt-1">Connect with experienced alumni who can guide your career journey</p>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => <div key={i} className="card animate-pulse h-48" />)}
+          {[1, 2, 3].map((i) => <SkeletonDirectoryCard key={i} />)}
         </div>
       </div>
     );

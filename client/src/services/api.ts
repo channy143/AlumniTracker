@@ -1,4 +1,21 @@
+import {
+  getCached,
+  setCached,
+  isCacheFresh,
+  getInflight,
+  setInflight,
+  invalidateForMutation,
+  clearAllCache,
+  isEndpointCacheable,
+} from '@/utils/apiCache';
+
 const API_BASE = '/api';
+
+export interface ApiGetOptions {
+  force?: boolean;
+  staleTimeMs?: number;
+  skipCache?: boolean;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -41,6 +58,9 @@ async function request<T>(
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearAllCache();
+    }
     const error = await response.json().catch(() => ({}));
     let cooldown = error.cooldownSeconds;
     if (!cooldown && response.headers.get('Retry-After')) {
@@ -84,14 +104,54 @@ async function request<T>(
 }
 
 export const api = {
-  get: <T>(endpoint: string) => request<T>(endpoint),
-  post: <T>(endpoint: string, data: unknown) =>
-    request<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }),
-  put: <T>(endpoint: string, data: unknown) =>
-    request<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
-  patch: <T>(endpoint: string, data: unknown) =>
-    request<T>(endpoint, { method: 'PATCH', body: JSON.stringify(data) }),
-  delete: <T>(endpoint: string) => request<T>(endpoint, { method: 'DELETE' }),
+  get: <T>(endpoint: string, options: ApiGetOptions = {}): Promise<T> => {
+    const cacheable = isEndpointCacheable(endpoint) && !options.skipCache;
+    if (cacheable && !options.force) {
+      if (isCacheFresh(endpoint, options.staleTimeMs)) {
+        const cached = getCached<T>(endpoint);
+        if (cached !== undefined) {
+          return Promise.resolve(cached);
+        }
+      }
+      const inflight = getInflight<T>(endpoint);
+      if (inflight) {
+        return inflight;
+      }
+    }
+
+    const promise = request<T>(endpoint).then((data) => {
+      if (cacheable) {
+        setCached(endpoint, data);
+      }
+      return data;
+    });
+
+    if (cacheable && !options.force) {
+      setInflight(endpoint, promise);
+    }
+
+    return promise;
+  },
+  post: async <T>(endpoint: string, data: unknown) => {
+    const res = await request<T>(endpoint, { method: 'POST', body: JSON.stringify(data) });
+    invalidateForMutation(endpoint);
+    return res;
+  },
+  put: async <T>(endpoint: string, data: unknown) => {
+    const res = await request<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) });
+    invalidateForMutation(endpoint);
+    return res;
+  },
+  patch: async <T>(endpoint: string, data: unknown) => {
+    const res = await request<T>(endpoint, { method: 'PATCH', body: JSON.stringify(data) });
+    invalidateForMutation(endpoint);
+    return res;
+  },
+  delete: async <T>(endpoint: string) => {
+    const res = await request<T>(endpoint, { method: 'DELETE' });
+    invalidateForMutation(endpoint);
+    return res;
+  },
   download: (endpoint: string) => {
     const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
     return fetch(`${API_BASE}${endpoint}`, {
@@ -138,6 +198,7 @@ export const api = {
         const err = await res.json().catch(() => ({}));
         throw new ApiError(err.message || 'File upload failed. Please try again.', res.status);
       }
+      invalidateForMutation(endpoint);
       return res.json() as T;
     }).catch((err) => {
       if (err instanceof ApiError) throw err;
@@ -319,7 +380,7 @@ export const surveyApi = {
 };
 
 export const notificationsApi = {
-  list: (limit = 20) => api.get<any[]>(`/notifications?limit=${limit}`),
+  list: (limit = 20, options?: ApiGetOptions) => api.get<any[]>(`/notifications?limit=${limit}`, options),
   listDetailed: (params: { limit?: number; offset?: number; type?: string; unread?: boolean } = {}) =>
     api.get<{ notifications: any[]; total: number }>(`/notifications?envelope=true&${toQuery(params)}`),
   unreadCount: () => api.get<{ count: number }>('/notifications/unread-count'),
@@ -339,9 +400,12 @@ export const adminApi = {
   updateUser: (id: string, data: any) => api.put<any>(`/admin/users/${id}`, data),
   exportData: (format: string) => api.get<Blob>(`/admin/export?format=${format}`),
 
-  dashboardStats: (year?: number | string) => api.get<any>(`/admin/dashboard/stats${year && year !== 'all' ? `?year=${year}` : ''}`),
-  dashboardCharts: (year?: number | string) => api.get<any>(`/admin/dashboard/charts${year && year !== 'all' ? `?year=${year}` : ''}`),
-  dashboardUpcomingEvents: () => api.get<any[]>('/admin/dashboard/upcoming-events'),
+  dashboardStats: (year?: number | string, options?: ApiGetOptions) =>
+    api.get<any>(`/admin/dashboard/stats${year && year !== 'all' ? `?year=${year}` : ''}`, options),
+  dashboardCharts: (year?: number | string, options?: ApiGetOptions) =>
+    api.get<any>(`/admin/dashboard/charts${year && year !== 'all' ? `?year=${year}` : ''}`, options),
+  dashboardUpcomingEvents: (options?: ApiGetOptions) =>
+    api.get<any[]>('/admin/dashboard/upcoming-events', options),
 
   alumniList: (params: Record<string, any> = {}) => api.get<any>(`/admin/alumni?${toQuery(params)}`),
   alumniGet: (id: string) => api.get<any>(`/admin/alumni/${id}`),
@@ -603,10 +667,11 @@ export const messagesApi = {
 };
 
 export const feedApi = {
-  list: (sort?: string) => api.get<any[]>(`/feed${sort ? `?sort=${sort}` : ''}`),
-  mine: () => api.get<any[]>('/feed/mine'),
-  userPosts: (userId: string) => api.get<any[]>(`/feed/user/${userId}`),
-  get: (id: string) => api.get<any>(`/feed/${id}`),
+  list: (sort?: string, options?: ApiGetOptions) =>
+    api.get<any[]>(`/feed${sort ? `?sort=${sort}` : ''}`, options),
+  mine: (options?: ApiGetOptions) => api.get<any[]>('/feed/mine', options),
+  userPosts: (userId: string, options?: ApiGetOptions) => api.get<any[]>(`/feed/user/${userId}`, options),
+  get: (id: string, options?: ApiGetOptions) => api.get<any>(`/feed/${id}`, options),
   create: (data: {
     content: string;
     title?: string | null;

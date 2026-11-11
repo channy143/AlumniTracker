@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { adminApi } from '@/services/api';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { getCached, buildQueryEndpoint, invalidateCachePrefixes } from '@/utils/apiCache';
+import { SkeletonChartPanel, SkeletonStatCard } from '@/components/ui/Skeleton';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -230,11 +231,7 @@ function PrioritySection({ priority, items, color }: { priority: string; items: 
 }
 
 export default function CurriculumInsights() {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [filters, setFilters] = useState({
+  const defaultFilters = {
     academic_year: '',
     batch: '',
     course: '',
@@ -243,14 +240,23 @@ export default function CurriculumInsights() {
     work_alignment: '',
     date_from: '',
     date_to: '',
-  });
-  const dataRef = useRef<any>(null);
+  };
+  const initialCacheKey = buildQueryEndpoint('/admin/curriculum-insights/statistics', defaultFilters);
+  const initialData = getCached<any>(initialCacheKey);
+
+  const [loading, setLoading] = useState(!initialData);
+  const [refreshing, setRefreshing] = useState(false);
+  const [data, setData] = useState<any>(initialData ?? null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [filters, setFilters] = useState(defaultFilters);
+  const dataRef = useRef<any>(initialData ?? null);
   const cacheRef = useRef(new Map<string, any>());
 
   const filterKey = JSON.stringify(filters);
 
   useEffect(() => {
-    const cached = cacheRef.current.get(filterKey);
+    const endpointKey = buildQueryEndpoint('/admin/curriculum-insights/statistics', filters);
+    const cached = cacheRef.current.get(filterKey) || getCached<any>(endpointKey);
     if (cached) {
       dataRef.current = cached;
       setData(cached);
@@ -289,6 +295,7 @@ export default function CurriculumInsights() {
 
   const handleRefresh = () => {
     cacheRef.current.clear();
+    invalidateCachePrefixes('/admin/curriculum-insights');
     setReloadKey((k) => k + 1);
   };
 
@@ -454,13 +461,13 @@ export default function CurriculumInsights() {
         {loading ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => <KpiSkeleton key={i} />)}
+              {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonStatCard key={i} />)}
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+              {[1, 2, 3, 4].map((i) => <SkeletonChartPanel key={i} />)}
             </div>
             <div className="grid grid-cols-1 gap-3">
-              {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+              {[1, 2].map((i) => <SkeletonChartPanel key={i} />)}
             </div>
           </>
         ) : !data ? (

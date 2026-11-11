@@ -2,45 +2,65 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { surveyApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
-import { SkeletonCard } from '@/components/ui/Skeleton';
+import { SkeletonSurveyForm } from '@/components/ui/Skeleton';
+import { getCached } from '@/utils/apiCache';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 
 export default function SurveyPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const addNotification = useUIStore((s) => s.addNotification);
-  const [survey, setSurvey] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const initialSurvey = id ? getCached<any>(`/surveys/${id}`) : undefined;
+  const [survey, setSurvey] = useState<any>(() => initialSurvey || null);
+  const [loading, setLoading] = useState(() => Boolean(id) && initialSurvey === undefined);
   const [notFound, setNotFound] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [completed, setCompleted] = useState(false);
-  const [responses, setResponses] = useState<Record<string, any>>({});
+  const [completed, setCompleted] = useState(() => Boolean(initialSurvey?.completed));
+  const [responses, setResponses] = useState<Record<string, any>>(() => {
+    if (!initialSurvey || initialSurvey.completed) return {};
+    const defaults: Record<string, any> = {};
+    (initialSurvey.questions || []).forEach((q: any) => {
+      if (q.type === 'section' || q.type === 'choice') return;
+      defaults[q.id] = '';
+    });
+    return defaults;
+  });
   const [currentSection, setCurrentSection] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
+    const hit = getCached<any>(`/surveys/${id}`);
+    if (hit !== undefined) {
+      setSurvey(hit);
+      setCompleted(hit.completed);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     setNotFound(false);
     surveyApi.get(id).then((data) => {
       setSurvey(data);
       setCompleted(data.completed);
       if (data.completed) return;
-      const defaults: Record<string, any> = {};
-      (data.questions || []).forEach((q: any) => {
-        if (q.type === 'section' || q.type === 'choice') return;
-        defaults[q.id] = '';
+      setResponses((prev) => {
+        if (Object.keys(prev).length > 0) return prev;
+        const defaults: Record<string, any> = {};
+        (data.questions || []).forEach((q: any) => {
+          if (q.type === 'section' || q.type === 'choice') return;
+          defaults[q.id] = '';
+        });
+        return defaults;
       });
-      setResponses(defaults);
     }).catch(() => {
-      setNotFound(true);
+      if (hit === undefined) setNotFound(true);
     }).finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto py-6">
-        <SkeletonCard />
+      <div className="py-6">
+        <SkeletonSurveyForm />
       </div>
     );
   }

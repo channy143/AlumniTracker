@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import { adminApi, careerTrendsApi } from '@/services/api';
+import { getCached } from '@/utils/apiCache';
+import { SkeletonStatCard, SkeletonTableRows } from '@/components/ui/Skeleton';
 
 export default function AdminPage() {
-  const [loading, setLoading] = useState(true);
+  const initialUsers = getCached<any[]>('/admin/users');
+  const initialOverview = getCached<any>('/career-trends');
+  const [loading, setLoading] = useState(!initialUsers || !initialOverview);
   const [error, setError] = useState('');
-  const [users, setUsers] = useState<any[]>([]);
-  const [overview, setOverview] = useState<any>(null);
+  const [users, setUsers] = useState<any[]>(Array.isArray(initialUsers) ? initialUsers : []);
+  const [overview, setOverview] = useState<any>(initialOverview ?? null);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editRole, setEditRole] = useState('');
   const [saving, setSaving] = useState(false);
@@ -15,8 +19,16 @@ export default function AdminPage() {
   }, []);
 
   const loadData = async () => {
-    try {
+    const cachedU = getCached<any[]>('/admin/users');
+    const cachedO = getCached<any>('/career-trends');
+    if (cachedU && cachedO) {
+      setUsers(cachedU);
+      setOverview(cachedO);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+    try {
       const [usersData, overviewData] = await Promise.all([
         adminApi.users(),
         careerTrendsApi.list({}),
@@ -24,7 +36,7 @@ export default function AdminPage() {
       setUsers(usersData);
       setOverview(overviewData);
     } catch {
-      setError('Failed to load admin data');
+      if (!cachedU || !cachedO) setError('Failed to load admin data');
     } finally {
       setLoading(false);
     }
@@ -67,9 +79,15 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div><h1 className="section-title">Admin Dashboard</h1><p className="text-gray-500 mt-1">Loading...</p></div>
+        <div>
+          <h1 className="section-title">Admin Dashboard</h1>
+          <p className="text-gray-500 mt-1">Manage alumni data, content, and system settings</p>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => <div key={i} className="card animate-pulse h-24" />)}
+          {[1, 2, 3, 4].map((i) => <SkeletonStatCard key={i} />)}
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <SkeletonTableRows rows={5} cols={4} />
         </div>
       </div>
     );

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '@/services/api';
+import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
+import { SkeletonModalDetail } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/store/uiStore';
 import { generateYears } from '@/utils/helpers';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
@@ -15,11 +17,16 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function AlumniManagement() {
-  const [data, setData] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [employers, setEmployers] = useState<string[]>([]);
-  const [locations, setLocations] = useState<string[]>([]);
+  const initialAlumniKey = buildQueryEndpoint('/admin/alumni', { page: 1, limit: 15, archived: 'false' });
+  const initialAlumniRes = getCached<any>(initialAlumniKey);
+  const initialEligibleRes = getCached<any[]>('/admin/eligible-alumni');
+
+  const [data, setData] = useState<any[]>(initialAlumniRes?.data ?? []);
+  const [total, setTotal] = useState(initialAlumniRes?.total ?? 0);
+  const [loading, setLoading] = useState(!initialAlumniRes);
+  const [loadingEligible, setLoadingEligible] = useState(false);
+  const [employers, setEmployers] = useState<string[]>(initialAlumniRes?.employers ?? []);
+  const [locations, setLocations] = useState<string[]>(initialAlumniRes?.locations ?? []);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({ course: '', year: '', employment_status: '', employer: '', location: '', archived: 'false' });
@@ -27,13 +34,16 @@ export default function AlumniManagement() {
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [detailData, setDetailData] = useState<any>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [editingDetail, setEditingDetail] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [savingDetail, setSavingDetail] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', idNumber: '', program: '', yearGraduated: '' });
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'registered' | 'eligible'>('registered');
-  const [eligible, setEligible] = useState<any[]>([]);
+  const [eligible, setEligible] = useState<any[]>(
+    Array.isArray(initialEligibleRes) ? initialEligibleRes.filter((e: any) => !e.user_id) : []
+  );
   const [showEligibleForm, setShowEligibleForm] = useState(false);
   const [eligibleForm, setEligibleForm] = useState<any>({ student_id: '', first_name: '', last_name: '', birth_date: '', program: '', year_graduated: '' });
   const [eligError, setEligError] = useState('');
@@ -92,14 +102,25 @@ export default function AlumniManagement() {
   const limit = 15;
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const queryParams = { page, limit, search, ...filters, archived: filters.archived };
+    const cacheKey = buildQueryEndpoint('/admin/alumni', queryParams);
+    const cached = getCached<any>(cacheKey);
+    if (cached) {
+      setData(cached.data ?? []);
+      setTotal(cached.total ?? 0);
+      if (cached.employers) setEmployers(cached.employers);
+      if (cached.locations) setLocations(cached.locations);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
-      const res = await adminApi.alumniList({ page, limit, search, ...filters, archived: filters.archived });
+      const res = await adminApi.alumniList(queryParams);
       setData(res.data);
       setTotal(res.total);
       if (res.employers) setEmployers(res.employers);
       if (res.locations) setLocations(res.locations);
-    } catch (err: any) { setError(err.message || 'Failed to load alumni'); }
+    } catch (err: any) { if (!cached) setError(err.message || 'Failed to load alumni'); }
     finally { setLoading(false); }
   }, [page, search, filters]);
 
@@ -108,12 +129,28 @@ export default function AlumniManagement() {
   const totalPages = Math.ceil(total / limit);
 
   const handleView = async (id: string) => {
+    const cachedDetail = getCached<any>(`/admin/alumni/${id}`);
+    setEditingDetail(false);
+    if (cachedDetail) {
+      setDetailData(cachedDetail);
+      setLoadingDetail(false);
+      setShowDetail(true);
+    } else {
+      setDetailData(null);
+      setLoadingDetail(true);
+      setShowDetail(true);
+    }
     try {
       const d = await adminApi.alumniGet(id);
       setDetailData(d);
-      setEditingDetail(false);
-      setShowDetail(true);
-    } catch { addNotification('Failed to load alumni details', 'error'); }
+    } catch {
+      if (!cachedDetail) {
+        setShowDetail(false);
+        addNotification('Failed to load alumni details', 'error');
+      }
+    } finally {
+      setLoadingDetail(false);
+    }
   };
 
   const handleEditDetail = () => {
@@ -305,10 +342,18 @@ export default function AlumniManagement() {
   };
 
   const loadEligible = useCallback(async () => {
+    const cachedElig = getCached<any[]>('/admin/eligible-alumni');
+    if (Array.isArray(cachedElig)) {
+      setEligible(cachedElig.filter((e: any) => !e.user_id));
+      setLoadingEligible(false);
+    } else {
+      setLoadingEligible(true);
+    }
     try {
       const res = await adminApi.eligibleAlumniList({});
       setEligible(Array.isArray(res) ? res.filter((e: any) => !e.user_id) : []);
-    } catch { addNotification('Failed to load eligible alumni', 'error'); }
+    } catch { if (!cachedElig) addNotification('Failed to load eligible alumni', 'error'); }
+    finally { setLoadingEligible(false); }
   }, [addNotification]);
 
   useEffect(() => {
@@ -574,7 +619,7 @@ export default function AlumniManagement() {
       )}
 
       {tab === 'eligible' && (
-        loading ? (
+        loadingEligible ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
               <div key={i} className="bg-white border border-gray-200 animate-pulse">
@@ -638,7 +683,7 @@ export default function AlumniManagement() {
         )
       )}
 
-      {showDetail && detailData && (
+      {showDetail && (loadingDetail || detailData) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setShowDetail(false)}>
           <div className="bg-white max-w-5xl w-full flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150" style={{ height: '88vh' }} onClick={(e) => e.stopPropagation()}>
             {/* Header bar */}
@@ -649,15 +694,17 @@ export default function AlumniManagement() {
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-sm sm:text-base font-bold text-white leading-tight truncate">
-                    {detailData.profile?.first_name} {detailData.profile?.last_name}
+                    {detailData ? `${detailData.profile?.first_name || ''} ${detailData.profile?.last_name || ''}`.trim() : 'Loading Alumni Profile...'}
                   </h2>
                   <p className="text-[11px] sm:text-xs text-orange-100 mt-0.5 truncate">
-                    {detailData.profile?.id_number || detailData.profile?.student_id ? `ID: ${detailData.profile.id_number || detailData.profile.student_id} · ` : ''}Alumni Profile & Records
+                    {detailData?.profile?.id_number || detailData?.profile?.student_id
+                      ? `ID: ${detailData.profile.id_number || detailData.profile.student_id} · `
+                      : ''}Alumni Profile & Records
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {!editingDetail ? (
+                {detailData && (!editingDetail ? (
                   <>
                     <button
                       onClick={() => {
@@ -696,7 +743,7 @@ export default function AlumniManagement() {
                       Cancel
                     </button>
                   </>
-                )}
+                ))}
                 <button
                   onClick={() => setShowDetail(false)}
                   className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer ml-1"
@@ -706,7 +753,11 @@ export default function AlumniManagement() {
               </div>
             </div>
 
-            {editingDetail ? (
+            {!detailData ? (
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-white">
+                <SkeletonModalDetail />
+              </div>
+            ) : editingDetail ? (
               <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-white space-y-5">
                 {/* Section 1: Personal Information */}
                 <div>

@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { adminApi } from '@/services/api';
+import { api, adminApi } from '@/services/api';
+import { getCached } from '@/utils/apiCache';
+import { SkeletonEventCard } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/store/uiStore';
 import { CalendarDaysIcon, XMarkIcon, PhotoIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 export default function AdminEvents() {
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialEvents = getCached<any[]>('/admin/events');
+  const [events, setEvents] = useState<any[]>(Array.isArray(initialEvents) ? initialEvents : []);
+  const [loading, setLoading] = useState(!Array.isArray(initialEvents));
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', description: '', date: '', time: '', location: '', banner: '' });
@@ -16,22 +19,18 @@ export default function AdminEvents() {
 
   useEffect(() => { load(); }, []);
 
-  const getToken = () => sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-
-  const headers = (): HeadersInit => {
-    const token = getToken();
-    const h: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) h['Authorization'] = `Bearer ${token}`;
-    return h;
-  };
-
   const load = async () => {
-    setLoading(true);
+    const cached = getCached<any[]>('/admin/events');
+    if (Array.isArray(cached)) {
+      setEvents(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
-      const res = await fetch('/api/admin/events', { headers: headers() });
-      const data = await res.json();
+      const data = await api.get<any[]>('/admin/events');
       setEvents(Array.isArray(data) ? data : []);
-    } catch { setEvents([]); addNotification('Failed to load events', 'error'); }
+    } catch { if (!cached) { setEvents([]); addNotification('Failed to load events', 'error'); } }
     finally { setLoading(false); }
   };
 
@@ -58,12 +57,12 @@ export default function AdminEvents() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/admin/events', {
-        method: editId ? 'PUT' : 'POST',
-        headers: headers(),
-        body: JSON.stringify({ ...form, id: editId }),
-      });
-      if (!res.ok) throw new Error('Failed');
+      const payload = { ...form, id: editId };
+      if (editId) {
+        await api.put('/admin/events', payload);
+      } else {
+        await api.post('/admin/events', payload);
+      }
       addNotification(editId ? 'Event updated' : 'Event created', 'success');
       setShowForm(false); setEditId(null);
       setForm({ name: '', description: '', date: '', time: '', location: '', banner: '' });
@@ -74,8 +73,7 @@ export default function AdminEvents() {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this event?')) return;
     try {
-      const token = getToken();
-      await fetch(`/api/admin/events/${id}`, { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      await api.delete(`/admin/events/${id}`);
       addNotification('Event deleted', 'success');
       load();
     } catch { addNotification('Failed to delete event', 'error'); }
@@ -95,15 +93,6 @@ export default function AdminEvents() {
       month: dt.toLocaleString('default', { month: 'short' }),
     };
   };
-
-  if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-4"><div className="h-5 w-32 bg-gray-200 animate-pulse rounded mb-1" /><div className="h-3 w-48 bg-gray-200 animate-pulse rounded" /></div>
-        <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 bg-gray-200 animate-pulse rounded-lg" />)}</div>
-      </div>
-    );
-  }
 
   const now = new Date();
   const filteredEvents = events.filter((e: any) => {
@@ -135,16 +124,7 @@ export default function AdminEvents() {
       <div data-tour="events-list" className="space-y-2">
         {loading ? (
           [1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between animate-pulse">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gray-200" />
-                <div className="space-y-1.5">
-                  <div className="h-3.5 w-40 bg-gray-200 rounded" />
-                  <div className="h-2.5 w-24 bg-gray-200 rounded" />
-                </div>
-              </div>
-              <div className="h-4 w-16 bg-gray-200 rounded" />
-            </div>
+            <SkeletonEventCard key={i} />
           ))
         ) : filteredEvents.length === 0 ? (
           <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">No {filter} events for now.</div>
