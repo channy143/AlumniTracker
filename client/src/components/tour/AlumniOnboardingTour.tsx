@@ -187,13 +187,22 @@ export default function AlumniOnboardingTour() {
 
         // Scroll target comfortably into view if outside comfortable viewport bounds
         const navbarHeight = 68;
-        const isOffscreen = rect.top < navbarHeight + 20 || rect.bottom > window.innerHeight - 60;
-        if (isOffscreen) {
-          try {
-            element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-          } catch {
-            const targetY = window.scrollY + rect.top - 120;
+        const isTallElement = rect.height > window.innerHeight * 0.65;
+        if (isTallElement) {
+          // For tall elements (summary widgets, large data tables, KPI grids), scroll top into view below navbar
+          if (rect.top < navbarHeight + 10 || rect.top > window.innerHeight * 0.45) {
+            const targetY = window.scrollY + rect.top - navbarHeight - 16;
             window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+          }
+        } else {
+          const isOffscreen = rect.top < navbarHeight + 20 || rect.bottom > window.innerHeight - 60;
+          if (isOffscreen) {
+            try {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            } catch {
+              const targetY = window.scrollY + rect.top - 120;
+              window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+            }
           }
         }
 

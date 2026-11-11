@@ -58,20 +58,27 @@ export default function CoachMarkTooltip({
     }
   });
 
-  // Collision-Avoidance Placement Solver
-  // Guarantees the modal NEVER covers or overlays targetRect and centers properly when standalone
+  // Viewport-Guaranteed Placement Solver
+  // Ensures the tooltip ALWAYS remains 100% visible within the viewport bounds.
+  // When targetRect is tall or covers most of the screen, the tooltip is placed comfortably
+  // inside the viewport (even if overlapping part of the target) so the admin can read the guide properly.
   const placement = useMemo(() => {
     const isCenterModal = !targetRect || step.pointingDirection === 'none';
     const vpWidth = windowSize.width;
     const vpHeight = windowSize.height;
     const tooltipWidth = Math.min(isCenterModal ? 490 : 390, vpWidth - 32);
-    const estimatedHeight = actualHeight > 50 ? actualHeight : 240;
+    const estimatedHeight = Math.max(160, Math.min(actualHeight > 50 ? actualHeight : 240, vpHeight - 32));
+
+    const minX = 16;
+    const maxX = Math.max(minX, vpWidth - tooltipWidth - 16);
+    const minY = 16;
+    const maxY = Math.max(minY, vpHeight - estimatedHeight - 16);
 
     // Standalone centered modal (e.g. final celebration guide)
     if (isCenterModal) {
       return {
-        x: Math.max(16, Math.round((vpWidth - tooltipWidth) / 2)),
-        y: Math.max(16, Math.round((vpHeight - estimatedHeight) / 2)),
+        x: Math.max(minX, Math.round((vpWidth - tooltipWidth) / 2)),
+        y: Math.max(minY, Math.round((vpHeight - estimatedHeight) / 2)),
         width: tooltipWidth,
         direction: 'none' as const,
       };
@@ -80,17 +87,16 @@ export default function CoachMarkTooltip({
     const margin = 16;
 
     // Helper: checks whether candidate tooltip box overlaps targetRect
-    const collides = (x: number, y: number): boolean => {
+    const collidesWithTarget = (x: number, y: number): boolean => {
       const boxLeft = x;
       const boxRight = x + tooltipWidth;
       const boxTop = y;
       const boxBottom = y + estimatedHeight;
 
-      // Expand target by small margin for safety
-      const safeTargetLeft = targetRect.left - 8;
-      const safeTargetRight = targetRect.right + 8;
-      const safeTargetTop = targetRect.top - 8;
-      const safeTargetBottom = targetRect.bottom + 8;
+      const safeTargetLeft = targetRect.left - 6;
+      const safeTargetRight = targetRect.right + 6;
+      const safeTargetTop = targetRect.top - 6;
+      const safeTargetBottom = targetRect.bottom + 6;
 
       const overlapX = boxLeft < safeTargetRight && boxRight > safeTargetLeft;
       const overlapY = boxTop < safeTargetBottom && boxBottom > safeTargetTop;
@@ -98,49 +104,31 @@ export default function CoachMarkTooltip({
       return overlapX && overlapY;
     };
 
-    // Helper: checks whether candidate fits cleanly in visible viewport
-    const fitsViewport = (x: number, y: number): boolean => {
-      return (
-        x >= 12 &&
-        x + tooltipWidth <= vpWidth - 12 &&
-        y >= 12 &&
-        y + estimatedHeight <= vpHeight - 12
-      );
-    };
-
     // Candidate generator for each direction
     const getCandidate = (direction: 'top' | 'bottom' | 'left' | 'right') => {
-      let x = 0;
-      let y = 0;
+      let rawX = 0;
+      let rawY = 0;
 
       if (direction === 'bottom') {
-        x = targetRect.left + targetRect.width / 2 - tooltipWidth / 2;
-        y = targetRect.bottom + margin;
+        rawX = targetRect.left + (targetRect.width - tooltipWidth) / 2;
+        rawY = targetRect.bottom + margin;
       } else if (direction === 'top') {
-        x = targetRect.left + targetRect.width / 2 - tooltipWidth / 2;
-        y = targetRect.top - estimatedHeight - margin;
+        rawX = targetRect.left + (targetRect.width - tooltipWidth) / 2;
+        rawY = targetRect.top - estimatedHeight - margin;
       } else if (direction === 'left') {
-        x = targetRect.left - tooltipWidth - margin;
-        y = targetRect.top + targetRect.height / 2 - estimatedHeight / 2;
+        rawX = targetRect.left - tooltipWidth - margin;
+        rawY = targetRect.top + (targetRect.height - estimatedHeight) / 2;
       } else if (direction === 'right') {
-        x = targetRect.right + margin;
-        y = targetRect.top + targetRect.height / 2 - estimatedHeight / 2;
+        rawX = targetRect.right + margin;
+        rawY = targetRect.top + (targetRect.height - estimatedHeight) / 2;
       }
 
-      // Clamp X into viewport
-      const clampedX = Math.max(12, Math.min(vpWidth - tooltipWidth - 12, x));
+      const clampedX = Math.max(minX, Math.min(maxX, rawX));
+      const clampedY = Math.max(minY, Math.min(maxY, rawY));
 
-      // Clamp Y into viewport while NEVER clamping into targetRect
-      let clampedY: number;
-      if (direction === 'bottom') {
-        clampedY = Math.max(targetRect.bottom + 8, Math.min(vpHeight - estimatedHeight - 12, y));
-      } else if (direction === 'top') {
-        clampedY = Math.min(targetRect.top - estimatedHeight - 8, Math.max(12, y));
-      } else {
-        clampedY = Math.max(12, Math.min(vpHeight - estimatedHeight - 12, y));
-      }
+      const fitsStrictly = rawY >= minY && rawY <= maxY && rawX >= minX && rawX <= maxX;
 
-      return { x: clampedX, y: clampedY, rawX: x, rawY: y, direction };
+      return { x: clampedX, y: clampedY, rawX, rawY, direction, fitsStrictly };
     };
 
     // Order candidate directions based on preferred direction
@@ -148,63 +136,81 @@ export default function CoachMarkTooltip({
     let dirOrder: ('bottom' | 'top' | 'left' | 'right')[] = ['bottom', 'top', 'right', 'left'];
 
     if (pref === 'left') {
-      dirOrder = ['left', 'top', 'bottom', 'right'];
+      dirOrder = ['left', 'right', 'bottom', 'top'];
     } else if (pref === 'right') {
-      dirOrder = ['right', 'top', 'bottom', 'left'];
+      dirOrder = ['right', 'left', 'bottom', 'top'];
     } else if (pref === 'top') {
       dirOrder = ['top', 'bottom', 'right', 'left'];
     } else if (pref === 'bottom') {
       dirOrder = ['bottom', 'top', 'right', 'left'];
     }
 
-    // 1. Try to find a direction where it fits viewport AND has ZERO COLLISION with target
+    // 1. Try to find a direction where it fits strictly within viewport AND has ZERO collision with target
     let chosen: { x: number; y: number; direction: 'top' | 'bottom' | 'left' | 'right' } | null = null;
     for (const dir of dirOrder) {
       const cand = getCandidate(dir);
-      if (fitsViewport(cand.rawX, cand.rawY) && !collides(cand.x, cand.y)) {
+      if (cand.fitsStrictly && !collidesWithTarget(cand.x, cand.y)) {
         chosen = cand;
         break;
       }
     }
 
-    // 2. If raw doesn't fit without clamping, try clamped versions that have ZERO collision
+    // 2. If raw doesn't fit strictly without clamping, try clamped versions that have ZERO collision
     if (!chosen) {
       for (const dir of dirOrder) {
         const cand = getCandidate(dir);
-        if (!collides(cand.x, cand.y)) {
+        if (!collidesWithTarget(cand.x, cand.y)) {
           chosen = cand;
           break;
         }
       }
     }
 
-    // 3. Fallback: guarantee it respects the preferred side without encroaching on the target
+    // 3. Fallback when targetRect is large or fills viewport:
+    // ALWAYS prioritize keeping the tooltip inside the viewport!
+    // It is permitted to overlap part of the highlighted element as long as the admin can read the guide properly.
     if (!chosen) {
-      if (step.pointingDirection === 'bottom') {
-        chosen = {
-          x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left + (targetRect.width - tooltipWidth) / 2)),
-          y: targetRect.bottom + 12,
-          direction: 'bottom' as const,
-        };
-      } else if (step.pointingDirection === 'top') {
-        chosen = {
-          x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left + (targetRect.width - tooltipWidth) / 2)),
-          y: Math.max(12, targetRect.top - estimatedHeight - 12),
-          direction: 'top' as const,
-        };
-      } else {
-        const targetCenterY = targetRect.top + targetRect.height / 2;
-        if (targetCenterY > vpHeight / 2) {
-          chosen = { x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left)), y: 16, direction: 'top' as const };
+      const targetCenterY = targetRect.top + targetRect.height / 2;
+      let fallbackY: number;
+      let fallbackDir: 'top' | 'bottom' = 'bottom';
+
+      if (pref === 'top') {
+        if (targetRect.top > estimatedHeight + 30) {
+          fallbackY = Math.max(minY, targetRect.top - estimatedHeight - margin);
+          fallbackDir = 'top';
         } else {
-          chosen = { x: Math.max(12, Math.min(vpWidth - tooltipWidth - 12, targetRect.left)), y: Math.max(targetRect.bottom + 12, vpHeight - estimatedHeight - 16), direction: 'bottom' as const };
+          fallbackY = maxY;
+          fallbackDir = 'top';
         }
+      } else if (pref === 'bottom') {
+        if (vpHeight - targetRect.bottom > estimatedHeight + 30) {
+          fallbackY = Math.min(maxY, targetRect.bottom + margin);
+          fallbackDir = 'bottom';
+        } else {
+          fallbackY = targetCenterY > vpHeight / 2 ? minY : maxY;
+          fallbackDir = 'bottom';
+        }
+      } else {
+        fallbackY = targetCenterY > vpHeight / 2 ? minY : maxY;
+        fallbackDir = targetCenterY > vpHeight / 2 ? 'bottom' : 'top';
       }
+
+      const fallbackX = Math.max(minX, Math.min(maxX, targetRect.left + (targetRect.width - tooltipWidth) / 2));
+
+      chosen = {
+        x: fallbackX,
+        y: fallbackY,
+        direction: fallbackDir,
+      };
     }
 
+    // ABSOLUTE FINAL GUARANTEE: Never, ever let x or y be outside the visible viewport!
+    const finalX = Math.max(minX, Math.min(maxX, chosen.x));
+    const finalY = Math.max(minY, Math.min(maxY, chosen.y));
+
     return {
-      x: chosen.x,
-      y: chosen.y,
+      x: finalX,
+      y: finalY,
       width: tooltipWidth,
       direction: chosen.direction,
     };
@@ -225,7 +231,7 @@ export default function CoachMarkTooltip({
         maxHeight: 'calc(100vh - 32px)',
         zIndex: 100005,
       }}
-      className="bg-white rounded-2xl shadow-2xl border border-orange-200/90 overflow-hidden select-none text-left scrollbar-none relative"
+      className="bg-white rounded-2xl shadow-2xl border border-orange-200/90 overflow-y-auto max-h-[calc(100vh-32px)] select-none text-left scrollbar-none relative"
     >
       {/* Top gradient progress line */}
       <div className="h-1.5 w-full bg-orange-100/70 overflow-hidden shrink-0 relative z-10">

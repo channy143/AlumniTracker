@@ -167,7 +167,7 @@ export function truncate(str: string, length: number = 100) {
   return str.length > length ? `${str.substring(0, length)}...` : str;
 }
 
-export function generateYears(start: number = 1990, end: number = new Date().getFullYear()) {
+export function generateYears(start: number = 1990, end: number = Math.max(2027, new Date().getFullYear())) {
   return Array.from({ length: end - start + 1 }, (_, i) => String(start + i));
 }
 

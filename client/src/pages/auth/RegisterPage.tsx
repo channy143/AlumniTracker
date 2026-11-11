@@ -364,7 +364,7 @@ export default function RegisterPage() {
     }
   }, [identity, formData, otp, setToken, setUser, navigate]);
 
-  const years = generateYears(2014, new Date().getFullYear());
+  const years = generateYears(2014, Math.max(2027, new Date().getFullYear()));
 
   const steps: { key: Step; label: string; number: number }[] = REQUIRE_ALUMNI_VERIFICATION
     ? [

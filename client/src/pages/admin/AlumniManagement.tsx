@@ -38,7 +38,7 @@ export default function AlumniManagement() {
   const [eligPage, setEligPage] = useState(1);
   const [deletingAlumni, setDeletingAlumni] = useState<string | null>(null);
   const addNotification = useUIStore((s) => s.addNotification);
-  const batchYears = generateYears(2014, new Date().getFullYear());
+  const batchYears = generateYears(2014, Math.max(2027, new Date().getFullYear()));
 
   const normalizeStatus = (s: string) => {
     if (!s) return 'Unemployed';
