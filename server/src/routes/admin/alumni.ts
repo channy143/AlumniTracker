@@ -392,17 +392,70 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { email, profile, education: eduData, career } = req.body;
+    const { email, password, profile, education: eduData, career } = req.body;
+
+    // Optional email update
     if (email) {
-      const { error: emailError } = await supabase.from('users').update({ email }).eq('id', req.params.id);
+      const { error: emailError } = await supabase.from('users').update({ email: email.trim().toLowerCase() }).eq('id', req.params.id);
       if (emailError) throw new AppError(emailError.message, 500);
     }
-    if (profile) {
-      const { error: profileError } = await supabase.from('profiles').update(profile).eq('user_id', req.params.id);
-      if (profileError) throw new AppError(profileError.message, 500);
+
+    // Optional password change
+    if (password) {
+      if (typeof password !== 'string' || password.length < 6) {
+        throw new AppError('Password must be at least 6 characters', 400);
+      }
+      const hashedPassword = await bcrypt.hash(password, 12);
+      const { error: passErr } = await supabase.from('users').update({ password_hash: hashedPassword }).eq('id', req.params.id);
+      if (passErr) throw new AppError(passErr.message, 500);
+
+      logAudit(req, {
+        action: 'ALUMNI_PASSWORD_RESET',
+        entity: 'alumni',
+        entityId: req.params.id,
+        severity: 'warning',
+        status: 'success',
+        details: { targetAlumniId: req.params.id, source: 'admin_edit_form' },
+      });
     }
+
+    // Personal & Profile fields update
+    if (profile && Object.keys(profile).length > 0) {
+      const { data: existingProf } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', req.params.id)
+        .maybeSingle();
+
+      const profilePayload = {
+        ...profile,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (existingProf) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update(profilePayload)
+          .eq('user_id', req.params.id);
+        if (profileError) throw new AppError(profileError.message, 500);
+      } else {
+        const { error: insertProfError } = await supabase
+          .from('profiles')
+          .insert({ user_id: req.params.id, ...profilePayload });
+        if (insertProfError) throw new AppError(insertProfError.message, 500);
+      }
+
+      // Also link eligible registry if id_number changed
+      if (profile.id_number) {
+        try {
+          await supabase.from('alumni_eligible').update({ user_id: req.params.id }).eq('student_id', profile.id_number);
+        } catch {}
+      }
+    }
+
+    // Career fields update
     if (career) {
       const careerFields: Record<string, any> = {};
       const allowed = ['employment_status', 'current_job_title', 'company_name', 'industry', 'salary_range'];
@@ -415,14 +468,35 @@ router.put('/:id', async (req, res, next) => {
         if (careerError) throw new AppError(careerError.message, 500);
       }
     }
+
+    // Education update
     if (eduData) {
-      const { data: existing } = await supabase.from('education').select('id').eq('profile_id', req.params.id).maybeSingle();
-      if (existing) {
-        await supabase.from('education').update(eduData).eq('id', existing.id);
+      const { data: prof } = await supabase.from('profiles').select('id').eq('user_id', req.params.id).maybeSingle();
+      const profileId = prof?.id || req.params.id;
+
+      const { data: existingEdu } = await supabase
+        .from('education')
+        .select('id')
+        .or(`profile_id.eq.${profileId},profile_id.eq.${req.params.id}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingEdu) {
+        await supabase.from('education').update(eduData).eq('id', existingEdu.id);
       } else {
-        await supabase.from('education').insert({ profile_id: req.params.id, ...eduData });
+        await supabase.from('education').insert({ profile_id: profileId, campus: 'Naga Extension Campus', ...eduData });
       }
     }
+
+    logAudit(req, {
+      action: 'ALUMNI_UPDATED',
+      entity: 'alumni',
+      entityId: req.params.id,
+      severity: 'info',
+      status: 'success',
+      details: { targetAlumniId: req.params.id, fields: Object.keys(req.body) },
+    });
+
     res.json({ message: 'Alumni updated successfully' });
   } catch (err) {
     next(err);
@@ -491,13 +565,25 @@ router.put('/:id/verify', async (req, res, next) => {
   }
 });
 
-router.post('/:id/reset-password', async (req, res, next) => {
+router.post('/:id/reset-password', async (req: AuthenticatedRequest, res, next) => {
   try {
     const { newPassword } = req.body;
-    if (!newPassword) throw new AppError('New password is required', 400);
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+      throw new AppError('New password is required and must be at least 6 characters', 400);
+    }
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     const { error } = await supabase.from('users').update({ password_hash: hashedPassword }).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: 'ALUMNI_PASSWORD_RESET',
+      entity: 'alumni',
+      entityId: req.params.id,
+      severity: 'warning',
+      status: 'success',
+      details: { targetAlumniId: req.params.id },
+    });
+
     res.json({ message: 'Password reset successfully' });
   } catch (err) {
     next(err);

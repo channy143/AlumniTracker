@@ -8,6 +8,10 @@ import {
   UserPlusIcon,
   CheckBadgeIcon,
   XMarkIcon,
+  KeyIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 
 export default function AlumniManagement() {
@@ -37,6 +41,13 @@ export default function AlumniManagement() {
   const [deletingEligible, setDeletingEligible] = useState<string | null>(null);
   const [eligPage, setEligPage] = useState(1);
   const [deletingAlumni, setDeletingAlumni] = useState<string | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordTargetAlumni, setPasswordTargetAlumni] = useState<any>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPasswordText, setShowPasswordText] = useState(false);
+  const [passwordModalError, setPasswordModalError] = useState('');
+  const [resettingPassword, setResettingPassword] = useState(false);
   const addNotification = useUIStore((s) => s.addNotification);
   const batchYears = generateYears(2014, Math.max(2027, new Date().getFullYear()));
 
@@ -108,40 +119,115 @@ export default function AlumniManagement() {
   const handleEditDetail = () => {
     const p = detailData?.profile || {};
     const edu = (detailData?.education || [])[0] || {};
+    const emp = (detailData?.employment || [])[0] || {};
     setEditForm({
-      id_number: p.id_number || '',
+      firstName: p.first_name || '',
+      lastName: p.last_name || '',
+      middleName: p.middle_name || '',
+      id_number: p.id_number || p.student_id || '',
       phone: p.phone || '',
+      email: detailData.email || '',
+      birth_date: p.birth_date ? p.birth_date.split('T')[0] : '',
+      gender: p.gender || 'Prefer not to say',
+      civil_status: p.civil_status || 'Single',
+      address: p.address || '',
       city: p.city || '',
       province: p.province || '',
       program: edu.program || '',
       year_graduated: edu.year_graduated || '',
-      email: detailData.email || '',
+      employment_status: p.employment_status || emp.employment_status || 'Unemployed',
+      company_name: p.company_name || emp.company_name || '',
+      current_job_title: p.current_job_title || emp.position || '',
+      newPassword: '',
     });
     setEditingDetail(true);
   };
 
   const handleSaveDetail = async () => {
+    if (!editForm.firstName?.trim() || !editForm.lastName?.trim()) {
+      addNotification('First name and Last name are required', 'error');
+      return;
+    }
+    if (editForm.newPassword?.trim() && editForm.newPassword.trim().length < 6) {
+      addNotification('New password must be at least 6 characters', 'error');
+      return;
+    }
+
     setSavingDetail(true);
     try {
       const edu = (detailData.education || [])[0] || {};
-      const hasEduChanges = editForm.program !== (edu.program || '') || editForm.year_graduated !== (edu.year_graduated || '');
+      const hasEduChanges =
+        editForm.program !== (edu.program || '') ||
+        String(editForm.year_graduated) !== String(edu.year_graduated || '');
+
       await adminApi.alumniUpdate(detailData.id, {
-        email: editForm.email !== detailData.email ? editForm.email : undefined,
+        email: editForm.email !== detailData.email ? editForm.email.trim() : undefined,
+        password: editForm.newPassword?.trim() ? editForm.newPassword.trim() : undefined,
         profile: {
-          id_number: editForm.id_number || null,
-          phone: editForm.phone || null,
-          city: editForm.city || null,
-          province: editForm.province || null,
+          first_name: editForm.firstName.trim(),
+          last_name: editForm.lastName.trim(),
+          middle_name: editForm.middleName?.trim() || null,
+          id_number: editForm.id_number?.trim() || null,
+          phone: editForm.phone?.trim() || null,
+          birth_date: editForm.birth_date || null,
+          gender: editForm.gender || null,
+          civil_status: editForm.civil_status || null,
+          address: editForm.address?.trim() || null,
+          city: editForm.city?.trim() || null,
+          province: editForm.province?.trim() || null,
+          employment_status: editForm.employment_status || null,
+          company_name: editForm.company_name?.trim() || null,
+          current_job_title: editForm.current_job_title?.trim() || null,
         },
-        education: hasEduChanges ? { program: editForm.program, year_graduated: editForm.year_graduated ? parseInt(editForm.year_graduated) : null } : undefined,
+        career: {
+          employment_status: editForm.employment_status || null,
+          company_name: editForm.company_name?.trim() || null,
+          current_job_title: editForm.current_job_title?.trim() || null,
+        },
+        education: hasEduChanges
+          ? {
+              program: editForm.program,
+              year_graduated: editForm.year_graduated ? parseInt(String(editForm.year_graduated)) : null,
+            }
+          : undefined,
       });
-      addNotification('Alumni updated', 'success');
+      addNotification('Alumni updated successfully', 'success');
       setEditingDetail(false);
       const fresh = await adminApi.alumniGet(detailData.id);
       setDetailData(fresh);
       load();
-    } catch (err: any) { addNotification(err.message || 'Failed to update', 'error'); }
-    finally { setSavingDetail(false); }
+    } catch (err: any) {
+      addNotification(err.response?.data?.message || err.message || 'Failed to update', 'error');
+    } finally {
+      setSavingDetail(false);
+    }
+  };
+
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordModalError('');
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordModalError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordModalError('Passwords do not match.');
+      return;
+    }
+    if (!passwordTargetAlumni?.id) return;
+
+    setResettingPassword(true);
+    try {
+      await adminApi.alumniResetPassword(passwordTargetAlumni.id, newPassword);
+      addNotification(`Password changed successfully for ${passwordTargetAlumni.profile?.first_name || passwordTargetAlumni.email}`, 'success');
+      setShowPasswordModal(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      setPasswordModalError(err.response?.data?.message || err.message || 'Failed to update password');
+    } finally {
+      setResettingPassword(false);
+    }
   };
 
   const handleArchive = async (id: string) => {
@@ -439,6 +525,20 @@ export default function AlumniManagement() {
                   </div>
                   <div data-tour="alumni-card-actions" className="px-2.5 pb-2.5 flex flex-wrap gap-1">
                     <button onClick={() => handleView(user.id)} className="text-[10px] px-2 py-1 font-medium bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100">View</button>
+                    <button
+                      onClick={() => {
+                        setPasswordTargetAlumni(user);
+                        setNewPassword('');
+                        setConfirmPassword('');
+                        setPasswordModalError('');
+                        setShowPasswordModal(true);
+                      }}
+                      className="text-[10px] px-2 py-1 font-medium bg-amber-50 text-amber-700 rounded-md hover:bg-amber-100 flex items-center gap-0.5 cursor-pointer"
+                      title="Change / Reset Password"
+                    >
+                      <KeyIcon className="w-3 h-3" />
+                      <span>Password</span>
+                    </button>
                     {!user.is_verified && (
                       <button onClick={() => handleVerify(user.id)} className="text-[10px] px-2 py-1 font-medium bg-emerald-50 text-emerald-600 rounded-md hover:bg-emerald-100">Verify</button>
                     )}
@@ -552,276 +652,685 @@ export default function AlumniManagement() {
                     {detailData.profile?.first_name} {detailData.profile?.last_name}
                   </h2>
                   <p className="text-[11px] sm:text-xs text-orange-100 mt-0.5 truncate">
-                    {detailData.profile?.student_id ? `ID: ${detailData.profile.student_id} · ` : ''}Alumni Profile & Records
+                    {detailData.profile?.id_number || detailData.profile?.student_id ? `ID: ${detailData.profile.id_number || detailData.profile.student_id} · ` : ''}Alumni Profile & Records
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {!editingDetail ? (
-                  <button onClick={handleEditDetail} className="px-3.5 py-1.5 text-xs font-semibold bg-white text-orange-700 hover:bg-orange-50 rounded-xl shadow-xs transition-colors cursor-pointer">Edit Profile</button>
+                  <>
+                    <button
+                      onClick={() => {
+                        setPasswordTargetAlumni(detailData);
+                        setNewPassword('');
+                        setConfirmPassword('');
+                        setPasswordModalError('');
+                        setShowPasswordModal(true);
+                      }}
+                      className="px-3 py-1.5 text-xs font-semibold bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <KeyIcon className="w-3.5 h-3.5" />
+                      <span>Change Password</span>
+                    </button>
+                    <button
+                      onClick={handleEditDetail}
+                      className="px-3.5 py-1.5 text-xs font-semibold bg-white text-orange-700 hover:bg-orange-50 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <PencilSquareIcon className="w-3.5 h-3.5" />
+                      <span>Edit Profile</span>
+                    </button>
+                  </>
                 ) : (
                   <>
-                    <button onClick={handleSaveDetail} disabled={savingDetail} className="px-3.5 py-1.5 text-xs font-semibold bg-white text-orange-700 hover:bg-orange-50 disabled:opacity-50 rounded-xl shadow-xs transition-colors cursor-pointer">{savingDetail ? 'Saving...' : 'Save Changes'}</button>
-                    <button onClick={() => setEditingDetail(false)} className="px-3.5 py-1.5 text-xs font-semibold border border-white/30 text-white hover:bg-white/20 rounded-xl transition-colors cursor-pointer">Cancel</button>
+                    <button
+                      onClick={handleSaveDetail}
+                      disabled={savingDetail}
+                      className="px-3.5 py-1.5 text-xs font-semibold bg-white text-orange-700 hover:bg-orange-50 disabled:opacity-50 rounded-xl shadow-xs transition-colors cursor-pointer"
+                    >
+                      {savingDetail ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button
+                      onClick={() => setEditingDetail(false)}
+                      className="px-3.5 py-1.5 text-xs font-semibold border border-white/30 text-white hover:bg-white/20 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
                   </>
                 )}
-                <button onClick={() => setShowDetail(false)} className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer ml-1">
+                <button
+                  onClick={() => setShowDetail(false)}
+                  className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer ml-1"
+                >
                   <XMarkIcon className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            <div className="flex flex-col md:flex-row flex-1 overflow-y-auto md:overflow-hidden">
-              {/* Left panel - 70% - scrollable */}
-              <div className="w-full md:w-[70%] p-4 sm:p-6 border-b md:border-b-0 md:border-r border-gray-200 md:overflow-y-auto">
-                {/* Quick summary */}
-                <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
-                  <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-600 shrink-0">
-                    {((detailData.profile?.first_name?.[0] || '') + (detailData.profile?.last_name?.[0] || '')).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-gray-900 truncate">{detailData.profile?.first_name} {detailData.profile?.last_name}</p>
-                    <p className="text-xs text-gray-500 truncate">{detailData.email}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 font-medium ${detailData.is_verified ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{detailData.is_verified ? 'Verified' : 'Unverified'}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 font-medium ${detailData.is_active !== false ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>{detailData.is_active !== false ? 'Active' : 'Inactive'}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 font-medium capitalize">{detailData.role}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Career Summary */}
-                <div className="mb-4">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Career Summary</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                    {[
-                      { label: 'Employment Status', value: detailData.profile?.employment_status, badge: detailData.profile?.employment_status },
-                      { label: 'Industry', value: detailData.profile?.industry },
-                      { label: 'Current Position', value: (detailData.employment || []).find((e: any) => e.is_current)?.position },
-                      { label: 'Company', value: (detailData.employment || []).find((e: any) => e.is_current)?.company_name },
-                      { label: 'Employment Type', value: (detailData.employment || []).find((e: any) => e.is_current)?.job_type },
-                      { label: 'Location', value: [detailData.profile?.city, detailData.profile?.province].filter(Boolean).join(', ') },
-                      { label: 'Time in Current Job', value: (() => {
-                        const cur = (detailData.employment || []).find((e: any) => e.is_current);
-                        return cur?.start_date ? formatExperienceFromDate(cur.start_date) : '';
-                      })() },
-                    ].map((item: any) => (
-                      item.value ? (
-                        <div key={item.label} className="flex justify-between py-1 border-b border-gray-50">
-                          <span className="text-gray-500">{item.label}</span>
-                          {item.badge ? (
-                            <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${statusBadge(item.badge)}`}>{normalizeStatus(item.badge)}</span>
-                          ) : (
-                            <span className="font-medium text-gray-800 text-right max-w-[60%] truncate">{item.value}</span>
-                          )}
-                        </div>
-                      ) : null
-                    ))}
-                  </div>
-                </div>
-
-                {/* Career Timeline */}
-                {detailData.employment?.length > 0 && (
-                  <div className="mb-4">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Career Timeline</h3>
-                    <div className="space-y-2">
-                      {detailData.employment.map((emp: any, i: number) => (
-                        <div key={i} className="text-xs bg-gray-50 px-3 py-2">
-                          <div className="flex items-center gap-1.5">
-                            {emp.start_date && <span className="text-gray-400">{new Date(emp.start_date).getFullYear()}</span>}
-                            <span className="text-gray-300">·</span>
-                            <p className="font-medium text-gray-800">{emp.position || 'N/A'}</p>
-                            {emp.is_current && <span className="text-[10px] px-1 py-0.5 bg-emerald-100 text-emerald-700 font-medium">Current</span>}
-                          </div>
-                          <p className="text-gray-500 mt-0.5">
-                            {emp.company_name && `${emp.company_name}`}{emp.company_industry ? ` · ${emp.company_industry}` : ''}
-                          </p>
-                          {emp.start_date && (
-                            <p className="text-gray-400 mt-0.5">
-                              {new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
-                              {' — '}
-                              {emp.is_current ? 'Present' : emp.end_date ? new Date(emp.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : ''}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Employment History Table */}
-                {detailData.employment?.length > 0 && (
-                  <div className="mb-4 overflow-x-auto">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Employment History &amp; Verification (Q-Pro)</h3>
-                    <table className="w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 text-gray-500 text-left">
-                          <th className="px-2 py-1.5 font-medium">Industry</th>
-                          <th className="px-2 py-1.5 font-medium">Company</th>
-                          <th className="px-2 py-1.5 font-medium">Position</th>
-                          <th className="px-2 py-1.5 font-medium">Type</th>
-                          <th className="px-2 py-1.5 font-medium">Salary</th>
-                          <th className="px-2 py-1.5 font-medium">Started</th>
-                          <th className="px-2 py-1.5 font-medium">Status</th>
-                          <th className="px-2 py-1.5 font-medium">Proof (COE/ID)</th>
-                          <th className="px-2 py-1.5 font-medium text-right">Accreditation</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detailData.employment.map((emp: any, i: number) => {
-                          const isVer = emp.is_verified || emp.verification_status === 'verified';
-                          return (
-                            <tr key={i} className="border-b border-gray-100 hover:bg-gray-50/50">
-                              <td className="px-2 py-1.5 text-gray-700">{emp.company_industry || '---'}</td>
-                              <td className="px-2 py-1.5 text-gray-700">{emp.company_name || '---'}</td>
-                              <td className="px-2 py-1.5 text-gray-700 font-medium">{emp.position || '---'}</td>
-                              <td className="px-2 py-1.5 text-gray-700">{emp.job_type || '---'}</td>
-                              <td className="px-2 py-1.5 text-gray-700">{emp.salary_range ? `₱${emp.salary_range}` : '---'}</td>
-                              <td className="px-2 py-1.5 text-gray-700">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '---'}</td>
-                              <td className="px-2 py-1.5">{emp.is_current ? <span className="text-emerald-600 font-medium">Current</span> : <span className="text-gray-400">Past</span>}</td>
-                              <td className="px-2 py-1.5">
-                                {emp.proof_url ? (
-                                  <a
-                                    href={emp.proof_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-orange-600 hover:underline font-semibold inline-flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded border border-orange-200"
-                                    title={emp.proof_type?.startsWith('other:') ? emp.proof_type : undefined}
-                                  >
-                                    <span>{formatProofLabel(emp.proof_type)}</span>
-                                    <span>↗</span>
-                                  </a>
-                                ) : (
-                                  <span className="text-gray-400 italic">None</span>
-                                )}
-                              </td>
-                              <td className="px-2 py-1.5 text-right">
-                                {isVer ? (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                    ✓ Verified
-                                  </span>
-                                ) : emp.proof_url ? (
-                                  <div className="inline-flex items-center gap-1 justify-end">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleVerifyEmploymentProof(emp.id, 'verified')}
-                                      className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-semibold transition-colors cursor-pointer"
-                                    >
-                                      Verify
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleVerifyEmploymentProof(emp.id, 'rejected')}
-                                      className="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[10px] font-medium border border-red-200 transition-colors cursor-pointer"
-                                    >
-                                      Reject
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] text-gray-400">Unverified</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* Education */}
-                {detailData.education?.length > 0 && (
-                  <div className="mb-4">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Education</h3>
-                    <div className="space-y-2">
-                      {detailData.education.map((edu: any, i: number) => (
-                        <div key={i} className="text-xs bg-gray-50 px-3 py-2">
-                          <p className="font-medium text-gray-800">{edu.program || edu.course || 'N/A'}</p>
-                          <p className="text-gray-500 mt-0.5">
-                            {[edu.institution, edu.campus].filter(Boolean).join(' - ')}
-                          </p>
-                          {edu.year_graduated && <p className="text-gray-400 mt-0.5">Class of {edu.year_graduated}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Skills */}
-                {detailData.skills?.length > 0 && (
-                  <div className="mb-4">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Skills</h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      {detailData.skills.map((s: any, i: number) => (
-                        <span key={i} className="px-2 py-1 bg-orange-50 text-orange-700 text-[10px] font-medium">{s.name}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Bio */}
-                {detailData.profile?.bio && (
-                  <div className="mb-4">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">About</h3>
-                    <p className="text-xs text-gray-600 leading-relaxed">{detailData.profile.bio}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Right panel - 30% */}
-              <div className="w-full md:w-[30%] p-4 sm:p-6 bg-gray-50 md:overflow-y-auto">
-                {/* Avatar */}
-                <div className="flex flex-col items-center mb-4">
-                  <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center text-xl font-bold text-orange-600 mb-2">
-                    {detailData.profile?.avatar_url ? (
-                      <img src={detailData.profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      ((detailData.profile?.first_name?.[0] || '') + (detailData.profile?.last_name?.[0] || '')).toUpperCase()
-                    )}
-                  </div>
-                  <p className="text-sm font-bold text-gray-900 text-center">{detailData.profile?.first_name} {detailData.profile?.last_name}</p>
-                  <p className="text-xs text-gray-500 text-center">{detailData.profile?.id_number || ''}</p>
-                </div>
-
-                {/* Personal Information */}
+            {editingDetail ? (
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-white space-y-5">
+                {/* Section 1: Personal Information */}
                 <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Personal Information</h3>
-                  {editingDetail ? (
-                    <div className="space-y-2 text-xs">
-                      <div><label className="text-gray-500 block mb-0.5">Email</label><input type="email" value={editForm.email} onChange={(e) => setEditForm((f: any) => ({ ...f, email: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" /></div>
-                      <div><label className="text-gray-500 block mb-0.5">ID Number</label><input type="text" value={editForm.id_number} onChange={(e) => setEditForm((f: any) => ({ ...f, id_number: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" placeholder="e.g. CTU-2020-0001" /></div>
-                      <div><label className="text-gray-500 block mb-0.5">Phone</label><input type="text" value={editForm.phone} onChange={(e) => setEditForm((f: any) => ({ ...f, phone: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" /></div>
-                      <div><label className="text-gray-500 block mb-0.5">City</label><input type="text" value={editForm.city} onChange={(e) => setEditForm((f: any) => ({ ...f, city: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" /></div>
-                      <div><label className="text-gray-500 block mb-0.5">Province</label><input type="text" value={editForm.province} onChange={(e) => setEditForm((f: any) => ({ ...f, province: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" /></div>
-                      <div><label className="text-gray-500 block mb-0.5">Course</label>
-                        <select value={editForm.program} onChange={(e) => setEditForm((f: any) => ({ ...f, program: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs">
-                          <option value="">Select</option>
-                          {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED'].map((o) => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </div>
-                      <div><label className="text-gray-500 block mb-0.5">Year Graduated</label><input type="number" value={editForm.year_graduated} onChange={(e) => setEditForm((f: any) => ({ ...f, year_graduated: e.target.value }))} className="w-full border border-gray-200 px-2 py-1 outline-none focus:border-orange-400 text-xs" min={2014} /></div>
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+                    <UserIcon className="w-4 h-4 text-orange-500" />
+                    <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                      Personal Information
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        First Name <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.firstName || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, firstName: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                        required
+                      />
                     </div>
-                  ) : (
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Last Name <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.lastName || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, lastName: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Middle Name <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.middleName || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, middleName: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Student / Alumni ID <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.id_number || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, id_number: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                        placeholder="e.g. CTU-2021-0001"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Email Address <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={editForm.email || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, email: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Phone / Mobile No. <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={editForm.phone || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, phone: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                        placeholder="0917 123 4567"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Birth Date <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={editForm.birth_date || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, birth_date: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Gender <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
+                      <select
+                        value={editForm.gender || 'Prefer not to say'}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, gender: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs bg-white"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Prefer not to say">Prefer not to say</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Civil Status <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
+                      <select
+                        value={editForm.civil_status || 'Single'}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, civil_status: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs bg-white"
+                      >
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Widowed">Widowed</option>
+                        <option value="Separated">Separated</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Street / Barangay Address <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.address || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, address: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                        placeholder="House No., Street, Barangay"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        City / Municipality <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.city || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, city: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                        placeholder="e.g. City of Naga"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Province <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.province || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, province: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                        placeholder="e.g. Cebu"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Educational Background */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+                    <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                      Educational Background
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Course / Program <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      <select
+                        value={editForm.program || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, program: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs bg-white"
+                      >
+                        <option value="">Select Degree Program</option>
+                        {['BSIT', 'BIT', 'BEEd', 'BSEd-Math', 'BTLED'].map((o) => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Graduation Year <span className="text-red-500 font-bold">*</span>
+                      </label>
+                      <select
+                        value={editForm.year_graduated || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, year_graduated: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs bg-white"
+                      >
+                        <option value="">Select Batch Year</option>
+                        {batchYears.map((y) => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Career & Employment */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+                    <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                      Employment & Career
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Employment Status
+                      </label>
+                      <select
+                        value={editForm.employment_status || 'Unemployed'}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, employment_status: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs bg-white"
+                      >
+                        <option value="Unemployed">Unemployed</option>
+                        <option value="Employed">Employed</option>
+                        <option value="Self-employed">Self-employed</option>
+                        <option value="Seeking Opportunities">Seeking Opportunities</option>
+                        <option value="Retired">Retired</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Current Position / Job Title
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.current_job_title || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, current_job_title: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                        placeholder="e.g. Software Engineer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-700 font-medium block mb-1">
+                        Company / Employer
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.company_name || ''}
+                        onChange={(e) => setEditForm((f: any) => ({ ...f, company_name: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs"
+                        placeholder="e.g. Acme Corp"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 4: Password & Security */}
+                <div className="bg-orange-50/50 border border-orange-200 rounded-xl p-3.5">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <KeyIcon className="w-4 h-4 text-orange-600" />
+                    <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                      Account Password
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mb-2">
+                    Leave blank to keep the user's current password. If entered, password will be updated immediately upon saving.
+                  </p>
+                  <div className="max-w-xs">
+                    <label className="text-gray-700 font-medium block mb-1 text-xs">
+                      New Password (min. 6 characters)
+                    </label>
+                    <input
+                      type="password"
+                      value={editForm.newPassword || ''}
+                      onChange={(e) => setEditForm((f: any) => ({ ...f, newPassword: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs bg-white"
+                      placeholder="Leave blank to keep current"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col md:flex-row flex-1 overflow-y-auto md:overflow-hidden">
+                {/* Left panel - 70% - scrollable */}
+                <div className="w-full md:w-[70%] p-4 sm:p-6 border-b md:border-b-0 md:border-r border-gray-200 md:overflow-y-auto">
+                  {/* Quick summary */}
+                  <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
+                    <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-600 shrink-0">
+                      {((detailData.profile?.first_name?.[0] || '') + (detailData.profile?.last_name?.[0] || '')).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-900 truncate">{detailData.profile?.first_name} {detailData.profile?.last_name}</p>
+                      <p className="text-xs text-gray-500 truncate">{detailData.email}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <span className={`text-[10px] px-1.5 py-0.5 font-medium ${detailData.is_verified ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{detailData.is_verified ? 'Verified' : 'Unverified'}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 font-medium ${detailData.is_active !== false ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>{detailData.is_active !== false ? 'Active' : 'Inactive'}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 font-medium capitalize">{detailData.role}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Career Summary */}
+                  <div className="mb-4">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Career Summary</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                      {[
+                        { label: 'Employment Status', value: detailData.profile?.employment_status, badge: detailData.profile?.employment_status },
+                        { label: 'Industry', value: detailData.profile?.industry },
+                        { label: 'Current Position', value: (detailData.employment || []).find((e: any) => e.is_current)?.position || detailData.profile?.current_job_title },
+                        { label: 'Company', value: (detailData.employment || []).find((e: any) => e.is_current)?.company_name || detailData.profile?.company_name },
+                        { label: 'Employment Type', value: (detailData.employment || []).find((e: any) => e.is_current)?.job_type },
+                        { label: 'Location', value: [detailData.profile?.city, detailData.profile?.province].filter(Boolean).join(', ') },
+                        { label: 'Time in Current Job', value: (() => {
+                          const cur = (detailData.employment || []).find((e: any) => e.is_current);
+                          return cur?.start_date ? formatExperienceFromDate(cur.start_date) : '';
+                        })() },
+                      ].map((item: any) => (
+                        item.value ? (
+                          <div key={item.label} className="flex justify-between py-1 border-b border-gray-50">
+                            <span className="text-gray-500">{item.label}</span>
+                            {item.badge ? (
+                              <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${statusBadge(item.badge)}`}>{normalizeStatus(item.badge)}</span>
+                            ) : (
+                              <span className="font-medium text-gray-800 text-right max-w-[60%] truncate">{item.value}</span>
+                            )}
+                          </div>
+                        ) : null
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Career Timeline */}
+                  {detailData.employment?.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Career Timeline</h3>
+                      <div className="space-y-2">
+                        {detailData.employment.map((emp: any, i: number) => (
+                          <div key={i} className="text-xs bg-gray-50 px-3 py-2">
+                            <div className="flex items-center gap-1.5">
+                              {emp.start_date && <span className="text-gray-400">{new Date(emp.start_date).getFullYear()}</span>}
+                              <span className="text-gray-300">·</span>
+                              <p className="font-medium text-gray-800">{emp.position || 'N/A'}</p>
+                              {emp.is_current && <span className="text-[10px] px-1 py-0.5 bg-emerald-100 text-emerald-700 font-medium">Current</span>}
+                            </div>
+                            <p className="text-gray-500 mt-0.5">
+                              {emp.company_name && `${emp.company_name}`}{emp.company_industry ? ` · ${emp.company_industry}` : ''}
+                            </p>
+                            {emp.start_date && (
+                              <p className="text-gray-400 mt-0.5">
+                                {new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+                                {' — '}
+                                {emp.is_current ? 'Present' : emp.end_date ? new Date(emp.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : ''}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Employment History Table */}
+                  {detailData.employment?.length > 0 && (
+                    <div className="mb-4 overflow-x-auto">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Employment History &amp; Verification (Q-Pro)</h3>
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 text-gray-500 text-left">
+                            <th className="px-2 py-1.5 font-medium">Industry</th>
+                            <th className="px-2 py-1.5 font-medium">Company</th>
+                            <th className="px-2 py-1.5 font-medium">Position</th>
+                            <th className="px-2 py-1.5 font-medium">Type</th>
+                            <th className="px-2 py-1.5 font-medium">Salary</th>
+                            <th className="px-2 py-1.5 font-medium">Started</th>
+                            <th className="px-2 py-1.5 font-medium">Status</th>
+                            <th className="px-2 py-1.5 font-medium">Proof (COE/ID)</th>
+                            <th className="px-2 py-1.5 font-medium text-right">Accreditation</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detailData.employment.map((emp: any, i: number) => {
+                            const isVer = emp.is_verified || emp.verification_status === 'verified';
+                            return (
+                              <tr key={i} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                <td className="px-2 py-1.5 text-gray-700">{emp.company_industry || '---'}</td>
+                                <td className="px-2 py-1.5 text-gray-700">{emp.company_name || '---'}</td>
+                                <td className="px-2 py-1.5 text-gray-700 font-medium">{emp.position || '---'}</td>
+                                <td className="px-2 py-1.5 text-gray-700">{emp.job_type || '---'}</td>
+                                <td className="px-2 py-1.5 text-gray-700">{emp.salary_range ? `₱${emp.salary_range}` : '---'}</td>
+                                <td className="px-2 py-1.5 text-gray-700">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '---'}</td>
+                                <td className="px-2 py-1.5">{emp.is_current ? <span className="text-emerald-600 font-medium">Current</span> : <span className="text-gray-400">Past</span>}</td>
+                                <td className="px-2 py-1.5">
+                                  {emp.proof_url ? (
+                                    <a
+                                      href={emp.proof_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-orange-600 hover:underline font-semibold inline-flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded border border-orange-200"
+                                      title={emp.proof_type?.startsWith('other:') ? emp.proof_type : undefined}
+                                    >
+                                      <span>{formatProofLabel(emp.proof_type)}</span>
+                                      <span>↗</span>
+                                    </a>
+                                  ) : (
+                                    <span className="text-gray-400 italic">None</span>
+                                  )}
+                                </td>
+                                <td className="px-2 py-1.5 text-right">
+                                  {isVer ? (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                      ✓ Verified
+                                    </span>
+                                  ) : emp.proof_url ? (
+                                    <div className="inline-flex items-center gap-1 justify-end">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleVerifyEmploymentProof(emp.id, 'verified')}
+                                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-semibold transition-colors cursor-pointer"
+                                      >
+                                        Verify
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleVerifyEmploymentProof(emp.id, 'rejected')}
+                                        className="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[10px] font-medium border border-red-200 transition-colors cursor-pointer"
+                                      >
+                                        Reject
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-gray-400">Unverified</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Education */}
+                  {detailData.education?.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Education</h3>
+                      <div className="space-y-2">
+                        {detailData.education.map((edu: any, i: number) => (
+                          <div key={i} className="text-xs bg-gray-50 px-3 py-2">
+                            <p className="font-medium text-gray-800">{edu.program || edu.course || 'N/A'}</p>
+                            <p className="text-gray-500 mt-0.5">
+                              {[edu.institution, edu.campus].filter(Boolean).join(' - ')}
+                            </p>
+                            {edu.year_graduated && <p className="text-gray-400 mt-0.5">Class of {edu.year_graduated}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Skills */}
+                  {detailData.skills?.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Skills</h3>
+                      <div className="flex flex-wrap gap-1.5">
+                        {detailData.skills.map((s: any, i: number) => (
+                          <span key={i} className="px-2 py-1 bg-orange-50 text-orange-700 text-[10px] font-medium">{s.name}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bio */}
+                  {detailData.profile?.bio && (
+                    <div className="mb-4">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">About</h3>
+                      <p className="text-xs text-gray-600 leading-relaxed">{detailData.profile.bio}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right panel - 30% */}
+                <div className="w-full md:w-[30%] p-4 sm:p-6 bg-gray-50 md:overflow-y-auto">
+                  {/* Avatar */}
+                  <div className="flex flex-col items-center mb-4">
+                    <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center text-xl font-bold text-orange-600 mb-2">
+                      {detailData.profile?.avatar_url ? (
+                        <img src={detailData.profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        ((detailData.profile?.first_name?.[0] || '') + (detailData.profile?.last_name?.[0] || '')).toUpperCase()
+                      )}
+                    </div>
+                    <p className="text-sm font-bold text-gray-900 text-center">{detailData.profile?.first_name} {detailData.profile?.last_name}</p>
+                    <p className="text-xs text-gray-500 text-center">{detailData.profile?.id_number || ''}</p>
+                  </div>
+
+                  {/* Personal Information */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Personal Information</h3>
                     <div className="space-y-2 text-xs">
                       {[
+                        { label: 'First Name', value: detailData.profile?.first_name },
+                        { label: 'Middle Name', value: detailData.profile?.middle_name },
+                        { label: 'Last Name', value: detailData.profile?.last_name },
                         { label: 'Email', value: detailData.email },
-                        { label: 'ID Number', value: detailData.profile?.id_number },
+                        { label: 'ID Number', value: detailData.profile?.id_number || detailData.profile?.student_id },
                         { label: 'Phone', value: detailData.profile?.phone },
+                        { label: 'Birth Date', value: detailData.profile?.birth_date ? new Date(detailData.profile.birth_date).toLocaleDateString() : '' },
+                        { label: 'Gender', value: detailData.profile?.gender },
+                        { label: 'Civil Status', value: detailData.profile?.civil_status },
+                        { label: 'Address', value: detailData.profile?.address },
                         { label: 'City', value: detailData.profile?.city },
                         { label: 'Province', value: detailData.profile?.province },
-                      { label: 'Employment Status', value: detailData.profile?.employment_status, badge: detailData.profile?.employment_status },
+                        { label: 'Employment Status', value: detailData.profile?.employment_status, badge: detailData.profile?.employment_status },
                         { label: 'Joined', value: detailData.created_at ? new Date(detailData.created_at).toLocaleDateString() : '---' },
                       ].map((item) => (
                         <div key={item.label} className="flex justify-between py-1 border-b border-gray-200 last:border-0">
                           <span className="text-gray-500">{item.label}</span>
-                          <span className="font-medium text-gray-800 text-right max-w-[55%] truncate">{item.value || '---'}</span>
+                          {item.badge ? (
+                            <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${statusBadge(item.badge)}`}>{normalizeStatus(item.badge)}</span>
+                          ) : (
+                            <span className="font-medium text-gray-800 text-right max-w-[55%] truncate">{item.value || '---'}</span>
+                          )}
                         </div>
                       ))}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showPasswordModal && passwordTargetAlumni && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10000] flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setShowPasswordModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 via-orange-600 to-amber-600 text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-xs text-white shrink-0">
+                  <KeyIcon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Reset User Password</h3>
+                  <p className="text-xs text-orange-100 mt-0.5 truncate max-w-xs">
+                    {passwordTargetAlumni.profile?.first_name} {passwordTargetAlumni.profile?.last_name} ({passwordTargetAlumni.email})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPasswordModal(false)}
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
             </div>
+
+            <form onSubmit={handleResetPasswordSubmit} className="p-6 space-y-4 text-xs">
+              {passwordModalError && (
+                <div className="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-xs">
+                  {passwordModalError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  New Password <span className="text-red-500 font-bold">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswordText ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 pr-9 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                    placeholder="Minimum 6 characters"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordText(!showPasswordText)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    {showPasswordText ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Confirm New Password <span className="text-red-500 font-bold">*</span>
+                </label>
+                <input
+                  type={showPasswordText ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                  placeholder="Repeat new password"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="px-4 py-2 text-xs font-semibold bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resettingPassword}
+                  className="px-4 py-2 text-xs font-semibold bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  {resettingPassword ? 'Saving...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

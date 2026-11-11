@@ -176,6 +176,23 @@ export default function AlumniOnboardingSurveyPage() {
     }));
   };
 
+  const isEvasiveInput = (val: string): boolean => {
+    if (!val) return false;
+    const s = val.trim().toLowerCase();
+    if (!s) return false;
+    const cleaned = s.replace(/[^a-z0-9]/g, '');
+    const blacklist = [
+      'secret', 'sekret', 'none', 'wala', 'wla', 'ambot', 'idk', 'pass', 'nothing',
+      'blank', 'test', 'testing', 'asdf', 'qwerty', 'zxcv', '1234', '12345',
+      'no', 'nope', 'skip', 'hidden', 'private', 'unknown', 'null', 'undefined',
+      'na', 'n/a', 'naa', 'wakabalo', 'dontknow', 'fake'
+    ];
+    if (blacklist.includes(cleaned)) return true;
+    if (/^(secret|sekret|wala|ambot|none|n\/a|na|i don't know|dont know|asdf|test)\b/i.test(s)) return true;
+    if (/^(.)\1{3,}$/.test(cleaned)) return true;
+    return false;
+  };
+
   const validateCurrentStep = (currentStep: number): boolean => {
     setValidationError('');
     if (currentStep === 1) {
@@ -194,12 +211,37 @@ export default function AlumniOnboardingSurveyPage() {
         return false;
       }
     } else if (currentStep === 2) {
+      if (!personalInfo.studentId.trim()) {
+        setValidationError('Please enter your Student or Alumni ID number.');
+        return false;
+      }
+      if (isEvasiveInput(personalInfo.studentId)) {
+        setValidationError('Please enter your actual Student or Alumni ID (evasive answers like "secret" are not accepted).');
+        return false;
+      }
       if (!personalInfo.phone.trim()) {
         setValidationError('Please enter your contact / mobile number.');
         return false;
       }
+      if (isEvasiveInput(personalInfo.phone)) {
+        setValidationError('Please provide a valid Philippine mobile number (e.g. 0917 123 4567).');
+        return false;
+      }
+      const digits = personalInfo.phone.replace(/[^0-9+]/g, '');
+      if (!/^(09\d{9}|\+639\d{9}|639\d{9}|9\d{9})$/.test(digits)) {
+        setValidationError('Please provide a valid 11-digit Philippine mobile number (e.g. 0917 123 4567 or +63 917 123 4567).');
+        return false;
+      }
       if (!personalInfo.city.trim()) {
         setValidationError('Please specify your City / Municipality.');
+        return false;
+      }
+      if (isEvasiveInput(personalInfo.city)) {
+        setValidationError('Please provide your actual City / Municipality (evasive answers like "secret" are not accepted).');
+        return false;
+      }
+      if (personalInfo.address.trim() && isEvasiveInput(personalInfo.address)) {
+        setValidationError('Please enter a valid Street / Barangay address or leave it blank.');
         return false;
       }
     } else if (currentStep === 3) {
@@ -207,8 +249,66 @@ export default function AlumniOnboardingSurveyPage() {
         setValidationError('Please specify your Degree / Program.');
         return false;
       }
+      if (isEvasiveInput(academicInfo.program)) {
+        setValidationError('Please enter your actual Degree or Program (evasive answers like "secret" are not accepted).');
+        return false;
+      }
       if (!academicInfo.yearGraduated.trim()) {
         setValidationError('Please provide your graduation year.');
+        return false;
+      }
+      const yr = parseInt(academicInfo.yearGraduated.trim(), 10);
+      if (isNaN(yr) || yr < 1980 || yr > 2030) {
+        setValidationError('Please enter a valid 4-digit graduation year between 1980 and 2030.');
+        return false;
+      }
+      if (academicInfo.licensureStatus === 'Passed') {
+        if (!academicInfo.licensureExamName.trim()) {
+          setValidationError('Please specify your Board / Licensure Exam or Title.');
+          return false;
+        }
+        if (isEvasiveInput(academicInfo.licensureExamName)) {
+          setValidationError('Please provide your actual Exam / License Title (evasive answers like "secret" are not accepted).');
+          return false;
+        }
+      } else if (academicInfo.licensureExamName.trim() && isEvasiveInput(academicInfo.licensureExamName)) {
+        setValidationError('Please enter a valid Exam / License Title or leave it blank.');
+        return false;
+      }
+    } else if (currentStep === 4) {
+      if (!employmentInfo.employmentStatus) {
+        setValidationError('Please select your current Employment Status.');
+        return false;
+      }
+      if (employmentInfo.employmentStatus === 'Employed' || employmentInfo.employmentStatus === 'Self-employed') {
+        if (!employmentInfo.currentJobTitle.trim()) {
+          setValidationError('Please enter your Current Job Title / Position.');
+          return false;
+        }
+        if (isEvasiveInput(employmentInfo.currentJobTitle)) {
+          setValidationError('Please enter your actual Job Title (evasive answers like "secret" are not accepted).');
+          return false;
+        }
+        if (!employmentInfo.companyName.trim()) {
+          setValidationError('Please enter your Company / Organization Name.');
+          return false;
+        }
+        if (isEvasiveInput(employmentInfo.companyName)) {
+          setValidationError('Please enter your actual Company Name (evasive answers like "secret" are not accepted).');
+          return false;
+        }
+        if (!employmentInfo.industry) {
+          setValidationError('Please select your Industry / Field.');
+          return false;
+        }
+      }
+    } else if (currentStep === 5) {
+      if (!feedbackInfo.curriculumRelevance) {
+        setValidationError('Please select your rating for Curriculum Relevance.');
+        return false;
+      }
+      if (feedbackInfo.suggestions.trim() && isEvasiveInput(feedbackInfo.suggestions)) {
+        setValidationError('Please provide constructive suggestions or leave the field blank.');
         return false;
       }
     }
@@ -456,7 +556,7 @@ export default function AlumniOnboardingSurveyPage() {
                       {consent.agreed && <CheckIcon className="w-3 h-3 text-white stroke-[3]" />}
                     </div>
                     <span className="text-xs font-semibold text-gray-900">
-                      I have read, understood, and accept the User Consent and Data Privacy terms under RA 10173.
+                      I have read, understood, and accept the User Consent and Data Privacy terms under RA 10173. <span className="text-red-500 font-bold ml-0.5">*</span>
                     </span>
                   </label>
                 </motion.div>
@@ -474,28 +574,34 @@ export default function AlumniOnboardingSurveyPage() {
                 >
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">First Name</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        First Name <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
                       <input
                         type="text"
                         disabled
                         value={personalInfo.firstName}
-                        className="w-full text-xs border border-gray-200 bg-gray-50 text-gray-500 rounded-lg px-3 py-2 cursor-not-allowed"
+                        className="w-full text-xs border border-gray-200 bg-gray-50 text-gray-600 font-medium rounded-lg px-3 py-2 cursor-not-allowed"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Last Name</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Last Name <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
                       <input
                         type="text"
                         disabled
                         value={personalInfo.lastName}
-                        className="w-full text-xs border border-gray-200 bg-gray-50 text-gray-500 rounded-lg px-3 py-2 cursor-not-allowed"
+                        className="w-full text-xs border border-gray-200 bg-gray-50 text-gray-600 font-medium rounded-lg px-3 py-2 cursor-not-allowed"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Middle Name</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Middle Name <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
                       <input
                         type="text"
-                        placeholder="Optional"
+                        placeholder="Middle name or initial"
                         value={personalInfo.middleName}
                         onChange={(e) => setPersonalInfo((p) => ({ ...p, middleName: e.target.value }))}
                         className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
@@ -503,26 +609,31 @@ export default function AlumniOnboardingSurveyPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Student / Alumni ID</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Student / Alumni ID <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
                       <input
                         type="text"
-                        disabled
+                        placeholder="e.g. CTU-2021-0001 or 1234567"
                         value={personalInfo.studentId}
-                        className="w-full text-xs border border-gray-200 bg-gray-50 text-gray-500 rounded-lg px-3 py-2 cursor-not-allowed"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        disabled
-                        value={personalInfo.email}
-                        className="w-full text-xs border border-gray-200 bg-gray-50 text-gray-500 rounded-lg px-3 py-2 cursor-not-allowed"
+                        onChange={(e) => setPersonalInfo((p) => ({ ...p, studentId: e.target.value }))}
+                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Contact / Mobile No. <span className="text-red-500">*</span>
+                        Email Address <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        disabled
+                        value={personalInfo.email}
+                        className="w-full text-xs border border-gray-200 bg-gray-50 text-gray-600 font-medium rounded-lg px-3 py-2 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Contact / Mobile No. <span className="text-red-500 font-bold ml-0.5">*</span>
                       </label>
                       <input
                         type="tel"
@@ -534,7 +645,9 @@ export default function AlumniOnboardingSurveyPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Gender <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
                       <select
                         value={personalInfo.gender}
                         onChange={(e) => setPersonalInfo((p) => ({ ...p, gender: e.target.value }))}
@@ -546,7 +659,9 @@ export default function AlumniOnboardingSurveyPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Civil Status</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Civil Status <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
                       <select
                         value={personalInfo.civilStatus}
                         onChange={(e) => setPersonalInfo((p) => ({ ...p, civilStatus: e.target.value }))}
@@ -560,7 +675,7 @@ export default function AlumniOnboardingSurveyPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        City / Municipality <span className="text-red-500">*</span>
+                        City / Municipality <span className="text-red-500 font-bold ml-0.5">*</span>
                       </label>
                       <input
                         type="text"
@@ -574,7 +689,9 @@ export default function AlumniOnboardingSurveyPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-gray-100">
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Street / Barangay Address</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Street / Barangay Address <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
                       <input
                         type="text"
                         placeholder="House No., Street, Barangay"
@@ -584,7 +701,9 @@ export default function AlumniOnboardingSurveyPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Current Living Location</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Current Living Location <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
                       <select
                         value={personalInfo.currentResidenceLocation}
                         onChange={(e) => setPersonalInfo((p) => ({ ...p, currentResidenceLocation: e.target.value }))}
@@ -610,13 +729,14 @@ export default function AlumniOnboardingSurveyPage() {
                   transition={{ duration: 0.12 }}
                   className="space-y-3"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Degree / Program Graduated at CTU <span className="text-red-500">*</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Degree / Program Graduated at CTU">
+                        Degree / Program <span className="text-red-500 font-bold ml-0.5">*</span>
                       </label>
                       <input
                         type="text"
+                        placeholder="e.g. BTLED, BSIT, BIT"
                         value={academicInfo.program}
                         onChange={(e) => setAcademicInfo((a) => ({ ...a, program: e.target.value }))}
                         className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
@@ -624,29 +744,33 @@ export default function AlumniOnboardingSurveyPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Graduation Year <span className="text-red-500">*</span>
+                        Graduation Year <span className="text-red-500 font-bold ml-0.5">*</span>
                       </label>
                       <input
                         type="number"
+                        placeholder="e.g. 2024"
+                        min={1980}
+                        max={2030}
                         value={academicInfo.yearGraduated}
                         onChange={(e) => setAcademicInfo((a) => ({ ...a, yearGraduated: e.target.value }))}
                         className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Academic Honors / Latin Honors</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Academic Honors / Latin Honors">
+                        Academic Honors <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                      </label>
                       <select
-                        value={academicInfo.honors}
+                        value={academicInfo.honors || 'None'}
                         onChange={(e) => setAcademicInfo((a) => ({ ...a, honors: e.target.value }))}
                         className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
                       >
-                        <option value="">Select Latin Honors (Optional)</option>
+                        <option value="None">None / Regular</option>
                         <option value="Cum Laude">Cum Laude</option>
                         <option value="Magna Cum Laude">Magna Cum Laude</option>
                         <option value="Summa Cum Laude">Summa Cum Laude</option>
                         <option value="Dean's Lister">Dean's Lister</option>
                         <option value="Leadership Awardee">Leadership Awardee</option>
-                        <option value="None">None / Regular Graduate</option>
                       </select>
                     </div>
                   </div>
@@ -654,12 +778,12 @@ export default function AlumniOnboardingSurveyPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Professional Licensure / Board Exam
+                        Professional Licensure / Board Exam <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
                       </label>
                       <select
                         value={academicInfo.licensureStatus}
                         onChange={(e) => setAcademicInfo((a) => ({ ...a, licensureStatus: e.target.value }))}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
+                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
                       >
                         <option value="Passed">Passed (PRC Licensed / CSC Eligible)</option>
                         <option value="Scheduled / Reviewing">Scheduled / Currently Reviewing</option>
@@ -669,7 +793,7 @@ export default function AlumniOnboardingSurveyPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Exam / License Title
+                        Exam / License Title {academicInfo.licensureStatus === 'Passed' ? <span className="text-red-500 font-bold ml-0.5">*</span> : <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>}
                       </label>
                       <input
                         type="text"
@@ -684,7 +808,7 @@ export default function AlumniOnboardingSurveyPage() {
                   {/* Reasons for choosing CTU - UNCHECKED BY DEFAULT */}
                   <div className="pt-1.5 border-t border-gray-100">
                     <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                      Primary reasons for enrolling at CTU (Select all that apply):
+                      Primary reasons for enrolling at CTU <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span> (Select all that apply):
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {[
@@ -744,7 +868,7 @@ export default function AlumniOnboardingSurveyPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Post-Graduate / Further Studies Status
+                        Post-Graduate / Further Studies Status <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
                       </label>
                       <select
                         value={skillsInfo.furtherStudies}
@@ -760,7 +884,7 @@ export default function AlumniOnboardingSurveyPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Post-Grad Certifications & Seminars (Optional)
+                        Post-Grad Certifications & Seminars <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
                       </label>
                       <input
                         type="text"
@@ -775,7 +899,7 @@ export default function AlumniOnboardingSurveyPage() {
                   {/* Core Competencies - UNCHECKED BY DEFAULT */}
                   <div className="pt-1.5 border-t border-gray-100">
                     <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                      Core competencies acquired from CTU education:
+                      Core competencies acquired from CTU education <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>:
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {[
@@ -836,7 +960,7 @@ export default function AlumniOnboardingSurveyPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Employment Status
+                          Employment Status <span className="text-red-500 font-bold ml-0.5">*</span>
                         </label>
                         <select
                           value={employmentInfo.employmentStatus}
@@ -856,7 +980,7 @@ export default function AlumniOnboardingSurveyPage() {
                       {employmentInfo.employmentStatus !== 'Unemployed' && (
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Employment Type
+                            Employment Type <span className="text-red-500 font-bold ml-0.5">*</span>
                           </label>
                           <select
                             value={employmentInfo.jobType}
@@ -881,7 +1005,7 @@ export default function AlumniOnboardingSurveyPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Current Job Title / Position
+                              Current Job Title / Position <span className="text-red-500 font-bold ml-0.5">*</span>
                             </label>
                             <input
                               type="text"
@@ -895,7 +1019,7 @@ export default function AlumniOnboardingSurveyPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Company / Organization Name
+                              Company / Organization Name <span className="text-red-500 font-bold ml-0.5">*</span>
                             </label>
                             <input
                               type="text"
@@ -912,7 +1036,7 @@ export default function AlumniOnboardingSurveyPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Industry / Field
+                              Industry / Field <span className="text-red-500 font-bold ml-0.5">*</span>
                             </label>
                             <select
                               value={employmentInfo.industry}
@@ -936,7 +1060,7 @@ export default function AlumniOnboardingSurveyPage() {
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Monthly Salary Range (₱)
+                              Monthly Salary Range (₱) <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
                             </label>
                             <select
                               value={employmentInfo.salaryRange}
@@ -972,7 +1096,7 @@ export default function AlumniOnboardingSurveyPage() {
                 >
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                      Curriculum Relevance to Professional Readiness:
+                      Curriculum Relevance to Professional Readiness <span className="text-red-500 font-bold ml-0.5">*</span>:
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {['Extremely Relevant', 'Very Relevant', 'Moderately Relevant', 'Slightly Relevant'].map((opt) => (
@@ -1000,7 +1124,9 @@ export default function AlumniOnboardingSurveyPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1.5 border-t border-gray-100">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Faculty Evaluation</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Faculty Evaluation <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
                       <select
                         value={feedbackInfo.facultyRating}
                         onChange={(e) => setFeedbackInfo((f) => ({ ...f, facultyRating: e.target.value }))}
@@ -1013,7 +1139,9 @@ export default function AlumniOnboardingSurveyPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Laboratories & Facilities</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Laboratories & Facilities <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
                       <select
                         value={feedbackInfo.facilitiesRating}
                         onChange={(e) => setFeedbackInfo((f) => ({ ...f, facilitiesRating: e.target.value }))}
@@ -1026,7 +1154,9 @@ export default function AlumniOnboardingSurveyPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Student Guidance & Services</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Student Guidance & Services <span className="text-red-500 font-bold ml-0.5">*</span>
+                      </label>
                       <select
                         value={feedbackInfo.studentServicesRating}
                         onChange={(e) => setFeedbackInfo((f) => ({ ...f, studentServicesRating: e.target.value }))}
@@ -1043,7 +1173,7 @@ export default function AlumniOnboardingSurveyPage() {
                   {/* Engagement preferences - UNCHECKED BY DEFAULT */}
                   <div className="pt-1.5 border-t border-gray-100">
                     <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                      Ways you would like to stay engaged with CTU-Naga:
+                      Ways you would like to stay engaged with CTU-Naga <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>:
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {[
@@ -1088,7 +1218,7 @@ export default function AlumniOnboardingSurveyPage() {
 
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Suggestions / Feedback for Curriculum or Institutional Improvement:
+                      Suggestions / Feedback for Curriculum or Institutional Improvement <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>:
                     </label>
                     <input
                       type="text"

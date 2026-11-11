@@ -169,12 +169,68 @@ router.get('/onboarding', authenticate, async (req: AuthenticatedRequest, res, n
   }
 });
 
+function isEvasiveInput(val: any): boolean {
+  if (!val || typeof val !== 'string') return false;
+  const s = val.trim().toLowerCase();
+  if (!s) return false;
+  const cleaned = s.replace(/[^a-z0-9]/g, '');
+  const blacklist = [
+    'secret', 'sekret', 'none', 'wala', 'wla', 'ambot', 'idk', 'pass', 'nothing',
+    'blank', 'test', 'testing', 'asdf', 'qwerty', 'zxcv', '1234', '12345',
+    'no', 'nope', 'skip', 'hidden', 'private', 'unknown', 'null', 'undefined',
+    'na', 'n/a', 'naa', 'wakabalo', 'dontknow', 'fake'
+  ];
+  if (blacklist.includes(cleaned)) return true;
+  if (/^(secret|sekret|wala|ambot|none|n\/a|na|i don't know|dont know|asdf|test)\b/i.test(s)) return true;
+  if (/^(.)\1{3,}$/.test(cleaned)) return true;
+  return false;
+}
+
 router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { consent, responses } = req.body;
 
     if (!consent || !consent.agreed) {
       throw new AppError('You must accept the Data Privacy Consent to complete your alumni registration', 400);
+    }
+
+    // Backend anti-evasion & format validation
+    if (responses?.studentId && isEvasiveInput(responses.studentId)) {
+      throw new AppError('Please provide your actual Student or Alumni ID (evasive answers like "secret" are not accepted).', 400);
+    }
+
+    if (responses?.phone) {
+      if (isEvasiveInput(responses.phone)) {
+        throw new AppError('Please provide a valid Philippine mobile number.', 400);
+      }
+      const digits = responses.phone.replace(/[^0-9+]/g, '');
+      if (!/^(09\d{9}|\+639\d{9}|639\d{9}|9\d{9})$/.test(digits)) {
+        throw new AppError('Please provide a valid Philippine mobile number (e.g. 0917 123 4567 or +63 917 123 4567).', 400);
+      }
+    }
+
+    if (responses?.city && isEvasiveInput(responses.city)) {
+      throw new AppError('Please provide a valid City / Municipality name.', 400);
+    }
+
+    if (responses?.program && isEvasiveInput(responses.program)) {
+      throw new AppError('Please provide a valid Degree / Program name.', 400);
+    }
+
+    if (responses?.yearGraduated) {
+      const yr = parseInt(String(responses.yearGraduated), 10);
+      if (isNaN(yr) || yr < 1980 || yr > 2030) {
+        throw new AppError('Please provide a valid 4-digit graduation year between 1980 and 2030.', 400);
+      }
+    }
+
+    if (responses?.employmentStatus === 'Employed' || responses?.employmentStatus === 'Self-employed') {
+      if (responses?.currentJobTitle && isEvasiveInput(responses.currentJobTitle)) {
+        throw new AppError('Please provide your actual Job Title / Position (evasive answers like "secret" are not accepted).', 400);
+      }
+      if (responses?.companyName && isEvasiveInput(responses.companyName)) {
+        throw new AppError('Please provide your actual Company / Employer name (evasive answers like "secret" are not accepted).', 400);
+      }
     }
 
     const { data: existing } = await supabase
@@ -218,18 +274,25 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
 
     // Sync relevant profile information if provided
     const profileUpdates: Record<string, any> = {};
+    const studentIdVal = responses?.studentId || responses?.id_number || responses?.idNumber;
+    if (studentIdVal && !isEvasiveInput(studentIdVal)) {
+      profileUpdates.id_number = String(studentIdVal).trim();
+      try {
+        await supabase.from('alumni_eligible').update({ user_id: req.user!.userId }).eq('student_id', String(studentIdVal).trim());
+      } catch {}
+    }
     if (responses?.phone) profileUpdates.phone = responses.phone;
     if (responses?.gender) profileUpdates.gender = responses.gender;
     if (responses?.civilStatus) profileUpdates.civil_status = responses.civilStatus;
-    if (responses?.address) profileUpdates.address = responses.address;
-    if (responses?.city) profileUpdates.city = responses.city;
-    if (responses?.province) profileUpdates.province = responses.province;
-    if (responses?.middleName) profileUpdates.middle_name = responses.middleName;
+    if (responses?.address && !isEvasiveInput(responses.address)) profileUpdates.address = responses.address;
+    if (responses?.city && !isEvasiveInput(responses.city)) profileUpdates.city = responses.city;
+    if (responses?.province && !isEvasiveInput(responses.province)) profileUpdates.province = responses.province;
+    if (responses?.middleName && !isEvasiveInput(responses.middleName)) profileUpdates.middle_name = responses.middleName;
 
     // Sync employment fields if provided
     if (responses?.employmentStatus) profileUpdates.employment_status = responses.employmentStatus;
-    if (responses?.currentJobTitle) profileUpdates.current_job_title = responses.currentJobTitle;
-    if (responses?.companyName) profileUpdates.company_name = responses.companyName;
+    if (responses?.currentJobTitle && !isEvasiveInput(responses.currentJobTitle)) profileUpdates.current_job_title = responses.currentJobTitle;
+    if (responses?.companyName && !isEvasiveInput(responses.companyName)) profileUpdates.company_name = responses.companyName;
     if (responses?.industry) profileUpdates.industry = responses.industry;
     if (responses?.salaryRange) profileUpdates.salary_range = responses.salaryRange;
     if (responses?.jobType) profileUpdates.job_type = String(responses.jobType).toLowerCase();
@@ -242,49 +305,67 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
         .eq('user_id', req.user!.userId);
     }
 
-    // Sync honors to education if provided
-    if (responses?.honors !== undefined) {
-      const honorsValue = responses.honors === 'None' || responses.honors === '' ? null : responses.honors;
+    // Sync education if program, year, or honors provided
+    if (responses?.program || responses?.yearGraduated || responses?.honors !== undefined) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('id')
         .eq('user_id', req.user!.userId)
-        .single();
-      if (profile) {
-        await supabase
-          .from('education')
-          .update({ honors: honorsValue })
-          .eq('profile_id', profile.id);
+        .maybeSingle();
 
-        // If employed, create or update current employment record
-        if (
-          (responses.employmentStatus === 'Employed' || responses.employmentStatus === 'Self-employed') &&
-          (responses.companyName || responses.currentJobTitle)
-        ) {
-          const { data: existingEmp } = await supabase
-            .from('employment')
-            .select('id')
-            .eq('profile_id', profile.id)
-            .eq('is_current', true)
-            .maybeSingle();
+      const profileId = profile?.id || req.user!.userId;
+      const { data: existingEdu } = await supabase
+        .from('education')
+        .select('id')
+        .or(`profile_id.eq.${profileId},profile_id.eq.${req.user!.userId}`)
+        .limit(1)
+        .maybeSingle();
 
-          const empPayload = {
-            profile_id: profile.id,
-            company_name: responses.companyName || 'Self-Employed / Independent',
-            position: responses.currentJobTitle || 'Professional',
-            company_industry: responses.industry || null,
-            employment_status: responses.employmentStatus,
-            job_type: responses.jobType ? String(responses.jobType).toLowerCase() : 'full-time',
-            salary_range: responses.salaryRange || null,
-            is_current: true,
-            start_date: new Date().toISOString().split('T')[0],
-          };
+      const honorsValue = responses.honors === 'None' || responses.honors === '' ? null : responses.honors;
+      const eduPayload: Record<string, any> = {
+        campus: 'Naga Extension Campus',
+      };
+      if (responses?.program && !isEvasiveInput(responses.program)) eduPayload.program = responses.program;
+      if (responses?.yearGraduated) {
+        const yr = parseInt(String(responses.yearGraduated), 10);
+        if (!isNaN(yr)) eduPayload.year_graduated = yr;
+      }
+      if (responses?.honors !== undefined) eduPayload.honors = honorsValue;
 
-          if (existingEmp) {
-            await supabase.from('employment').update(empPayload).eq('id', existingEmp.id);
-          } else {
-            await supabase.from('employment').insert(empPayload);
-          }
+      if (existingEdu) {
+        await supabase.from('education').update(eduPayload).eq('id', existingEdu.id);
+      } else {
+        await supabase.from('education').insert({ profile_id: profileId, ...eduPayload });
+      }
+
+      // If employed, create or update current employment record
+      if (
+        (responses.employmentStatus === 'Employed' || responses.employmentStatus === 'Self-employed') &&
+        (responses.companyName || responses.currentJobTitle)
+      ) {
+        const { data: existingEmp } = await supabase
+          .from('employment')
+          .select('id')
+          .eq('profile_id', profileId)
+          .eq('is_current', true)
+          .maybeSingle();
+
+        const empPayload = {
+          profile_id: profileId,
+          company_name: responses.companyName || 'Self-Employed / Independent',
+          position: responses.currentJobTitle || 'Professional',
+          company_industry: responses.industry || null,
+          employment_status: responses.employmentStatus,
+          job_type: responses.jobType ? String(responses.jobType).toLowerCase() : 'full-time',
+          salary_range: responses.salaryRange || null,
+          is_current: true,
+          start_date: new Date().toISOString().split('T')[0],
+        };
+
+        if (existingEmp) {
+          await supabase.from('employment').update(empPayload).eq('id', existingEmp.id);
+        } else {
+          await supabase.from('employment').insert(empPayload);
         }
       }
     }
