@@ -351,26 +351,51 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
 
     if (commentsError) throw new AppError(commentsError.message, 500);
 
-    // Check user's reactions on comments
-    const { data: commentReactions } = await supabase
-      .from('feed_comment_reactions')
-      .select('comment_id, reaction_type')
-      .eq('user_id', req.user!.userId);
-
+    // Fetch all reactions for these comments to build reactions_summary and top_reactions
+    const commentIds = (comments || []).map((c: any) => c.id);
     const commentReactionMap = new Map<string, string>();
-    (commentReactions || []).forEach((r: any) => {
-      commentReactionMap.set(r.comment_id, r.reaction_type || '👍');
-    });
+    const commentReactionsSummaryMap = new Map<string, Record<string, number>>();
+    const commentTopReactionsMap = new Map<string, string[]>();
+
+    if (commentIds.length > 0) {
+      const { data: allReactions } = await supabase
+        .from('feed_comment_reactions')
+        .select('comment_id, reaction_type, user_id')
+        .in('comment_id', commentIds);
+
+      (allReactions || []).forEach((r: any) => {
+        const emoji = r.reaction_type || '👍';
+        if (r.user_id === req.user!.userId) {
+          commentReactionMap.set(r.comment_id, emoji);
+        }
+        if (!commentReactionsSummaryMap.has(r.comment_id)) {
+          commentReactionsSummaryMap.set(r.comment_id, {});
+        }
+        const summ = commentReactionsSummaryMap.get(r.comment_id)!;
+        summ[emoji] = (summ[emoji] || 0) + 1;
+      });
+
+      commentReactionsSummaryMap.forEach((summ, commentId) => {
+        const top = Object.entries(summ)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([emoji]) => emoji);
+        commentTopReactionsMap.set(commentId, top);
+      });
+    }
 
     // Structure comments into parent and replies
     const commentList: any[] = [];
     const replyMap = new Map<string, any[]>();
     (comments || []).forEach((c: any) => {
+      const summ = commentReactionsSummaryMap.get(c.id) || {};
       const enriched = {
         ...c,
         like_count: c.like_count || 0,
         liked: commentReactionMap.has(c.id),
         user_reaction: commentReactionMap.get(c.id) || null,
+        reactions_summary: summ,
+        top_reactions: commentTopReactionsMap.get(c.id) || (c.like_count > 0 ? ['👍'] : []),
       };
       if (c.parent_id) {
         if (!replyMap.has(c.parent_id)) replyMap.set(c.parent_id, []);
@@ -936,12 +961,24 @@ router.post('/comments/:id/reaction', authenticate, async (req: AuthenticatedReq
       userReaction = reaction;
     }
 
-    const { count } = await supabase
+    const { data: allReactions } = await supabase
       .from('feed_comment_reactions')
-      .select('id', { count: 'exact', head: true })
+      .select('reaction_type')
       .eq('comment_id', commentId);
 
-    await supabase.from('feed_post_comments').update({ like_count: count || 0 }).eq('id', commentId);
+    const reactionsSummary: Record<string, number> = {};
+    (allReactions || []).forEach((r: any) => {
+      const emoji = r.reaction_type || '👍';
+      reactionsSummary[emoji] = (reactionsSummary[emoji] || 0) + 1;
+    });
+
+    const topReactions = Object.entries(reactionsSummary)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([emoji]) => emoji);
+
+    const count = (allReactions || []).length;
+    await supabase.from('feed_post_comments').update({ like_count: count }).eq('id', commentId);
 
     if (liked) {
       const { data: c } = await supabase
@@ -971,7 +1008,13 @@ router.post('/comments/:id/reaction', authenticate, async (req: AuthenticatedReq
       }
     }
 
-    res.json({ liked, user_reaction: userReaction, like_count: count || 0 });
+    res.json({
+      liked,
+      user_reaction: userReaction,
+      like_count: count,
+      reactions_summary: reactionsSummary,
+      top_reactions: topReactions,
+    });
   } catch (err) { next(err); }
 });
 

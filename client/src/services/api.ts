@@ -284,8 +284,10 @@ export const communityApi = {
     api.post<any>('/community/posts', data),
   likePost: (postId: string) =>
     api.post<{ id: string; liked: boolean; like_count: number }>(`/community/posts/${postId}/like`, {}),
-  addComment: (postId: string, content: string) =>
-    api.post<{ comment: any; comments: any[]; comment_count: number }>(`/community/posts/${postId}/comments`, { content }),
+  addComment: (postId: string, content: string, parent_id?: string | null) =>
+    api.post<{ comment: any; comments: any[]; comment_count: number }>(`/community/posts/${postId}/comments`, { content, parent_id }),
+  reactComment: (postId: string, commentId: string, reaction?: string) =>
+    api.post<{ comment_id: string; liked: boolean; user_reaction: string | null; post: any }>(`/community/posts/${postId}/comments/${commentId}/reaction`, { reaction }),
   deletePost: (postId: string) => api.delete<{ success: boolean; id: string }>(`/community/posts/${postId}`),
 };
 
@@ -626,7 +628,13 @@ export const feedApi = {
   addComment: (id: string, content: string, parent_id?: string | null) =>
     api.post<any>(`/feed/${id}/comments`, { content, parent_id }),
   reactComment: (commentId: string, reaction?: string) =>
-    api.post<{ liked: boolean; user_reaction: string | null; like_count: number }>(`/feed/comments/${commentId}/reaction`, { reaction }),
+    api.post<{
+      liked: boolean;
+      user_reaction: string | null;
+      like_count: number;
+      reactions_summary?: Record<string, number>;
+      top_reactions?: string[];
+    }>(`/feed/comments/${commentId}/reaction`, { reaction }),
   deleteComment: (commentId: string) => api.delete<any>(`/feed/comments/${commentId}`),
   report: (id: string, reason: string, details?: string) =>
     api.post<{ message: string }>(`/feed/${id}/report`, { reason, details }),

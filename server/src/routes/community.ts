@@ -3,6 +3,7 @@ import { supabase } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
+import { createNotification } from './notifications';
 
 const router = Router();
 
@@ -53,11 +54,68 @@ async function getProfileForUser(userId: string) {
   return data;
 }
 
+function formatComment(c: any, myProfileId?: string | null) {
+  const reactions: Record<string, string[]> = (c.reactions && typeof c.reactions === 'object') ? c.reactions : {};
+  let userReaction: string | null = null;
+  let totalLikes = 0;
+  const reactionsSummary: Record<string, number> = {};
+
+  Object.entries(reactions).forEach(([emoji, userIds]) => {
+    const list = Array.isArray(userIds) ? userIds : [];
+    if (list.length > 0) {
+      reactionsSummary[emoji] = list.length;
+      totalLikes += list.length;
+      if (myProfileId && list.includes(myProfileId)) {
+        userReaction = emoji;
+      }
+    }
+  });
+
+  const topReactions = Object.entries(reactionsSummary)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([emoji]) => emoji);
+
+  return {
+    id: c.id,
+    author_id: c.author_id,
+    author_name: c.author_name || 'CTU-Naga Alumnus',
+    author_avatar: c.author_avatar || null,
+    author_headline: c.author_headline || null,
+    content: c.content || '',
+    created_at: c.created_at || new Date().toISOString(),
+    parent_id: c.parent_id || null,
+    like_count: totalLikes,
+    liked: !!userReaction,
+    user_reaction: userReaction,
+    reactions_summary: reactionsSummary,
+    top_reactions: topReactions,
+  };
+}
+
 function formatForumPost(post: any, myProfileId?: string | null) {
   const authorObj = Array.isArray(post.author) ? post.author[0] : post.author;
   const groupObj = Array.isArray(post.group) ? post.group[0] : post.group;
   const likedBy: string[] = Array.isArray(post.liked_by) ? post.liked_by : [];
-  const comments: any[] = Array.isArray(post.comments) ? post.comments : [];
+  const rawComments: any[] = Array.isArray(post.comments) ? post.comments : [];
+
+  const formattedRaw = rawComments.map((c: any) => formatComment(c, myProfileId));
+  const commentList: any[] = [];
+  const replyMap = new Map<string, any[]>();
+
+  formattedRaw.forEach((c: any) => {
+    if (c.parent_id) {
+      if (!replyMap.has(c.parent_id)) replyMap.set(c.parent_id, []);
+      replyMap.get(c.parent_id)!.push(c);
+    } else {
+      commentList.push(c);
+    }
+  });
+
+  const structuredComments = commentList.map((c: any) => ({
+    ...c,
+    replies: replyMap.get(c.id) || [],
+  }));
 
   return {
     ...post,
@@ -74,9 +132,9 @@ function formatForumPost(post: any, myProfileId?: string | null) {
     like_count: typeof post.like_count === 'number' ? post.like_count : likedBy.length,
     likes_count: typeof post.like_count === 'number' ? post.like_count : likedBy.length,
     liked: Boolean(myProfileId && likedBy.includes(myProfileId)),
-    comment_count: typeof post.comment_count === 'number' ? post.comment_count : comments.length,
-    comments_count: typeof post.comment_count === 'number' ? post.comment_count : comments.length,
-    comments,
+    comment_count: rawComments.length,
+    comments_count: rawComments.length,
+    comments: structuredComments,
   };
 }
 
@@ -328,6 +386,7 @@ router.post('/posts/:id/comments', authenticate, async (req: AuthenticatedReques
   try {
     const postId = req.params.id;
     const content = (req.body?.content || '').trim();
+    const parentId = req.body?.parent_id || null;
     if (!content) throw new AppError('Comment content is required', 400);
 
     const profile = await getProfileForUser(req.user!.userId);
@@ -335,7 +394,7 @@ router.post('/posts/:id/comments', authenticate, async (req: AuthenticatedReques
 
     const { data: post, error: fetchErr } = await supabase
       .from('forum_posts')
-      .select('id, comments, comment_count')
+      .select('id, author_id, comments, comment_count')
       .eq('id', postId)
       .maybeSingle();
 
@@ -349,6 +408,8 @@ router.post('/posts/:id/comments', authenticate, async (req: AuthenticatedReques
       author_avatar: profile.avatar_url || null,
       author_headline: profile.headline || null,
       content,
+      parent_id: parentId,
+      reactions: {},
       created_at: new Date().toISOString(),
     };
 
@@ -366,10 +427,132 @@ router.post('/posts/:id/comments', authenticate, async (req: AuthenticatedReques
 
     if (updateErr) throw new AppError(updateErr.message, 500);
 
+    const formattedPost = formatForumPost({ ...post, comments: updatedComments }, profile.id);
+
+    // Notification to post author if not self
+    if (post.author_id && post.author_id !== profile.id) {
+      const { data: pUser } = await supabase.from('profiles').select('user_id').eq('id', post.author_id).maybeSingle();
+      if (pUser?.user_id) {
+        createNotification({
+          userId: pUser.user_id,
+          type: 'post',
+          title: 'New Comment on Your Forum Post',
+          message: `${newComment.author_name} commented: "${content.slice(0, 60)}"`,
+          link: '/community',
+        }).catch(() => {});
+      }
+    }
+
+    // Notification to parent comment author if reply
+    if (parentId) {
+      const parentComment = existingComments.find((c: any) => c.id === parentId);
+      if (parentComment && parentComment.author_id && parentComment.author_id !== profile.id && parentComment.author_id !== post.author_id) {
+        const { data: pUser } = await supabase.from('profiles').select('user_id').eq('id', parentComment.author_id).maybeSingle();
+        if (pUser?.user_id) {
+          createNotification({
+            userId: pUser.user_id,
+            type: 'post',
+            title: 'New Reply to Your Comment',
+            message: `${newComment.author_name} replied: "${content.slice(0, 60)}"`,
+            link: '/community',
+          }).catch(() => {});
+        }
+      }
+    }
+
     res.status(201).json({
-      comment: newComment,
-      comments: updatedComments,
+      comment: formatComment(newComment, profile.id),
+      comments: formattedPost.comments,
       comment_count: newCount,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/posts/:id/comments/:commentId/reaction', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id: postId, commentId } = req.params;
+    const reaction = req.body?.reaction || '👍';
+    const profile = await getProfileForUser(req.user!.userId);
+    if (!profile) throw new AppError('Profile not found', 404);
+
+    const { data: post, error: fetchErr } = await supabase
+      .from('forum_posts')
+      .select('id, author_id, comments, comment_count')
+      .eq('id', postId)
+      .maybeSingle();
+
+    if (fetchErr || !post) throw new AppError('Post not found', 404);
+
+    const comments: any[] = Array.isArray(post.comments) ? [...post.comments] : [];
+    const targetIdx = comments.findIndex((c: any) => c.id === commentId);
+    if (targetIdx === -1) throw new AppError('Comment not found', 404);
+
+    const targetComment = { ...comments[targetIdx] };
+    const reactions: Record<string, string[]> = { ...(targetComment.reactions || {}) };
+
+    let userCurrentReaction: string | null = null;
+    Object.entries(reactions).forEach(([emoji, userList]) => {
+      if (Array.isArray(userList) && userList.includes(profile.id)) {
+        userCurrentReaction = emoji;
+      }
+    });
+
+    // Remove user from all existing reaction buckets on this comment
+    Object.keys(reactions).forEach((emoji) => {
+      reactions[emoji] = (reactions[emoji] || []).filter((uid) => uid !== profile.id);
+      if (reactions[emoji].length === 0) {
+        delete reactions[emoji];
+      }
+    });
+
+    let liked = false;
+    let finalUserReaction: string | null = null;
+
+    if (userCurrentReaction !== reaction) {
+      if (!reactions[reaction]) reactions[reaction] = [];
+      reactions[reaction].push(profile.id);
+      liked = true;
+      finalUserReaction = reaction;
+    } else {
+      liked = false;
+      finalUserReaction = null;
+    }
+
+    targetComment.reactions = reactions;
+    comments[targetIdx] = targetComment;
+
+    const { error: updateErr } = await supabase
+      .from('forum_posts')
+      .update({
+        comments,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', postId);
+
+    if (updateErr) throw new AppError(updateErr.message, 500);
+
+    const formattedPost = formatForumPost({ ...post, comments }, profile.id);
+
+    if (liked && targetComment.author_id && targetComment.author_id !== profile.id) {
+      const { data: pUser } = await supabase.from('profiles').select('user_id').eq('id', targetComment.author_id).maybeSingle();
+      if (pUser?.user_id) {
+        createNotification({
+          userId: pUser.user_id,
+          type: 'post',
+          title: 'Reaction to Your Comment',
+          message: `${profile.first_name || 'An alumnus'} reacted ${reaction} to your comment.`,
+          link: '/community',
+        }).catch(() => {});
+      }
+    }
+
+    res.json({
+      comment_id: commentId,
+      liked,
+      user_reaction: finalUserReaction,
+      post: formattedPost,
     });
   } catch (err) {
     next(err);

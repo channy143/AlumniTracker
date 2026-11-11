@@ -46,6 +46,8 @@ interface CommentReply {
   like_count?: number;
   liked?: boolean;
   user_reaction?: string | null;
+  reactions_summary?: Record<string, number>;
+  top_reactions?: string[];
 }
 
 interface CommentItem {
@@ -58,6 +60,8 @@ interface CommentItem {
   like_count?: number;
   liked?: boolean;
   user_reaction?: string | null;
+  reactions_summary?: Record<string, number>;
+  top_reactions?: string[];
   replies?: CommentReply[];
 }
 
@@ -158,8 +162,14 @@ export default function FeedPostCard({
 
   // Replying to a specific comment
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
+  const [replyingToAuthorName, setReplyingToAuthorName] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
+  const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState(false);
+
+  // Floating reaction picker for comments/replies
+  const [activeCommentReactionPickerId, setActiveCommentReactionPickerId] = useState<string | null>(null);
+  const commentPickerTimeoutRef = useRef<any>(null);
 
   // Edit Post Modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -400,6 +410,8 @@ export default function FeedPostCard({
       setCommentCount((prev) => prev + 1);
       setReplyText('');
       setReplyingToCommentId(null);
+      setReplyingToAuthorName(null);
+      setShowReplyEmojiPicker(false);
     } catch (err: any) {
       alert(err.message || 'Failed to post reply.');
     } finally {
@@ -409,18 +421,65 @@ export default function FeedPostCard({
 
   // React to Comment
   const handleReactComment = async (commentId: string, emoji = '👍') => {
+    // Instant optimistic update
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c.id === commentId) {
+          const isSame = c.liked && c.user_reaction === emoji;
+          const nextLiked = !isSame;
+          const nextReaction = nextLiked ? emoji : null;
+          const delta = isSame ? -1 : (c.liked ? 0 : 1);
+          const nextCount = Math.max(0, (c.like_count || 0) + delta);
+          return { ...c, liked: nextLiked, user_reaction: nextReaction, like_count: nextCount };
+        }
+        if (c.replies) {
+          return {
+            ...c,
+            replies: c.replies.map((r) => {
+              if (r.id === commentId) {
+                const isSame = r.liked && r.user_reaction === emoji;
+                const nextLiked = !isSame;
+                const nextReaction = nextLiked ? emoji : null;
+                const delta = isSame ? -1 : (r.liked ? 0 : 1);
+                const nextCount = Math.max(0, (r.like_count || 0) + delta);
+                return { ...r, liked: nextLiked, user_reaction: nextReaction, like_count: nextCount };
+              }
+              return r;
+            }),
+          };
+        }
+        return c;
+      })
+    );
+
     try {
       const res = await feedApi.reactComment(commentId, emoji);
       setComments((prev) =>
         prev.map((c) => {
           if (c.id === commentId) {
-            return { ...c, liked: res.liked, user_reaction: res.user_reaction, like_count: res.like_count };
+            return {
+              ...c,
+              liked: res.liked,
+              user_reaction: res.user_reaction,
+              like_count: res.like_count,
+              reactions_summary: res.reactions_summary || c.reactions_summary,
+              top_reactions: res.top_reactions || (res.user_reaction ? [res.user_reaction] : []),
+            };
           }
           if (c.replies) {
             return {
               ...c,
               replies: c.replies.map((r) =>
-                r.id === commentId ? { ...r, liked: res.liked, user_reaction: res.user_reaction, like_count: res.like_count } : r
+                r.id === commentId
+                  ? {
+                      ...r,
+                      liked: res.liked,
+                      user_reaction: res.user_reaction,
+                      like_count: res.like_count,
+                      reactions_summary: res.reactions_summary || r.reactions_summary,
+                      top_reactions: res.top_reactions || (res.user_reaction ? [res.user_reaction] : []),
+                    }
+                  : r
               ),
             };
           }
@@ -1123,39 +1182,94 @@ export default function FeedPostCard({
                         )}
                       </div>
 
-                      <div className="flex-1">
-                        <div className="bg-white p-2.5 rounded-2xl border border-gray-200/80 shadow-2xs">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-gray-900">{c.author}</span>
-                            <span className="text-[10px] text-gray-400">
+                      <div className="flex-1 min-w-0">
+                        <div className="relative inline-block max-w-full bg-white p-2.5 rounded-2xl border border-gray-200/80 shadow-2xs">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-bold text-gray-900 truncate">{c.author}</span>
+                            <span className="text-[10px] text-gray-400 shrink-0">
                               {formatDate(c.created_at)}
                             </span>
                           </div>
-                          <p className="text-gray-700 mt-0.5 leading-relaxed">{c.content}</p>
+                          <p className="text-gray-700 mt-0.5 leading-relaxed break-words">{c.content}</p>
+
+                          {/* Reaction badge inside/under comment bubble */}
+                          {(c.like_count || 0) > 0 && (
+                            <div className="absolute -bottom-2.5 right-2 flex items-center gap-0.5 bg-white border border-gray-200/90 rounded-full px-1.5 py-0.5 text-[10px] shadow-2xs text-gray-700 font-medium">
+                              <span>
+                                {c.top_reactions && c.top_reactions.length > 0
+                                  ? c.top_reactions.join('')
+                                  : c.user_reaction || '👍'}
+                              </span>
+                              <span className="text-[9px] font-semibold text-gray-600">{c.like_count}</span>
+                            </div>
+                          )}
                         </div>
 
-                        {/* Comment Action Links: Like, Reply */}
+                        {/* Comment Action Links: Like with Picker, Reply, Delete */}
                         <div className="flex items-center gap-3 px-2 pt-1 text-[11px] font-semibold text-gray-500">
-                          <button
-                            type="button"
-                            onClick={() => handleReactComment(c.id, '👍')}
-                            className={`hover:underline cursor-pointer flex items-center gap-1 ${
-                              c.liked ? 'text-blue-600 font-bold' : ''
-                            }`}
+                          <div
+                            className="relative inline-block"
+                            onMouseEnter={() => {
+                              if (commentPickerTimeoutRef.current) clearTimeout(commentPickerTimeoutRef.current);
+                              setActiveCommentReactionPickerId(c.id);
+                            }}
+                            onMouseLeave={() => {
+                              commentPickerTimeoutRef.current = setTimeout(() => {
+                                setActiveCommentReactionPickerId((curr) => (curr === c.id ? null : curr));
+                              }, 350);
+                            }}
                           >
-                            <span>{c.user_reaction || '👍'}</span>
-                            <span>Endorse</span>
-                            {(c.like_count || 0) > 0 && <span className="text-[10px]">({c.like_count})</span>}
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => handleReactComment(c.id, c.user_reaction || '👍')}
+                              className={`hover:underline cursor-pointer flex items-center gap-1 transition-colors ${
+                                c.liked ? 'text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                            >
+                              <span>{c.user_reaction || '👍'}</span>
+                              <span>{c.liked ? 'Endorsed' : 'Endorse'}</span>
+                            </button>
+
+                            {/* Floating Comment Reaction Picker */}
+                            {activeCommentReactionPickerId === c.id && (
+                              <div
+                                className="absolute -top-10 left-0 z-30 bg-white border border-gray-200/90 rounded-full px-2 py-0.5 shadow-xl flex items-center gap-1 animate-in fade-in zoom-in-95 duration-150"
+                                onMouseEnter={() => {
+                                  if (commentPickerTimeoutRef.current) clearTimeout(commentPickerTimeoutRef.current);
+                                }}
+                              >
+                                {REAL_REACTIONS.map((r) => (
+                                  <button
+                                    key={r.emoji}
+                                    type="button"
+                                    onClick={() => {
+                                      handleReactComment(c.id, r.emoji);
+                                      setActiveCommentReactionPickerId(null);
+                                    }}
+                                    className="text-base p-1 rounded-full hover:scale-130 transition-transform duration-150 cursor-pointer active:scale-110"
+                                    title={r.label}
+                                  >
+                                    {r.emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
 
                           {!currentPost.comments_disabled && (
                             <button
                               type="button"
                               onClick={() => {
-                                setReplyingToCommentId(replyingToCommentId === c.id ? null : c.id);
-                                setReplyText('');
+                                if (replyingToCommentId === c.id && !replyText) {
+                                  setReplyingToCommentId(null);
+                                  setReplyingToAuthorName(null);
+                                } else {
+                                  setReplyingToCommentId(c.id);
+                                  setReplyingToAuthorName(c.author);
+                                  setReplyText('');
+                                }
                               }}
-                              className="hover:underline cursor-pointer text-gray-600"
+                              className="hover:underline cursor-pointer text-gray-600 hover:text-orange-600 transition-colors"
                             >
                               Reply
                             </button>
@@ -1176,7 +1290,7 @@ export default function FeedPostCard({
 
                     {/* Nested Replies List */}
                     {c.replies && c.replies.length > 0 && (
-                      <div className="ml-4 sm:ml-9 pl-3 border-l-2 border-gray-200 space-y-2">
+                      <div className="ml-4 sm:ml-9 pl-3 border-l-2 border-gray-200 space-y-2.5">
                         {c.replies.map((reply) => {
                           const isOwnReply = currentUserId && reply.user_id && currentUserId === reply.user_id;
                           const canDeleteReply = isOwnReply || currentUserRole === 'admin';
@@ -1191,21 +1305,91 @@ export default function FeedPostCard({
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="bg-white p-2 rounded-xl border border-gray-200/80 shadow-2xs">
+                                <div className="relative inline-block max-w-full bg-white p-2 rounded-xl border border-gray-200/80 shadow-2xs">
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="font-bold text-gray-900 text-[11px] truncate">{reply.author}</span>
                                     <span className="text-[9px] text-gray-400 shrink-0">{formatDate(reply.created_at)}</span>
                                   </div>
                                   <p className="text-gray-700 mt-0.5 text-xs break-words">{reply.content}</p>
+
+                                  {/* Reply reaction badge */}
+                                  {(reply.like_count || 0) > 0 && (
+                                    <div className="absolute -bottom-2.5 right-2 flex items-center gap-0.5 bg-white border border-gray-200/90 rounded-full px-1.5 py-0.5 text-[9px] shadow-2xs text-gray-700 font-medium">
+                                      <span>
+                                        {reply.top_reactions && reply.top_reactions.length > 0
+                                          ? reply.top_reactions.join('')
+                                          : reply.user_reaction || '👍'}
+                                      </span>
+                                      <span className="text-[8px] font-semibold text-gray-600">{reply.like_count}</span>
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="flex items-center gap-3 px-2 pt-0.5 text-[10px] text-gray-500">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReactComment(reply.id, '👍')}
-                                    className={`hover:underline cursor-pointer ${reply.liked ? 'text-blue-600 font-bold' : ''}`}
+
+                                <div className="flex items-center gap-3 px-2 pt-1 text-[10px] font-semibold text-gray-500">
+                                  {/* Reply Reaction with Picker */}
+                                  <div
+                                    className="relative inline-block"
+                                    onMouseEnter={() => {
+                                      if (commentPickerTimeoutRef.current) clearTimeout(commentPickerTimeoutRef.current);
+                                      setActiveCommentReactionPickerId(reply.id);
+                                    }}
+                                    onMouseLeave={() => {
+                                      commentPickerTimeoutRef.current = setTimeout(() => {
+                                        setActiveCommentReactionPickerId((curr) => (curr === reply.id ? null : curr));
+                                      }, 350);
+                                    }}
                                   >
-                                    Endorse {(reply.like_count || 0) > 0 && `(${reply.like_count})`}
-                                  </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleReactComment(reply.id, reply.user_reaction || '👍')}
+                                      className={`hover:underline cursor-pointer flex items-center gap-1 transition-colors ${
+                                        reply.liked ? 'text-blue-600 font-bold' : 'text-gray-500 hover:text-gray-700'
+                                      }`}
+                                    >
+                                      <span>{reply.user_reaction || '👍'}</span>
+                                      <span>{reply.liked ? 'Endorsed' : 'Endorse'}</span>
+                                    </button>
+
+                                    {/* Floating Reply Reaction Picker */}
+                                    {activeCommentReactionPickerId === reply.id && (
+                                      <div
+                                        className="absolute -top-10 left-0 z-30 bg-white border border-gray-200/90 rounded-full px-2 py-0.5 shadow-xl flex items-center gap-1 animate-in fade-in zoom-in-95 duration-150"
+                                        onMouseEnter={() => {
+                                          if (commentPickerTimeoutRef.current) clearTimeout(commentPickerTimeoutRef.current);
+                                        }}
+                                      >
+                                        {REAL_REACTIONS.map((r) => (
+                                          <button
+                                            key={r.emoji}
+                                            type="button"
+                                            onClick={() => {
+                                              handleReactComment(reply.id, r.emoji);
+                                              setActiveCommentReactionPickerId(null);
+                                            }}
+                                            className="text-base p-1 rounded-full hover:scale-130 transition-transform duration-150 cursor-pointer active:scale-110"
+                                            title={r.label}
+                                          >
+                                            {r.emoji}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {!currentPost.comments_disabled && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setReplyingToCommentId(c.id);
+                                        setReplyingToAuthorName(reply.author);
+                                        setReplyText(`@${reply.author} `);
+                                      }}
+                                      className="hover:underline cursor-pointer text-gray-600 hover:text-orange-600 transition-colors"
+                                    >
+                                      Reply
+                                    </button>
+                                  )}
+
                                   {canDeleteReply && (
                                     <button
                                       type="button"
@@ -1225,30 +1409,69 @@ export default function FeedPostCard({
 
                     {/* Inline Reply Input Box */}
                     {replyingToCommentId === c.id && (
-                      <div className="ml-4 sm:ml-9 flex items-center gap-1.5 sm:gap-2 pt-1 animate-in fade-in">
-                        <input
-                          type="text"
-                          value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
-                          placeholder={`Reply to ${c.author}...`}
-                          className="flex-1 min-w-0 bg-white border border-gray-200 rounded-full px-3 py-1 text-xs outline-none focus:border-orange-500"
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleAddReply(c.id)}
-                          disabled={!replyText.trim() || submittingReply}
-                          className="px-3 py-1 bg-orange-500 text-white rounded-full text-xs font-semibold hover:bg-orange-600 disabled:opacity-40 cursor-pointer"
-                        >
-                          Reply
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setReplyingToCommentId(null)}
-                          className="text-gray-400 hover:text-gray-600 text-xs px-1"
-                        >
-                          Cancel
-                        </button>
+                      <div className="ml-4 sm:ml-9 pt-1.5 animate-in fade-in space-y-1">
+                        <div className="flex items-center justify-between text-[11px] text-gray-500 px-1">
+                          <span>
+                            Replying to <span className="font-semibold text-orange-600">{replyingToAuthorName || c.author}</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyingToCommentId(null);
+                              setReplyText('');
+                              setReplyingToAuthorName(null);
+                            }}
+                            className="text-gray-400 hover:text-gray-600 cursor-pointer text-[10px]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <div className="flex-1 min-w-0 relative flex items-center bg-white border border-gray-200 rounded-full px-3 py-1 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 transition-all">
+                            <input
+                              type="text"
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder={`Reply to ${replyingToAuthorName || c.author}...`}
+                              className="flex-1 min-w-0 bg-transparent text-xs outline-none pr-1"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleAddReply(c.id);
+                                }
+                              }}
+                            />
+                            <div className="relative shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setShowReplyEmojiPicker((prev) => !prev)}
+                                className="p-1 text-gray-400 hover:text-gray-600 rounded-full transition-colors cursor-pointer"
+                                title="Insert emoji"
+                              >
+                                <FaceSmileIcon className="w-3.5 h-3.5" />
+                              </button>
+                              {showReplyEmojiPicker && (
+                                <EmojiPicker
+                                  position="top"
+                                  className="right-0"
+                                  onSelect={(emoji) => {
+                                    setReplyText((prev) => prev + emoji);
+                                  }}
+                                  onClose={() => setShowReplyEmojiPicker(false)}
+                                />
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleAddReply(c.id)}
+                            disabled={!replyText.trim() || submittingReply}
+                            className="px-3.5 py-1 bg-orange-500 text-white rounded-full text-xs font-semibold hover:bg-orange-600 disabled:opacity-40 cursor-pointer transition-colors shadow-2xs"
+                          >
+                            Reply
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
