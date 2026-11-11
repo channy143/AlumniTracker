@@ -30,6 +30,8 @@ import { supabase, isSupabaseConfigured } from '@/services/supabase';
 import CreatePostBox from '@/components/dashboard/CreatePostBox';
 import FeedPostCard, { PostItem, REAL_REACTIONS } from '@/components/dashboard/FeedPostCard';
 import EmojiPicker from '@/components/ui/EmojiPicker';
+import { JellyBlobMascot } from '@/components/ui/feral-blob/JellyBlobMascot';
+import '@/styles/blob.css';
 
 
 type PostType = 'text' | 'post' | 'job' | 'announcement' | 'event' | 'discussion' | 'guide';
@@ -1395,6 +1397,14 @@ export default function DashboardPage() {
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
   const [profile, setProfile] = useState<any>(() => getCached('/profile') || null);
+  const [greetingMood, setGreetingMood] = useState<'neutral' | 'happy' | 'angry'>('neutral');
+  const overpokeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (overpokeTimerRef.current) clearTimeout(overpokeTimerRef.current);
+    };
+  }, []);
 
   const targetPostId = searchParams.get('post');
 
@@ -1628,13 +1638,25 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white text-sm font-bold shadow-xs">
-          {profile?.avatar_url ? (
-            <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-          ) : (
-            user?.email ? user.email[0].toUpperCase() : '?'
-          )}
+      <div className="flex items-center gap-2.5 mb-4">
+        <div
+          className="w-12 h-11 flex items-center justify-center shrink-0 overflow-visible"
+          onMouseEnter={() => {
+            if (greetingMood !== 'angry') setGreetingMood('happy');
+          }}
+          onMouseLeave={() => {
+            if (greetingMood !== 'angry') setGreetingMood('neutral');
+          }}
+        >
+          <JellyBlobMascot
+            mood={greetingMood}
+            onOverpoke={() => {
+              setGreetingMood('angry');
+              if (overpokeTimerRef.current) clearTimeout(overpokeTimerRef.current);
+              overpokeTimerRef.current = setTimeout(() => setGreetingMood('neutral'), 1600);
+            }}
+            className="w-[74px] h-auto shrink-0"
+          />
         </div>
         <div>
           <h1 className="text-base font-bold text-gray-900">
