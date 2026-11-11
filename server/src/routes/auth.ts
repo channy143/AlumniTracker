@@ -29,6 +29,7 @@ import {
 } from '../services/trustedDeviceService';
 import { revokeToken } from '../services/revokedTokenService';
 import { markUserOffline, markUserActive } from '../services/presenceService';
+import { notifyAdmins } from './notifications';
 import {
   sendOtpSchema,
   forgotPasswordSchema,
@@ -236,6 +237,13 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
       severity: 'info',
       status: 'success',
       details: { email: user.email, program, yearGraduated },
+    });
+
+    notifyAdmins({
+      type: 'alumni',
+      title: `🎓 New Alumni Registered: ${firstName} ${lastName}`,
+      message: `${firstName} ${lastName} (${program || 'Graduate'} - Class of ${gradYear || 'N/A'}) has registered an account.`,
+      link: `/admin/alumni?search=${encodeURIComponent(lastName || email)}`,
     });
 
     res.status(201).json({
@@ -982,6 +990,14 @@ router.post('/report-incident', authenticate, async (req: AuthenticatedRequest, 
       },
       severity: severity === 'critical' ? 'critical' : 'warning',
       status: 'success',
+    });
+
+    const reporterName = req.user?.email || 'User';
+    notifyAdmins({
+      type: 'security',
+      title: `🛡️ Security Incident: ${(incidentType || 'Activity').replace(/_/g, ' ').toUpperCase()}`,
+      message: `Severity: ${severity.toUpperCase()}. Reported by ${reporterName}: "${description.slice(0, 120)}${description.length > 120 ? '...' : ''}"`,
+      link: '/admin/activity',
     });
 
     res.json({

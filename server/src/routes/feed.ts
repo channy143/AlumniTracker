@@ -8,7 +8,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { addActivity } from '../services/activityStore';
 import { createPostSchema, updatePostSchema } from '../middleware/validationSchemas';
-import { createNotification } from './notifications';
+import { createNotification, notifyAdmins } from './notifications';
 
 const router = Router();
 
@@ -1031,6 +1031,13 @@ router.post('/:id/report', authenticate, async (req: AuthenticatedRequest, res, 
       });
 
     if (error) throw new AppError(error.message, 500);
+
+    notifyAdmins({
+      type: 'moderation',
+      title: '⚠️ Content Moderation: Post Reported',
+      message: `A community feed post was reported for "${reason.trim()}". Details: "${(details || 'None provided').slice(0, 100)}"`,
+      link: '/admin/activity',
+    });
 
     res.status(201).json({ message: 'Report submitted. Our moderation team will review this post.' });
   } catch (err) { next(err); }

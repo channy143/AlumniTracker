@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { addActivity } from '../services/activityStore';
 import { validateResumeContent } from '../utils/validateResume';
+import { notifyAdmins } from './notifications';
 import {
   updateProfileSchema,
   updateCareerSchema,
@@ -174,8 +175,17 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
       }
     }
 
-    const name = profile?.first_name || req.user!.email?.split('@')[0] || 'Someone';
+    const name = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : (req.user!.email?.split('@')[0] || 'Someone');
     logActivity(name, 'updated their career info', `Status: ${updates.employment_status || 'unchanged'}`);
+
+    if (updates.employment_status) {
+      notifyAdmins({
+        type: 'employment',
+        title: `💼 Career Status Update: ${name}`,
+        message: `${name} updated employment status to "${updates.employment_status}"${updates.company_name ? ` at ${updates.company_name}` : ''}${updates.current_job_title ? ` as ${updates.current_job_title}` : ''}.`,
+        link: `/admin/alumni?search=${encodeURIComponent(profile?.last_name || name)}`,
+      });
+    }
 
     res.json(profile);
   } catch (err) { next(err); }

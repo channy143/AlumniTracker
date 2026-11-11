@@ -5,6 +5,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
 import { logAudit } from '../../services/auditLogger';
 import { AuthenticatedRequest } from '../../types';
+import { notifyAdmins } from '../notifications';
 
 const router = Router();
 const upload = multer({
@@ -191,6 +192,13 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
         employer_type: data.employer_type,
         agreement_type: data.agreement_type,
       },
+    });
+
+    notifyAdmins({
+      type: 'company',
+      title: `🏢 Partner Company Added: ${data.name}`,
+      message: `${data.name} (${data.industry || 'General Industry'}) was registered as a ${data.employer_type || 'partner'} company.`,
+      link: '/admin/companies',
     });
 
     res.status(201).json(data);

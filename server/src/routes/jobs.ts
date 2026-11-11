@@ -7,7 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { applyJobSchema } from '../middleware/validationSchemas';
 import { validateResumeContent } from '../utils/validateResume';
-import { createNotification } from './notifications';
+import { createNotification, notifyAdmins } from './notifications';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -314,6 +314,20 @@ router.post('/:id/apply', authenticate, upload.single('resume'), validate(applyJ
         title: `Application Received: ${job.position}`,
         message: `Your application for ${job.position} at ${job.company_name} was successfully submitted and is under review.`,
         link: '/jobs?tab=applications',
+      });
+
+      const { data: appProfile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('user_id', req.user!.userId)
+        .maybeSingle();
+      const applicantName = appProfile ? `${appProfile.first_name || ''} ${appProfile.last_name || ''}`.trim() : (req.user?.email || 'Applicant');
+
+      await notifyAdmins({
+        type: 'application',
+        title: `💼 New Job Application: ${job.position}`,
+        message: `${applicantName} submitted an application for ${job.position} at ${job.company_name}.`,
+        link: '/admin/jobs',
       });
     }
 

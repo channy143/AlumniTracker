@@ -219,14 +219,21 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const notifIcon = (type: string) => {
     switch (type) {
+      case 'alumni':
+      case 'registration': return AcademicCapIcon;
       case 'survey': return ClipboardDocumentCheckIcon;
-      case 'job': return BriefcaseIcon;
-      case 'application': return BriefcaseIcon;
+      case 'job':
+      case 'application':
+      case 'employment': return BriefcaseIcon;
+      case 'security':
+      case 'incident':
+      case 'moderation': return ShieldExclamationIcon;
       case 'mentorship':
       case 'connection': return UserGroupIcon;
       case 'post': return ChatBubbleLeftRightIcon;
       case 'announcement': return MegaphoneIcon;
       case 'event': return CalendarIcon;
+      case 'system': return ShieldCheckIcon;
       default: return AcademicCapIcon;
     }
   };
@@ -344,7 +351,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                     <div className="divide-y divide-gray-50">
                       {notifications.map((n: any) => {
                         const Icon = notifIcon(n.type);
-                        const targetLink = resolveNotificationLink(n);
+                        const targetLink = resolveNotificationLink(n, user?.role);
                         return (
                           <div
                             key={n.id}
@@ -380,7 +387,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                               <div className="flex items-center gap-2 mt-1">
                                 {targetLink && (
                                   <span className="text-[10px] font-medium text-orange-600 hover:text-orange-700">
-                                    {getNotificationActionLabel(n.type)}
+                                    {getNotificationActionLabel(n.type, user?.role)}
                                   </span>
                                 )}
                                 <span className="text-[10px] text-gray-400">

@@ -16,13 +16,30 @@ import {
   MegaphoneIcon,
   CalendarDaysIcon,
   ShieldExclamationIcon,
+  ShieldCheckIcon,
+  AcademicCapIcon,
+  BuildingOfficeIcon,
+  ArrowTrendingUpIcon,
   SparklesIcon,
   FunnelIcon,
   EyeIcon,
   ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 
-const NOTIF_TYPES: Record<string, { id: string; label: string; icon: any }> = {
+const ADMIN_NOTIF_TYPES: Record<string, { id: string; label: string; icon: any }> = {
+  alumni: { id: 'alumni', label: 'Alumni Registrations', icon: AcademicCapIcon },
+  survey: { id: 'survey', label: 'Survey Responses', icon: DocumentTextIcon },
+  application: { id: 'application', label: 'Job Applications', icon: BriefcaseIcon },
+  employment: { id: 'employment', label: 'Career Updates', icon: ArrowTrendingUpIcon },
+  security: { id: 'security', label: 'Security & Incidents', icon: ShieldExclamationIcon },
+  moderation: { id: 'moderation', label: 'Content Moderation', icon: ShieldExclamationIcon },
+  company: { id: 'company', label: 'Partner Companies', icon: BuildingOfficeIcon },
+  system: { id: 'system', label: 'System Alerts', icon: ShieldCheckIcon },
+  announcement: { id: 'announcement', label: 'Announcements', icon: MegaphoneIcon },
+  event: { id: 'event', label: 'Events', icon: CalendarDaysIcon },
+};
+
+const ALUMNI_NOTIF_TYPES: Record<string, { id: string; label: string; icon: any }> = {
   survey: { id: 'survey', label: 'Surveys', icon: DocumentTextIcon },
   job: { id: 'job', label: 'Job Opportunities', icon: BriefcaseIcon },
   application: { id: 'application', label: 'Applications', icon: BriefcaseIcon },
@@ -34,8 +51,51 @@ const NOTIF_TYPES: Record<string, { id: string; label: string; icon: any }> = {
   system: { id: 'system', label: 'System & Security', icon: ShieldExclamationIcon },
 };
 
-function getNotifConfig(type?: string) {
+function getNotifConfig(type?: string, isAdmin?: boolean) {
   switch (type) {
+    case 'alumni':
+    case 'registration':
+      return {
+        icon: AcademicCapIcon,
+        color: 'text-blue-600',
+        bg: 'bg-blue-50',
+        badge: isAdmin ? 'Alumni Registration' : 'Account',
+        actionLabel: isAdmin ? 'Review Alumni' : 'View Profile',
+      };
+    case 'employment':
+    case 'career':
+      return {
+        icon: ArrowTrendingUpIcon,
+        color: 'text-teal-600',
+        bg: 'bg-teal-50',
+        badge: 'Career Update',
+        actionLabel: isAdmin ? 'View Alumni Career' : 'View Career',
+      };
+    case 'security':
+    case 'incident':
+      return {
+        icon: ShieldExclamationIcon,
+        color: 'text-red-600',
+        bg: 'bg-red-50',
+        badge: 'Security Incident',
+        actionLabel: isAdmin ? 'Inspect Incident' : 'Inspect Details',
+      };
+    case 'moderation':
+      return {
+        icon: ShieldExclamationIcon,
+        color: 'text-rose-600',
+        bg: 'bg-rose-50',
+        badge: 'Moderation Alert',
+        actionLabel: 'Review Report',
+      };
+    case 'company':
+      return {
+        icon: BuildingOfficeIcon,
+        color: 'text-indigo-600',
+        bg: 'bg-indigo-50',
+        badge: 'Partner Company',
+        actionLabel: isAdmin ? 'View Partner Companies' : 'View Company',
+      };
     case 'group_mention':
     case 'message':
       return {
@@ -46,21 +106,30 @@ function getNotifConfig(type?: string) {
         actionLabel: 'Open Chat',
       };
     case 'survey':
+    case 'survey_response':
       return {
         icon: DocumentTextIcon,
         color: 'text-amber-600',
         bg: 'bg-amber-50',
-        badge: 'Survey',
-        actionLabel: 'Take Survey',
+        badge: isAdmin ? 'Survey Response' : 'Survey',
+        actionLabel: isAdmin ? 'View Responses' : 'Take Survey',
       };
     case 'job':
-    case 'application':
       return {
         icon: BriefcaseIcon,
         color: 'text-emerald-600',
         bg: 'bg-emerald-50',
         badge: 'Job Opportunity',
-        actionLabel: 'View Details',
+        actionLabel: isAdmin ? 'Manage Jobs' : 'View Details',
+      };
+    case 'application':
+    case 'job_application':
+      return {
+        icon: BriefcaseIcon,
+        color: 'text-emerald-600',
+        bg: 'bg-emerald-50',
+        badge: 'Job Application',
+        actionLabel: isAdmin ? 'Review Application' : 'View Application',
       };
     case 'mentorship':
     case 'connection':
@@ -85,7 +154,7 @@ function getNotifConfig(type?: string) {
         color: 'text-orange-600',
         bg: 'bg-orange-50',
         badge: 'Announcement',
-        actionLabel: 'Read More',
+        actionLabel: isAdmin ? 'Manage Announcements' : 'Read More',
       };
     case 'event':
       return {
@@ -93,15 +162,15 @@ function getNotifConfig(type?: string) {
         color: 'text-purple-600',
         bg: 'bg-purple-50',
         badge: 'Event',
-        actionLabel: 'View Event',
+        actionLabel: isAdmin ? 'Manage Events' : 'View Event',
       };
     case 'system':
       return {
-        icon: ShieldExclamationIcon,
-        color: 'text-red-600',
-        bg: 'bg-red-50',
+        icon: ShieldCheckIcon,
+        color: 'text-slate-600',
+        bg: 'bg-slate-100',
         badge: 'System Alert',
-        actionLabel: 'Inspect',
+        actionLabel: isAdmin ? 'System Settings' : 'Inspect',
       };
     default:
       return {
@@ -212,7 +281,7 @@ export default function NotificationsPage() {
     if (!n.is_read) {
       handleMarkRead(n.id);
     }
-    const targetLink = resolveNotificationLink(n);
+    const targetLink = resolveNotificationLink(n, user?.role);
     const groupMatch = targetLink?.match(/group=([^&]+)/);
     if (groupMatch) {
       const groupId = groupMatch[1];
@@ -230,6 +299,9 @@ export default function NotificationsPage() {
       navigate(targetLink);
     }
   };
+
+  const isAdmin = user?.role === 'admin';
+  const notifCategories = useMemo(() => (isAdmin ? ADMIN_NOTIF_TYPES : ALUMNI_NOTIF_TYPES), [isAdmin]);
 
   const filteredNotifications = useMemo(() => {
     return notifications.filter((n) => {
@@ -266,7 +338,7 @@ export default function NotificationsPage() {
           <div>
             <div className="flex items-center gap-2.5 mb-1.5">
               <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[11px] font-bold uppercase tracking-wider backdrop-blur-xs">
-                Notification Center
+                {isAdmin ? 'Admin Notification Center' : 'Notification Center'}
               </span>
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">
@@ -274,9 +346,13 @@ export default function NotificationsPage() {
                 </span>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">All Notifications</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              {isAdmin ? 'Administrative Notifications' : 'All Notifications'}
+            </h1>
             <p className="text-xs sm:text-sm text-orange-100 mt-1 max-w-xl">
-              Stay updated with academic tracer surveys, career opportunities, security alerts, and campus announcements.
+              {isAdmin
+                ? 'Institutional stream of alumni registrations, tracer survey responses, job applications, career updates, and security alerts.'
+                : 'Stay updated with academic tracer surveys, career opportunities, security alerts, and campus announcements.'}
             </p>
           </div>
 
@@ -364,7 +440,7 @@ export default function NotificationsPage() {
           >
             All Categories
           </button>
-          {Object.entries(NOTIF_TYPES).map(([key, item]) => {
+          {Object.entries(notifCategories).map(([key, item]) => {
             const Icon = item.icon;
             const isSelected = typeFilter === key;
             return (
@@ -390,7 +466,7 @@ export default function NotificationsPage() {
         {loading ? (
           <div className="p-12 text-center space-y-3">
             <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-gray-400">Loading your notifications...</p>
+            <p className="text-xs text-gray-400">Loading notifications...</p>
           </div>
         ) : filteredNotifications.length === 0 ? (
           <div className="py-16 px-4 text-center space-y-3">
@@ -401,15 +477,17 @@ export default function NotificationsPage() {
             <p className="text-xs text-gray-500 max-w-sm mx-auto">
               {search || typeFilter !== 'all' || activeTab === 'unread'
                 ? 'No notifications match your current filter or search criteria.'
+                : isAdmin
+                ? 'You are completely caught up! New alumni registrations, tracer responses, and security alerts will appear here.'
                 : 'You are completely caught up! We will alert you when new tracer surveys, job opportunities, or announcements arrive.'}
             </p>
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
             {filteredNotifications.map((notif) => {
-              const cfg = getNotifConfig(notif.type);
+              const cfg = getNotifConfig(notif.type, isAdmin);
               const Icon = cfg.icon;
-              const targetLink = resolveNotificationLink(notif);
+              const targetLink = resolveNotificationLink(notif, user?.role);
 
               return (
                 <div
@@ -457,7 +535,7 @@ export default function NotificationsPage() {
                     {targetLink && (
                       <div className="mt-2.5">
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 group-hover:text-orange-700 group-hover:underline">
-                          <span>{getNotificationActionLabel(notif.type) || cfg.actionLabel}</span>
+                          <span>{getNotificationActionLabel(notif.type, user?.role) || cfg.actionLabel}</span>
                         </span>
                       </div>
                     )}

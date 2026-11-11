@@ -3,6 +3,7 @@ import { supabase } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
+import { notifyAdmins } from './notifications';
 
 const STANDARD_QUESTIONS = [
   { id: 'personal_info', section: 'Personal Information', type: 'section' },
@@ -288,6 +289,14 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
       }
     }
 
+    const alumniName = [responses?.firstName, responses?.lastName].filter(Boolean).join(' ') || req.user?.email?.split('@')[0] || 'Alumnus';
+    notifyAdmins({
+      type: 'survey',
+      title: '📋 Alumni Onboarding Survey Completed',
+      message: `${alumniName} completed their baseline onboarding survey. Employment: ${responses?.employmentStatus || 'Not specified'}.`,
+      link: '/admin/surveys',
+    });
+
     res.json({
       success: true,
       message: 'Onboarding survey and consent successfully recorded.',
@@ -366,6 +375,30 @@ router.post('/:id/respond', authenticate, async (req: AuthenticatedRequest, res,
       .eq('survey_id', req.params.id)
       .eq('user_id', req.user!.userId)
       .eq('type', 'survey');
+
+    const [{ data: userProfile }, { data: surveyRec }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('user_id', req.user!.userId)
+        .maybeSingle(),
+      supabase
+        .from('surveys')
+        .select('id, title')
+        .eq('id', req.params.id)
+        .maybeSingle(),
+    ]);
+
+    const respondentName = userProfile ? `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() : (req.user?.email || 'Alumnus');
+    const surveyTitle = surveyRec?.title || 'Tracer Survey';
+
+    notifyAdmins({
+      type: 'survey',
+      title: `📋 Tracer Survey Response: ${surveyTitle}`,
+      message: `${respondentName} submitted their response for "${surveyTitle}".`,
+      link: '/admin/surveys',
+      surveyId: req.params.id,
+    });
 
     res.status(201).json({ success: true, response: surveyResponse });
   } catch (err) {
