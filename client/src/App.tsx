@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useHeartbeat } from '@/hooks/useHeartbeat';
 import MainLayout from '@/components/layout/MainLayout';
 import AuthLayout from '@/components/layout/AuthLayout';
+import ScrollToTop from '@/components/layout/ScrollToTop';
 
 import LandingPage from '@/pages/landing/LandingPage';
 import LoginPage from '@/pages/auth/LoginPage';
@@ -111,7 +112,9 @@ export default function App() {
   useAuth();
   useHeartbeat();
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       <Route path="/" element={<IndexRoute />}>
         <Route index element={<DashboardPage />} />
         <Route path="profile" element={<ProfilePage />} />
@@ -182,5 +185,6 @@ export default function App() {
         <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>
+    </>
   );
 }

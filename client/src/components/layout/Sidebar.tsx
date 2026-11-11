@@ -88,6 +88,13 @@ export default function Sidebar({
       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
     }`;
 
+  const handleNavClick = () => {
+    onMobileClose();
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  };
+
   const items = isAdminPath && user?.role === 'admin' ? adminNav : mainNav;
 
   return (
@@ -133,7 +140,7 @@ export default function Sidebar({
                 <NavLink
                   key={item.name}
                   to={item.href}
-                  onClick={onMobileClose}
+                  onClick={handleNavClick}
                   className={isAdminPath ? linkClass : ({ isActive }) =>
                     `flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
                       ? 'bg-gray-100 text-orange-600 font-semibold'
@@ -161,7 +168,7 @@ export default function Sidebar({
                       <NavLink
                         key={item.name}
                         to={item.href}
-                        onClick={onMobileClose}
+                        onClick={handleNavClick}
                         className={({ isActive }) =>
                           `flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
                             ? 'bg-gray-100 text-orange-600 font-semibold'

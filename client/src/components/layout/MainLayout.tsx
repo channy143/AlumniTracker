@@ -81,6 +81,11 @@ export default function MainLayout() {
               key={item.name}
               to={item.href}
               end={item.end}
+              onClick={() => {
+                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                document.documentElement.scrollTop = 0;
+                document.body.scrollTop = 0;
+              }}
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl text-[10px] font-semibold transition-colors ${
                   isActive
