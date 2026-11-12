@@ -21,13 +21,35 @@ export class ApiError extends Error {
   status: number;
   cooldownSeconds?: number;
   remainingAttempts?: number;
+  code?: string;
+  blocked?: boolean;
+  category?: string;
+  categoryLabel?: string;
+  reason?: string;
 
-  constructor(message: string, status: number, cooldownSeconds?: number, remainingAttempts?: number) {
+  constructor(
+    message: string,
+    status: number,
+    cooldownSeconds?: number,
+    remainingAttempts?: number,
+    extra?: {
+      code?: string;
+      blocked?: boolean;
+      category?: string;
+      categoryLabel?: string;
+      reason?: string;
+    }
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.cooldownSeconds = cooldownSeconds;
     this.remainingAttempts = remainingAttempts;
+    this.code = extra?.code;
+    this.blocked = extra?.blocked;
+    this.category = extra?.category;
+    this.categoryLabel = extra?.categoryLabel;
+    this.reason = extra?.reason;
   }
 }
 
@@ -86,7 +108,14 @@ async function request<T>(
       userMsg,
       response.status,
       cooldown,
-      error.remainingAttempts
+      error.remainingAttempts,
+      {
+        code: error.code,
+        blocked: error.blocked,
+        category: error.category,
+        categoryLabel: error.categoryLabel,
+        reason: error.reason,
+      }
     );
   }
 
@@ -612,6 +641,10 @@ export const messagesApi = {
   conversations: () => api.get<any[]>('/messages/conversations'),
   getConversation: (profileId: string) => api.get<any[]>(`/messages/${profileId}`),
   unreadCount: () => api.get<{ count: number }>('/messages/unread/count'),
+  getPolicyNoticeStatus: () =>
+    api.get<{ seen: boolean }>('/messages/policy-notice', { skipCache: true }),
+  markPolicyNoticeSeen: () =>
+    api.post<{ seen: boolean }>('/messages/policy-notice/seen', {}),
   heartbeat: () => api.post<{ success: boolean; last_active_at: string }>('/messages/heartbeat', {}),
   offline: () => {
     const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');

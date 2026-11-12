@@ -14,6 +14,7 @@ import {
   PhotoIcon,
   CameraIcon,
   AtSymbolIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { useChatStore } from '@/store/chatStore';
 import { messagesApi, profileApi, connectionsApi } from '@/services/api';
@@ -160,6 +161,15 @@ interface MessageItem {
   reactions?: Record<string, { emoji: string; name?: string; updated_at?: string } | string>;
 }
 
+interface BlockedNoticeItem {
+  id: string;
+  attemptedText: string;
+  categoryLabel: string;
+  reason: string;
+  message: string;
+  createdAt: string;
+}
+
 function formatLastActive(dateStr?: string | null): string {
   if (!dateStr) return 'Offline';
   const now = Date.now();
@@ -228,6 +238,14 @@ export default function DockedChatBox() {
 
   // Photo Lightbox modal
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
+
+  // Blocked non-business message notices per conversation
+  const [blockedNoticesByChat, setBlockedNoticesByChat] = useState<Record<string, BlockedNoticeItem[]>>({});
+
+  // First-time brief policy notice (persisted per alumni user in database across devices & incognito)
+  const [showFirstTimePolicyNotice, setShowFirstTimePolicyNotice] = useState(false);
+  const policyNoticeCheckedRef = useRef(false);
+  const policyNoticeTimerRef = useRef<any>(null);
 
   // Group Mention autocomplete state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -377,6 +395,37 @@ export default function DockedChatBox() {
         }
       })
       .catch(() => {});
+  }, []);
+
+  // Show first-time brief policy notice once per alumni account (backed by DB across devices/incognito)
+  useEffect(() => {
+    if (!isOpen || !activeChat?.profileId || policyNoticeCheckedRef.current) return;
+    policyNoticeCheckedRef.current = true;
+
+    let cancelled = false;
+    messagesApi
+      .getPolicyNoticeStatus()
+      .then((res) => {
+        if (cancelled) return;
+        if (res && res.seen === false) {
+          setShowFirstTimePolicyNotice(true);
+          messagesApi.markPolicyNoticeSeen().catch(() => {});
+          policyNoticeTimerRef.current = setTimeout(() => {
+            setShowFirstTimePolicyNotice(false);
+          }, 6000);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, activeChat?.profileId]);
+
+  useEffect(() => {
+    return () => {
+      if (policyNoticeTimerRef.current) clearTimeout(policyNoticeTimerRef.current);
+    };
   }, []);
 
   // Fetch presence for direct chat contacts and minimized conversation heads
@@ -718,6 +767,33 @@ export default function DockedChatBox() {
       }
     } catch (err: any) {
       setUploadingMsgPhoto(false);
+      if (err?.blocked || err?.code === 'NON_BUSINESS_MESSAGE_BLOCKED' || err?.status === 422) {
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => m.id !== tempId);
+          setChatMessages(targetProfileId, filtered);
+          return filtered;
+        });
+        const notice: BlockedNoticeItem = {
+          id: `blocked-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          attemptedText: rawText,
+          categoryLabel: err?.categoryLabel || 'Non-Business / Casual Conversation',
+          reason:
+            err?.reason ||
+            'Alumni Messaging is strictly reserved for business, career, academic, or official matters.',
+          message:
+            err?.message ||
+            'Message blocked because it does not appear to be business or alumni-related.',
+          createdAt: new Date().toISOString(),
+        };
+        setBlockedNoticesByChat((prev) => ({
+          ...prev,
+          [targetProfileId]: [...(prev[targetProfileId] || []), notice],
+        }));
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 20);
+        return;
+      }
       console.error('Failed to deliver message:', err);
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m))
@@ -1286,13 +1362,35 @@ export default function DockedChatBox() {
           ) : (
             /* VIEW: Message List */
             <>
+              {/* First-time Brief Business-Only Policy Notice (disappears permanently after first view) */}
+              {showFirstTimePolicyNotice && (
+                <div className="px-3 py-2 bg-orange-50 border-b border-orange-200/80 flex items-start justify-between gap-2 text-[11px] text-orange-900 shrink-0 animate-fade-in">
+                  <div className="flex items-start gap-2 min-w-0 flex-1">
+                    <ShieldCheckIcon className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+                    <p className="leading-snug break-words">
+                      <span className="font-semibold">Business, career &amp; alumni inquiries only</span>
+                      {' · '}
+                      Casual chat or &ldquo;chika&rdquo; is automatically blocked.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFirstTimePolicyNotice(false)}
+                    className="text-orange-500 hover:text-orange-700 p-0.5 rounded shrink-0 cursor-pointer"
+                    title="Dismiss notice"
+                  >
+                    <XMarkIcon className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               <div
                 onClick={() => setActiveReactionMsgId(null)}
                 className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2.5 bg-gradient-to-b from-gray-50/50 to-white"
               >
                 {loadingChat && messages.length === 0 ? (
                   <SkeletonChatMessages />
-                ) : messages.length === 0 ? (
+                ) : messages.length === 0 && (blockedNoticesByChat[activeChat.profileId] || []).length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-4">
                     <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-xl font-bold mb-2 shadow-inner">
                       {activeChat.isGroup ? <UserGroupIcon className="w-8 h-8" /> : getInitials(activeChat.name)}
@@ -1686,6 +1784,71 @@ export default function DockedChatBox() {
                     );
                   })
                 )}
+
+                {/* Inline Blocked / Non-Business Message Notices */}
+                {(blockedNoticesByChat[activeChat.profileId] || []).map((notice) => (
+                  <div
+                    key={notice.id}
+                    className="mx-auto max-w-[95%] rounded-xl border border-red-200 bg-red-50/95 p-2.5 shadow-2xs text-xs animate-fade-in"
+                  >
+                    <div className="flex items-start gap-2">
+                      <ExclamationTriangleIcon className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-red-800 text-[11px] leading-snug">
+                          Message Not Sent (Blocked)
+                        </p>
+                        <div className="mt-1">
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-semibold">
+                            {notice.categoryLabel}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-red-700 mt-1 leading-snug">
+                          Due to: {notice.reason}
+                        </p>
+                        {notice.attemptedText && (
+                          <p className="mt-1 px-2 py-1 rounded bg-white/80 border border-red-100 text-[11px] text-gray-500 line-through break-words">
+                            {notice.attemptedText}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1.5">
+                          {notice.attemptedText && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInputText(notice.attemptedText);
+                                setBlockedNoticesByChat((prev) => ({
+                                  ...prev,
+                                  [activeChat.profileId]: (prev[activeChat.profileId] || []).filter(
+                                    (n) => n.id !== notice.id
+                                  ),
+                                }));
+                                setTimeout(() => inputRef.current?.focus(), 20);
+                              }}
+                              className="text-[10px] font-semibold text-orange-700 hover:text-orange-800 underline cursor-pointer"
+                            >
+                              Rephrase
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setBlockedNoticesByChat((prev) => ({
+                                ...prev,
+                                [activeChat.profileId]: (prev[activeChat.profileId] || []).filter(
+                                  (n) => n.id !== notice.id
+                                ),
+                              }))
+                            }
+                            className="text-[10px] font-medium text-gray-500 hover:text-gray-700 cursor-pointer"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
                 <div ref={messagesEndRef} />
               </div>
 
@@ -1757,7 +1920,7 @@ export default function DockedChatBox() {
               <div className="px-3 py-1 bg-gray-50/90 border-t border-gray-100 flex items-center justify-between text-xs shrink-0">
                 <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Quick:</span>
                 <div className="flex items-center gap-1.5">
-                  {['🎓', '👍', '❤️', '🔥', '🎉', '👏', '🚀'].map((em) => (
+                  {['🎓', '👍', '👏', '🤝', '💼', '🚀'].map((em) => (
                     <button
                       key={em}
                       type="button"
@@ -1911,34 +2074,24 @@ export default function DockedChatBox() {
                     replyingTo
                       ? `Reply to ${replyingTo.senderId === currentProfileId ? 'yourself' : replyingTo.senderName}...`
                       : activeChat.isGroup
-                        ? 'Message group (type @ to mention)...'
-                        : 'Write a message...'
+                        ? 'Business message to group (@ to mention)...'
+                        : 'Write a business or alumni message...'
                   }
                   className="flex-1 bg-gray-100 hover:bg-gray-200/60 focus:bg-white focus:ring-1 focus:ring-orange-500 border border-transparent focus:border-orange-400 rounded-full px-3.5 py-1.5 text-sm text-gray-800 placeholder-gray-500 outline-none transition-all"
                 />
 
-                {inputText.trim() || pendingPhotoFile ? (
-                  <button
-                    onClick={() => handleSend()}
-                    disabled={uploadingMsgPhoto}
-                    className="p-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-full transition-colors shadow-xs cursor-pointer active:scale-95"
-                    title="Send message"
-                  >
-                    {uploadingMsgPhoto ? (
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-                    ) : (
-                      <PaperAirplaneIcon className="w-4 h-4" />
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleSend('👋')}
-                    className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-full transition-colors text-base cursor-pointer active:scale-95"
-                    title="Send Wave"
-                  >
-                    👋
-                  </button>
-                )}
+                <button
+                  onClick={() => handleSend()}
+                  disabled={uploadingMsgPhoto || (!inputText.trim() && !pendingPhotoFile)}
+                  className="p-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-full transition-colors shadow-xs cursor-pointer active:scale-95"
+                  title="Send business message"
+                >
+                  {uploadingMsgPhoto ? (
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                  ) : (
+                    <PaperAirplaneIcon className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </>
           )}

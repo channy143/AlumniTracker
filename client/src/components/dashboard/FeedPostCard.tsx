@@ -2207,12 +2207,14 @@ export default function FeedPostCard({
         document.body
       )}
 
-      {/* Floating Feedback Toast */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-60 bg-gray-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-xl animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2">
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      {/* Floating Feedback Toast (portaled above all stacking contexts) */}
+      {toastMessage &&
+        createPortal(
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 sm:top-auto sm:left-auto sm:translate-x-0 sm:bottom-6 sm:right-6 z-[99999] pointer-events-none w-max max-w-[calc(100vw-2rem)] bg-gray-900 text-white text-xs font-medium px-4 py-2.5 rounded-xl shadow-2xl animate-in fade-in duration-150 flex items-center gap-2">
+            <span>{toastMessage}</span>
+          </div>,
+          document.body
+        )}
 
       {/* Lightbox / Fullscreen Image Viewer Modal */}
       {showImageLightbox && currentPost.image_url && createPortal(

@@ -8,6 +8,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { sanitizeFilterInput } from '../utils/sanitizeFilterInput';
 import { sendMessageSchema } from '../middleware/validationSchemas';
+import { analyzeMessageRelevance } from '../utils/messageModeration';
 
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '../middleware/auth';
@@ -191,6 +192,74 @@ router.get('/presence', authenticate, async (req: AuthenticatedRequest, res, nex
     }
 
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+// GET /api/messages/policy-notice - check whether the authenticated alumni has seen the business-only chat notice
+router.get('/policy-notice', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('id, privacy_settings')
+      .eq('user_id', req.user!.userId)
+      .maybeSingle();
+
+    if (error) throw new AppError(error.message, 500);
+    if (!profile) return res.json({ seen: true });
+
+    let privacy: Record<string, any> = {};
+    if (typeof profile.privacy_settings === 'string') {
+      try {
+        privacy = JSON.parse(profile.privacy_settings) || {};
+      } catch {
+        privacy = {};
+      }
+    } else if (profile.privacy_settings && typeof profile.privacy_settings === 'object') {
+      privacy = profile.privacy_settings;
+    }
+
+    return res.json({ seen: Boolean(privacy.seen_business_chat_notice) });
+  } catch (err) { next(err); }
+});
+
+// POST /api/messages/policy-notice/seen - permanently record across all devices/sessions that the alumni has seen the notice
+router.post('/policy-notice/seen', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { data: profile, error: fetchErr } = await supabase
+      .from('profiles')
+      .select('id, privacy_settings')
+      .eq('user_id', req.user!.userId)
+      .maybeSingle();
+
+    if (fetchErr) throw new AppError(fetchErr.message, 500);
+    if (!profile) return res.json({ seen: true });
+
+    let existingPrivacy: Record<string, any> = {};
+    if (typeof profile.privacy_settings === 'string') {
+      try {
+        existingPrivacy = JSON.parse(profile.privacy_settings) || {};
+      } catch {
+        existingPrivacy = {};
+      }
+    } else if (profile.privacy_settings && typeof profile.privacy_settings === 'object') {
+      existingPrivacy = profile.privacy_settings;
+    }
+
+    const updatedPrivacy = {
+      ...existingPrivacy,
+      seen_business_chat_notice: true,
+      seen_business_chat_notice_at:
+        existingPrivacy.seen_business_chat_notice_at || new Date().toISOString(),
+    };
+
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ privacy_settings: updatedPrivacy })
+      .eq('id', profile.id);
+
+    if (updateErr) throw new AppError(updateErr.message, 500);
+
+    return res.json({ seen: true });
   } catch (err) { next(err); }
 });
 
@@ -659,6 +728,19 @@ router.post('/groups/:groupId/messages', authenticate, async (req: Authenticated
 
     if (!member) {
       throw new AppError('You are not a member of this group chat', 403);
+    }
+
+    // Enforce business/professional-only message policy
+    const moderation = analyzeMessageRelevance(body.trim());
+    if (!moderation.allowed) {
+      return res.status(422).json({
+        blocked: true,
+        code: 'NON_BUSINESS_MESSAGE_BLOCKED',
+        category: moderation.category,
+        categoryLabel: moderation.categoryLabel,
+        reason: moderation.reason,
+        message: moderation.userNotice,
+      });
     }
 
     const isUuid = typeof reply_to_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reply_to_id);
@@ -1140,6 +1222,19 @@ router.post('/', authenticate, validate(sendMessageSchema), async (req: Authenti
   try {
     const { receiver_id, subject, body, connection_id, reply_to_id, reply_preview } = req.body;
     if (!receiver_id || !body) throw new AppError('Receiver and message body are required', 400);
+
+    // Enforce business/professional-only message policy
+    const moderation = analyzeMessageRelevance(body, subject);
+    if (!moderation.allowed) {
+      return res.status(422).json({
+        blocked: true,
+        code: 'NON_BUSINESS_MESSAGE_BLOCKED',
+        category: moderation.category,
+        categoryLabel: moderation.categoryLabel,
+        reason: moderation.reason,
+        message: moderation.userNotice,
+      });
+    }
 
     // Fast profile resolution using RAM cache
     const senderProfileId = await getProfileIdForUser(req.user!.userId);
