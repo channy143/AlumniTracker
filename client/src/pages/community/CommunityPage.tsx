@@ -24,6 +24,9 @@ import { SkeletonForumPostCard, SkeletonEventItem } from '@/components/ui/Skelet
 import { REAL_REACTIONS } from '@/components/dashboard/FeedPostCard';
 import { dedupeCommentTree, countAllComments } from '@/utils/helpers';
 import { getCached } from '@/utils/apiCache';
+import MentionInput from '@/components/ui/MentionInput';
+import MentionText from '@/components/ui/MentionText';
+import { MentionCandidate } from '@/hooks/useMentionPeople';
 
 const FORUM_TAGS = [
   'Job Opportunity',
@@ -66,6 +69,7 @@ export default function CommunityPage() {
     content: '',
     tags: ['Job Opportunity'] as string[],
   });
+  const [postFormMentions, setPostFormMentions] = useState<Array<{ id: string; name: string }>>([]);
   const [saving, setSaving] = useState(false);
 
   const [showGroupModal, setShowGroupModal] = useState(false);
@@ -78,10 +82,12 @@ export default function CommunityPage() {
 
   const [expandedPostIds, setExpandedPostIds] = useState<Record<string, boolean>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [commentMentionsMap, setCommentMentionsMap] = useState<Record<string, Array<{ id: string; name: string }>>>({});
   const [submittingCommentMap, setSubmittingCommentMap] = useState<Record<string, boolean>>({});
   const submittingCommentKeysRef = useRef<Set<string>>(new Set());
   const [replyingCommentMap, setReplyingCommentMap] = useState<Record<string, { parentCommentId: string; authorName: string } | null>>({});
   const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
+  const [replyMentionsMap, setReplyMentionsMap] = useState<Record<string, Array<{ id: string; name: string }>>>({});
   const [submittingReplyMap, setSubmittingReplyMap] = useState<Record<string, boolean>>({});
   const submittingReplyKeysRef = useRef<Set<string>>(new Set());
   const [activeCommentReactionPickerId, setActiveCommentReactionPickerId] = useState<string | null>(null);
@@ -212,14 +218,19 @@ export default function CommunityPage() {
     if (!targetGroupId || !postForm.title.trim() || !postForm.content.trim()) return;
     try {
       setSaving(true);
+      const activeMentions = postFormMentions.filter((m) =>
+        postForm.content.toLowerCase().includes(`@${m.name.toLowerCase()}`)
+      );
       const created = await communityApi.createPost({
         group_id: targetGroupId,
         title: postForm.title.trim(),
         content: postForm.content.trim(),
         tags: postForm.tags,
+        mentions: activeMentions,
       });
       setShowPostModal(false);
       setPostForm((prev) => ({ ...prev, title: '', content: '' }));
+      setPostFormMentions([]);
       if (created) {
         setPosts((prev) => [created, ...prev]);
         setGroups((prev) =>
@@ -270,8 +281,12 @@ export default function CommunityPage() {
     submittingCommentKeysRef.current.add(postId);
     setSubmittingCommentMap((prev) => ({ ...prev, [postId]: true }));
     try {
-      const res = await communityApi.addComment(postId, text);
+      const activeMentions = (commentMentionsMap[postId] || []).filter((m) =>
+        text.toLowerCase().includes(`@${m.name.toLowerCase()}`)
+      );
+      const res = await communityApi.addComment(postId, text, undefined, activeMentions);
       setCommentInputs((prev) => ({ ...prev, [postId]: '' }));
+      setCommentMentionsMap((prev) => ({ ...prev, [postId]: [] }));
       setExpandedPostIds((prev) => ({ ...prev, [postId]: true }));
       setPosts((prev) =>
         prev.map((p) =>
@@ -301,8 +316,12 @@ export default function CommunityPage() {
     submittingReplyKeysRef.current.add(replyKey);
     setSubmittingReplyMap((prev) => ({ ...prev, [replyKey]: true }));
     try {
-      const res = await communityApi.addComment(postId, text, parentCommentId);
+      const activeMentions = (replyMentionsMap[replyKey] || []).filter((m) =>
+        text.toLowerCase().includes(`@${m.name.toLowerCase()}`)
+      );
+      const res = await communityApi.addComment(postId, text, parentCommentId, activeMentions);
       setReplyInputs((prev) => ({ ...prev, [replyKey]: '' }));
+      setReplyMentionsMap((prev) => ({ ...prev, [replyKey]: [] }));
       setReplyingCommentMap((prev) => ({ ...prev, [postId]: null }));
       setPosts((prev) =>
         prev.map((p) =>
@@ -736,7 +755,10 @@ export default function CommunityPage() {
                         {post.title}
                       </h3>
                       <p className="text-xs sm:text-sm text-gray-600 mt-1 whitespace-pre-wrap break-words leading-relaxed">
-                        {post.content}
+                        <MentionText
+                          text={post.content}
+                          mentionedProfiles={post.mentioned_profiles}
+                        />
                       </p>
                     </div>
 
@@ -847,7 +869,10 @@ export default function CommunityPage() {
                                           </div>
                                         </div>
                                         <p className="text-xs text-gray-700 mt-0.5 break-words whitespace-pre-wrap leading-relaxed">
-                                          {c.content}
+                                          <MentionText
+                                            text={c.content}
+                                            mentionedProfiles={c.mentioned_profiles}
+                                          />
                                         </p>
                                       </div>
                                     </div>
@@ -955,12 +980,25 @@ export default function CommunityPage() {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                               <div className="flex items-center justify-between gap-2">
-                                                <span className="font-bold text-gray-900 text-[11px] truncate">{reply.author_name}</span>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => reply.author_id && navigate(`/directory/${reply.author_id}`)}
+                                                  className={`font-bold text-gray-900 text-[11px] truncate text-left ${
+                                                    reply.author_id ? 'hover:text-orange-600 hover:underline cursor-pointer' : ''
+                                                  }`}
+                                                >
+                                                  {reply.author_name}
+                                                </button>
                                                 <span className="text-[9px] text-gray-400 shrink-0">
                                                   {reply.created_at ? new Date(reply.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                                 </span>
                                               </div>
-                                              <p className="text-xs text-gray-700 mt-0.5 break-words">{reply.content}</p>
+                                              <p className="text-xs text-gray-700 mt-0.5 break-words">
+                                                <MentionText
+                                                  text={reply.content}
+                                                  mentionedProfiles={reply.mentioned_profiles}
+                                                />
+                                              </p>
                                             </div>
                                           </div>
 
@@ -1065,12 +1103,24 @@ export default function CommunityPage() {
                                         </button>
                                       </div>
                                       <div className="flex items-center gap-1.5">
-                                        <input
-                                          type="text"
+                                        <MentionInput
+                                          as="input"
                                           value={replyInputs[replyKey] || ''}
-                                          onChange={(e) => setReplyInputs((prev) => ({ ...prev, [replyKey]: e.target.value }))}
-                                          placeholder={`Reply to ${replyingCommentMap[post.id]?.authorName}...`}
-                                          className="flex-1 h-8 px-3 bg-white border border-gray-200 rounded-full text-xs text-gray-800 placeholder-gray-400 outline-none focus:border-orange-400"
+                                          onChange={(val) => setReplyInputs((prev) => ({ ...prev, [replyKey]: val }))}
+                                          onMentionSelect={(candidate: MentionCandidate) => {
+                                            setReplyMentionsMap((prev) => {
+                                              const current = prev[replyKey] || [];
+                                              return current.some((m) => m.id === candidate.id)
+                                                ? prev
+                                                : {
+                                                    ...prev,
+                                                    [replyKey]: [...current, { id: candidate.id, name: candidate.name }],
+                                                  };
+                                            });
+                                          }}
+                                          dropdownPosition="top"
+                                          placeholder={`Reply to ${replyingCommentMap[post.id]?.authorName}... (type @ to mention)`}
+                                          className="w-full h-8 px-3 bg-white border border-gray-200 rounded-full text-xs text-gray-800 placeholder-gray-400 outline-none focus:border-orange-400"
                                           autoFocus
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !e.shiftKey) {
@@ -1098,20 +1148,32 @@ export default function CommunityPage() {
 
                         {/* Add Reply Input */}
                         <div className="flex items-center gap-2">
-                          <input
-                            type="text"
+                          <MentionInput
+                            as="input"
                             value={commentInputs[post.id] || ''}
-                            onChange={(e) =>
-                              setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))
+                            onChange={(val) =>
+                              setCommentInputs((prev) => ({ ...prev, [post.id]: val }))
                             }
+                            onMentionSelect={(candidate: MentionCandidate) => {
+                              setCommentMentionsMap((prev) => {
+                                const current = prev[post.id] || [];
+                                return current.some((m) => m.id === candidate.id)
+                                  ? prev
+                                  : {
+                                      ...prev,
+                                      [post.id]: [...current, { id: candidate.id, name: candidate.name }],
+                                    };
+                              });
+                            }}
+                            dropdownPosition="top"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
                                 handleAddComment(post.id);
                               }
                             }}
-                            placeholder="Write a comment or share details..."
-                            className="flex-1 h-8 px-3 bg-white border border-gray-200 rounded-full text-xs text-gray-800 placeholder-gray-400 outline-none focus:border-orange-400"
+                            placeholder="Write a comment or share details... (type @ to mention)"
+                            className="w-full h-8 px-3 bg-white border border-gray-200 rounded-full text-xs text-gray-800 placeholder-gray-400 outline-none focus:border-orange-400"
                           />
                           <button
                             type="button"
@@ -1370,11 +1432,20 @@ export default function CommunityPage() {
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   Details &amp; How to Connect
                 </label>
-                <textarea
+                <MentionInput
+                  as="textarea"
                   value={postForm.content}
-                  onChange={(e) => setPostForm({ ...postForm, content: e.target.value })}
+                  onChange={(val) => setPostForm({ ...postForm, content: val })}
+                  onMentionSelect={(candidate: MentionCandidate) => {
+                    setPostFormMentions((prev) =>
+                      prev.some((m) => m.id === candidate.id)
+                        ? prev
+                        : [...prev, { id: candidate.id, name: candidate.name }]
+                    );
+                  }}
+                  dropdownPosition="bottom"
                   rows={5}
-                  placeholder="Share role details, qualifications, application links, or your question for fellow alumni..."
+                  placeholder="Share role details, qualifications, application links, or your question for fellow alumni... (type @ to mention)"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all placeholder:text-gray-400"
                 />
               </div>

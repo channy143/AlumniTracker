@@ -387,6 +387,7 @@ export const createPostSchema = z.object({
   feeling: z.string().max(100).optional().nullable().or(z.literal('')),
   location: z.string().max(150).optional().nullable().or(z.literal('')),
   tagged_friends: z.any().optional().nullable(),
+  mentions: z.array(z.object({ id: z.string().max(64), name: z.string().max(200) })).max(50).optional(),
   media_type: z.enum(['photo', 'video']).optional(),
   video_url: z.string().max(2000).optional().nullable().or(z.literal('')),
 }).strict();
@@ -401,6 +402,7 @@ export const updatePostSchema = z.object({
   feeling: z.string().max(100).optional().nullable().or(z.literal('')),
   location: z.string().max(150).optional().nullable().or(z.literal('')),
   tagged_friends: z.any().optional().nullable(),
+  mentions: z.array(z.object({ id: z.string().max(64), name: z.string().max(200) })).max(50).optional(),
   comments_disabled: z.boolean().optional(),
 }).strict();
 

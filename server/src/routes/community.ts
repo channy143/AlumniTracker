@@ -4,6 +4,11 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { createNotification } from './notifications';
+import {
+  fetchAllMentionCandidateProfiles,
+  matchMentionsInText,
+  notifyMentionedUsers,
+} from '../utils/mentions';
 
 const router = Router();
 
@@ -138,6 +143,43 @@ function formatForumPost(post: any, myProfileId?: string | null) {
   };
 }
 
+function commentTreeContainsAt(comments: any[]): boolean {
+  return (comments || []).some(
+    (c: any) =>
+      (typeof c?.content === 'string' && c.content.includes('@')) ||
+      (Array.isArray(c?.replies) && commentTreeContainsAt(c.replies))
+  );
+}
+
+function attachMentionsToComments(comments: any[], candidates: any[]): any[] {
+  return (comments || []).map((c: any) => ({
+    ...c,
+    mentioned_profiles:
+      typeof c?.content === 'string' && c.content.includes('@')
+        ? matchMentionsInText(c.content, candidates).map(({ id, name }) => ({ id, name }))
+        : [],
+    replies: Array.isArray(c?.replies) ? attachMentionsToComments(c.replies, candidates) : [],
+  }));
+}
+
+async function enrichForumPostsMentions(posts: any[]) {
+  const hasAnyAt = posts.some(
+    (p: any) =>
+      (typeof p?.content === 'string' && p.content.includes('@')) ||
+      commentTreeContainsAt(p?.comments || [])
+  );
+  if (!hasAnyAt) return posts;
+  const candidates = await fetchAllMentionCandidateProfiles();
+  return posts.map((p: any) => ({
+    ...p,
+    mentioned_profiles:
+      typeof p?.content === 'string' && p.content.includes('@')
+        ? matchMentionsInText(p.content, candidates).map(({ id, name }) => ({ id, name }))
+        : [],
+    comments: attachMentionsToComments(p?.comments || [], candidates),
+  }));
+}
+
 router.get('/groups', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const profile = await getProfileForUser(req.user!.userId);
@@ -266,7 +308,8 @@ router.get('/posts', authenticate, async (req: AuthenticatedRequest, res, next) 
       .limit(100);
 
     if (error) throw new AppError(error.message, 500);
-    res.json((posts || []).map((p: any) => formatForumPost(p, profile?.id)));
+    const formatted = (posts || []).map((p: any) => formatForumPost(p, profile?.id));
+    res.json(await enrichForumPostsMentions(formatted));
   } catch (err) {
     next(err);
   }
@@ -287,7 +330,8 @@ router.get('/groups/:id/posts', authenticate, async (req: AuthenticatedRequest, 
     const { data: posts, error } = await query;
     if (error) throw new AppError(error.message, 500);
 
-    res.json((posts || []).map((p: any) => formatForumPost(p, profile?.id)));
+    const formatted = (posts || []).map((p: any) => formatForumPost(p, profile?.id));
+    res.json(await enrichForumPostsMentions(formatted));
   } catch (err) {
     next(err);
   }
@@ -298,7 +342,7 @@ router.post('/posts', authenticate, async (req: AuthenticatedRequest, res, next)
     const profile = await getProfileForUser(req.user!.userId);
     if (!profile) throw new AppError('Profile not found', 404);
 
-    const { group_id, title, content, tags } = req.body;
+    const { group_id, title, content, tags, mentions } = req.body;
     if (!title || !title.trim() || !content || !content.trim()) {
       throw new AppError('Title and content are required', 400);
     }
@@ -336,7 +380,18 @@ router.post('/posts', authenticate, async (req: AuthenticatedRequest, res, next)
 
     if (error) throw new AppError(error.message, 500);
 
-    res.status(201).json(formatForumPost(post, profile.id));
+    const actorName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'CTU-Naga Alumnus';
+    notifyMentionedUsers({
+      content: content.trim(),
+      actorUserId: req.user!.userId,
+      actorName,
+      link: '/community',
+      titlePrefix: 'You Were Mentioned in a Forum Post',
+      explicitMentions: Array.isArray(mentions) ? mentions : [],
+    }).catch(() => {});
+
+    const [enriched] = await enrichForumPostsMentions([formatForumPost(post, profile.id)]);
+    res.status(201).json(enriched);
   } catch (err) {
     next(err);
   }
@@ -430,9 +485,11 @@ router.post('/posts/:id/comments', authenticate, async (req: AuthenticatedReques
     const formattedPost = formatForumPost({ ...post, comments: updatedComments }, profile.id);
 
     // Notification to post author if not self
+    let postAuthorUserId: string | null = null;
     if (post.author_id && post.author_id !== profile.id) {
       const { data: pUser } = await supabase.from('profiles').select('user_id').eq('id', post.author_id).maybeSingle();
       if (pUser?.user_id) {
+        postAuthorUserId = pUser.user_id;
         createNotification({
           userId: pUser.user_id,
           type: 'post',
@@ -444,11 +501,13 @@ router.post('/posts/:id/comments', authenticate, async (req: AuthenticatedReques
     }
 
     // Notification to parent comment author if reply
+    let parentAuthorUserId: string | null = null;
     if (parentId) {
       const parentComment = existingComments.find((c: any) => c.id === parentId);
       if (parentComment && parentComment.author_id && parentComment.author_id !== profile.id && parentComment.author_id !== post.author_id) {
         const { data: pUser } = await supabase.from('profiles').select('user_id').eq('id', parentComment.author_id).maybeSingle();
         if (pUser?.user_id) {
+          parentAuthorUserId = pUser.user_id;
           createNotification({
             userId: pUser.user_id,
             type: 'post',
@@ -460,9 +519,20 @@ router.post('/posts/:id/comments', authenticate, async (req: AuthenticatedReques
       }
     }
 
+    notifyMentionedUsers({
+      content,
+      actorUserId: req.user!.userId,
+      actorName: newComment.author_name,
+      link: '/community',
+      titlePrefix: 'You Were Mentioned in a Forum Comment',
+      explicitMentions: Array.isArray(req.body?.mentions) ? req.body.mentions : [],
+      excludeUserIds: [postAuthorUserId, parentAuthorUserId],
+    }).catch(() => {});
+
+    const [enrichedPost] = await enrichForumPostsMentions([formattedPost]);
     res.status(201).json({
       comment: formatComment(newComment, profile.id),
-      comments: formattedPost.comments,
+      comments: enrichedPost.comments,
       comment_count: newCount,
     });
   } catch (err) {

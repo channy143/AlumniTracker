@@ -251,17 +251,29 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       .eq('role', 'admin');
     const adminUserIds = (adminUsers || []).map((u: any) => u.id);
 
-    const { data: profile, error } = await db
+    let { data: profile, error } = await db
       .from('profiles')
       .select('*, employment(*), education(*), skills(*), certifications(*)')
       .eq('id', req.params.id)
-      .single();
+      .maybeSingle();
+
+    if (!profile) {
+      const fallback = await db
+        .from('profiles')
+        .select('*, employment(*), education(*), skills(*), certifications(*)')
+        .eq('user_id', req.params.id)
+        .maybeSingle();
+      profile = fallback.data;
+      error = fallback.error;
+    }
 
     if (error || !profile) throw new AppError('Profile not found', 404);
 
+    const resolvedProfileId = profile.id;
+
     const [achievementsRes, feedbackRes] = await Promise.all([
-      db.from('achievements').select('*').eq('profile_id', req.params.id).order('date_achieved', { ascending: false }),
-      db.from('career_feedback').select('*').eq('profile_id', req.params.id).maybeSingle(),
+      db.from('achievements').select('*').eq('profile_id', resolvedProfileId).order('date_achieved', { ascending: false }),
+      db.from('career_feedback').select('*').eq('profile_id', resolvedProfileId).maybeSingle(),
     ]);
 
     const privacy = (typeof profile.privacy_settings === 'string'
@@ -352,7 +364,7 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       .single();
 
     if (currentProfile) {
-      const sanitizedId = sanitizeFilterInput(req.params.id);
+      const sanitizedId = sanitizeFilterInput(resolvedProfileId);
       const { data: connectionStatus } = await db
         .from('connections')
         .select('id, status, requester_id, recipient_id')

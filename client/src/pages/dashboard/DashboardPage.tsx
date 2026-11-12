@@ -30,6 +30,9 @@ import { supabase, isSupabaseConfigured } from '@/services/supabase';
 import CreatePostBox from '@/components/dashboard/CreatePostBox';
 import FeedPostCard, { PostItem, REAL_REACTIONS } from '@/components/dashboard/FeedPostCard';
 import EmojiPicker from '@/components/ui/EmojiPicker';
+import MentionInput from '@/components/ui/MentionInput';
+import MentionText from '@/components/ui/MentionText';
+import { MentionCandidate } from '@/hooks/useMentionPeople';
 import { JellyBlobMascot } from '@/components/ui/feral-blob/JellyBlobMascot';
 import '@/styles/blob.css';
 
@@ -57,14 +60,44 @@ function formatDate(dateStr: string): string {
 }
 
 function InfoCard({ post, onViewDetails }: { post: FeedPost; onViewDetails: () => void }) {
+  const navigate = useNavigate();
+  const isSystemAuthor =
+    post.is_official ||
+    post.author === 'CTU-Naga Alumni Office' ||
+    post.author === 'Career Services';
+  const authorProfileTarget = !isSystemAuthor
+    ? post.author_profile_id || post.user_id || null
+    : null;
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg">
       <div className="py-3 px-4">
         <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${post.author === 'CTU-Naga Alumni Office' ? 'bg-blue-800' : post.author === 'Career Services' ? 'bg-orange-500' : 'bg-gray-500'}`}>
+          <div
+            onClick={() => {
+              if (authorProfileTarget) navigate(`/directory/${authorProfileTarget}`);
+            }}
+            className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 ${
+              post.author === 'CTU-Naga Alumni Office'
+                ? 'bg-blue-800'
+                : post.author === 'Career Services'
+                  ? 'bg-orange-500'
+                  : 'bg-gray-500'
+            } ${authorProfileTarget ? 'cursor-pointer hover:opacity-85' : ''}`}
+          >
             {post.author_avatar || post.author.charAt(0).toUpperCase()}
           </div>
-          <span className="font-medium text-gray-700">{post.author}</span>
+          {authorProfileTarget ? (
+            <button
+              type="button"
+              onClick={() => navigate(`/directory/${authorProfileTarget}`)}
+              className="font-medium text-gray-700 hover:text-orange-600 hover:underline cursor-pointer"
+            >
+              {post.author}
+            </button>
+          ) : (
+            <span className="font-medium text-gray-700">{post.author}</span>
+          )}
           <span className="text-gray-400">&middot;</span>
           <span>{formatDate(post.created_at)}</span>
           {post.tag && (
@@ -80,7 +113,13 @@ function InfoCard({ post, onViewDetails }: { post: FeedPost; onViewDetails: () =
         <h3 className="text-sm font-semibold text-gray-900 mb-1">{post.title}</h3>
 
         <p className="text-xs text-gray-600 leading-relaxed mb-1 line-clamp-3">
-          {decodeUnicode(post.content)}
+          <MentionText
+            text={decodeUnicode(post.content)}
+            mentionedProfiles={[
+              ...(post.mentioned_profiles || []),
+              ...(post.tagged_friends || []),
+            ]}
+          />
         </p>
 
         {post.image_url && (
@@ -133,7 +172,9 @@ function PostDetailView({
     const cachedPost = getCached<any>(`/feed/${post.id}`);
     return !cachedPost?.comments;
   });
+  const navigate = useNavigate();
   const [commentText, setCommentText] = useState('');
+  const [commentMentions, setCommentMentions] = useState<Array<{ id: string; name: string }>>([]);
   const [submittingComment, setSubmittingComment] = useState(false);
   const submittingCommentRef = useRef(false);
   const [liked, setLiked] = useState(!!post.liked);
@@ -142,12 +183,25 @@ function PostDetailView({
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [replyingToAuthorName, setReplyingToAuthorName] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [replyMentions, setReplyMentions] = useState<Array<{ id: string; name: string }>>([]);
   const [submittingReply, setSubmittingReply] = useState(false);
   const submittingReplyRef = useRef(false);
   const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState(false);
   const [activeCommentReactionPickerId, setActiveCommentReactionPickerId] = useState<string | null>(null);
   const commentPickerTimeoutRef = useRef<any>(null);
   const commentMutationSeqRef = useRef(0);
+
+  const isOfficialPost = Boolean(
+    post.is_official || post.author === 'CTU-Naga Alumni Office'
+  );
+  const postAuthorProfileTarget = !isOfficialPost
+    ? post.author_profile_id || post.user_id || null
+    : null;
+  const openAlumniProfile = (e: React.MouseEvent, targetId?: string | null) => {
+    if (!targetId) return;
+    e.stopPropagation();
+    navigate(`/directory/${targetId}`);
+  };
 
   const totalCommentCount = hasLoadedComments ? countAllComments(comments) : (post.comment_count || 0);
   const lastSyncedCountRef = useRef<number | null>(null);
@@ -274,11 +328,20 @@ function PostDetailView({
     setSubmittingComment(true);
     commentMutationSeqRef.current += 1;
     try {
-      const newComment = await feedApi.addComment(post.id, commentText.trim());
+      const activeMentions = commentMentions.filter((m) =>
+        commentText.toLowerCase().includes(`@${m.name.toLowerCase()}`)
+      );
+      const newComment = await feedApi.addComment(
+        post.id,
+        commentText.trim(),
+        undefined,
+        activeMentions
+      );
       commentMutationSeqRef.current += 1;
       setHasLoadedComments(true);
       setComments((prev) => dedupeCommentTree([...prev, newComment]));
       setCommentText('');
+      setCommentMentions([]);
     } catch (err: any) {
       alert(err.message || 'Failed to post comment.');
     } finally {
@@ -294,7 +357,15 @@ function PostDetailView({
     setSubmittingReply(true);
     commentMutationSeqRef.current += 1;
     try {
-      const newReply = await feedApi.addComment(post.id, replyText.trim(), commentId);
+      const activeMentions = replyMentions.filter((m) =>
+        replyText.toLowerCase().includes(`@${m.name.toLowerCase()}`)
+      );
+      const newReply = await feedApi.addComment(
+        post.id,
+        replyText.trim(),
+        commentId,
+        activeMentions
+      );
       commentMutationSeqRef.current += 1;
       setHasLoadedComments(true);
       setComments((prev) =>
@@ -305,6 +376,7 @@ function PostDetailView({
         )
       );
       setReplyText('');
+      setReplyMentions([]);
       setReplyingToCommentId(null);
       setReplyingToAuthorName(null);
       setShowReplyEmojiPicker(false);
@@ -459,7 +531,12 @@ function PostDetailView({
           <div className="p-3.5 sm:p-5">
             {/* Post Author Info */}
             <div className="flex items-center gap-2.5 text-xs text-gray-500 mb-1">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden shadow-xs">
+          <div
+            onClick={(e) => openAlumniProfile(e, postAuthorProfileTarget)}
+            className={`w-9 h-9 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden shadow-xs ${
+              postAuthorProfileTarget ? 'cursor-pointer hover:opacity-90' : ''
+            }`}
+          >
             {post.author_avatar && (post.author_avatar.startsWith('http') || post.author_avatar.startsWith('/')) ? (
               <img src={post.author_avatar} alt="" className="w-full h-full object-cover" />
             ) : (
@@ -467,8 +544,35 @@ function PostDetailView({
             )}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-gray-900 text-sm">{post.author}</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {postAuthorProfileTarget ? (
+                <button
+                  type="button"
+                  onClick={(e) => openAlumniProfile(e, postAuthorProfileTarget)}
+                  className="font-bold text-gray-900 hover:text-orange-600 hover:underline text-sm cursor-pointer text-left"
+                >
+                  {post.author}
+                </button>
+              ) : (
+                <span className="font-bold text-gray-900 text-sm">{post.author}</span>
+              )}
+              {post.tagged_friends && post.tagged_friends.length > 0 && (
+                <span className="text-xs text-gray-600 font-normal">
+                  with{' '}
+                  {post.tagged_friends.map((f, idx) => (
+                    <span key={f.id || idx}>
+                      {idx > 0 && ', '}
+                      <button
+                        type="button"
+                        onClick={(e) => openAlumniProfile(e, f.id)}
+                        className="font-medium text-gray-800 hover:text-orange-600 hover:underline cursor-pointer"
+                      >
+                        {f.name}
+                      </button>
+                    </span>
+                  ))}
+                </span>
+              )}
               {post.tag && (
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${post.tag_color || 'bg-orange-50 text-orange-700'}`}>
                   {post.tag}
@@ -486,7 +590,13 @@ function PostDetailView({
 
         {/* Post Content */}
         <p className="text-sm text-gray-800 leading-relaxed mb-3 whitespace-pre-line">
-          {decodeUnicode(post.content)}
+          <MentionText
+            text={decodeUnicode(post.content)}
+            mentionedProfiles={[
+              ...(post.mentioned_profiles || []),
+              ...(post.tagged_friends || []),
+            ]}
+          />
         </p>
 
         {/* Post Image */}
@@ -578,14 +688,24 @@ function PostDetailView({
               userInitial
             )}
           </div>
-          <input
-            type="text"
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Write a comment or response..."
-            className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-xs text-gray-800 placeholder-gray-400 outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 transition-all shadow-2xs"
-            autoFocus
-          />
+          <div className="flex-1 min-w-0 bg-white border border-gray-200 rounded-full px-4 py-2 focus-within:ring-1 focus-within:ring-orange-500 focus-within:border-orange-500 transition-all shadow-2xs">
+            <MentionInput
+              as="input"
+              value={commentText}
+              onChange={setCommentText}
+              onMentionSelect={(candidate: MentionCandidate) => {
+                setCommentMentions((prev) =>
+                  prev.some((m) => m.id === candidate.id)
+                    ? prev
+                    : [...prev, { id: candidate.id, name: candidate.name }]
+                );
+              }}
+              dropdownPosition="top"
+              placeholder="Write a comment or response... (type @ to mention)"
+              className="w-full bg-transparent text-xs text-gray-800 placeholder-gray-400 outline-none"
+              autoFocus
+            />
+          </div>
           <button
             type="submit"
             disabled={!commentText.trim() || submittingComment}
@@ -612,20 +732,43 @@ function PostDetailView({
               return (
                 <div key={c.id} className="space-y-2">
                   <div className="flex items-start gap-2.5 text-xs group">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center shrink-0 text-xs overflow-hidden shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={(e) => openAlumniProfile(e, c.author_profile_id || c.user_id || null)}
+                      className={`w-8 h-8 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center shrink-0 text-xs overflow-hidden shadow-2xs ${
+                        c.author_profile_id || c.user_id ? 'cursor-pointer hover:opacity-85' : ''
+                      }`}
+                    >
                       {c.author_avatar ? (
                         <img src={c.author_avatar} alt="" className="w-full h-full object-cover" />
                       ) : (
                         c.author?.[0]?.toUpperCase() || 'U'
                       )}
-                    </div>
+                    </button>
                     <div className="flex-1 min-w-0">
                       <div className="relative inline-block max-w-full bg-white p-3 rounded-2xl border border-gray-200/70 shadow-2xs">
                         <div className="flex items-center justify-between gap-3 mb-0.5">
-                          <span className="font-bold text-gray-900 truncate">{c.author}</span>
+                          {c.author_profile_id || c.user_id ? (
+                            <button
+                              type="button"
+                              onClick={(e) =>
+                                openAlumniProfile(e, c.author_profile_id || c.user_id || null)
+                              }
+                              className="font-bold text-gray-900 hover:text-orange-600 hover:underline truncate cursor-pointer text-left"
+                            >
+                              {c.author}
+                            </button>
+                          ) : (
+                            <span className="font-bold text-gray-900 truncate">{c.author}</span>
+                          )}
                           <span className="text-[10px] text-gray-400 shrink-0">{formatDate(c.created_at)}</span>
                         </div>
-                        <p className="text-gray-700 leading-relaxed whitespace-pre-line break-words">{c.content}</p>
+                        <p className="text-gray-700 leading-relaxed whitespace-pre-line break-words">
+                          <MentionText
+                            text={c.content}
+                            mentionedProfiles={c.mentioned_profiles}
+                          />
+                        </p>
 
                         {/* Reaction badge */}
                         {(c.like_count || 0) > 0 && (
@@ -730,20 +873,48 @@ function PostDetailView({
 
                         return (
                           <div key={reply.id} className="flex items-start gap-2 text-xs">
-                            <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center shrink-0 text-[9px] overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={(e) =>
+                                openAlumniProfile(e, reply.author_profile_id || reply.user_id || null)
+                              }
+                              className={`w-6 h-6 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center shrink-0 text-[9px] overflow-hidden ${
+                                reply.author_profile_id || reply.user_id ? 'cursor-pointer hover:opacity-85' : ''
+                              }`}
+                            >
                               {reply.author_avatar ? (
                                 <img src={reply.author_avatar} alt="" className="w-full h-full object-cover" />
                               ) : (
                                 reply.author?.[0]?.toUpperCase() || 'U'
                               )}
-                            </div>
+                            </button>
                             <div className="flex-1 min-w-0">
                               <div className="relative inline-block max-w-full bg-white p-2 rounded-xl border border-gray-200/80 shadow-2xs">
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="font-bold text-gray-900 text-[11px] truncate">{reply.author}</span>
+                                  {reply.author_profile_id || reply.user_id ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) =>
+                                        openAlumniProfile(
+                                          e,
+                                          reply.author_profile_id || reply.user_id || null
+                                        )
+                                      }
+                                      className="font-bold text-gray-900 hover:text-orange-600 hover:underline text-[11px] truncate cursor-pointer text-left"
+                                    >
+                                      {reply.author}
+                                    </button>
+                                  ) : (
+                                    <span className="font-bold text-gray-900 text-[11px] truncate">{reply.author}</span>
+                                  )}
                                   <span className="text-[9px] text-gray-400 shrink-0">{formatDate(reply.created_at)}</span>
                                 </div>
-                                <p className="text-gray-700 mt-0.5 text-xs break-words">{reply.content}</p>
+                                <p className="text-gray-700 mt-0.5 text-xs break-words">
+                                  <MentionText
+                                    text={reply.content}
+                                    mentionedProfiles={reply.mentioned_profiles}
+                                  />
+                                </p>
 
                                 {(reply.like_count || 0) > 0 && (
                                   <div className="absolute -bottom-2.5 right-2 flex items-center gap-0.5 bg-white border border-gray-200/90 rounded-full px-1.5 py-0.5 text-[9px] shadow-2xs text-gray-700 font-medium">
@@ -856,12 +1027,20 @@ function PostDetailView({
                       </div>
                       <div className="flex items-center gap-1.5 sm:gap-2">
                         <div className="flex-1 min-w-0 relative flex items-center bg-white border border-gray-200 rounded-full px-3 py-1 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 transition-all">
-                          <input
-                            type="text"
+                          <MentionInput
+                            as="input"
                             value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            placeholder={`Reply to ${replyingToAuthorName || c.author}...`}
-                            className="flex-1 min-w-0 bg-transparent text-xs outline-none pr-1"
+                            onChange={setReplyText}
+                            onMentionSelect={(candidate: MentionCandidate) => {
+                              setReplyMentions((prev) =>
+                                prev.some((m) => m.id === candidate.id)
+                                  ? prev
+                                  : [...prev, { id: candidate.id, name: candidate.name }]
+                              );
+                            }}
+                            dropdownPosition="top"
+                            placeholder={`Reply to ${replyingToAuthorName || c.author}... (type @ to mention)`}
+                            className="w-full bg-transparent text-xs outline-none pr-1"
                             autoFocus
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey) {

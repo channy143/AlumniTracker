@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   ChatBubbleOvalLeftIcon,
   TrashIcon,
@@ -27,6 +28,9 @@ import { SkeletonCommentList, SkeletonReactionUserList, SkeletonRow } from '@/co
 import { supabase, isSupabaseConfigured } from '@/services/supabase';
 import { useChatStore } from '@/store/chatStore';
 import EmojiPicker from '@/components/ui/EmojiPicker';
+import MentionInput from '@/components/ui/MentionInput';
+import MentionText from '@/components/ui/MentionText';
+import { MentionCandidate } from '@/hooks/useMentionPeople';
 
 export const REAL_REACTIONS = [
   { emoji: '👍', label: 'Endorse', color: 'text-blue-600', activeBg: 'bg-blue-50 text-blue-600' },
@@ -41,6 +45,7 @@ export const REAL_REACTIONS = [
 interface CommentReply {
   id: string;
   user_id?: string;
+  author_profile_id?: string | null;
   author: string;
   author_avatar?: string;
   content: string;
@@ -50,12 +55,14 @@ interface CommentReply {
   user_reaction?: string | null;
   reactions_summary?: Record<string, number>;
   top_reactions?: string[];
+  mentioned_profiles?: Array<{ id: string; name: string }>;
 }
 
 interface CommentItem {
   id: string;
   author: string;
   author_avatar?: string;
+  author_profile_id?: string | null;
   content: string;
   created_at: string;
   user_id?: string;
@@ -64,6 +71,7 @@ interface CommentItem {
   user_reaction?: string | null;
   reactions_summary?: Record<string, number>;
   top_reactions?: string[];
+  mentioned_profiles?: Array<{ id: string; name: string }>;
   replies?: CommentReply[];
 }
 
@@ -87,6 +95,7 @@ export interface PostItem {
   feeling?: string | null;
   location?: string | null;
   tagged_friends?: Array<{ id: string; name: string }>;
+  mentioned_profiles?: Array<{ id: string; name: string }>;
   media_type?: 'photo' | 'video';
   video_url?: string | null;
   comments_disabled?: boolean;
@@ -95,7 +104,7 @@ export interface PostItem {
   image_url?: string;
   is_official?: boolean;
   linked_survey?: any;
-  author_profile_id?: string;
+  author_profile_id?: string | null;
 }
 
 interface FeedPostCardProps {
@@ -131,8 +140,21 @@ export default function FeedPostCard({
   onPostUpdated,
   onViewDetails,
 }: FeedPostCardProps) {
+  const navigate = useNavigate();
+
   // Post core state
   const [currentPost, setCurrentPost] = useState<PostItem>(post);
+  const isOfficialPost = Boolean(
+    currentPost.is_official || currentPost.author === 'CTU-Naga Alumni Office'
+  );
+  const postAuthorProfileTarget = !isOfficialPost
+    ? currentPost.author_profile_id || currentPost.user_id || null
+    : null;
+  const openAlumniProfile = (e: React.MouseEvent, targetId?: string | null) => {
+    if (!targetId) return;
+    e.stopPropagation();
+    navigate(`/directory/${targetId}`);
+  };
   const [liked, setLiked] = useState(!!post.liked);
   const [userReaction, setUserReaction] = useState<string | null>(post.user_reaction || (post.liked ? '👍' : null));
   const [likeCount, setLikeCount] = useState(post.like_count || 0);
@@ -161,6 +183,7 @@ export default function FeedPostCard({
   const [hasLoadedComments, setHasLoadedComments] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [commentMentions, setCommentMentions] = useState<Array<{ id: string; name: string }>>([]);
   const [submittingComment, setSubmittingComment] = useState(false);
   const submittingCommentRef = useRef(false);
 
@@ -168,6 +191,7 @@ export default function FeedPostCard({
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [replyingToAuthorName, setReplyingToAuthorName] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [replyMentions, setReplyMentions] = useState<Array<{ id: string; name: string }>>([]);
   const [submittingReply, setSubmittingReply] = useState(false);
   const submittingReplyRef = useRef(false);
   const [showReplyEmojiPicker, setShowReplyEmojiPicker] = useState(false);
@@ -182,6 +206,9 @@ export default function FeedPostCard({
   // Edit Post Modal
   const [showEditModal, setShowEditModal] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
+  const [editMentions, setEditMentions] = useState<Array<{ id: string; name: string }>>(
+    post.mentioned_profiles || []
+  );
   const [editAudience, setEditAudience] = useState<'public' | 'friends' | 'only_me'>(post.audience || 'public');
   const [editLocation, setEditLocation] = useState(post.location || '');
   const [editImageUrl, setEditImageUrl] = useState(post.image_url || '');
@@ -418,11 +445,20 @@ export default function FeedPostCard({
     setSubmittingComment(true);
     commentMutationSeqRef.current += 1;
     try {
-      const newComment = await feedApi.addComment(currentPost.id, commentText.trim());
+      const activeMentions = commentMentions.filter((m) =>
+        commentText.toLowerCase().includes(`@${m.name.toLowerCase()}`)
+      );
+      const newComment = await feedApi.addComment(
+        currentPost.id,
+        commentText.trim(),
+        undefined,
+        activeMentions
+      );
       commentMutationSeqRef.current += 1;
       setHasLoadedComments(true);
       setComments((prev) => dedupeCommentTree([...prev, newComment]));
       setCommentText('');
+      setCommentMentions([]);
     } catch (err: any) {
       alert(err.message || 'Failed to post comment.');
     } finally {
@@ -439,7 +475,15 @@ export default function FeedPostCard({
     setSubmittingReply(true);
     commentMutationSeqRef.current += 1;
     try {
-      const newReply = await feedApi.addComment(currentPost.id, replyText.trim(), commentId);
+      const activeMentions = replyMentions.filter((m) =>
+        replyText.toLowerCase().includes(`@${m.name.toLowerCase()}`)
+      );
+      const newReply = await feedApi.addComment(
+        currentPost.id,
+        replyText.trim(),
+        commentId,
+        activeMentions
+      );
       commentMutationSeqRef.current += 1;
       setHasLoadedComments(true);
       setComments((prev) =>
@@ -450,6 +494,7 @@ export default function FeedPostCard({
         )
       );
       setReplyText('');
+      setReplyMentions([]);
       setReplyingToCommentId(null);
       setReplyingToAuthorName(null);
       setShowReplyEmojiPicker(false);
@@ -596,6 +641,9 @@ export default function FeedPostCard({
     }
     setSavingEdit(true);
     try {
+      const activeMentions = editMentions.filter((m) =>
+        editContent.toLowerCase().includes(`@${m.name.toLowerCase()}`)
+      );
       const payload: any = {
         content: editContent,
         audience: editAudience,
@@ -603,11 +651,13 @@ export default function FeedPostCard({
         image_url: editMediaType === 'photo' ? (editImageUrl || null) : null,
         video_url: editMediaType === 'video' ? (editVideoUrl || null) : null,
         media_type: editMediaType,
+        mentions: activeMentions,
       };
       await feedApi.update(currentPost.id, payload);
       const updatedPost = {
         ...currentPost,
         ...payload,
+        mentioned_profiles: activeMentions,
       };
       setCurrentPost(updatedPost);
       onPostUpdated?.(updatedPost);
@@ -749,7 +799,11 @@ export default function FeedPostCard({
         <div className="flex items-start justify-between gap-3">
           {/* Author avatar & info */}
           <div className="flex items-center gap-3 min-w-0">
-            <div className="relative shrink-0">
+            <div
+              onClick={(e) => openAlumniProfile(e, postAuthorProfileTarget)}
+              className={`relative shrink-0 ${postAuthorProfileTarget ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
+              title={postAuthorProfileTarget ? `View ${currentPost.author}'s profile` : undefined}
+            >
               {currentPost.author_avatar && (currentPost.author_avatar.startsWith('http') || currentPost.author_avatar.startsWith('/')) ? (
                 <img
                   src={currentPost.author_avatar}
@@ -771,9 +825,19 @@ export default function FeedPostCard({
 
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-bold text-sm text-gray-900 truncate">
-                  {currentPost.author}
-                </span>
+                {postAuthorProfileTarget ? (
+                  <button
+                    type="button"
+                    onClick={(e) => openAlumniProfile(e, postAuthorProfileTarget)}
+                    className="font-bold text-sm text-gray-900 hover:text-orange-600 hover:underline truncate cursor-pointer text-left"
+                  >
+                    {currentPost.author}
+                  </button>
+                ) : (
+                  <span className="font-bold text-sm text-gray-900 truncate">
+                    {currentPost.author}
+                  </span>
+                )}
 
                 {/* Milestone indicator */}
                 {currentPost.feeling && (
@@ -787,7 +851,18 @@ export default function FeedPostCard({
                   <span className="text-xs text-gray-600 font-normal">
                     with{' '}
                     <span className="font-medium text-gray-800">
-                      {currentPost.tagged_friends.map((f) => f.name).join(', ')}
+                      {currentPost.tagged_friends.map((f, idx) => (
+                        <span key={f.id || idx}>
+                          {idx > 0 && ', '}
+                          <button
+                            type="button"
+                            onClick={(e) => openAlumniProfile(e, f.id)}
+                            className="hover:text-orange-600 hover:underline cursor-pointer font-medium"
+                          >
+                            {f.name}
+                          </button>
+                        </span>
+                      ))}
                     </span>
                   </span>
                 )}
@@ -938,7 +1013,13 @@ export default function FeedPostCard({
 
         {/* Post Content */}
         <p className="text-sm text-gray-800 leading-relaxed mt-1.5 whitespace-pre-line">
-          {decodeUnicode(currentPost.content)}
+          <MentionText
+            text={decodeUnicode(currentPost.content)}
+            mentionedProfiles={[
+              ...(currentPost.mentioned_profiles || []),
+              ...(currentPost.tagged_friends || []),
+            ]}
+          />
         </p>
       </div>
 
@@ -1156,12 +1237,20 @@ export default function FeedPostCard({
                 Me
               </div>
               <div className="flex-1 min-w-0 relative flex items-center bg-white border border-gray-200 rounded-full px-3 py-1 focus-within:ring-1 focus-within:ring-orange-500 focus-within:border-orange-500 transition-all">
-                <input
-                  type="text"
+                <MentionInput
+                  as="input"
                   value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Write a comment..."
-                  className="flex-1 min-w-0 bg-transparent text-xs text-gray-800 placeholder-gray-400 outline-none pr-1"
+                  onChange={setCommentText}
+                  onMentionSelect={(candidate: MentionCandidate) => {
+                    setCommentMentions((prev) =>
+                      prev.some((m) => m.id === candidate.id)
+                        ? prev
+                        : [...prev, { id: candidate.id, name: candidate.name }]
+                    );
+                  }}
+                  dropdownPosition="top"
+                  placeholder="Write a comment... (type @ to mention)"
+                  className="w-full bg-transparent text-xs text-gray-800 placeholder-gray-400 outline-none pr-1"
                 />
                 <div className="relative shrink-0">
                   <button
@@ -1222,23 +1311,48 @@ export default function FeedPostCard({
                   <div key={c.id} className="space-y-2">
                     {/* Top Comment Bubble */}
                     <div className="flex items-start gap-2.5 text-xs group">
-                      <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center shrink-0 text-[10px] overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={(e) =>
+                          openAlumniProfile(e, c.author_profile_id || c.user_id || null)
+                        }
+                        className={`w-7 h-7 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center shrink-0 text-[10px] overflow-hidden ${
+                          c.author_profile_id || c.user_id ? 'cursor-pointer hover:opacity-85' : ''
+                        }`}
+                      >
                         {c.author_avatar ? (
                           <img src={c.author_avatar} alt="" className="w-full h-full object-cover" />
                         ) : (
                           c.author?.[0]?.toUpperCase() || 'U'
                         )}
-                      </div>
+                      </button>
 
                       <div className="flex-1 min-w-0">
                         <div className="relative inline-block max-w-full bg-white p-2.5 rounded-2xl border border-gray-200/80 shadow-2xs">
                           <div className="flex items-center justify-between gap-3">
-                            <span className="font-bold text-gray-900 truncate">{c.author}</span>
+                            {c.author_profile_id || c.user_id ? (
+                              <button
+                                type="button"
+                                onClick={(e) =>
+                                  openAlumniProfile(e, c.author_profile_id || c.user_id || null)
+                                }
+                                className="font-bold text-gray-900 hover:text-orange-600 hover:underline truncate cursor-pointer text-left"
+                              >
+                                {c.author}
+                              </button>
+                            ) : (
+                              <span className="font-bold text-gray-900 truncate">{c.author}</span>
+                            )}
                             <span className="text-[10px] text-gray-400 shrink-0">
                               {formatDate(c.created_at)}
                             </span>
                           </div>
-                          <p className="text-gray-700 mt-0.5 leading-relaxed break-words">{c.content}</p>
+                          <p className="text-gray-700 mt-0.5 leading-relaxed break-words">
+                            <MentionText
+                              text={c.content}
+                              mentionedProfiles={c.mentioned_profiles}
+                            />
+                          </p>
 
                           {/* Reaction badge inside/under comment bubble */}
                           {(c.like_count || 0) > 0 && (
@@ -1345,20 +1459,53 @@ export default function FeedPostCard({
 
                           return (
                             <div key={reply.id} className="flex items-start gap-2 text-xs">
-                              <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center shrink-0 text-[9px] overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={(e) =>
+                                  openAlumniProfile(
+                                    e,
+                                    reply.author_profile_id || reply.user_id || null
+                                  )
+                                }
+                                className={`w-6 h-6 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center shrink-0 text-[9px] overflow-hidden ${
+                                  reply.author_profile_id || reply.user_id
+                                    ? 'cursor-pointer hover:opacity-85'
+                                    : ''
+                                }`}
+                              >
                                 {reply.author_avatar ? (
                                   <img src={reply.author_avatar} alt="" className="w-full h-full object-cover" />
                                 ) : (
                                   reply.author?.[0]?.toUpperCase() || 'U'
                                 )}
-                              </div>
+                              </button>
                               <div className="flex-1 min-w-0">
                                 <div className="relative inline-block max-w-full bg-white p-2 rounded-xl border border-gray-200/80 shadow-2xs">
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-bold text-gray-900 text-[11px] truncate">{reply.author}</span>
+                                    {reply.author_profile_id || reply.user_id ? (
+                                      <button
+                                        type="button"
+                                        onClick={(e) =>
+                                          openAlumniProfile(
+                                            e,
+                                            reply.author_profile_id || reply.user_id || null
+                                          )
+                                        }
+                                        className="font-bold text-gray-900 hover:text-orange-600 hover:underline text-[11px] truncate cursor-pointer text-left"
+                                      >
+                                        {reply.author}
+                                      </button>
+                                    ) : (
+                                      <span className="font-bold text-gray-900 text-[11px] truncate">{reply.author}</span>
+                                    )}
                                     <span className="text-[9px] text-gray-400 shrink-0">{formatDate(reply.created_at)}</span>
                                   </div>
-                                  <p className="text-gray-700 mt-0.5 text-xs break-words">{reply.content}</p>
+                                  <p className="text-gray-700 mt-0.5 text-xs break-words">
+                                    <MentionText
+                                      text={reply.content}
+                                      mentionedProfiles={reply.mentioned_profiles}
+                                    />
+                                  </p>
 
                                   {/* Reply reaction badge */}
                                   {(reply.like_count || 0) > 0 && (
@@ -1476,12 +1623,20 @@ export default function FeedPostCard({
                         </div>
                         <div className="flex items-center gap-1.5 sm:gap-2">
                           <div className="flex-1 min-w-0 relative flex items-center bg-white border border-gray-200 rounded-full px-3 py-1 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 transition-all">
-                            <input
-                              type="text"
+                            <MentionInput
+                              as="input"
                               value={replyText}
-                              onChange={(e) => setReplyText(e.target.value)}
-                              placeholder={`Reply to ${replyingToAuthorName || c.author}...`}
-                              className="flex-1 min-w-0 bg-transparent text-xs outline-none pr-1"
+                              onChange={setReplyText}
+                              onMentionSelect={(candidate: MentionCandidate) => {
+                                setReplyMentions((prev) =>
+                                  prev.some((m) => m.id === candidate.id)
+                                    ? prev
+                                    : [...prev, { id: candidate.id, name: candidate.name }]
+                                );
+                              }}
+                              dropdownPosition="top"
+                              placeholder={`Reply to ${replyingToAuthorName || c.author}... (type @ to mention)`}
+                              className="w-full bg-transparent text-xs outline-none pr-1"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -1588,8 +1743,20 @@ export default function FeedPostCard({
               ) : (
                 reactionsList
                   .filter((r) => selectedReactionTab === 'all' || r.reaction_type === selectedReactionTab)
-                  .map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50">
+                  .map((item) => {
+                    const reactionProfileId = item.profile_id || item.user_id || null;
+                    return (
+                    <div
+                      key={item.id}
+                      onClick={(e) => {
+                        if (!reactionProfileId) return;
+                        setShowReactionsModal(false);
+                        openAlumniProfile(e, reactionProfileId);
+                      }}
+                      className={`flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 ${
+                        reactionProfileId ? 'cursor-pointer' : ''
+                      }`}
+                    >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="relative">
                           <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center text-xs overflow-hidden shrink-0">
@@ -1602,12 +1769,15 @@ export default function FeedPostCard({
                           <span className="absolute -bottom-1 -right-1 text-xs">{item.reaction_type}</span>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-gray-900 truncate">{item.name}</p>
+                          <p className="text-xs font-semibold text-gray-900 hover:text-orange-600 truncate">
+                            {item.name}
+                          </p>
                           {item.headline && <p className="text-[10px] text-gray-400 truncate">{item.headline}</p>}
                         </div>
                       </div>
                     </div>
-                  ))
+                  );
+                  })
               )}
             </div>
           </div>
@@ -1641,10 +1811,20 @@ export default function FeedPostCard({
             <div className="space-y-3 py-3 overflow-y-auto flex-1 scrollbar-hover pr-1">
               <div>
                 <label className="text-xs font-semibold text-gray-700 block mb-1">Update Content</label>
-                <textarea
+                <MentionInput
+                  as="textarea"
                   rows={4}
                   value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
+                  onChange={setEditContent}
+                  onMentionSelect={(candidate: MentionCandidate) => {
+                    setEditMentions((prev) =>
+                      prev.some((m) => m.id === candidate.id)
+                        ? prev
+                        : [...prev, { id: candidate.id, name: candidate.name }]
+                    );
+                  }}
+                  dropdownPosition="bottom"
+                  placeholder="Update post content... (type @ to mention)"
                   className="w-full p-2.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-orange-500"
                 />
               </div>

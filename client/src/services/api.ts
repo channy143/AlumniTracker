@@ -341,12 +341,12 @@ export const communityApi = {
   allPosts: () => api.get<any[]>('/community/posts'),
   forums: (groupId: string) =>
     api.get<any[]>(groupId === 'all' ? '/community/posts' : `/community/groups/${groupId}/posts`),
-  createPost: (data: { group_id: string; title: string; content: string; tags?: string[] }) =>
+  createPost: (data: { group_id: string; title: string; content: string; tags?: string[]; mentions?: Array<{ id: string; name: string }> }) =>
     api.post<any>('/community/posts', data),
   likePost: (postId: string) =>
     api.post<{ id: string; liked: boolean; like_count: number }>(`/community/posts/${postId}/like`, {}),
-  addComment: (postId: string, content: string, parent_id?: string | null) =>
-    api.post<{ comment: any; comments: any[]; comment_count: number }>(`/community/posts/${postId}/comments`, { content, parent_id }),
+  addComment: (postId: string, content: string, parent_id?: string | null, mentions?: Array<{ id: string; name: string }>) =>
+    api.post<{ comment: any; comments: any[]; comment_count: number }>(`/community/posts/${postId}/comments`, { content, parent_id, mentions }),
   reactComment: (postId: string, commentId: string, reaction?: string) =>
     api.post<{ comment_id: string; liked: boolean; user_reaction: string | null; post: any }>(`/community/posts/${postId}/comments/${commentId}/reaction`, { reaction }),
   deletePost: (postId: string) => api.delete<{ success: boolean; id: string }>(`/community/posts/${postId}`),
@@ -682,6 +682,7 @@ export const feedApi = {
     feeling?: string | null;
     location?: string | null;
     tagged_friends?: any[];
+    mentions?: Array<{ id: string; name: string }>;
     media_type?: 'photo' | 'video';
     video_url?: string | null;
   }) => api.post<any>('/feed', data),
@@ -690,8 +691,8 @@ export const feedApi = {
   react: (id: string, reaction: string) =>
     api.post<{ liked: boolean; user_reaction: string | null; like_count: number; reactions_summary: any; top_reactions: string[] }>(`/feed/${id}/reaction`, { reaction }),
   getReactions: (id: string) => api.get<any[]>(`/feed/${id}/reactions`),
-  addComment: (id: string, content: string, parent_id?: string | null) =>
-    api.post<any>(`/feed/${id}/comments`, { content, parent_id }),
+  addComment: (id: string, content: string, parent_id?: string | null, mentions?: Array<{ id: string; name: string }>) =>
+    api.post<any>(`/feed/${id}/comments`, { content, parent_id, mentions }),
   reactComment: (commentId: string, reaction?: string) =>
     api.post<{
       liked: boolean;

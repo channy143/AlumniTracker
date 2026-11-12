@@ -22,6 +22,8 @@ import {
 } from '@heroicons/react/24/solid';
 import { feedApi, connectionsApi } from '@/services/api';
 import EmojiPicker from '@/components/ui/EmojiPicker';
+import MentionInput from '@/components/ui/MentionInput';
+import { MentionCandidate } from '@/hooks/useMentionPeople';
 import { SkeletonRow } from '@/components/ui/Skeleton';
 import { getCached } from '@/utils/apiCache';
 
@@ -92,6 +94,7 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
 
   // Tagging friends
   const [taggedFriends, setTaggedFriends] = useState<{ id: string; name: string }[]>([]);
+  const [mentionedPeople, setMentionedPeople] = useState<{ id: string; name: string }[]>([]);
   const [showTagFriendsModal, setShowTagFriendsModal] = useState(false);
   const [availableFriends, setAvailableFriends] = useState<any[]>([]);
   const [friendSearch, setFriendSearch] = useState('');
@@ -247,6 +250,10 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
     setError(null);
 
     try {
+      const activeMentions = mentionedPeople.filter((m) =>
+        content.toLowerCase().includes(`@${m.name.toLowerCase()}`)
+      );
+
       const created = await feedApi.create({
         content: content.trim(),
         tag: selectedTag,
@@ -257,12 +264,14 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
         feeling: feeling ? `${feeling.emoji} ${feeling.label}` : null,
         location: location.trim() || null,
         tagged_friends: taggedFriends,
+        mentions: activeMentions,
         type: 'post',
       });
 
       onPostCreated(created);
       // Reset form
       setContent('');
+      setMentionedPeople([]);
       setImageUrl('');
       setVideoUrl('');
       setFeeling(null);
@@ -476,14 +485,26 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
               )}
 
               {/* Main Post Content Textarea */}
-              <textarea
+              <MentionInput
+                as="textarea"
                 rows={4}
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
+                onChange={setContent}
+                onMentionSelect={(candidate: MentionCandidate) => {
+                  setMentionedPeople((prev) =>
+                    prev.some((m) => m.id === candidate.id)
+                      ? prev
+                      : [...prev, { id: candidate.id, name: candidate.name }]
+                  );
+                }}
+                dropdownPosition="bottom"
                 placeholder={`Share an alumni post, project, job lead, or inquiry, ${firstName}...`}
                 className="w-full text-base text-gray-900 placeholder-gray-400 outline-none resize-none border-none focus:ring-0 p-0"
                 autoFocus
               />
+              <p className="text-[11px] text-gray-400 mt-1">
+                Tip: Type <span className="font-semibold text-orange-600">@</span> to mention an alumnus
+              </p>
 
               {/* Tag / Category Chips */}
               <div className="flex items-center gap-1.5 flex-wrap pt-1">

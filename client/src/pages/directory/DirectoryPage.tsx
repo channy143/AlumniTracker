@@ -6,6 +6,8 @@ import {
   CalendarDaysIcon,
   FunnelIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   UserPlusIcon,
   UserMinusIcon,
   CheckIcon,
@@ -112,6 +114,8 @@ function buildConnMap(conns: any[]) {
   return map;
 }
 
+const DIRECTORY_PAGE_LIMIT = 15;
+
 export default function DirectoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -119,16 +123,17 @@ export default function DirectoryPage() {
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(() => getCached<any>('/profile')?.id || null);
 
   const query = searchParams.get('q') || '';
+  const [page, setPage] = useState(() => Math.max(1, parseInt(searchParams.get('page') || '1') || 1));
   const [programs, setPrograms] = useState<string[]>(searchParams.get('program')?.split(',').filter(Boolean) || []);
   const [batches, setBatches] = useState<string[]>(searchParams.get('batch')?.split(',').filter(Boolean) || []);
   const [employmentStatuses, setEmploymentStatuses] = useState<string[]>(searchParams.get('employment_status')?.split(',').filter(Boolean) || []);
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'name');
 
-  const buildSearchEndpoint = () => {
+  const buildSearchEndpoint = (targetPage = page) => {
     const qObj: Record<string, any> = {
       q: query,
-      page: 1,
-      limit: 50,
+      page: targetPage,
+      limit: DIRECTORY_PAGE_LIMIT,
       program: programs.join(','),
       batch: batches.join(','),
       employment_status: employmentStatuses.join(','),
@@ -233,15 +238,23 @@ export default function DirectoryPage() {
 
 
   useEffect(() => {
+    const urlPage = Math.max(1, parseInt(searchParams.get('page') || '1') || 1);
+    if (urlPage !== page) {
+      setPage(urlPage);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     const params = new URLSearchParams();
     if (query) params.set('q', query);
+    if (page > 1) params.set('page', String(page));
     if (programs.length) params.set('program', programs.join(','));
     if (batches.length) params.set('batch', batches.join(','));
     if (employmentStatuses.length) params.set('employment_status', employmentStatuses.join(','));
     if (sortBy !== 'name') params.set('sort', sortBy);
     setSearchParams(params, { replace: true });
 
-    const cachedSearch = getCached<any>(buildSearchEndpoint());
+    const cachedSearch = getCached<any>(buildSearchEndpoint(page));
     if (cachedSearch !== undefined) {
       setResults(cachedSearch.data || []);
       setTotal(cachedSearch.total || 0);
@@ -252,8 +265,8 @@ export default function DirectoryPage() {
 
     directoryApi.search({
       q: query,
-      page: 1,
-      limit: 50,
+      page,
+      limit: DIRECTORY_PAGE_LIMIT,
       program: programs.join(','),
       batch: batches.join(','),
       employment_status: employmentStatuses.join(','),
@@ -267,7 +280,7 @@ export default function DirectoryPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [query, programs, batches, employmentStatuses, sortBy]);
+  }, [query, page, programs, batches, employmentStatuses, sortBy]);
 
   const handleView = (profile: any) => {
     if (!profile.is_admin) {
@@ -281,6 +294,17 @@ export default function DirectoryPage() {
     setBatches([]);
     setEmploymentStatuses([]);
     setSortBy('name');
+    setPage(1);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(total / DIRECTORY_PAGE_LIMIT));
+  const showingFrom = total === 0 ? 0 : (page - 1) * DIRECTORY_PAGE_LIMIT + 1;
+  const showingTo = Math.min(total, (page - 1) * DIRECTORY_PAGE_LIMIT + results.length);
+
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === page) return;
+    setPage(nextPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const hasFilters = programs.length || batches.length || employmentStatuses.length || sortBy !== 'name';
@@ -310,13 +334,13 @@ export default function DirectoryPage() {
       {/* Filter Row */}
       <div data-tour="directory-search" className="flex flex-wrap items-center gap-2 mb-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
         <FunnelIcon className="w-4 h-4 text-gray-400 shrink-0" />
-        <FilterDropdown label="Program" options={programOptions} selected={programs} onChange={setPrograms} />
-        <FilterDropdown label="Batch" options={batchOptions} selected={batches} onChange={setBatches} />
-        <FilterDropdown label="Status" options={employmentStatusOptions} selected={employmentStatuses} onChange={setEmploymentStatuses} />
+        <FilterDropdown label="Program" options={programOptions} selected={programs} onChange={(vals) => { setPrograms(vals); setPage(1); }} />
+        <FilterDropdown label="Batch" options={batchOptions} selected={batches} onChange={(vals) => { setBatches(vals); setPage(1); }} />
+        <FilterDropdown label="Status" options={employmentStatusOptions} selected={employmentStatuses} onChange={(vals) => { setEmploymentStatuses(vals); setPage(1); }} />
         <span className="w-px h-5 bg-gray-200" />
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
+          onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-600 outline-none focus:border-orange-400"
         >
           <option value="name">Name A-Z</option>
@@ -528,6 +552,37 @@ export default function DirectoryPage() {
           );
         })}
       </div>
+
+      {/* Pagination Controls */}
+      {!loading && total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-4 px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg shadow-2xs">
+          <span className="text-xs text-gray-500">
+            Showing <strong className="font-semibold text-gray-800">{showingFrom}</strong>–<strong className="font-semibold text-gray-800">{showingTo}</strong> of{' '}
+            <strong className="font-semibold text-gray-800">{total}</strong> alumni
+            <span className="text-gray-400 ml-1.5">· Page {page} of {totalPages}</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page <= 1 || loading}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg text-gray-700 bg-white hover:bg-gray-50 hover:border-orange-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <ChevronLeftIcon className="w-3.5 h-3.5" />
+              <span>Prev</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page >= totalPages || loading}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg text-gray-700 bg-white hover:bg-gray-50 hover:border-orange-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <span>Next</span>
+              <ChevronRightIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

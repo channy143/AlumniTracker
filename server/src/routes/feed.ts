@@ -9,6 +9,12 @@ import { AuthenticatedRequest } from '../types';
 import { addActivity } from '../services/activityStore';
 import { createPostSchema, updatePostSchema } from '../middleware/validationSchemas';
 import { createNotification, notifyAdmins } from './notifications';
+import {
+  fetchAllMentionCandidateProfiles,
+  getProfileIdByUserIdMap,
+  matchMentionsInText,
+  notifyMentionedUsers,
+} from '../utils/mentions';
 
 const router = Router();
 
@@ -143,6 +149,10 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       userReactionMap.set(l.post_id, l.reaction_type || '👍');
     });
 
+    const authorProfileMap = await getProfileIdByUserIdMap(merged.map((p: any) => p.user_id).filter(Boolean));
+    const hasAnyMention = merged.some((p: any) => typeof p.content === 'string' && p.content.includes('@'));
+    const mentionCandidates = hasAnyMention ? await fetchAllMentionCandidateProfiles() : [];
+
     const result = await Promise.all(merged.map(async (p: any) => {
       let linkedSurvey = null;
       if (p.linked_survey_id) {
@@ -162,8 +172,14 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
         .slice(0, 3)
         .map(([emoji]) => emoji);
 
+      const mentionedProfiles = hasAnyMention && typeof p.content === 'string' && p.content.includes('@')
+        ? matchMentionsInText(p.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
+        : [];
+
       return {
         ...p,
+        author_profile_id: p.is_official || !p.user_id ? null : (authorProfileMap.get(p.user_id) || null),
+        mentioned_profiles: mentionedProfiles,
         audience: p.audience || 'public',
         feeling: p.feeling || null,
         location: p.location || null,
@@ -204,6 +220,10 @@ router.get('/mine', authenticate, async (req: AuthenticatedRequest, res, next) =
       userReactionMap.set(l.post_id, l.reaction_type || '👍');
     });
 
+    const authorProfileMap = await getProfileIdByUserIdMap((posts || []).map((p: any) => p.user_id).filter(Boolean));
+    const hasAnyMention = (posts || []).some((p: any) => typeof p.content === 'string' && p.content.includes('@'));
+    const mentionCandidates = hasAnyMention ? await fetchAllMentionCandidateProfiles() : [];
+
     const formatted = (posts || []).map((p: any) => {
       const myReaction = userReactionMap.get(p.id) || null;
       const reactionsSummary = p.reactions_summary || (p.like_count > 0 ? { '👍': p.like_count } : {});
@@ -213,8 +233,14 @@ router.get('/mine', authenticate, async (req: AuthenticatedRequest, res, next) =
         .slice(0, 3)
         .map(([emoji]) => emoji);
 
+      const mentionedProfiles = hasAnyMention && typeof p.content === 'string' && p.content.includes('@')
+        ? matchMentionsInText(p.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
+        : [];
+
       return {
         ...p,
+        author_profile_id: p.is_official || !p.user_id ? null : (authorProfileMap.get(p.user_id) || null),
+        mentioned_profiles: mentionedProfiles,
         audience: p.audience || 'public',
         feeling: p.feeling || null,
         location: p.location || null,
@@ -295,6 +321,10 @@ router.get('/user/:userId', authenticate, async (req: AuthenticatedRequest, res,
       userReactionMap.set(l.post_id, l.reaction_type || '👍');
     });
 
+    const authorProfileMap = await getProfileIdByUserIdMap((posts || []).map((p: any) => p.user_id).filter(Boolean));
+    const hasAnyMention = (posts || []).some((p: any) => typeof p.content === 'string' && p.content.includes('@'));
+    const mentionCandidates = hasAnyMention ? await fetchAllMentionCandidateProfiles() : [];
+
     const formatted = (posts || []).map((p: any) => {
       const myReaction = userReactionMap.get(p.id) || null;
       const reactionsSummary = p.reactions_summary || (p.like_count > 0 ? { '👍': p.like_count } : {});
@@ -304,8 +334,14 @@ router.get('/user/:userId', authenticate, async (req: AuthenticatedRequest, res,
         .slice(0, 3)
         .map(([emoji]) => emoji);
 
+      const mentionedProfiles = hasAnyMention && typeof p.content === 'string' && p.content.includes('@')
+        ? matchMentionsInText(p.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
+        : [];
+
       return {
         ...p,
+        author_profile_id: p.is_official || !p.user_id ? null : (authorProfileMap.get(p.user_id) || null),
+        mentioned_profiles: mentionedProfiles,
         audience: p.audience || 'public',
         feeling: p.feeling || null,
         location: p.location || null,
@@ -384,13 +420,26 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       });
     }
 
+    // Enrich with author_profile_id and mentioned_profiles
+    const allUserIds = [post.user_id, ...(comments || []).map((c: any) => c.user_id)].filter(Boolean);
+    const authorProfileMap = await getProfileIdByUserIdMap(allUserIds);
+    const hasAnyMention =
+      (typeof post.content === 'string' && post.content.includes('@')) ||
+      (comments || []).some((c: any) => typeof c.content === 'string' && c.content.includes('@'));
+    const mentionCandidates = hasAnyMention ? await fetchAllMentionCandidateProfiles() : [];
+
     // Structure comments into parent and replies
     const commentList: any[] = [];
     const replyMap = new Map<string, any[]>();
     (comments || []).forEach((c: any) => {
       const summ = commentReactionsSummaryMap.get(c.id) || {};
+      const cMentions = hasAnyMention && typeof c.content === 'string' && c.content.includes('@')
+        ? matchMentionsInText(c.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
+        : [];
       const enriched = {
         ...c,
+        author_profile_id: c.user_id ? (authorProfileMap.get(c.user_id) || null) : null,
+        mentioned_profiles: cMentions,
         like_count: c.like_count || 0,
         liked: commentReactionMap.has(c.id),
         user_reaction: commentReactionMap.get(c.id) || null,
@@ -417,8 +466,14 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       .slice(0, 3)
       .map(([emoji]) => emoji);
 
+    const postMentions = hasAnyMention && typeof post.content === 'string' && post.content.includes('@')
+      ? matchMentionsInText(post.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
+      : [];
+
     res.json({
       ...post,
+      author_profile_id: post.is_official || !post.user_id ? null : (authorProfileMap.get(post.user_id) || null),
+      mentioned_profiles: postMentions,
       audience: post.audience || 'public',
       feeling: post.feeling || null,
       location: post.location || null,
@@ -460,6 +515,7 @@ router.get('/:id/reactions', authenticate, async (req: AuthenticatedRequest, res
       return {
         id: l.id,
         user_id: l.user_id,
+        profile_id: p?.id || null,
         reaction_type: l.reaction_type || '👍',
         name: p ? `${p.first_name} ${p.last_name}` : 'Alumnus',
         avatar: p?.avatar_url || null,
@@ -524,6 +580,7 @@ router.post('/', authenticate, validate(createPostSchema), async (req: Authentic
       feeling,
       location,
       tagged_friends,
+      mentions,
       media_type = 'photo',
       video_url,
     } = req.body;
@@ -574,8 +631,29 @@ router.post('/', authenticate, validate(createPostSchema), async (req: Authentic
     if (error) throw new AppError(error.message, 500);
 
     addActivity(authorName, 'created', 'a new post').catch(() => {});
+
+    const combinedExplicit = [
+      ...(Array.isArray(mentions) ? mentions : []),
+      ...(Array.isArray(tagged_friends) ? tagged_friends : []),
+    ];
+    notifyMentionedUsers({
+      content: post.content,
+      actorUserId: userId,
+      actorName: authorName,
+      link: '/?post=' + post.id,
+      titlePrefix: 'You Were Mentioned in a Post',
+      explicitMentions: combinedExplicit,
+    }).catch(() => {});
+
+    const mentionCandidates = post.content.includes('@') ? await fetchAllMentionCandidateProfiles() : [];
+    const mentionedProfiles = post.content.includes('@')
+      ? matchMentionsInText(post.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
+      : combinedExplicit.filter((m) => m?.id && m?.name);
+
     res.status(201).json({
       ...post,
+      author_profile_id: profile?.id || null,
+      mentioned_profiles: mentionedProfiles,
       liked: false,
       user_reaction: null,
       top_reactions: [],
@@ -834,7 +912,7 @@ router.post('/:id/like', authenticate, async (req: AuthenticatedRequest, res, ne
 // POST /api/feed/:id/comments - add a comment or reply
 router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { content, parent_id } = req.body;
+    const { content, parent_id, mentions } = req.body;
     if (!content || !content.trim()) throw new AppError('Comment content is required', 400);
 
     // Check if comments disabled
@@ -850,7 +928,7 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('first_name, last_name, avatar_url')
+      .select('id, first_name, last_name, avatar_url')
       .eq('user_id', req.user!.userId)
       .single();
 
@@ -902,12 +980,15 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
     }
 
     // If this is a reply to another comment, notify the parent comment author
+    let parentCommentUserId: string | null = null;
     if (parent_id) {
       const { data: parentComment } = await supabase
         .from('feed_post_comments')
         .select('user_id')
         .eq('id', parent_id)
         .maybeSingle();
+
+      parentCommentUserId = parentComment?.user_id || null;
 
       if (
         parentComment &&
@@ -926,7 +1007,29 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
       }
     }
 
-    res.status(201).json({ ...comment, replies: [], liked: false, user_reaction: null });
+    notifyMentionedUsers({
+      content: content.trim(),
+      actorUserId: req.user!.userId,
+      actorName: displayName,
+      link: '/?post=' + req.params.id,
+      titlePrefix: 'You Were Mentioned in a Comment',
+      explicitMentions: Array.isArray(mentions) ? mentions : [],
+      excludeUserIds: [post?.user_id, parentCommentUserId],
+    }).catch(() => {});
+
+    const mentionCandidates = content.includes('@') ? await fetchAllMentionCandidateProfiles() : [];
+    const mentionedProfiles = content.includes('@')
+      ? matchMentionsInText(content.trim(), mentionCandidates).map(({ id, name }) => ({ id, name }))
+      : [];
+
+    res.status(201).json({
+      ...comment,
+      author_profile_id: profile?.id || null,
+      mentioned_profiles: mentionedProfiles,
+      replies: [],
+      liked: false,
+      user_reaction: null,
+    });
   } catch (err) { next(err); }
 });
 
