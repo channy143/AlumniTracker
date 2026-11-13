@@ -716,7 +716,7 @@ export default function FeedPostCard({
 
   // Copy link
   const handleCopyLink = () => {
-    const url = `${window.location.origin}/dashboard?post=${currentPost.id}`;
+    const url = `${window.location.origin}/?post=${currentPost.id}`;
     navigator.clipboard?.writeText(url).catch(() => {});
     setShareCount((prev) => prev + 1);
     feedApi.share(currentPost.id).catch(() => {});
@@ -756,7 +756,7 @@ export default function FeedPostCard({
   const handleSendToAlumnus = async (alumnus: any) => {
     setSendingMessage(alumnus.id);
     try {
-      const postUrl = `${window.location.origin}/dashboard?post=${currentPost.id}`;
+      const postUrl = `${window.location.origin}/?post=${currentPost.id}`;
       const text = `Shared a post: "${currentPost.content.slice(0, 80)}..."\n${postUrl}`;
       await messagesApi.send(alumnus.id, text);
       setSentMap((prev) => ({ ...prev, [alumnus.id]: true }));

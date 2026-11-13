@@ -1043,20 +1043,19 @@ export default function JobsPage() {
   });
 
   const handleToggleSave = (jobId: string) => {
-    setSavedJobIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(jobId)) {
-        next.delete(jobId);
-        addNotification('Job removed from saved', 'info');
-      } else {
-        next.add(jobId);
-        addNotification('Job saved successfully', 'success');
-      }
-      try {
-        localStorage.setItem('alumni_saved_jobs', JSON.stringify([...next]));
-      } catch {}
-      return next;
-    });
+    const isCurrentlySaved = savedJobIds.has(jobId);
+    const next = new Set(savedJobIds);
+    if (isCurrentlySaved) {
+      next.delete(jobId);
+      addNotification('Job removed from saved', 'info');
+    } else {
+      next.add(jobId);
+      addNotification('Job saved successfully', 'success');
+    }
+    setSavedJobIds(next);
+    try {
+      localStorage.setItem('alumni_saved_jobs', JSON.stringify([...next]));
+    } catch {}
   };
 
   const handleViewDetails = (job: any) => {
@@ -1361,8 +1360,27 @@ export default function JobsPage() {
               onToggleSave={() => handleToggleSave(selectedJob.id)}
             />
           ) : filteredJobs.length === 0 ? (
-            <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">
-              No job openings match this filter.
+            <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-12 text-center shadow-xs flex flex-col items-center justify-center">
+              <BriefcaseIcon className="w-10 h-10 text-gray-300 mx-auto mb-3 stroke-1" />
+              <h3 className="text-base font-bold text-gray-900">
+                {queryFilter
+                  ? `No ${queryFilter} job openings right now`
+                  : filter !== 'all' && filter !== 'exclusive'
+                    ? `No ${JOB_TYPE_LABELS[filter] || filter} job openings right now`
+                    : filter === 'exclusive'
+                      ? 'No Alumni Exclusive job openings right now'
+                      : 'No matching job openings right now'}
+              </h3>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1.5 max-w-md mx-auto leading-relaxed">
+                We don't have verified openings in this category yet. Explore other industries or view all {jobs.length} active job opportunities.
+              </p>
+              <button
+                type="button"
+                onClick={handleViewAll}
+                className="mt-4 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+              >
+                <span>View All Jobs</span>
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

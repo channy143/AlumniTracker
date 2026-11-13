@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   MinusIcon,
   XMarkIcon,
@@ -15,6 +17,7 @@ import {
   CameraIcon,
   AtSymbolIcon,
   ExclamationTriangleIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import { useChatStore } from '@/store/chatStore';
 import { messagesApi, profileApi, connectionsApi } from '@/services/api';
@@ -68,7 +71,8 @@ function renderMessageContent(
   text: string,
   isMe: boolean,
   currentProfileName: string,
-  members: Array<{ profile_id?: string; id?: string; name: string }> = []
+  members: Array<{ profile_id?: string; id?: string; name: string }> = [],
+  onNavigate?: (path: string) => void
 ) {
   if (!text) return null;
 
@@ -78,7 +82,7 @@ function renderMessageContent(
   });
 
   const sortedNames = Array.from(nameSet).sort((a, b) => b.length - a.length);
-  const patterns = ['@everyone\\b', '@all\\b'];
+  const patterns = ['https?:\\/\\/[^\\s<>"\']+', '@everyone\\b', '@all\\b'];
   sortedNames.forEach((n) => {
     patterns.push(`@${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
   });
@@ -89,10 +93,53 @@ function renderMessageContent(
 
   const myNameLower = (currentProfileName || '').toLowerCase().trim();
   const myFirstLower = myNameLower.split(/\s+/)[0] || '';
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
     <>
       {tokens.map((part, idx) => {
+        if (/^https?:\/\//i.test(part)) {
+          // Separate any trailing punctuation like '.', ',', ')'
+          const match = part.match(/^(https?:\/\/[^\s<>"']*?)([.,!?;:)\]]*)$/);
+          const url = match ? match[1] : part;
+          const trailing = match ? match[2] : '';
+
+          let internalPath: string | null = null;
+          try {
+            const parsed = new URL(url);
+            if (currentOrigin && parsed.origin === currentOrigin) {
+              internalPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+            }
+          } catch {
+            // Keep as external URL
+          }
+
+          return (
+            <span key={idx}>
+              <a
+                href={url}
+                target={internalPath ? undefined : '_blank'}
+                rel={internalPath ? undefined : 'noopener noreferrer'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (internalPath && onNavigate) {
+                    e.preventDefault();
+                    onNavigate(internalPath);
+                  }
+                }}
+                className={`underline font-medium break-all transition-colors ${
+                  isMe
+                    ? 'text-white decoration-white/80 hover:text-orange-100'
+                    : 'text-orange-600 decoration-orange-400 hover:text-orange-700'
+                }`}
+              >
+                {url}
+              </a>
+              {trailing}
+            </span>
+          );
+        }
+
         if (part.startsWith('@')) {
           const target = part.slice(1).toLowerCase().trim();
           const isEveryone = target === 'everyone' || target === 'all';
@@ -192,6 +239,7 @@ let cachedProfileId: string | null = null;
 let cachedProfileName: string | null = null;
 
 export default function DockedChatBox() {
+  const navigate = useNavigate();
   const {
     activeChat,
     isOpen,
@@ -238,6 +286,10 @@ export default function DockedChatBox() {
 
   // Photo Lightbox modal
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
+
+  // Delete message confirmation modal
+  const [deleteTargetMsg, setDeleteTargetMsg] = useState<MessageItem | null>(null);
+  const [deletingMessage, setDeletingMessage] = useState(false);
 
   // Blocked non-business message notices per conversation
   const [blockedNoticesByChat, setBlockedNoticesByChat] = useState<Record<string, BlockedNoticeItem[]>>({});
@@ -656,6 +708,47 @@ export default function DockedChatBox() {
     setTimeout(() => {
       inputRef.current?.focus();
     }, 20);
+  };
+
+  const handleDeleteMessage = (msg: MessageItem) => {
+    if (!activeChat?.profileId || !msg?.id || msg.id.startsWith('temp-')) return;
+    setActiveReactionMsgId(null);
+    setDeleteTargetMsg(msg);
+  };
+
+  const confirmDeleteMessage = async () => {
+    if (!activeChat?.profileId || !deleteTargetMsg?.id || deletingMessage) return;
+
+    const msg = deleteTargetMsg;
+    const targetProfileId = activeChat.profileId;
+    const prevMessages = messages;
+
+    setDeletingMessage(true);
+    setDeleteTargetMsg(null);
+    if (replyingTo?.id === msg.id) {
+      setReplyingTo(null);
+    }
+
+    setMessages((prev) => {
+      const next = prev.filter((item) => item.id !== msg.id);
+      setChatMessages(targetProfileId, next);
+      return next;
+    });
+
+    try {
+      if (activeChat.isGroup) {
+        await messagesApi.deleteGroupMessage(targetProfileId, msg.id);
+      } else {
+        await messagesApi.delete(msg.id);
+      }
+    } catch (err: any) {
+      // Restore message if server delete failed
+      setMessages(prevMessages);
+      setChatMessages(targetProfileId, prevMessages);
+      alert(err?.message || 'Failed to delete message.');
+    } finally {
+      setDeletingMessage(false);
+    }
   };
 
   const handleSend = async (textToSend?: string) => {
@@ -1531,7 +1624,8 @@ export default function DockedChatBox() {
                       </div>
                     );
 
-                    // Hover action buttons (React + Reply) like Messenger
+                    // Hover action buttons (React + Reply + Delete) like Messenger
+                    const canDeleteMsg = isMe || (Boolean(activeChat.isGroup) && isGroupAdmin);
                     const messageActionButtons = !isPending && !isFailed && (
                       <div
                         onClick={(e) => e.stopPropagation()}
@@ -1561,6 +1655,16 @@ export default function DockedChatBox() {
                         >
                           <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
                         </button>
+                        {canDeleteMsg && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMessage(m)}
+                            className="p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Delete message"
+                          >
+                            <TrashIcon className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     );
 
@@ -1657,7 +1761,13 @@ export default function DockedChatBox() {
                                         isFailed ? 'border border-red-400 bg-red-600 text-white' : ''
                                       }`}
                                     >
-                                      {renderMessageContent(parsedMedia.text, true, currentProfileName, activeChat.members || [])}
+                                      {renderMessageContent(
+                                        parsedMedia.text,
+                                        true,
+                                        currentProfileName,
+                                        activeChat.members || [],
+                                        navigate
+                                      )}
                                     </div>
                                   )
                                 )}
@@ -1762,7 +1872,13 @@ export default function DockedChatBox() {
                                     </div>
                                   ) : (
                                     <div className="max-w-full px-3.5 py-2 rounded-2xl text-sm leading-relaxed bg-gray-200/90 text-gray-900 rounded-tl-xs break-words [overflow-wrap:anywhere] whitespace-pre-wrap shadow-2xs">
-                                      {renderMessageContent(parsedMedia.text, false, currentProfileName, activeChat.members || [])}
+                                      {renderMessageContent(
+                                        parsedMedia.text,
+                                        false,
+                                        currentProfileName,
+                                        activeChat.members || [],
+                                        navigate
+                                      )}
                                     </div>
                                   )
                                 )}
@@ -2074,8 +2190,8 @@ export default function DockedChatBox() {
                     replyingTo
                       ? `Reply to ${replyingTo.senderId === currentProfileId ? 'yourself' : replyingTo.senderName}...`
                       : activeChat.isGroup
-                        ? 'Business message to group (@ to mention)...'
-                        : 'Write a business or alumni message...'
+                        ? 'Message group (type @ to mention)...'
+                        : 'Write a message...'
                   }
                   className="flex-1 bg-gray-100 hover:bg-gray-200/60 focus:bg-white focus:ring-1 focus:ring-orange-500 border border-transparent focus:border-orange-400 rounded-full px-3.5 py-1.5 text-sm text-gray-800 placeholder-gray-500 outline-none transition-all"
                 />
@@ -2084,7 +2200,7 @@ export default function DockedChatBox() {
                   onClick={() => handleSend()}
                   disabled={uploadingMsgPhoto || (!inputText.trim() && !pendingPhotoFile)}
                   className="p-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-full transition-colors shadow-xs cursor-pointer active:scale-95"
-                  title="Send business message"
+                  title="Send message"
                 >
                   {uploadingMsgPhoto ? (
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
@@ -2123,6 +2239,68 @@ export default function DockedChatBox() {
           </div>
         </div>
       )}
+
+      {/* Delete Message Confirmation Modal */}
+      {deleteTargetMsg &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+            onClick={() => !deletingMessage && setDeleteTargetMsg(null)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-sm w-full p-5 animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                  <TrashIcon className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-bold text-gray-900">Delete message?</h3>
+                    <button
+                      type="button"
+                      disabled={deletingMessage}
+                      onClick={() => setDeleteTargetMsg(null)}
+                      className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                      aria-label="Close"
+                    >
+                      <XMarkIcon className="w-4 h-4 stroke-2" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Are you sure you want to delete this message? This action cannot be undone.
+                  </p>
+                  {formatReplyBody(deleteTargetMsg.body) && (
+                    <div className="mt-2.5 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200/80 text-xs text-gray-700 line-clamp-3 break-words">
+                      &ldquo;{formatReplyBody(deleteTargetMsg.body)}&rdquo;
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={deletingMessage}
+                  onClick={() => setDeleteTargetMsg(null)}
+                  className="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deletingMessage}
+                  onClick={confirmDeleteMessage}
+                  className="px-3.5 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {deletingMessage ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }

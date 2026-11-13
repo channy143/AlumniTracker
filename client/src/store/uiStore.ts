@@ -23,9 +23,15 @@ export const useUIStore = create<UIState>((set) => ({
   notifications: [],
   addNotification: (messageOrNotification, type) =>
     set((state) => {
-      const notification = typeof messageOrNotification === 'string'
-        ? { id: Date.now().toString(), message: messageOrNotification, type: type || 'info' }
+      const notification: Notification = typeof messageOrNotification === 'string'
+        ? { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, message: messageOrNotification, type: type || 'info' }
         : messageOrNotification;
+      
+      // Prevent duplicate notifications with the exact same message if already showing
+      if (state.notifications.some((n) => n.message === notification.message && n.type === notification.type)) {
+        return state;
+      }
+
       return { notifications: [...state.notifications, notification] };
     }),
   removeNotification: (id) =>

@@ -343,7 +343,7 @@ export default function CareerTrendsPage() {
 
   const careerNames = [...new Set(allCareers.map((c) => c.position))];
   const careerIndustryNames = [...new Set(allCareers.flatMap((c) => c.topIndustries?.map((ind) => ind.name) || []))];
-  const hasAnyFilter = selectedPosition || selectedIndustry || selectedEmploymentType || selectedBatch || selectedExperience || selectedLocation;
+  const hasAnyFilter = selectedPosition || selectedIndustry || selectedEmploymentType || selectedBatch || selectedExperience || selectedLocation || qproProgram || qproBatch;
 
   const clearAllFilters = () => {
     setSelectedPosition(null);
@@ -353,6 +353,9 @@ export default function CareerTrendsPage() {
     setSelectedExperience(null);
     setSelectedLocation(null);
     setSortBy('all');
+    setQproProgram(null);
+    setQproBatch(null);
+    clearSearch();
   };
 
   const matchesExperience = (career: CareerTrend, range: string): boolean => {
@@ -593,10 +596,31 @@ export default function CareerTrendsPage() {
                   onToggleActiveJobs={handleToggleActiveJobs}
                   isActiveJobsNavOpen={!!activeJobsNav && activeJobsNav.cardName === selectedCard.name}
                 />
-              ) : (
-                filteredCareers.length > 0 && filteredCareers.map((career) => (
+              ) : filteredCareers.length > 0 ? (
+                filteredCareers.map((career) => (
                   <CareerCard key={career.position} career={career} />
                 ))
+              ) : (
+                <div className="bg-white border border-gray-200 rounded-xl p-8 sm:p-12 text-center shadow-xs flex flex-col items-center justify-center">
+                  <AcademicCapIcon className="w-10 h-10 text-gray-300 mx-auto mb-3 stroke-1" />
+                  <h3 className="text-base font-bold text-gray-900">
+                    No alumni career records found
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1.5 max-w-md mx-auto leading-relaxed">
+                    There are currently no tracked career pathways for{' '}
+                    {qproProgram
+                      ? formatProgramLongName(qproProgram) || qproProgram
+                      : 'these selections'}{' '}
+                    under these filters. Try switching degrees or resetting your filters.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="mt-4 px-4 py-2 bg-white hover:bg-orange-50 border border-orange-500 text-orange-600 hover:text-orange-700 text-xs font-semibold rounded-full transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
+                  >
+                    <span>Reset All Filters</span>
+                  </button>
+                </div>
               )}
             </div>
 

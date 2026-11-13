@@ -430,9 +430,15 @@ export default function DirectoryProfilePage() {
           </div>
         </div>
 
-        {profile.bio && (
+        {profile.bio && profile.bio.trim() ? (
           <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-sm text-gray-600 leading-relaxed">{profile.bio}</p>
+            <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{profile.bio}</p>
+          </div>
+        ) : (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-sm text-gray-500 italic">
+              {profile.first_name || 'This alumnus'} hasn&apos;t added a bio yet.
+            </p>
           </div>
         )}
       </div>

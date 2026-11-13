@@ -638,6 +638,8 @@ export const messagesApi = {
     }),
   react: (messageId: string, emoji: string) =>
     api.post<{ id: string; reactions: Record<string, any> }>(`/messages/${messageId}/reactions`, { emoji }),
+  delete: (messageId: string) =>
+    api.delete<{ success: boolean; id: string }>(`/messages/${messageId}`),
   conversations: () => api.get<any[]>('/messages/conversations'),
   getConversation: (profileId: string) => api.get<any[]>(`/messages/${profileId}`),
   unreadCount: () => api.get<{ count: number }>('/messages/unread/count'),
@@ -691,6 +693,10 @@ export const messagesApi = {
     api.post<{ id: string; reactions: Record<string, any> }>(
       `/messages/groups/${groupId}/messages/${messageId}/reactions`,
       { emoji }
+    ),
+  deleteGroupMessage: (groupId: string, messageId: string) =>
+    api.delete<{ success: boolean; id: string }>(
+      `/messages/groups/${groupId}/messages/${messageId}`
     ),
   addGroupMembers: (groupId: string, memberIds: string[]) =>
     api.post<any>(`/messages/groups/${groupId}/members`, { member_ids: memberIds }),

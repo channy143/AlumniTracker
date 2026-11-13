@@ -918,6 +918,57 @@ router.post('/groups/:groupId/messages/:messageId/reactions', authenticate, asyn
   } catch (err) { next(err); }
 });
 
+// DELETE /api/messages/groups/:groupId/messages/:messageId - delete a group message (sender or group admin)
+router.delete('/groups/:groupId/messages/:messageId', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { groupId, messageId } = req.params;
+    const myProfileId = await getProfileIdForUser(req.user!.userId);
+    if (!myProfileId) throw new AppError('Profile not found', 404);
+
+    const [{ data: member }, { data: group }, { data: msg, error: fetchErr }] = await Promise.all([
+      supabase
+        .from('chat_group_members')
+        .select('id, role')
+        .eq('group_id', groupId)
+        .eq('profile_id', myProfileId)
+        .maybeSingle(),
+      supabase
+        .from('chat_groups')
+        .select('admin_id')
+        .eq('id', groupId)
+        .maybeSingle(),
+      supabase
+        .from('chat_group_messages')
+        .select('id, sender_id, group_id')
+        .eq('id', messageId)
+        .eq('group_id', groupId)
+        .maybeSingle(),
+    ]);
+
+    if (!member) {
+      throw new AppError('You are not a member of this group chat', 403);
+    }
+    if (fetchErr || !msg) {
+      throw new AppError('Message not found', 404);
+    }
+
+    const isGroupAdmin = member.role === 'admin' || group?.admin_id === myProfileId;
+    if (msg.sender_id !== myProfileId && !isGroupAdmin && req.user!.role !== 'admin') {
+      throw new AppError('You can only delete your own messages', 403);
+    }
+
+    const { error: delErr } = await supabase
+      .from('chat_group_messages')
+      .delete()
+      .eq('id', messageId)
+      .eq('group_id', groupId);
+
+    if (delErr) throw new AppError(delErr.message, 500);
+
+    res.json({ success: true, id: messageId });
+  } catch (err) { next(err); }
+});
+
 // GET /api/messages/groups/:groupId/members - list group members
 router.get('/groups/:groupId/members', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
@@ -1168,6 +1219,38 @@ router.post('/:messageId/reactions', authenticate, async (req: AuthenticatedRequ
     if (updateErr) throw new AppError(updateErr.message, 500);
 
     res.json({ id: messageId, reactions: currentReactions });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/messages/:messageId - delete a direct message (sender or admin)
+router.delete('/:messageId', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const myProfileId = await getProfileIdForUser(req.user!.userId);
+    if (!myProfileId) throw new AppError('Profile not found', 404);
+
+    const { data: msg, error: fetchErr } = await supabase
+      .from('messages')
+      .select('id, sender_id, receiver_id')
+      .eq('id', messageId)
+      .maybeSingle();
+
+    if (fetchErr || !msg) {
+      throw new AppError('Message not found', 404);
+    }
+
+    if (msg.sender_id !== myProfileId && req.user!.role !== 'admin') {
+      throw new AppError('You can only delete your own messages', 403);
+    }
+
+    const { error: delErr } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId);
+
+    if (delErr) throw new AppError(delErr.message, 500);
+
+    res.json({ success: true, id: messageId });
   } catch (err) { next(err); }
 });
 

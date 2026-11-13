@@ -8,7 +8,7 @@ import {
   TrophyIcon, ArrowTrendingUpIcon, UserCircleIcon, XMarkIcon,
   LockClosedIcon, ShieldCheckIcon, ShieldExclamationIcon, InformationCircleIcon,
   ChatBubbleBottomCenterTextIcon, DocumentArrowUpIcon, DocumentTextIcon,
-  ArrowTopRightOnSquareIcon, TrashIcon, ArrowPathIcon, QuestionMarkCircleIcon
+  ArrowTopRightOnSquareIcon, TrashIcon, ArrowPathIcon, QuestionMarkCircleIcon, PlusIcon
 } from '@heroicons/react/24/outline';
 import { SkeletonCard, SkeletonProfilePage } from '@/components/ui/Skeleton';
 import { getCached } from '@/utils/apiCache';
@@ -100,6 +100,7 @@ export default function ProfilePage() {
   const [form, setForm] = useState<any>({});
   const fileRef = useRef<HTMLInputElement>(null);
   const resumeRef = useRef<HTMLInputElement>(null);
+  const bioTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [uploadingResume, setUploadingResume] = useState(false);
   const [editSkills, setEditSkills] = useState<string[]>([]);
   const [editEducation, setEditEducation] = useState<any[]>([]);
@@ -812,7 +813,35 @@ export default function ProfilePage() {
     <div className="flex-1 space-y-5">
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <SectionLine label="About" />
-        <p className="text-sm text-gray-700 leading-relaxed">{profile?.bio || 'No bio added yet.'}</p>
+        {profile?.bio && profile.bio.trim() ? (
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{profile.bio}</p>
+        ) : (
+          <div className="mt-2 p-4 bg-orange-50/60 border border-orange-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-bold text-gray-900">
+                Tell employers and fellow alumni about yourself
+              </h4>
+              <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                Add a short bio highlighting your freelance work, career goals, or key projects to boost your profile completion.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(true);
+                setEditSection('personal');
+                setTimeout(() => {
+                  bioTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  bioTextareaRef.current?.focus();
+                }, 80);
+              }}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer shrink-0 shadow-2xs"
+            >
+              <PlusIcon className="w-3.5 h-3.5" />
+              <span>Add Bio</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {professionalLinks.length > 0 && (
@@ -942,7 +971,7 @@ export default function ProfilePage() {
 
                   <div>
                     <SectionLine label="Bio" />
-                    <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 mt-3" placeholder="Brief professional summary" />
+                    <textarea ref={bioTextareaRef} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 mt-3" placeholder="Brief professional summary" />
                   </div>
 
                   <div data-tour="profile-edit-employment-section">
