@@ -506,7 +506,7 @@ export const adminApi = {
   surveyDuplicate: (id: string) => api.post<any>(`/admin/surveys/${id}/duplicate`, {}),
   surveyAnalytics: (id: string) => api.get<any>(`/admin/surveys/${id}/analytics`),
   surveyResponses: (id: string, params: Record<string, any> = {}) => api.get<any>(`/admin/surveys/${id}/responses?${toQuery(params)}`),
-  surveyExportResponses: (id: string) => api.get<Blob>(`/admin/surveys/${id}/responses/export`),
+  surveyExportResponses: (id: string) => api.blob(`/admin/surveys/${id}/responses/export`),
   surveyStandardQuestions: () => api.get<any[]>('/admin/surveys/standard-questions'),
 
   announcementList: (params: Record<string, any> = {}) => api.get<any>(`/admin/announcements?${toQuery(params)}`),
@@ -533,6 +533,8 @@ export const adminApi = {
     params.format === 'csv' ? api.blob(`/admin/reports/alumni?${toQuery(params)}`) : api.get<any>(`/admin/reports/alumni?${toQuery(params)}`),
   reportEmployment: (params: Record<string, any> = {}) =>
     params.format === 'csv' ? api.blob(`/admin/reports/employment?${toQuery(params)}`) : api.get<any>(`/admin/reports/employment?${toQuery(params)}`),
+  reportEmploymentProofs: (params: Record<string, any> = {}) =>
+    params.format === 'csv' ? api.blob(`/admin/reports/employment-proofs?${toQuery(params)}`) : api.get<any>(`/admin/reports/employment-proofs?${toQuery(params)}`),
   reportEmployer: (params: Record<string, any> = {}) =>
     params.format === 'csv' ? api.blob(`/admin/reports/employer?${toQuery(params)}`) : api.get<any>(`/admin/reports/employer?${toQuery(params)}`),
   reportCareerProgress: (params: Record<string, any> = {}) =>
@@ -591,6 +593,7 @@ export const adminApi = {
   auditLogs: (params: Record<string, any> = {}) => api.get<any>(`/admin/audit-logs?${toQuery(params)}`),
   auditLogStats: () => api.get<any>('/admin/audit-logs/stats'),
   exportAuditLogsUrl: (params: Record<string, any> = {}) => `/api/admin/audit-logs/export?${toQuery(params)}`,
+  exportAuditLogs: (params: Record<string, any> = {}) => api.blob(`/admin/audit-logs/export?${toQuery(params)}`),
   auditReports: () => api.get<{ reports: any[] }>('/admin/audit-logs/reports'),
   auditUpdateReportStatus: (id: string, status: string, adminNotes?: string) =>
     api.put<any>(`/admin/audit-logs/reports/${id}/status`, { status, adminNotes }),
@@ -782,7 +785,35 @@ export const directoryApi = {
 };
 
 export const publicApi = {
-  stats: () => api.get<{ totalAlumni: number; employmentRate: number; mentorshipMatches: number; programsTracked: number }>('/public/stats'),
+  stats: () =>
+    api.get<{
+      totalAlumni: number;
+      employmentRate: number;
+      mentorshipMatches: number;
+      programsTracked: number;
+      activeJobsCount?: number;
+      featuredJobs?: Array<{
+        id: string;
+        position: string;
+        company_name: string;
+        location: string;
+        job_type: string;
+        is_remote: boolean;
+        is_alumni_exclusive: boolean;
+        salary_range?: string | null;
+        experience_level?: string | null;
+        created_at?: string | null;
+        vacancies_count?: number | null;
+        poster_url?: string | null;
+        poster_avatar_url?: string | null;
+      }>;
+      featuredAlumni?: Array<{
+        id: string;
+        name: string;
+        avatar_url: string;
+        batch: string;
+      }>;
+    }>('/public/stats'),
 };
 
 export const employerApi = {

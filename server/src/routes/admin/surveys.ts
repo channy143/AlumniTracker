@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { createSurveyNotifications } from '../notifications';
+import { buildDpaCsv } from '../../utils/csvExport';
+import { logAudit } from '../../services/auditLogger';
 
 const STANDARD_QUESTIONS = [
   { id: 'personal_info', section: 'Personal Information', type: 'section' },
@@ -540,13 +542,36 @@ router.get('/:id/responses/export', async (req, res, next) => {
       return row;
     });
 
-    if (csvRows.length === 0) return res.json([]);
+    try {
+      await logAudit(req, {
+        actorId: (req as any).user?.userId,
+        actorName: (req as any).user?.email || 'Administrator',
+        actorRole: 'admin',
+        action: 'SURVEY_RESPONSES_EXPORTED',
+        entity: 'surveys',
+        entityId: req.params.id,
+        details: { surveyTitle: survey?.title, recordCount: csvRows.length, format: 'csv' },
+        severity: 'info',
+        status: 'success',
+      });
+      if ((req as any).user?.userId) {
+        await supabase.from('report_exports').insert({
+          user_id: (req as any).user.userId,
+          admin_email: (req as any).user.email || 'Administrator',
+          report_name: `Survey Responses: ${survey?.title || req.params.id.slice(0, 8)}`,
+          report_type: 'survey_responses',
+          format: 'csv',
+          record_count: csvRows.length,
+          filters: { surveyId: req.params.id },
+          ip_address: req.ip || 'unknown',
+          user_agent: req.headers['user-agent'] as string,
+        });
+      }
+    } catch {}
 
-    const headers = Object.keys(csvRows[0]);
-    const csv = csvRows.map((r: any) => headers.map((h) => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(',')).join('\n');
-    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=survey-${req.params.id.slice(0, 8)}-responses.csv`);
-    return res.send(`${headers.join(',')}\n${csv}`);
+    return res.send(buildDpaCsv(csvRows));
   } catch (err) {
     next(err);
   }

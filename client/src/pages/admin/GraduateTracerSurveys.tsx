@@ -1282,7 +1282,26 @@ function SurveyResponses({ survey }: { survey: any }) {
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           placeholder="Search by name, email, or course..." className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full sm:w-64" />
-        <button onClick={() => { const a = document.createElement('a'); a.href = `/admin/surveys/${survey.id}/responses/export`; a.click(); }} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 ml-auto">Export CSV</button>
+        <button
+          onClick={async () => {
+            try {
+              const blob = await adminApi.surveyExportResponses(survey.id);
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `survey-${survey.id.slice(0, 8)}-responses.csv`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            } catch (err) {
+              console.error('Failed to export survey responses:', err);
+            }
+          }}
+          className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 ml-auto cursor-pointer"
+        >
+          Export CSV
+        </button>
       </div>
 
       {loading ? (

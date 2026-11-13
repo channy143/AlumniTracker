@@ -18,21 +18,153 @@ import {
   SparklesIcon,
   AcademicCapIcon,
   GlobeAltIcon,
+  ChatBubbleLeftRightIcon,
+  DocumentArrowUpIcon,
+  CheckBadgeIcon,
+  LockClosedIcon,
+  BookmarkIcon,
 } from '@heroicons/react/24/outline';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { useCountUp } from '@/hooks/useCountUp';
 import { publicApi } from '@/services/api';
+import { TiltedGridHero } from '@/components/ui/tilted-grid-hero';
+import { Marquee } from '@/components/ui/3d-testimonails';
+import { BentoGridShowcase } from '@/components/ui/bento-grid-showcase';
+import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 /* ─── Data ─── */
 
 const NAV_SECTIONS = [
   { id: 'numbers', label: 'Our Numbers' },
-  { id: 'manifesto', label: 'Manifesto' },
-  { id: 'how-it-works', label: 'How It Works' },
-  { id: 'platform', label: 'Platform' },
-  { id: 'values', label: 'Values' },
+  { id: 'community', label: 'Community' },
+  { id: 'jobs', label: 'Job Offers' },
+  { id: 'chat', label: 'Alumni Chat' },
   { id: 'connect', label: 'Connect' },
 ];
+
+const TILTED_COMMUNITY_IMAGES = [
+  {
+    src: '/landingpage_assets/New%20folder/Screenshot%202026-11-14%20044322.png',
+    alt: 'CTU-Naga Alumni Portal preview 1',
+  },
+  {
+    src: '/landingpage_assets/New%20folder/Screenshot%202026-11-14%20044420.png',
+    alt: 'CTU-Naga Alumni Portal preview 2',
+  },
+  {
+    src: '/landingpage_assets/New%20folder/Screenshot%202026-11-14%20044748.png',
+    alt: 'CTU-Naga Alumni Portal preview 3',
+  },
+  {
+    src: '/landingpage_assets/New%20folder/Screenshot%202026-11-14%20044830.png',
+    alt: 'CTU-Naga Alumni Portal preview 4',
+  },
+  {
+    src: '/landingpage_assets/New%20folder/Screenshot%202026-11-14%20044956.png',
+    alt: 'CTU-Naga Alumni Portal preview 5',
+  },
+  {
+    src: '/landingpage_assets/New%20folder/Screenshot%202026-11-14%20045035.png',
+    alt: 'CTU-Naga Alumni Portal preview 6',
+  },
+];
+
+const ALUMNI_CHAT_CAPTIONS = [
+  {
+    body: 'We’re hiring 2 junior React & Node.js developers in Cebu IT Park—DM me or apply via the Job Offers tab!',
+    tag: 'Job Hiring',
+  },
+  {
+    body: 'Just posted photos from our Batch Homecoming prep! Tagging @batchmates so nobody misses Saturday’s event.',
+    tag: 'Alumni Post',
+  },
+  {
+    body: 'Hey! Saw your update on the feed—how was the technical interview at your new engineering firm?',
+    tag: 'Alumni Chat',
+  },
+  {
+    body: 'Urgent hiring: Licensed Secondary & Elementary Educators needed for partner schools across Cebu Province.',
+    tag: 'Job Hiring',
+  },
+  {
+    body: 'Grateful to celebrate 2 years in cloud support today! Sharing my career journey caption for our fresh grads.',
+    tag: 'Alumni Post',
+  },
+  {
+    body: 'Thanks for connecting! Let’s catch up in the batch group chat and share referral tips for the new grads.',
+    tag: 'Alumni Chat',
+  },
+];
+
+const WAVY_LINE_PALETTES = [
+  { stroke: '#fb923c' },
+  { stroke: '#f59e0b' },
+  { stroke: '#38bdf8' },
+  { stroke: '#34d399' },
+  { stroke: '#a78bfa' },
+  { stroke: '#f472b6' },
+];
+
+function getJobWavyPalette(jobId: string | number) {
+  const str = String(jobId || '0');
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return WAVY_LINE_PALETTES[Math.abs(hash) % WAVY_LINE_PALETTES.length];
+}
+
+const WAVY_CONTOUR_LINES = Array.from({ length: 24 }, (_, i) => {
+  const baseY = -40 + i * 11;
+  const widthFactor = Math.pow(Math.sin((i / 24) * Math.PI * 2.8 + 0.35), 2);
+  const strokeWidth = Number((1.4 + 2.2 * widthFactor).toFixed(1));
+  const halfW = 145;
+  const amp = 22;
+  const tilt = 0.085;
+  let d = `M -60 ${Number((baseY - 60 * tilt).toFixed(1))}`;
+  for (let k = 0; k < 8; k++) {
+    const startX = -60 + k * halfW;
+    const endX = startX + halfW;
+    const peakY = baseY + (startX + halfW * 0.5) * tilt + (k % 2 === 0 ? -amp : amp);
+    const endY = baseY + endX * tilt;
+    const cp1x = Number((startX + halfW * 0.36).toFixed(1));
+    const cp2x = Number((startX + halfW * 0.64).toFixed(1));
+    d += ` C ${cp1x} ${Number(peakY.toFixed(1))}, ${cp2x} ${Number(peakY.toFixed(1))}, ${Number(endX.toFixed(1))} ${Number(endY.toFixed(1))}`;
+  }
+  return { id: i, d, strokeWidth };
+});
+
+function getCompanyInitials(name: string): string {
+  if (!name) return 'JB';
+  const clean = name.trim().replace(/[^a-zA-Z0-9\s]/g, '');
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return clean.slice(0, 2).toUpperCase() || 'JB';
+}
+
+function jobTimeAgo(dateStr?: string | null): string {
+  if (!dateStr) return 'Recently';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return 'just now';
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(diff / 86400000);
+  if (days === 1) return '1 day ago';
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? '1 month ago' : `${months} months ago`;
+}
+
+const JOB_TYPE_LABELS: Record<string, string> = {
+  'full-time': 'Full-Time',
+  'part-time': 'Part-Time',
+  contract: 'Contract',
+  internship: 'Internship',
+  freelance: 'Freelance',
+};
 
 interface BentoFeature {
   title: string; desc: string; icon: any;
@@ -294,13 +426,69 @@ function ValueCard({ value, index, revealed }: { value: (typeof values)[0]; inde
   );
 }
 
+function AlumniChatCard({ img, name, batch, body, tag }: { img: string; name: string; batch: string; body: string; tag: string }) {
+  return (
+    <Card className="w-72 border-gray-200/80 bg-white/95 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2.5">
+          <Avatar className="size-9 border border-ctu-marigold/30">
+            <AvatarImage src={img} alt={name} />
+            <AvatarFallback className="bg-ctu-blue text-white text-xs font-semibold">
+              {name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col min-w-0 flex-1">
+            <figcaption className="text-xs font-semibold text-ctu-charcoal truncate">
+              {name}
+            </figcaption>
+            <p className="text-[11px] text-gray-500 truncate">{batch}</p>
+          </div>
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-ctu-marigold/15 text-ctu-blue shrink-0">
+            {tag}
+          </span>
+        </div>
+        <blockquote className="mt-2.5 text-xs text-gray-700 leading-relaxed">
+          &ldquo;{body}&rdquo;
+        </blockquote>
+      </CardContent>
+    </Card>
+  );
+}
+
 /* ─── Main Component ─── */
 
 export default function LandingPage() {
   const [showHeader, setShowHeader] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('');
-  const [stats, setStats] = useState<{ totalAlumni: number; employmentRate: number; mentorshipMatches: number; programsTracked: number } | null>(null);
+  const [stats, setStats] = useState<{
+    totalAlumni: number;
+    employmentRate: number;
+    mentorshipMatches: number;
+    programsTracked: number;
+    activeJobsCount?: number;
+    featuredJobs?: Array<{
+      id: string;
+      position: string;
+      company_name: string;
+      location: string;
+      job_type: string;
+      is_remote: boolean;
+      is_alumni_exclusive: boolean;
+      salary_range?: string | null;
+      experience_level?: string | null;
+      created_at?: string | null;
+      vacancies_count?: number | null;
+      poster_url?: string | null;
+      poster_avatar_url?: string | null;
+    }>;
+    featuredAlumni?: Array<{
+      id: string;
+      name: string;
+      avatar_url: string;
+      batch: string;
+    }>;
+  } | null>(null);
 
   const heroTaglineRef = useRef<HTMLDivElement>(null);
   const heroHeadlineRef = useRef<HTMLHeadingElement>(null);
@@ -325,12 +513,18 @@ export default function LandingPage() {
     { value: 0, label: 'Programs Tracked', suffix: '+', max: 10 },
   ];
 
-  const featureStat = (key: string) => {
-    if (!stats) return undefined;
-    if (key === 'alumni') return `${stats.totalAlumni.toLocaleString()}+`;
-    if (key === 'programs') return `${stats.programsTracked}+`;
-    return undefined;
-  };
+  const chatItems = ALUMNI_CHAT_CAPTIONS.map((cap, idx) => {
+    const dbAlumni = stats?.featuredAlumni && stats.featuredAlumni.length > 0
+      ? stats.featuredAlumni[idx % stats.featuredAlumni.length]
+      : null;
+    return {
+      name: dbAlumni?.name || `CTU-Naga Alumnus ${idx + 1}`,
+      batch: dbAlumni?.batch || 'CTU-Naga Graduate',
+      img: dbAlumni?.avatar_url || '',
+      body: cap.body,
+      tag: cap.tag,
+    };
+  });
 
   useEffect(() => {
     const handleScroll = () => {
@@ -360,6 +554,31 @@ export default function LandingPage() {
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    html.classList.add('snap-y', 'snap-proximity');
+    return () => {
+      html.classList.remove('snap-y', 'snap-proximity');
+    };
+  }, []);
+
+  const [tiltedCurve, setTiltedCurve] = useState<number>(() => {
+    if (typeof window === 'undefined') return 80;
+    if (window.innerWidth < 640) return 42;
+    if (window.innerWidth < 1024) return 60;
+    return 80;
+  });
+
+  useEffect(() => {
+    const updateCurve = () => {
+      if (window.innerWidth < 640) setTiltedCurve(42);
+      else if (window.innerWidth < 1024) setTiltedCurve(60);
+      else setTiltedCurve(80);
+    };
+    window.addEventListener('resize', updateCurve, { passive: true });
+    return () => window.removeEventListener('resize', updateCurve);
   }, []);
 
   useEffect(() => {
@@ -394,10 +613,9 @@ export default function LandingPage() {
 
   const { ref: heroRef, revealed: heroRevealed } = useScrollReveal(0.15);
   const { ref: statsRef, revealed: statsRevealed } = useScrollReveal(0.2);
-  const { ref: manifestoRef, revealed: manifestoRevealed } = useScrollReveal(0.15);
-  const { ref: howRef, revealed: howRevealed } = useScrollReveal(0.15);
-  const { ref: platformRef, revealed: platformRevealed } = useScrollReveal(0.1);
-  const { ref: valuesRef, revealed: valuesRevealed } = useScrollReveal(0.2);
+  const { ref: communityRef, revealed: communityRevealed } = useScrollReveal(0.15);
+  const { ref: jobsRef, revealed: jobsRevealed } = useScrollReveal(0.15);
+  const { ref: chatRef, revealed: chatRevealed } = useScrollReveal(0.15);
   const { ref: ctaRef, revealed: ctaRevealed } = useScrollReveal(0.2);
 
   return (
@@ -528,7 +746,7 @@ export default function LandingPage() {
       <section
         id="hero"
         ref={heroRef}
-        className="relative min-h-screen flex items-center overflow-hidden"
+        className="relative min-h-screen flex items-center overflow-hidden snap-start"
         style={{ backgroundImage: 'url("/image/ChatGPT Image May 27, 2026, 04_38_30 AM.png")', backgroundSize: 'cover', backgroundPosition: 'center' }}
       >
         <div className="absolute inset-0 gradient-mesh" />
@@ -591,242 +809,581 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
-      {/* ═══ Divider ═══ */}
-      <div className="h-24 bg-gradient-to-b from-[#0f172a] to-[#0f172a] relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-ctu-gold/20 to-transparent" />
-      </div>
-
       {/* ═══ By the Numbers ═══ */}
       <section
         id="numbers"
         ref={statsRef}
-        className="min-h-screen bg-[#0f172a] flex items-center relative overflow-hidden"
+        className="min-h-screen bg-[#0f172a] flex items-center relative overflow-hidden snap-start pt-20 pb-10"
       >
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-ctu-gold/20 to-transparent" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(212,175,55,0.03),transparent_70%)]" />
         <div className="absolute top-0 left-1/2 w-px h-full bg-gradient-to-b from-transparent via-ctu-gold/10 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-ctu-gold/10 to-transparent" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24 w-full relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 w-full relative z-10">
           <motion.div
             initial="hidden"
             animate={statsRevealed ? 'visible' : 'hidden'}
             variants={container}
-            className="grid lg:grid-cols-2 gap-8 sm:gap-16 items-end mb-12 sm:mb-16"
+            className="grid lg:grid-cols-2 gap-4 sm:gap-10 items-end mb-6 sm:mb-8"
           >
             <div>
               <motion.span variants={fadeUp} className="text-ctu-gold text-xs uppercase tracking-[0.25em] font-semibold flex items-center gap-3">
                 <span className="w-8 h-px bg-ctu-gold/60" />
                 By the Numbers
               </motion.span>
-              <motion.h2 variants={fadeUp} className="text-4xl sm:text-5xl md:text-7xl font-bold font-display text-white mt-6 leading-[0.95]">
-                <span className="text-ctu-marigold">{stats ? `${stats.totalAlumni.toLocaleString()}+` : '0+'}</span>
-                <br />
+              <motion.h2 variants={fadeUp} className="text-3xl sm:text-5xl font-bold font-display text-white mt-3 leading-[1.02]">
+                <span className="text-ctu-marigold">{stats ? `${stats.totalAlumni.toLocaleString()}+` : '0+'}</span>{' '}
                 Alumni Strong
               </motion.h2>
             </div>
-            <motion.p variants={fadeUp} className="text-gray-400 text-lg leading-relaxed max-w-md lg:ml-auto font-light">
+            <motion.p variants={fadeUp} className="text-gray-400 text-sm sm:text-base leading-relaxed max-w-md lg:ml-auto font-light">
               A growing community of graduates who continue to learn, connect,
               and build a legacy that spans generations across industries.
             </motion.p>
           </motion.div>
 
-          <motion.div
-            initial="hidden"
-            animate={statsRevealed ? 'visible' : 'hidden'}
-            variants={{
-              hidden: {},
-              visible: { transition: { staggerChildren: 0.15, delayChildren: 0.4 } },
-            }}
-            className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-10 lg:gap-6"
-          >
-            {statConfig.map((stat) => (
-              <AnimatedStatRing key={stat.label} {...stat} />
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ═══ The Manifesto ═══ */}
-      <section
-        id="manifesto"
-        ref={manifestoRef}
-        className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden"
-      >
-        <motion.div
-          initial={false}
-          animate={manifestoRevealed ? { opacity: 1, x: 0 } : { opacity: 0, x: -60 }}
-          transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
-          className="flex-1 flex items-center justify-center p-6 sm:p-12 lg:p-20 bg-white relative overflow-hidden"
-        >
-          <div className="max-w-lg relative z-10">
-            <span className="text-ctu-marigold text-xs uppercase tracking-[0.25em] font-semibold flex items-center gap-3">
-              <span className="w-8 h-px bg-ctu-marigold/60" />
-              Our Manifesto
-            </span>
-            <div className="relative">
-              <span className="absolute -top-6 sm:-top-8 -left-2 sm:-left-4 text-[5rem] sm:text-[8rem] font-display font-bold text-ctu-marigold/10 leading-none select-none pointer-events-none">
-                &ldquo;
-              </span>
-              <blockquote className="text-3xl md:text-4xl lg:text-5xl font-display font-bold text-ctu-charcoal mt-8 leading-[1.1] tracking-tight relative z-10">
-                Education doesn&apos;t end at graduation&mdash;
-                <span className="text-ctu-blue">it transforms</span> into a lifelong journey.
-              </blockquote>
-            </div>
-            <div className="w-16 h-0.5 bg-ctu-marigold mt-8" />
-          </div>
-          <span className="absolute text-[8rem] sm:text-[14rem] md:text-[20rem] font-display font-bold text-gray-50 -bottom-6 sm:-bottom-10 -right-6 sm:-right-10 leading-none select-none pointer-events-none">
-            ∞
-          </span>
-        </motion.div>
-
-        <motion.div
-          initial={false}
-          animate={manifestoRevealed ? { opacity: 1, x: 0 } : { opacity: 0, x: 60 }}
-          transition={{ duration: 0.7, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-          className="flex-1 gradient-header flex items-center p-6 sm:p-12 lg:p-20 relative overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-ctu-blue via-blue-800 to-blue-950" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(232,160,80,0.06),transparent_50%)]" />
-
-          <div className="max-w-lg relative z-10">
-            <h3 className="text-ctu-gold text-lg font-semibold font-display">Bridging Education to Eternity</h3>
-            <p className="text-blue-200/80 text-lg mt-6 leading-relaxed font-light">
-              We don&apos;t just track careers&mdash;we cultivate communities where every
-              alumnus continues to grow, contribute, and inspire the next generation.
-            </p>
-            <ul className="mt-10 space-y-5">
-              {[
-                { text: 'Graduates become mentors, guiding the next generation', icon: HandRaisedIcon },
-                { text: 'Classrooms extend into industries, creating real-world learning', icon: AcademicCapIcon },
-                { text: 'Connections evolve into collaborations, sparking innovations', icon: SparklesIcon },
-              ].map((item) => (
-                <li key={item.text} className="flex items-start gap-4 text-blue-200/90">
-                  <span className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <item.icon className="w-4 h-4 text-ctu-gold" />
+          <BentoGridShowcase
+            revealed={statsRevealed}
+            integrations={
+              <div className="h-full rounded-2xl bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-between backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] uppercase tracking-[0.2em] text-ctu-gold font-semibold">Academic Reach</span>
+                  <AcademicCapIcon className="w-5 h-5 text-ctu-gold" />
+                </div>
+                <div className="mt-3">
+                  <div className="text-3xl sm:text-4xl font-bold font-display text-white">
+                    {stats ? `${stats.programsTracked}+` : '0+'}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Degree programs tracked across CTU-Naga Extension Campus.
+                  </p>
+                </div>
+              </div>
+            }
+            mainFeature={
+              <div className="h-full rounded-2xl bg-gradient-to-b from-ctu-blue/40 via-[#13223b] to-[#0b1324] border border-ctu-gold/25 p-6 flex flex-col justify-between shadow-lg">
+                <div>
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ctu-marigold/15 text-ctu-marigold text-[11px] font-semibold uppercase tracking-wider">
+                    <SparklesIcon className="w-3.5 h-3.5" />
+                    Verified Network
                   </span>
-                  <span className="leading-relaxed">{item.text}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="absolute bottom-0 right-0 w-72 h-72 bg-white/5 rounded-tl-full pointer-events-none" />
-          <div className="absolute top-0 left-0 w-48 h-48 bg-white/[0.02] rounded-br-full pointer-events-none" />
+                  <h3 className="text-xl sm:text-2xl font-bold font-display text-white mt-4">
+                    Alumni Network
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-300 mt-1.5 leading-relaxed">
+                    Graduates verified against CTU-Naga Registrar records and active across industries.
+                  </p>
+                </div>
+
+                <div className="my-4 flex justify-center">
+                  <AnimatedStatRing
+                    value={statConfig[0].value}
+                    label={statConfig[0].label}
+                    suffix={statConfig[0].suffix}
+                    max={statConfig[0].max}
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-gray-300">
+                  <span>Cross-Batch Directory</span>
+                  <Link to="/auth/register" className="text-ctu-marigold font-semibold hover:underline inline-flex items-center gap-1">
+                    Join <ArrowRightIcon className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            }
+            featureTags={
+              <div className="h-full rounded-2xl bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-between backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
+                <span className="text-[11px] uppercase tracking-[0.2em] text-ctu-marigold font-semibold">
+                  Tracked Metrics
+                </span>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <span className="px-2.5 py-1 rounded-full bg-white/10 text-xs text-white/90 font-medium">
+                    CHED Tracer Ready
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-ctu-marigold/20 text-xs text-ctu-marigold font-medium">
+                    Registrar Verified
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-xs text-emerald-300 font-medium">
+                    Live Career Data
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-xs text-blue-300 font-medium">
+                    Consent-First
+                  </span>
+                </div>
+              </div>
+            }
+            secondaryFeature={
+              <div className="h-full rounded-2xl bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-between backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] uppercase tracking-[0.2em] text-blue-300 font-semibold">Connections</span>
+                  <HandRaisedIcon className="w-5 h-5 text-blue-300" />
+                </div>
+                <div className="mt-3">
+                  <div className="text-3xl sm:text-4xl font-bold font-display text-white">
+                    {stats ? stats.mentorshipMatches.toLocaleString() : '0'}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Mentorship &amp; peer alumni connections accepted.
+                  </p>
+                </div>
+              </div>
+            }
+            statistic={
+              <div className="h-full rounded-2xl bg-white/[0.05] border border-white/10 p-6 flex flex-col justify-between backdrop-blur-sm hover:border-emerald-400/30 transition-colors">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] uppercase tracking-[0.2em] text-emerald-300 font-semibold">
+                    Career Outcomes
+                  </span>
+                  <ChartBarIcon className="w-5 h-5 text-emerald-300" />
+                </div>
+
+                <div className="my-4">
+                  <div className="text-5xl sm:text-6xl font-bold font-display text-ctu-marigold leading-none">
+                    {stats ? `${stats.employmentRate}%` : '0%'}
+                  </div>
+                  <p className="text-sm font-semibold text-white mt-2">Employment Rate</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                    Graduates currently employed, self-employed, or leading businesses.
+                  </p>
+                </div>
+
+                <div>
+                  <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-ctu-marigold to-emerald-400 transition-all duration-1000"
+                      style={{ width: `${Math.min(100, stats?.employmentRate ?? 0)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-gray-400 mt-1.5">
+                    <span>0%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+              </div>
+            }
+            journey={
+              <div className="h-full rounded-2xl bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-between backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] uppercase tracking-[0.2em] text-ctu-marigold font-semibold">Career Portal</span>
+                  <BriefcaseIcon className="w-5 h-5 text-ctu-marigold" />
+                </div>
+                <div className="mt-3 flex items-end justify-between gap-2">
+                  <div>
+                    <div className="text-3xl sm:text-4xl font-bold font-display text-white">
+                      {stats?.activeJobsCount ?? 0}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Active verified job openings
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => scrollTo('jobs')}
+                    className="text-xs font-semibold text-ctu-marigold hover:underline inline-flex items-center gap-1 shrink-0"
+                  >
+                    View <ArrowRightIcon className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            }
+          />
+        </div>
+      </section>
+
+      {/* ═══ Exclusive Alumni Community (TiltedGridHero) ═══ */}
+      <section
+        id="community"
+        ref={communityRef}
+        className="min-h-screen flex flex-col justify-center pt-20 pb-4 bg-white relative overflow-hidden snap-start"
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full relative z-10">
+          <motion.div
+            initial={false}
+            animate={communityRevealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 28 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="text-center mb-3 sm:mb-4"
+          >
+            <span className="text-ctu-marigold text-xs uppercase tracking-[0.25em] font-semibold flex items-center justify-center gap-3 mb-2">
+              <span className="w-8 h-px bg-ctu-marigold/60" />
+              Exclusive to CTU-Naga
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-bold font-display text-ctu-charcoal leading-[1.08] tracking-tight">
+              Your Alumni Feed,{' '}
+              <span className="text-ctu-blue">All in One Place</span>
+            </h2>
+            <p className="text-gray-500 mt-2.5 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
+              Share career milestones, tag classmates with <span className="font-semibold text-ctu-blue">@mentions</span>, catch official homecoming announcements, and reconnect across batches in a dedicated CTU-Naga space.
+            </p>
+          </motion.div>
+        </div>
+
+        <motion.div
+          initial={false}
+          animate={communityRevealed ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 24, scale: 0.98 }}
+          transition={{ duration: 0.65, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <TiltedGridHero
+            images={TILTED_COMMUNITY_IMAGES}
+            speed={4.5}
+            tileHeight={30}
+            gap={20}
+            axis={42}
+            curve={tiltedCurve}
+            fade={14}
+            className="h-[360px] sm:h-[400px] lg:h-[calc(100vh-280px)] min-h-[320px] max-h-[440px] w-full bg-gradient-to-b from-slate-50/40 via-white to-slate-50/40"
+          >
+            <div className="relative z-10 flex h-full flex-col items-center justify-between py-2 sm:py-3 text-center px-4">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-gray-200 shadow-xs text-xs font-medium text-ctu-blue">
+                <AcademicCapIcon className="w-4 h-4 text-ctu-marigold" />
+                <span>Verified Graduates · Cross-Batch Networking · Homecoming Updates</span>
+              </div>
+              <p className="max-w-xl text-xs sm:text-sm font-medium text-gray-600 mb-3 sm:mb-4">
+                Post updates with photos, react and comment on batchmate milestones, and never miss an official CTU-Naga alumni event.
+              </p>
+            </div>
+          </TiltedGridHero>
         </motion.div>
       </section>
 
-      {/* ═══ How It Works ═══ */}
+      {/* ═══ Job Opportunities, Profile & Resume Support ═══ */}
       <section
-        id="how-it-works"
-        ref={howRef}
-        className="min-h-screen flex items-center py-16 sm:py-24 bg-white relative overflow-hidden"
+        id="jobs"
+        ref={jobsRef}
+        className="min-h-screen flex items-center pt-24 pb-8 bg-gradient-to-b from-ctu-warm via-white to-ctu-warm relative overflow-hidden snap-start"
       >
-        <div className="absolute top-0 left-0 w-[20rem] sm:w-[30rem] h-[20rem] sm:h-[30rem] bg-ctu-blue/[0.02] rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-[20rem] sm:w-[30rem] h-[20rem] sm:h-[30rem] bg-ctu-marigold/[0.02] rounded-full translate-x-1/2 translate-y-1/2 pointer-events-none" />
-
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 w-full relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full relative z-10">
           <motion.div
             initial={false}
-            animate={howRevealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-20"
+            animate={jobsRevealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 28 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           >
-            <span className="text-ctu-marigold text-xs uppercase tracking-[0.25em] font-semibold flex items-center justify-center gap-3 mb-4">
-              <span className="w-8 h-px bg-ctu-marigold/60" />
-              How It Works
-            </span>
-            <h2 className="text-4xl md:text-6xl font-bold font-display text-ctu-charcoal mt-2 leading-[1.05] tracking-tight">
-              Your Journey in
-              <br />
-              <span className="text-ctu-blue">Four Steps</span>
-            </h2>
-            <p className="text-gray-400 mt-4 max-w-xl mx-auto font-light">
-              From registration to giving back &mdash; see how the platform grows with you.
-            </p>
-          </motion.div>
+            {/* Top Hierarchy: Header + CTA */}
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-6">
+              <div className="max-w-3xl">
+                <span className="text-ctu-marigold text-xs uppercase tracking-[0.25em] font-semibold flex items-center gap-3 mb-2">
+                  <span className="w-8 h-px bg-ctu-marigold/60" />
+                  Job Offers &amp; Career Opportunities
+                </span>
+                <h2 className="text-3xl sm:text-4xl lg:text-[2.5rem] font-bold font-display text-ctu-charcoal leading-[1.1] tracking-tight">
+                  Opportunities Tailored for{' '}
+                  <span className="text-ctu-blue whitespace-nowrap">CTU-Naga Graduates</span>
+                </h2>
+                <p className="text-gray-500 mt-2 text-sm leading-relaxed">
+                  Verified openings from partner companies and fellow alumni—with direct applications, skill matching, and referral links.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row lg:flex-col sm:items-center lg:items-end gap-2 shrink-0">
+                <Link
+                  to="/auth/register"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-ctu-blue text-white text-sm font-medium hover:bg-blue-900 transition-colors shadow-sm"
+                >
+                  <span>Explore {stats?.activeJobsCount ? `${stats.activeJobsCount} ` : ''}Openings</span>
+                  <ArrowRightIcon className="w-4 h-4" />
+                </Link>
+                <span className="text-[11px] text-gray-500">
+                  Sign in or register to apply with your resume.
+                </span>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-12 lg:gap-6">
-            {steps.map((step, i) => (
-              <HowItWorksStep key={step.num} step={step} index={i} revealed={howRevealed} />
-            ))}
-          </div>
+            {/* 3-Column Job Cards using our JobsPage UI */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {(stats?.featuredJobs && stats.featuredJobs.length > 0
+                ? stats.featuredJobs
+                : [
+                    {
+                      id: 'sample-1',
+                      position: 'Junior Software Developer',
+                      company_name: 'Partner Tech Employer',
+                      location: 'Cebu City / Hybrid',
+                      job_type: 'full-time',
+                      is_remote: false,
+                      is_alumni_exclusive: true,
+                      salary_range: 'Competitive',
+                      experience_level: 'Entry level',
+                      created_at: null,
+                      vacancies_count: null,
+                      poster_url: null,
+                      poster_avatar_url: null,
+                    },
+                    {
+                      id: 'sample-2',
+                      position: 'Industrial Process Technician',
+                      company_name: 'Naga Manufacturing Partner',
+                      location: 'City of Naga, Cebu',
+                      job_type: 'full-time',
+                      is_remote: false,
+                      is_alumni_exclusive: true,
+                      salary_range: 'Competitive',
+                      experience_level: 'Mid level',
+                      created_at: null,
+                      vacancies_count: null,
+                      poster_url: null,
+                      poster_avatar_url: null,
+                    },
+                    {
+                      id: 'sample-3',
+                      position: 'Licensed Secondary Educator',
+                      company_name: 'Regional Academic Institutions',
+                      location: 'Cebu Province',
+                      job_type: 'full-time',
+                      is_remote: false,
+                      is_alumni_exclusive: false,
+                      salary_range: 'Competitive',
+                      experience_level: 'Entry level',
+                      created_at: null,
+                      vacancies_count: null,
+                      poster_url: null,
+                      poster_avatar_url: null,
+                    },
+                  ]
+              ).map((job) => {
+                const palette = getJobWavyPalette(job.id);
+                const initials = getCompanyInitials(job.company_name);
+                const jobTypeLabel =
+                  JOB_TYPE_LABELS[job.job_type] ||
+                  (job.job_type ? job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1) : 'Full-Time');
+
+                return (
+                  <div
+                    key={job.id}
+                    className="relative bg-white border border-gray-200 rounded-xl p-5 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden"
+                  >
+                    {/* Wavy Contour Lines Background */}
+                    <div className="absolute top-0 left-0 right-0 h-36 overflow-hidden pointer-events-none z-0">
+                      <svg viewBox="0 0 900 260" className="w-full h-full" preserveAspectRatio="xMidYMid slice" fill="none">
+                        {WAVY_CONTOUR_LINES.map((line) => (
+                          <path
+                            key={line.id}
+                            d={line.d}
+                            stroke={palette.stroke}
+                            strokeWidth={line.strokeWidth}
+                            strokeOpacity={0.65}
+                            strokeLinecap="round"
+                          />
+                        ))}
+                      </svg>
+                      <div className="absolute inset-0 bg-gradient-to-b from-transparent from-25% via-white/50 via-60% to-white" />
+                    </div>
+
+                    <div className="relative z-10">
+                      {/* Top Header: Company Avatar/Initials & Save Pill */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="w-12 h-12 rounded-full border border-gray-200/90 p-0.5 bg-white shadow-xs flex items-center justify-center shrink-0">
+                          {job.poster_avatar_url ? (
+                            <img src={job.poster_avatar_url} alt={job.company_name} className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full rounded-full bg-orange-600 text-white flex items-center justify-center text-xs font-bold tracking-widest uppercase">
+                              {initials}
+                            </div>
+                          )}
+                        </div>
+                        <Link
+                          to="/auth/register"
+                          className="flex items-center gap-1.5 px-2.5 py-1 border bg-white/90 backdrop-blur-xs border-gray-200 text-gray-600 hover:text-orange-600 hover:border-orange-200 text-[11px] font-medium transition-colors"
+                        >
+                          <span>Save</span>
+                          <BookmarkIcon className="w-3.5 h-3.5 text-gray-500" />
+                        </Link>
+                      </div>
+
+                      {/* Company & Time */}
+                      <div className="mt-3.5 flex items-center gap-2 text-xs">
+                        <span className="font-bold text-gray-900 text-sm truncate">{job.company_name}</span>
+                        <span className="text-gray-400 font-normal shrink-0">{jobTimeAgo(job.created_at)}</span>
+                      </div>
+
+                      {/* Job Title */}
+                      <Link
+                        to="/auth/register"
+                        className="block text-lg font-bold text-gray-900 mt-1 mb-2.5 leading-snug line-clamp-1 hover:text-orange-600 transition-colors"
+                        title={job.position}
+                      >
+                        {job.position}
+                      </Link>
+
+                      {/* Badges Row */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-800">
+                          {jobTypeLabel}
+                        </span>
+                        {job.experience_level && (
+                          <span className="px-2.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-800 capitalize">
+                            {job.experience_level}
+                          </span>
+                        )}
+                        {job.is_remote && (
+                          <span className="px-2.5 py-0.5 text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                            Remote
+                          </span>
+                        )}
+                        {job.is_alumni_exclusive && (
+                          <span className="px-2.5 py-0.5 text-[11px] font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                            Alumni Exclusive
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="relative z-10">
+                      <hr className="border-gray-100 my-3" />
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-gray-900 leading-tight truncate">
+                            {job.salary_range || 'Competitive'}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5 truncate">
+                            {job.location}
+                          </p>
+                        </div>
+                        <Link
+                          to="/auth/register"
+                          className="shrink-0 bg-ctu-blue hover:bg-blue-900 text-white text-xs font-semibold px-3.5 py-2 rounded-lg inline-flex items-center gap-1 transition-colors"
+                        >
+                          <span>Apply Now</span>
+                          <ArrowRightIcon className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom Compact Trust Pillars */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-3 shadow-xs">
+                <div className="w-9 h-9 rounded-lg bg-ctu-blue/10 text-ctu-blue flex items-center justify-center shrink-0">
+                  <DocumentArrowUpIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-ctu-charcoal">Profile Photo &amp; Resume Ready</h3>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                    Upload your CV/resume and skills so partner employers can hire you faster.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-3 shadow-xs">
+                <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                  <CheckBadgeIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-ctu-charcoal">Registrar-Verified Graduate Access</h3>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                    Verified against CTU-Naga Registrar batch records using your name and birthdate.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-[#0f172a] text-white rounded-xl p-4 flex items-start gap-3 shadow-sm">
+                <div className="w-9 h-9 rounded-lg bg-ctu-marigold/20 text-ctu-marigold flex items-center justify-center shrink-0">
+                  <LockClosedIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Consent-First Contact Privacy</h3>
+                  <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">
+                    Approve connection requests before sharing contact links or direct messages.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* ═══ The Platform ═══ */}
+      {/* ═══ Real-Time Alumni Chat (3D Marquee) ═══ */}
       <section
-        id="platform"
-        ref={platformRef}
-        className="py-16 sm:py-24 lg:py-32 bg-gradient-to-b from-ctu-warm via-white to-ctu-warm relative overflow-hidden"
+        id="chat"
+        ref={chatRef}
+        className="min-h-screen flex items-center pt-20 pb-10 sm:py-20 bg-white relative overflow-hidden snap-start"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(#00336608_1px,transparent_1px)] [background-size:32px_32px] pointer-events-none" />
-        <div className="absolute top-0 right-0 w-[50rem] h-[50rem] bg-gradient-to-bl from-ctu-blue/[0.04] to-transparent rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[30rem] h-[30rem] bg-gradient-to-tr from-ctu-marigold/[0.04] to-transparent rounded-full translate-y-1/2 -translate-x-1/4 pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60rem] h-[60rem] bg-ctu-blue/[0.015] rounded-full pointer-events-none" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full relative z-10">
+          <div className="grid lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+            {/* Left: Chat Feature Summary */}
+            <motion.div
+              initial={false}
+              animate={chatRevealed ? { opacity: 1, x: 0 } : { opacity: 0, x: -24 }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              className="lg:col-span-5"
+            >
+              <span className="text-ctu-marigold text-xs uppercase tracking-[0.25em] font-semibold flex items-center gap-3 mb-4">
+                <span className="w-8 h-px bg-ctu-marigold/60" />
+                Alumni Chat &amp; Messaging
+              </span>
+              <h2 className="text-3xl sm:text-5xl font-bold font-display text-ctu-charcoal leading-[1.08] tracking-tight">
+                Direct Conversations{' '}
+                <span className="text-ctu-blue">Across Batches</span>
+              </h2>
+              <p className="text-gray-500 mt-4 text-sm sm:text-base leading-relaxed">
+                Built-in messaging keeps career referrals, mentorship advice, and batch homecoming coordination flowing without leaving the portal.
+              </p>
 
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <motion.div
-            initial={false}
-            animate={platformRevealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-12 sm:mb-16 lg:mb-20"
-          >
-            <span className="text-ctu-marigold text-xs uppercase tracking-[0.25em] font-semibold flex items-center justify-center gap-3 mb-4">
-              <span className="w-8 h-px bg-ctu-marigold/60" />
-              The Platform
-            </span>
-            <h2 className="text-4xl md:text-6xl font-bold font-display text-ctu-charcoal mt-2 leading-[1.05] tracking-tight">
-              Everything You Need
-            </h2>
-            <p className="text-gray-400 mt-4 max-w-xl mx-auto font-light">
-              Eight powerful modules designed to keep you connected, informed, and growing.
-            </p>
-          </motion.div>
+              <ul className="mt-6 space-y-3 text-sm text-gray-700">
+                <li className="flex items-start gap-2.5">
+                  <ChatBubbleLeftRightIcon className="w-5 h-5 text-ctu-marigold shrink-0 mt-0.5" />
+                  <span><strong>1-on-1 &amp; Group Chats</strong> with real-time online status and message reactions.</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <SparklesIcon className="w-5 h-5 text-ctu-marigold shrink-0 mt-0.5" />
+                  <span><strong>Share Photos &amp; Post Links</strong> directly inside conversations.</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <ShieldCheckIcon className="w-5 h-5 text-ctu-marigold shrink-0 mt-0.5" />
+                  <span><strong>Professional Communication Filter</strong> keeping chats focused on careers, mentorship, and official alumni topics.</span>
+                </li>
+              </ul>
 
-          <motion.div
-            initial="hidden"
-            animate={platformRevealed ? 'visible' : 'hidden'}
-            variants={container}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
-          >
-            {features.map((f) => (
-              <BentoCard key={f.title} feature={f} hoverable={!showHeader} stat={featureStat(f.statKey as string)} />
-            ))}
-          </motion.div>
-        </div>
-      </section>
+              <div className="mt-8">
+                <Link
+                  to="/auth/register"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-ctu-marigold text-white text-sm font-semibold hover:bg-[#d4893a] transition-colors shadow-sm"
+                >
+                  <span>Start Connecting with Alumni</span>
+                  <ArrowRightIcon className="w-4 h-4" />
+                </Link>
+              </div>
+            </motion.div>
 
-      {/* ═══ Values ═══ */}
-      <section
-        id="values"
-        ref={valuesRef}
-        className="min-h-screen flex items-center py-16 sm:py-24 bg-white relative overflow-hidden"
-      >
-        <div className="absolute top-1/2 left-0 w-96 h-96 bg-ctu-blue/[0.02] rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-        <div className="absolute top-1/2 right-0 w-96 h-96 bg-ctu-marigold/[0.02] rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 w-full relative z-10">
-          <motion.div
-            initial={false}
-            animate={valuesRevealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-16"
-          >
-            <span className="text-ctu-marigold text-xs uppercase tracking-[0.25em] font-semibold flex items-center justify-center gap-3 mb-4">
-              <span className="w-8 h-px bg-ctu-marigold/60" />
-              Why Join
-            </span>
-            <h2 className="text-4xl md:text-6xl font-bold font-display text-ctu-charcoal mt-2 leading-[1.05] tracking-tight">
-              Built on <span className="text-ctu-marigold">Three Pillars</span>
-            </h2>
-            <p className="text-gray-400 mt-4 max-w-xl mx-auto font-light">
-              Every feature, every connection, every opportunity is guided by these core principles.
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
-            {values.map((value, i) => (
-              <ValueCard key={value.title} value={value} index={i} revealed={valuesRevealed} />
-            ))}
+            {/* Right: 3D Vertical Marquee */}
+            <motion.div
+              initial={false}
+              animate={chatRevealed ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: 24, scale: 0.97 }}
+              transition={{ duration: 0.65, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              className="lg:col-span-7"
+            >
+              <div className="border border-gray-200 rounded-2xl bg-slate-50/70 relative flex h-[420px] sm:h-[460px] w-full flex-row items-center justify-center overflow-hidden gap-2 [perspective:400px] shadow-inner">
+                <div
+                  className="flex flex-row items-center gap-4"
+                  style={{
+                    transform:
+                      'translateX(-40px) translateY(0px) translateZ(-60px) rotateX(16deg) rotateY(-8deg) rotateZ(12deg)',
+                  }}
+                >
+                  <Marquee vertical pauseOnHover repeat={3} className="[--duration:36s]">
+                    {chatItems.map((msg, i) => (
+                      <AlumniChatCard key={`c1-${i}-${msg.name}`} {...msg} />
+                    ))}
+                  </Marquee>
+                  <Marquee vertical pauseOnHover reverse repeat={3} className="[--duration:36s]">
+                    {chatItems.map((msg, i) => (
+                      <AlumniChatCard key={`c2-${i}-${msg.name}`} {...msg} />
+                    ))}
+                  </Marquee>
+                  <Marquee vertical pauseOnHover repeat={3} className="hidden sm:flex [--duration:36s]">
+                    {chatItems.map((msg, i) => (
+                      <AlumniChatCard key={`c3-${i}-${msg.name}`} {...msg} />
+                    ))}
+                  </Marquee>
+                </div>
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-slate-50 to-transparent" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-slate-50 to-transparent" />
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-1/6 bg-gradient-to-r from-slate-50 to-transparent" />
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-1/6 bg-gradient-to-l from-slate-50 to-transparent" />
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -835,7 +1392,7 @@ export default function LandingPage() {
       <section
         id="connect"
         ref={ctaRef}
-        className="relative min-h-screen flex items-center overflow-hidden"
+        className="relative min-h-screen flex items-center overflow-hidden snap-start"
         style={{ backgroundImage: 'url("/image/ChatGPT Image May 27, 2026, 04_38_30 AM.png")', backgroundSize: 'cover', backgroundPosition: 'center' }}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/60" />
@@ -891,7 +1448,7 @@ export default function LandingPage() {
       </section>
 
       {/* ═══ Footer ═══ */}
-      <footer className="bg-[#0a0f1a] text-gray-400 py-12 sm:py-16 relative">
+      <footer className="bg-[#0a0f1a] text-gray-400 py-12 sm:py-16 relative snap-start">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-ctu-gold/20 to-transparent" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(212,175,55,0.02),transparent_60%)]" />
 
@@ -912,7 +1469,7 @@ export default function LandingPage() {
             <div className="lg:col-span-3">
               <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-[0.2em]">Explore</h4>
               <ul className="mt-5 space-y-3 text-sm">
-                {['numbers', 'manifesto', 'how-it-works', 'platform'].map((id) => (
+                {['numbers', 'community', 'jobs', 'chat', 'connect'].map((id) => (
                   <li key={id}>
                     <button onClick={() => scrollTo(id)} className="text-gray-400 hover:text-white transition-colors">
                       {NAV_SECTIONS.find((s) => s.id === id)?.label}

@@ -197,6 +197,14 @@ export default function ReportsPage() {
   };
 
   // Helper: Printable HTML / PDF Window
+  const escapeHtml = (val: any) =>
+    String(val ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
   const openPrintWindow = (title: string, data: any[]) => {
     if (data.length === 0) {
       alert('No records available to print for this report.');
@@ -207,7 +215,7 @@ export default function ReportsPage() {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>${title} - CTU-Naga Alumni Connect</title>
+  <title>${escapeHtml(title)} - CTU-Naga Alumni Connect</title>
   <style>
     @media print {
       @page { size: landscape; margin: 12mm; }
@@ -231,7 +239,7 @@ export default function ReportsPage() {
     <div>
       <h1 class="title">Cebu Technological University — Naga Campus</h1>
       <p class="sub">CTU-Naga Alumni Connect · Institutional Analytics &amp; Graduate Tracer System</p>
-      <p class="sub" style="margin-top: 4px; font-weight: 600; color: #ea580c;">${title}</p>
+      <p class="sub" style="margin-top: 4px; font-weight: 600; color: #ea580c;">${escapeHtml(title)}</p>
     </div>
     <div style="text-align: right;">
       <p class="sub"><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
@@ -246,14 +254,14 @@ export default function ReportsPage() {
 
   <table>
     <thead>
-      <tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>
+      <tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
     </thead>
     <tbody>
       ${data
         .map(
           (row) =>
             `<tr>${headers
-              .map((h) => `<td>${row[h] !== null && row[h] !== undefined ? String(row[h]) : ''}</td>`)
+              .map((h) => `<td>${escapeHtml(row[h])}</td>`)
               .join('')}</tr>`
         )
         .join('')}
@@ -348,10 +356,11 @@ export default function ReportsPage() {
     try {
       addNotification('Compiling Master Institutional Workbook across all live datasets...', 'info');
 
-      const [alumniRes, empRes, compRes, salaryRes, courseRes, batchRes, skillsRes, tracerRes] =
+      const [alumniRes, empRes, proofsRes, compRes, salaryRes, courseRes, batchRes, skillsRes, tracerRes] =
         await Promise.all([
           adminApi.reportAlumni({ ...activeParams, format: 'json' }),
           adminApi.reportEmployment({ ...activeParams, format: 'json' }),
+          adminApi.reportEmploymentProofs({ ...activeParams, format: 'json' }),
           adminApi.reportEmployer({ format: 'json' }),
           adminApi.reportSalaryDistribution({ format: 'json' }),
           adminApi.reportEmploymentByCourse({ ...activeParams, format: 'json' }),
@@ -386,6 +395,12 @@ export default function ReportsPage() {
       const empRows = empRes.data || [];
       if (empRows.length > 0) {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(empRows), 'Graduate Employment');
+      }
+
+      // Sheet 4: Proof of Employment & Verification
+      const proofRows = proofsRes.data || [];
+      if (proofRows.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(proofRows), 'Employment Proofs');
       }
 
       // Sheet 4: Companies & Industry Partners
@@ -460,6 +475,17 @@ export default function ReportsPage() {
       fetchLiveJson: () => adminApi.reportEmployment({ ...activeParams, format: 'json' }),
       fetchCsv: () => adminApi.reportEmployment({ ...activeParams, format: 'csv' }),
       defaultFilename: 'graduate-employment-report',
+    },
+    {
+      id: 'employment-proofs',
+      title: 'Proof of Employment & Verification',
+      badge: 'Credential Audit',
+      desc: 'Per-alumni proof of employment summary including submitted document types (COE, Payslip, Contract, ID), direct file links, and verification status.',
+      icon: ShieldCheckIcon,
+      accent: 'emerald',
+      fetchLiveJson: () => adminApi.reportEmploymentProofs({ ...activeParams, format: 'json' }),
+      fetchCsv: () => adminApi.reportEmploymentProofs({ ...activeParams, format: 'csv' }),
+      defaultFilename: 'employment-proofs-report',
     },
     {
       id: 'career-progress',
@@ -631,7 +657,14 @@ export default function ReportsPage() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Master All-in-One Export Button */}
           <button
-            onClick={handleExportMasterWorkbook}
+            onClick={() =>
+              requestExport(
+                'Master Institutional Analytics Workbook',
+                `CTU_Master_Institutional_Analytics_${new Date().toISOString().slice(0, 10)}.xlsx`,
+                'xlsx',
+                handleExportMasterWorkbook
+              )
+            }
             disabled={generating === 'master-workbook'}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-xl shadow-xs hover:shadow-md hover:from-orange-700 hover:to-amber-700 transition-all cursor-pointer disabled:opacity-50"
             title="Download all institutional reports bundled into a single multi-tab Excel file"

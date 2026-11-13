@@ -3,18 +3,9 @@ import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { AuthenticatedRequest } from '../../types';
 import { logAudit } from '../../services/auditLogger';
+import { buildDpaCsv } from '../../utils/csvExport';
 
 const router = Router();
-
-// Confidentiality notice adhering to Rule 5 & RA 10173 (Data Privacy Act of 2012)
-const DPA_CSV_WATERMARK =
-  '# -----------------------------------------------------------------------------\n' +
-  '# CONFIDENTIALITY & DATA PRIVACY NOTICE (RULE 5 & REPUBLIC ACT NO. 10173)\n' +
-  '# CTU-Naga Alumni Connect — Centralized Career Analytics & Alumni Records\n' +
-  '# This report contains protected alumni personal and career information.\n' +
-  '# Unauthorized copying, disclosure, or distribution is strictly prohibited.\n' +
-  '# Exported for authorized institutional analytics only. Store securely.\n' +
-  '# -----------------------------------------------------------------------------\n';
 
 function groupBy<T extends Record<string, any>>(arr: T[], key: string): Record<string, T[]> {
   return (arr || []).reduce((acc: Record<string, T[]>, item: T) => {
@@ -25,21 +16,7 @@ function groupBy<T extends Record<string, any>>(arr: T[], key: string): Record<s
   }, {} as Record<string, T[]>);
 }
 
-function buildCsv(rows: Record<string, any>[]): string {
-  if (rows.length === 0) {
-    return '\ufeff' + DPA_CSV_WATERMARK + '# No records found\n';
-  }
-  const headers = Object.keys(rows[0]);
-  const csv = rows.map((r) =>
-    headers
-      .map((h) => {
-        const val = r[h] === null || r[h] === undefined ? '' : String(r[h]);
-        return `"${val.replace(/"/g, '""')}"`;
-      })
-      .join(',')
-  );
-  return '\ufeff' + DPA_CSV_WATERMARK + [headers.join(','), ...csv].join('\n');
-}
+const buildCsv = buildDpaCsv;
 
 function clientIp(req: any): string {
   const forwarded = req.headers['x-forwarded-for'];
@@ -113,7 +90,7 @@ router.get('/stats', async (_req: AuthenticatedRequest, res, next) => {
       exportsRes,
       profilesRes,
     ] = await Promise.all([
-      supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'alumni'),
+      supabase.from('users').select('id, is_archived').eq('role', 'alumni'),
       supabase.from('employment').select('profile_id, employment_status, is_current'),
       supabase.from('companies').select('id', { count: 'exact', head: true }),
       supabase.from('surveys').select('id', { count: 'exact', head: true }),
@@ -121,8 +98,12 @@ router.get('/stats', async (_req: AuthenticatedRequest, res, next) => {
       supabase.from('job_postings').select('id', { count: 'exact', head: true }),
       supabase.from('skills').select('name'),
       supabase.from('report_exports').select('id', { count: 'exact', head: true }),
-      supabase.from('profiles').select('id, employment_status'),
+      supabase.from('profiles').select('id, user_id, employment_status'),
     ]);
+
+    const activeAlumniUsers = (usersRes.data || []).filter((u: any) => !u.is_archived);
+    const activeUserIds = new Set(activeAlumniUsers.map((u: any) => u.id));
+    const profileByUserId = new Map((profilesRes.data || []).map((p: any) => [p.user_id, p]));
 
     const empStatusMap = new Map<string, string>();
     (empRes.data || []).forEach((e: any) => {
@@ -133,18 +114,19 @@ router.get('/stats', async (_req: AuthenticatedRequest, res, next) => {
     let selfEmployed = 0;
     let unemployed = 0;
 
-    (profilesRes.data || []).forEach((p: any) => {
-      const raw = p.employment_status || empStatusMap.get(p.id) || '';
+    activeAlumniUsers.forEach((u: any) => {
+      const p = profileByUserId.get(u.id);
+      const raw = p?.employment_status || (p ? empStatusMap.get(p.id) : '') || '';
       const lower = String(raw).toLowerCase().trim();
-      if (raw === 'Employed' || lower === 'employed') employed++;
-      else if (raw === 'Self-employed' || ['self-employed', 'entrepreneur', 'freelance'].includes(lower)) selfEmployed++;
+      if (lower === 'employed') employed++;
+      else if (['self-employed', 'entrepreneur', 'freelance'].includes(lower)) selfEmployed++;
       else unemployed++;
     });
 
-    const uniqueSkills = new Set((skillsRes.data || []).map((s: any) => (s.name || '').trim().toLowerCase()));
+    const uniqueSkills = new Set((skillsRes.data || []).map((s: any) => (s.name || '').trim().toLowerCase()).filter(Boolean));
 
     res.json({
-      totalAlumni: usersRes.count || 0,
+      totalAlumni: activeUserIds.size,
       totalEmployed: employed + selfEmployed,
       employed,
       selfEmployed,
@@ -233,6 +215,14 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
     }
 
     // Apply filters
+    if (statusFilter === 'archived') {
+      users = users.filter((u: any) => u.is_archived);
+    } else {
+      users = users.filter((u: any) => !u.is_archived);
+      if (statusFilter === 'verified') users = users.filter((u: any) => u.is_verified);
+      if (statusFilter === 'unverified') users = users.filter((u: any) => !u.is_verified);
+      if (statusFilter === 'active') users = users.filter((u: any) => u.is_active !== false);
+    }
     if (programFilter) {
       users = users.filter((u: any) =>
         (u.education || []).some((e: any) => (e.program || '').toLowerCase().includes(programFilter.toLowerCase()))
@@ -243,8 +233,6 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
         (u.education || []).some((e: any) => String(e.year_graduated) === String(batchFilter))
       );
     }
-    if (statusFilter === 'verified') users = users.filter((u: any) => u.is_verified);
-    if (statusFilter === 'unverified') users = users.filter((u: any) => !u.is_verified);
     if (empStatusFilter) {
       users = users.filter((u: any) => {
         const currentEmp = (u.employment || []).find((e: any) => e.is_current) || (u.employment || [])[0];
@@ -385,6 +373,176 @@ router.get('/employment', async (req: AuthenticatedRequest, res, next) => {
     }
 
     res.json({ count: rows.length, data: rows, raw: employment });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// GET /api/admin/reports/employment-proofs - Alumni Proof of Employment Report
+// -----------------------------------------------------------------------------
+function formatProofTypeLabel(type?: string | null): string {
+  if (!type) return '';
+  if (type.startsWith('other:')) return type.replace('other:', '').trim();
+  const map: Record<string, string> = {
+    coe: 'Certificate of Employment (COE)',
+    welcome_email_payslip: 'Payslip / Welcome Email',
+    affidavit: 'Sworn Affidavit',
+    company_id: 'Company ID',
+    contract: 'Employment Contract',
+    dti_sec: 'DTI / SEC Registration',
+    other: 'Other Proof',
+  };
+  return map[type] || type.toUpperCase();
+}
+
+router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const format = (req.query.format as string) || 'json';
+    const programFilter = req.query.program as string;
+    const batchFilter = req.query.batch as string;
+    const empStatusFilter = req.query.employment_status as string;
+    const verificationFilter = req.query.verification_status as string;
+
+    const { data: usersData, error: uErr } = await supabase
+      .from('users')
+      .select('id, email, is_verified, is_archived, created_at')
+      .eq('role', 'alumni')
+      .order('created_at', { ascending: false });
+
+    if (uErr) throw new AppError(uErr.message, 500);
+    const activeUsers = (usersData || []).filter((u: any) => !u.is_archived);
+    const userIds = activeUsers.map((u: any) => u.id).filter(Boolean);
+
+    let profiles: any[] = [];
+    let education: any[] = [];
+    let employment: any[] = [];
+
+    if (userIds.length > 0) {
+      const { data: profData } = await supabase
+        .from('profiles')
+        .select('id, user_id, first_name, last_name, email, id_number, employment_status')
+        .in('user_id', userIds);
+      profiles = profData || [];
+      const profileIds = profiles.map((p: any) => p.id).filter(Boolean);
+
+      if (profileIds.length > 0) {
+        const [edRes, empRes] = await Promise.all([
+          supabase.from('education').select('profile_id, program, year_graduated').in('profile_id', profileIds),
+          supabase.from('employment').select('*').in('profile_id', profileIds).order('is_current', { ascending: false }).order('start_date', { ascending: false }),
+        ]);
+        education = edRes.data || [];
+        employment = empRes.data || [];
+      }
+    }
+
+    const profByUser = new Map(profiles.map((p: any) => [p.user_id, p]));
+    const eduByProfile = groupBy(education, 'profile_id');
+    const empByProfile = groupBy(employment, 'profile_id');
+
+    let records: any[] = [];
+    activeUsers.forEach((u: any) => {
+      const prof = profByUser.get(u.id);
+      const edList = prof ? eduByProfile[prof.id] || [] : [];
+      const empList = prof ? empByProfile[prof.id] || [] : [];
+      const ed = edList[0] || {};
+
+      if (empList.length === 0) {
+        records.push({
+          user: u,
+          profile: prof || {},
+          education: ed,
+          employment: null,
+        });
+      } else {
+        empList.forEach((emp: any) => {
+          records.push({
+            user: u,
+            profile: prof || {},
+            education: ed,
+            employment: emp,
+          });
+        });
+      }
+    });
+
+    if (programFilter) {
+      records = records.filter((r) =>
+        (r.education?.program || '').toLowerCase().includes(programFilter.toLowerCase())
+      );
+    }
+    if (batchFilter) {
+      records = records.filter((r) =>
+        String(r.education?.year_graduated || '') === String(batchFilter)
+      );
+    }
+    if (empStatusFilter) {
+      records = records.filter((r) => {
+        const st = r.employment?.employment_status || r.profile?.employment_status || '';
+        return st.toLowerCase() === empStatusFilter.toLowerCase();
+      });
+    }
+    if (verificationFilter) {
+      records = records.filter((r) => {
+        const emp = r.employment;
+        const hasProof = Boolean(emp?.proof_url);
+        const status = emp?.is_verified
+          ? 'verified'
+          : emp?.verification_status === 'rejected'
+            ? 'rejected'
+            : hasProof
+              ? 'pending'
+              : 'missing';
+        return status === verificationFilter.toLowerCase();
+      });
+    }
+
+    const rows = records.map((r) => {
+      const emp = r.employment;
+      const hasProof = Boolean(emp?.proof_url);
+      const verificationStatus = !emp
+        ? 'No Employment Record'
+        : emp.is_verified
+          ? 'Verified'
+          : emp.verification_status === 'rejected'
+            ? 'Rejected'
+            : hasProof
+              ? 'Pending Verification'
+              : 'No Proof Submitted';
+
+      return {
+        'Alumni Name': `${r.profile?.first_name || ''} ${r.profile?.last_name || ''}`.trim() || r.user?.email || '',
+        'Email': r.user?.email || r.profile?.email || '',
+        'ID Number': r.profile?.id_number || '',
+        'Degree Program': r.education?.program || '',
+        'Graduation Year': r.education?.year_graduated || '',
+        'Employment Status': emp?.employment_status || r.profile?.employment_status || 'N/A',
+        'Company Name': emp?.company_name || '',
+        'Position / Job Title': emp?.position || '',
+        'Current Position': emp ? (emp.is_current ? 'Yes' : 'No') : '',
+        'Proof Document Type': hasProof ? (formatProofTypeLabel(emp?.proof_type) || 'Uploaded Document') : 'None',
+        'Proof File URL': emp?.proof_url || '',
+        'Verification Status': verificationStatus,
+        'Start Date': emp?.start_date || '',
+        'Updated At': emp?.updated_at ? new Date(emp.updated_at).toLocaleDateString() : '',
+      };
+    });
+
+    await recordReportExport(req, {
+      reportName: 'Proof of Employment Report',
+      reportType: 'employment_proofs',
+      format,
+      recordCount: rows.length,
+      filters: { program: programFilter, batch: batchFilter, employment_status: empStatusFilter, verification_status: verificationFilter },
+    });
+
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename=employment-proofs-report.csv');
+      return res.send(buildCsv(rows));
+    }
+
+    res.json({ count: rows.length, data: rows });
   } catch (err) {
     next(err);
   }

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   MinusIcon,
@@ -286,10 +285,6 @@ export default function DockedChatBox() {
 
   // Photo Lightbox modal
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
-
-  // Delete message confirmation modal
-  const [deleteTargetMsg, setDeleteTargetMsg] = useState<MessageItem | null>(null);
-  const [deletingMessage, setDeletingMessage] = useState(false);
 
   // Blocked non-business message notices per conversation
   const [blockedNoticesByChat, setBlockedNoticesByChat] = useState<Record<string, BlockedNoticeItem[]>>({});
@@ -710,21 +705,13 @@ export default function DockedChatBox() {
     }, 20);
   };
 
-  const handleDeleteMessage = (msg: MessageItem) => {
+  const handleDeleteMessage = async (msg: MessageItem) => {
     if (!activeChat?.profileId || !msg?.id || msg.id.startsWith('temp-')) return;
-    setActiveReactionMsgId(null);
-    setDeleteTargetMsg(msg);
-  };
+    if (!confirm('Delete this message?')) return;
 
-  const confirmDeleteMessage = async () => {
-    if (!activeChat?.profileId || !deleteTargetMsg?.id || deletingMessage) return;
-
-    const msg = deleteTargetMsg;
     const targetProfileId = activeChat.profileId;
     const prevMessages = messages;
-
-    setDeletingMessage(true);
-    setDeleteTargetMsg(null);
+    setActiveReactionMsgId(null);
     if (replyingTo?.id === msg.id) {
       setReplyingTo(null);
     }
@@ -746,8 +733,6 @@ export default function DockedChatBox() {
       setMessages(prevMessages);
       setChatMessages(targetProfileId, prevMessages);
       alert(err?.message || 'Failed to delete message.');
-    } finally {
-      setDeletingMessage(false);
     }
   };
 
@@ -2239,68 +2224,6 @@ export default function DockedChatBox() {
           </div>
         </div>
       )}
-
-      {/* Delete Message Confirmation Modal */}
-      {deleteTargetMsg &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
-            onClick={() => !deletingMessage && setDeleteTargetMsg(null)}
-          >
-            <div
-              className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-sm w-full p-5 animate-in zoom-in-95 duration-150"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-                  <TrashIcon className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-bold text-gray-900">Delete message?</h3>
-                    <button
-                      type="button"
-                      disabled={deletingMessage}
-                      onClick={() => setDeleteTargetMsg(null)}
-                      className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
-                      aria-label="Close"
-                    >
-                      <XMarkIcon className="w-4 h-4 stroke-2" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                    Are you sure you want to delete this message? This action cannot be undone.
-                  </p>
-                  {formatReplyBody(deleteTargetMsg.body) && (
-                    <div className="mt-2.5 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200/80 text-xs text-gray-700 line-clamp-3 break-words">
-                      &ldquo;{formatReplyBody(deleteTargetMsg.body)}&rdquo;
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  disabled={deletingMessage}
-                  onClick={() => setDeleteTargetMsg(null)}
-                  className="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={deletingMessage}
-                  onClick={confirmDeleteMessage}
-                  className="px-3.5 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
-                >
-                  {deletingMessage ? 'Deleting...' : 'Delete'}
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
     </>
   );
 }

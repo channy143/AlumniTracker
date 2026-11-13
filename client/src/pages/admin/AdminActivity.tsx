@@ -731,7 +731,7 @@ export default function AdminActivity() {
     }
   }, [page, category, severity, status, datePreset, debouncedSearch, mainTab]);
 
-  const handleExportCsv = () => {
+  const handleExportCsv = async () => {
     const params: Record<string, any> = {};
     if (debouncedSearch) params.search = debouncedSearch;
     if (category !== 'all') params.category = category;
@@ -747,8 +747,20 @@ export default function AdminActivity() {
       params.from = new Date(Date.now() - 30 * 86400000).toISOString();
     }
 
-    const exportUrl = adminApi.exportAuditLogsUrl(params);
-    window.open(exportUrl, '_blank');
+    try {
+      const blob = await adminApi.exportAuditLogs(params);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `audit-trail-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast('Audit trail exported as CSV');
+    } catch {
+      showToast('Failed to export audit trail');
+    }
   };
 
   const totalPages = Math.ceil(totalCount / limit) || 1;

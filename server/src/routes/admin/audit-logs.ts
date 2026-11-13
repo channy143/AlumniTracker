@@ -203,6 +203,7 @@ router.get('/stats', async (req, res, next) => {
 router.get('/export', async (req, res, next) => {
   try {
     const search = (req.query.search as string) || '';
+    const category = (req.query.category as string) || '';
     const severity = (req.query.severity as string) || '';
     const status = (req.query.status as string) || '';
     const from = (req.query.from as string) || '';
@@ -226,7 +227,17 @@ router.get('/export', async (req, res, next) => {
     const { data: logs, error } = await query;
     if (error) throw new AppError(error.message, 500);
 
-    const rows = logs || [];
+    let rows = logs || [];
+    if (category && category !== 'all') {
+      rows = rows.filter((l: any) => {
+        const resolvedRole = (l.actor_role || (l.user_id ? 'user' : 'system')).toLowerCase();
+        const cat = resolveCategory(l.action, l.entity, resolvedRole);
+        if (category === 'admin') {
+          return resolvedRole === 'admin' || resolvedRole === 'moderator' || cat === 'admin';
+        }
+        return cat === category;
+      });
+    }
     const headers = [
       'Timestamp (UTC)',
       'Severity',

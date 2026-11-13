@@ -8,12 +8,16 @@ const router = Router();
 // honest values instead of fabricated numbers.
 router.get('/stats', async (_req, res, next) => {
   try {
-    const [usersRes, profilesRes, employmentRes, educationRes, connectionsRes] = await Promise.all([
+    const [usersRes, profilesRes, employmentRes, educationRes, connectionsRes, jobsRes] = await Promise.all([
       supabase.from('users').select('id').eq('role', 'alumni'),
-      supabase.from('profiles').select('id, employment_status'),
+      supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, headline, employment_status'),
       supabase.from('employment').select('profile_id, employment_status, is_current'),
-      supabase.from('education').select('program'),
+      supabase.from('education').select('profile_id, program, graduation_year'),
       supabase.from('connections').select('id').eq('status', 'accepted'),
+      supabase
+        .from('job_postings')
+        .select('id, position, company_name, location, job_type, is_remote, is_alumni_exclusive, expires_at, salary_range, experience_level, created_at, vacancies_count, poster_url, posted_by')
+        .order('created_at', { ascending: false }),
     ]);
 
     const alumniUsers = usersRes.data || [];
@@ -38,12 +42,59 @@ router.get('/stats', async (_req, res, next) => {
       : employedIds.size;
     const employmentRate = totalAlumni > 0 ? Math.round((employed / totalAlumni) * 100) : 0;
     const programsTracked = new Set(programs.map((p: any) => p.program).filter(Boolean)).size;
+    const now = Date.now();
+    const avatarByUserId = new Map<string, string>();
+    profiles.forEach((p: any) => {
+      if (p.user_id && p.avatar_url) avatarByUserId.set(String(p.user_id), p.avatar_url);
+    });
+    const eduByProfileId = new Map<string, { program?: string; graduation_year?: number }>();
+    programs.forEach((e: any) => {
+      if (e.profile_id && !eduByProfileId.has(String(e.profile_id))) {
+        eduByProfileId.set(String(e.profile_id), { program: e.program, graduation_year: e.graduation_year });
+      }
+    });
+
+    const featuredAlumni = profiles
+      .filter((p: any) => p.first_name && p.avatar_url)
+      .slice(0, 6)
+      .map((p: any) => {
+        const edu = eduByProfileId.get(String(p.id));
+        const programPart = edu?.program || 'CTU-Naga Alumni';
+        const yearPart = edu?.graduation_year ? ` '${String(edu.graduation_year).slice(-2)}` : '';
+        const rolePart = p.headline ? ` · ${p.headline}` : '';
+        return {
+          id: String(p.id),
+          name: `${p.first_name} ${p.last_name || ''}`.trim(),
+          avatar_url: p.avatar_url as string,
+          batch: `${programPart}${yearPart}${rolePart}`,
+        };
+      });
+
+    const activeJobs = (jobsRes.data || []).filter((j: any) => !j.expires_at || new Date(j.expires_at).getTime() > now);
+    const featuredJobs = activeJobs.slice(0, 3).map((j: any) => ({
+      id: j.id,
+      position: j.position,
+      company_name: j.company_name,
+      location: j.location,
+      job_type: j.job_type,
+      is_remote: Boolean(j.is_remote),
+      is_alumni_exclusive: Boolean(j.is_alumni_exclusive),
+      salary_range: j.salary_range || null,
+      experience_level: j.experience_level || null,
+      created_at: j.created_at || null,
+      vacancies_count: j.vacancies_count || null,
+      poster_url: j.poster_url || null,
+      poster_avatar_url: j.posted_by ? avatarByUserId.get(String(j.posted_by)) || null : null,
+    }));
 
     res.json({
       totalAlumni,
       employmentRate,
       mentorshipMatches: matches.length || 0,
       programsTracked,
+      activeJobsCount: activeJobs.length,
+      featuredJobs,
+      featuredAlumni,
     });
   } catch (err) {
     next(err);

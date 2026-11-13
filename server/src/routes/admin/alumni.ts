@@ -6,6 +6,7 @@ import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
 import { formatProgramLongName } from '../../utils/formatProgram';
 import { logAudit } from '../../services/auditLogger';
 import { AuthenticatedRequest } from '../../types';
+import { buildDpaCsv } from '../../utils/csvExport';
 
 const router = Router();
 
@@ -231,37 +232,76 @@ router.get('/export', async (req, res, next) => {
     const format = (req.query.format as string) || 'json';
     const { data: usersData } = await supabase
       .from('users')
-      .select('id, email, role, is_verified, last_login, created_at')
-      .eq('role', 'alumni');
-    const { data: profiles } = await supabase.from('profiles').select('*');
+      .select('id, email, role, is_verified, is_archived, last_login, created_at')
+      .eq('role', 'alumni')
+      .order('created_at', { ascending: false });
+
+    const activeUsers = (usersData || []).filter((u: any) => !u.is_archived);
+    const userIds = activeUsers.map((u: any) => u.id).filter(Boolean);
+
+    const { data: profiles } = userIds.length > 0
+      ? await supabase.from('profiles').select('*').in('user_id', userIds)
+      : { data: [] as any[] };
     const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
-    const users = (usersData || []).map((u: any) => ({ ...u, profile: profileMap.get(u.id) || null }));
+    const profileIds = (profiles || []).map((p: any) => p.id).filter(Boolean);
+
+    let education: any[] = [];
+    let employment: any[] = [];
+    if (profileIds.length > 0) {
+      const [edRes, empRes] = await Promise.all([
+        supabase.from('education').select('*').in('profile_id', profileIds),
+        supabase.from('employment').select('*').in('profile_id', profileIds),
+      ]);
+      education = edRes.data || [];
+      employment = empRes.data || [];
+    }
+
+    const eduByProfile = new Map<string, any[]>();
+    education.forEach((ed: any) => {
+      if (!eduByProfile.has(ed.profile_id)) eduByProfile.set(ed.profile_id, []);
+      eduByProfile.get(ed.profile_id)!.push(ed);
+    });
+
+    const empByProfile = new Map<string, any[]>();
+    employment.forEach((emp: any) => {
+      if (!empByProfile.has(emp.profile_id)) empByProfile.set(emp.profile_id, []);
+      empByProfile.get(emp.profile_id)!.push(emp);
+    });
+
+    const users = activeUsers.map((u: any) => {
+      const prof = profileMap.get(u.id) || null;
+      return {
+        ...u,
+        profile: prof,
+        education: prof ? eduByProfile.get(prof.id) || [] : [],
+        employment: prof ? empByProfile.get(prof.id) || [] : [],
+      };
+    });
 
     if (format === 'csv') {
-      const rows = (users || []).map((u: any) => ({
-        email: u.email,
-        first_name: u.profile?.first_name || '',
-        last_name: u.profile?.last_name || '',
-        id_number: u.profile?.id_number || '',
-        phone: u.profile?.phone || '',
-        city: u.profile?.city || '',
-        province: u.profile?.province || '',
-        employment_status: u.profile?.employment_status || '',
-        current_job_title: u.profile?.current_job_title || '',
-        company_name: u.profile?.company_name || '',
-        industry: u.profile?.industry || '',
-        salary_range: u.profile?.salary_range || '',
-        is_verified: u.is_verified,
-        created_at: u.created_at,
-      }));
-      const headers = Object.keys(rows[0] || {}).join(',');
-      const csv = rows.map((r: any) => Object.values(r).map((v: any) => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
-      const dpaNotice = 
-        '# -----------------------------------------------------------------------------\n' +
-        '# CONFIDENTIALITY & DATA PRIVACY NOTICE (RULE 5 & REPUBLIC ACT NO. 10173)\n' +
-        '# CTU-Naga Alumni Connect — Exported Alumni Personal Data\n' +
-        '# Unauthorized disclosure, copying, or distribution is strictly prohibited.\n' +
-        '# -----------------------------------------------------------------------------\n';
+      const rows = users.map((u: any) => {
+        const ed = (u.education || [])[0] || {};
+        const emp = (u.employment || []).find((e: any) => e.is_current) || (u.employment || [])[0] || {};
+        return {
+          'Email Address': u.email || '',
+          'First Name': u.profile?.first_name || '',
+          'Last Name': u.profile?.last_name || '',
+          'ID Number': u.profile?.id_number || '',
+          'Degree Program': ed.program ? formatProgramLongName(ed.program) : '',
+          'Major': ed.major || '',
+          'Graduation Year': ed.year_graduated || '',
+          'Employment Status': emp.employment_status || u.profile?.employment_status || 'N/A',
+          'Current Position': emp.position || u.profile?.current_job_title || '',
+          'Current Company': emp.company_name || u.profile?.company_name || '',
+          'Industry': emp.company_industry || u.profile?.industry || '',
+          'Salary Range': emp.salary_range || u.profile?.salary_range || '',
+          'Phone': u.profile?.phone || '',
+          'City': u.profile?.city || '',
+          'Province': u.profile?.province || '',
+          'Verified': u.is_verified ? 'Yes' : 'No',
+          'Registered Date': u.created_at ? new Date(u.created_at).toLocaleDateString() : '',
+        };
+      });
 
       logAudit(req, {
         action: 'ALUMNI_DATA_EXPORTED',
@@ -274,6 +314,7 @@ router.get('/export', async (req, res, next) => {
       if ((req as any).user?.userId) {
         await supabase.from('report_exports').insert({
           user_id: (req as any).user.userId,
+          admin_email: (req as any).user?.email || 'Administrator',
           report_name: 'Alumni Directory Export',
           report_type: 'alumni_export',
           format: 'csv',
@@ -283,9 +324,9 @@ router.get('/export', async (req, res, next) => {
         });
       }
 
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=alumni-export.csv');
-      return res.send(`${dpaNotice}${headers}\n${csv}`);
+      return res.send(buildDpaCsv(rows));
     }
 
     logAudit(req, {

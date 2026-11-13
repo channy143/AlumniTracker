@@ -341,6 +341,23 @@ export default function AlumniManagement() {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportProofs = async () => {
+    try {
+      const blob = await adminApi.reportEmploymentProofs({ format: 'csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `employment-proofs-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addNotification('Proof of employment report exported', 'success');
+    } catch {
+      addNotification('Failed to export employment proofs', 'error');
+    }
+  };
+
   const loadEligible = useCallback(async () => {
     const cachedElig = getCached<any[]>('/admin/eligible-alumni');
     if (Array.isArray(cachedElig)) {
@@ -451,6 +468,7 @@ export default function AlumniManagement() {
         </div>
         <div data-tour="alumni-top-actions" className="flex flex-wrap gap-2">
           {tab === 'registered' && <button onClick={handleExport} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Export CSV</button>}
+          {tab === 'registered' && <button onClick={handleExportProofs} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Export Employment Proofs</button>}
           <button onClick={() => { setShowForm(true); setError(''); }} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Add Alumni</button>
           <button onClick={openEligibleForm} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Eligible Alumni</button>
         </div>
