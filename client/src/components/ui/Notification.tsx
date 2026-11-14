@@ -49,7 +49,7 @@ export default function NotificationContainer() {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="fixed top-14 left-4 right-4 sm:left-auto sm:right-4 z-50 space-y-2 sm:max-w-sm">
+    <div className="fixed top-14 left-4 right-4 sm:left-auto sm:right-4 z-[99999] space-y-2 sm:max-w-sm">
       {notifications.map((notif) => (
         <NotificationItem key={notif.id} notif={notif} />
       ))}

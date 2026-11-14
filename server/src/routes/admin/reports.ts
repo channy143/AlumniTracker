@@ -1087,6 +1087,15 @@ router.get('/survey/:id', async (req: AuthenticatedRequest, res, next) => {
     }
 
     // Build ordered, human-readable columns from survey.questions + any extra response keys
+    // Exclude redundant identity keys already represented by Respondent Name / Email / Student ID
+    const REDUNDANT_IDENTITY_KEYS = new Set([
+      'full_name', 'fullname', 'name',
+      'first_name', 'firstname',
+      'middle_name', 'middlename',
+      'last_name', 'lastname',
+      'email', 'email_address', 'emailaddress',
+      'student_id', 'studentid', 'id_number', 'idnumber',
+    ]);
     const questionLabelMap = new Map<string, string>();
     const orderedKeys: string[] = [];
     const seenKeys = new Set<string>();
@@ -1095,6 +1104,7 @@ router.get('/survey/:id', async (req: AuthenticatedRequest, res, next) => {
       survey.questions.forEach((q: any) => {
         if (!q || !q.id || q.type === 'section') return;
         const key = String(q.id);
+        if (REDUNDANT_IDENTITY_KEYS.has(key.toLowerCase())) return;
         if (q.label) questionLabelMap.set(key, String(q.label));
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
@@ -1106,6 +1116,7 @@ router.get('/survey/:id', async (req: AuthenticatedRequest, res, next) => {
     responses.forEach((r: any) => {
       const respObj = typeof r.responses === 'object' && r.responses !== null ? r.responses : {};
       Object.keys(respObj).forEach((k) => {
+        if (REDUNDANT_IDENTITY_KEYS.has(k.toLowerCase())) return;
         if (!seenKeys.has(k)) {
           seenKeys.add(k);
           orderedKeys.push(k);
@@ -1162,11 +1173,24 @@ router.get('/survey/:id', async (req: AuthenticatedRequest, res, next) => {
 
     const rows = responses.map((r: any) => {
       const respObj = typeof r.responses === 'object' && r.responses !== null ? r.responses : {};
+      const profileName = `${r.profile?.first_name || ''} ${r.profile?.last_name || ''}`.trim();
+      const respFullName =
+        respObj.full_name ||
+        respObj.fullName ||
+        [
+          respObj.firstName || respObj.first_name,
+          respObj.middleName || respObj.middle_name,
+          respObj.lastName || respObj.last_name,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+
       const row: Record<string, any> = {
         'Survey Title': survey.title,
-        'Respondent Name': `${r.profile?.first_name || ''} ${r.profile?.last_name || ''}`.trim() || 'Anonymous',
-        'Respondent Email': r.user?.email || 'N/A',
-        'Student ID': r.profile?.id_number || 'N/A',
+        'Respondent Name': profileName || respFullName || 'Anonymous',
+        'Respondent Email': r.user?.email || respObj.email || respObj.emailAddress || 'N/A',
+        'Student ID': r.profile?.id_number || respObj.studentId || respObj.student_id || respObj.idNumber || 'N/A',
         'Submission Timestamp': r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '',
       };
 

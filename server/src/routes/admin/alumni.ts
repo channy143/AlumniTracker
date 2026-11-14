@@ -482,10 +482,13 @@ router.put('/:id', async (req: AuthenticatedRequest, res, next) => {
         .eq('user_id', req.params.id)
         .maybeSingle();
 
-      const profilePayload = {
+      const profilePayload: Record<string, any> = {
         ...profile,
         updated_at: new Date().toISOString(),
       };
+      if (profilePayload.id_number !== undefined && String(profilePayload.id_number).trim() === '') {
+        profilePayload.id_number = null;
+      }
 
       if (existingProf) {
         const { error: profileError } = await supabase
@@ -526,6 +529,11 @@ router.put('/:id', async (req: AuthenticatedRequest, res, next) => {
     if (eduData) {
       const { data: prof } = await supabase.from('profiles').select('id').eq('user_id', req.params.id).maybeSingle();
       const profileId = prof?.id || req.params.id;
+      const sanitizedEdu: Record<string, any> = { ...eduData };
+      if (sanitizedEdu.year_graduated !== undefined) {
+        const parsedYear = parseInt(String(sanitizedEdu.year_graduated), 10);
+        sanitizedEdu.year_graduated = Number.isNaN(parsedYear) ? null : parsedYear;
+      }
 
       const { data: existingEdu } = await supabase
         .from('education')
@@ -535,9 +543,11 @@ router.put('/:id', async (req: AuthenticatedRequest, res, next) => {
         .maybeSingle();
 
       if (existingEdu) {
-        await supabase.from('education').update(eduData).eq('id', existingEdu.id);
+        const { error: eduErr } = await supabase.from('education').update(sanitizedEdu).eq('id', existingEdu.id);
+        if (eduErr) throw new AppError(eduErr.message, 500);
       } else {
-        await supabase.from('education').insert({ profile_id: profileId, campus: 'Naga Extension Campus', ...eduData });
+        const { error: eduErr } = await supabase.from('education').insert({ profile_id: profileId, campus: 'Naga Extension Campus', ...sanitizedEdu });
+        if (eduErr) throw new AppError(eduErr.message, 500);
       }
     }
 
@@ -679,6 +689,38 @@ router.delete('/:id', async (req: AuthenticatedRequest, res, next) => {
     if (targetUser.role !== 'alumni') {
       throw new AppError('Only alumni accounts can be deleted from Alumni Management', 400);
     }
+
+    // Clean up/unlink dependent records so foreign keys never block permanent deletion
+    const { data: targetProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', targetId)
+      .maybeSingle();
+    const profileId = targetProfile?.id;
+
+    const cleanupOps: PromiseLike<any>[] = [
+      supabase.from('alumni_eligible').update({ user_id: null }).eq('user_id', targetId),
+      supabase.from('audit_logs').update({ user_id: null }).eq('user_id', targetId),
+      supabase.from('report_exports').update({ user_id: null }).eq('user_id', targetId),
+      supabase.from('notifications').delete().eq('user_id', targetId),
+      supabase.from('survey_responses').delete().eq('user_id', targetId),
+      supabase.from('feed_posts').delete().eq('user_id', targetId),
+      supabase.from('feed_comments').delete().eq('user_id', targetId),
+      supabase.from('messages').delete().eq('sender_id', targetId),
+      supabase.from('messages').delete().eq('receiver_id', targetId),
+    ];
+
+    if (profileId) {
+      cleanupOps.push(
+        supabase.from('education').delete().eq('profile_id', profileId),
+        supabase.from('employment').delete().eq('profile_id', profileId),
+        supabase.from('skills').delete().eq('profile_id', profileId),
+        supabase.from('connections').delete().or(`requester_id.eq.${profileId},addressee_id.eq.${profileId}`),
+        supabase.from('profiles').delete().eq('id', profileId),
+      );
+    }
+
+    await Promise.allSettled(cleanupOps);
 
     const { error } = await supabase.from('users').delete().eq('id', targetId);
     if (error) throw new AppError(error.message, 500);
