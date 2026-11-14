@@ -23,6 +23,8 @@ router.get('/', async (req, res, next) => {
     const employmentStatus = (req.query.employment_status as string) || '';
     const employer = (req.query.employer as string) || '';
     const location = (req.query.location as string) || '';
+    const provinceFilter = (req.query.province as string) || '';
+    const cityFilter = (req.query.city as string) || '';
     const archivedParam = req.query.archived as string;
 
     let query = supabase
@@ -75,23 +77,33 @@ router.get('/', async (req, res, next) => {
       }
     });
 
-    // Populate distinct employers and locations across all profiles & employment records
+    // Populate distinct employers, provinces, and cities across all profiles & employment records
     const distinctEmployerSet = new Set<string>();
-    const distinctLocationSet = new Set<string>();
+    const distinctProvinceSet = new Set<string>();
+    const distinctCityMap = new Map<string, { city: string; province: string }>();
 
     (allProfiles || []).forEach((p: any) => {
       if (p.company_name?.trim()) distinctEmployerSet.add(p.company_name.trim());
-      const normCity = normalizeCityName(p.city, p.province);
       const normProv = normalizeProvinceName(p.province);
-      if (normCity) distinctLocationSet.add(normCity);
-      if (normProv) distinctLocationSet.add(normProv);
+      const normCity = normalizeCityName(p.city, p.province);
+      if (normProv) distinctProvinceSet.add(normProv);
+      if (normCity) {
+        const key = `${normCity.toLowerCase()}||${normProv.toLowerCase()}`;
+        if (!distinctCityMap.has(key)) {
+          distinctCityMap.set(key, { city: normCity, province: normProv });
+        }
+      }
     });
     (allEmployment || []).forEach((e: any) => {
       if (e.company_name?.trim()) distinctEmployerSet.add(e.company_name.trim());
     });
 
     const employers = Array.from(distinctEmployerSet).sort();
-    const locations = Array.from(distinctLocationSet).sort();
+    const provinces = Array.from(distinctProvinceSet).sort();
+    const locationCities = Array.from(distinctCityMap.values()).sort((a, b) =>
+      a.city.localeCompare(b.city) || a.province.localeCompare(b.province)
+    );
+    const locations = Array.from(new Set([...provinces, ...locationCities.map((c) => c.city)])).sort();
 
     // Map each user with their profile, education, and current employment
     const enrichedAlumni = (usersList || []).map((u: any) => {
@@ -203,8 +215,24 @@ router.get('/', async (req, res, next) => {
       });
     }
 
-    // Location filter (normalized so legacy "Naga" / "Naga City" / "City of Naga" all match)
-    if (location.trim()) {
+    // Structured Province & City/Municipality filters
+    if (provinceFilter.trim()) {
+      const targetProv = normalizeProvinceName(provinceFilter).toLowerCase();
+      filtered = filtered.filter((u: any) => {
+        const normProv = normalizeProvinceName(u.profile?.province).toLowerCase();
+        return normProv === targetProv;
+      });
+    }
+    if (cityFilter.trim()) {
+      const targetCity = normalizeCityName(cityFilter, provinceFilter).toLowerCase();
+      filtered = filtered.filter((u: any) => {
+        const normCity = normalizeCityName(u.profile?.city, u.profile?.province).toLowerCase();
+        return normCity === targetCity;
+      });
+    }
+
+    // Legacy combined Location filter (kept for backwards compatibility)
+    if (location.trim() && !provinceFilter.trim() && !cityFilter.trim()) {
       const rawTarget = location.trim().toLowerCase();
       const normTargetCity = normalizeCityName(location).toLowerCase();
       const normTargetProv = normalizeProvinceName(location).toLowerCase();
@@ -220,8 +248,7 @@ router.get('/', async (req, res, next) => {
           normCity === rawTarget ||
           normProv === rawTarget ||
           (normTargetCity && normCity === normTargetCity) ||
-          (normTargetProv && normProv === normTargetProv) ||
-          `${normCity}, ${normProv}`.includes(rawTarget)
+          (normTargetProv && normProv === normTargetProv)
         );
       });
     }
@@ -236,6 +263,8 @@ router.get('/', async (req, res, next) => {
       limit,
       employers,
       locations,
+      provinces,
+      locationCities,
     });
   } catch (err) {
     next(err);

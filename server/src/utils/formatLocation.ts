@@ -15,19 +15,23 @@ const CITY_ALIASES: Record<string, { city: string; province?: string }> = {
   'naga': { city: 'City of Naga', province: 'Cebu' },
   'naga city': { city: 'City of Naga', province: 'Cebu' },
   'city of naga': { city: 'City of Naga', province: 'Cebu' },
+  'city of baga': { city: 'City of Naga', province: 'Cebu' },
+  'city of nage': { city: 'City of Naga', province: 'Cebu' },
   'naga cebu': { city: 'City of Naga', province: 'Cebu' },
   'naga, cebu': { city: 'City of Naga', province: 'Cebu' },
   'city of naga, cebu': { city: 'City of Naga', province: 'Cebu' },
   'cebu': { city: 'Cebu City', province: 'Cebu' },
   'cebu city': { city: 'Cebu City', province: 'Cebu' },
-  'toledo': { city: 'Toledo City', province: 'Cebu' },
-  'toledo city': { city: 'Toledo City', province: 'Cebu' },
-  'carcar': { city: 'Carcar City', province: 'Cebu' },
-  'carcar city': { city: 'Carcar City', province: 'Cebu' },
-  'talisay': { city: 'Talisay City', province: 'Cebu' },
-  'talisay city': { city: 'Talisay City', province: 'Cebu' },
-  'city of talisay': { city: 'Talisay City', province: 'Cebu' },
-  'city of talisay, cebu': { city: 'Talisay City', province: 'Cebu' },
+  'toledo': { city: 'City of Toledo', province: 'Cebu' },
+  'toledo city': { city: 'City of Toledo', province: 'Cebu' },
+  'city of toledo': { city: 'City of Toledo', province: 'Cebu' },
+  'carcar': { city: 'City of Carcar', province: 'Cebu' },
+  'carcar city': { city: 'City of Carcar', province: 'Cebu' },
+  'city of carcar': { city: 'City of Carcar', province: 'Cebu' },
+  'talisay': { city: 'City of Talisay', province: 'Cebu' },
+  'talisay city': { city: 'City of Talisay', province: 'Cebu' },
+  'city of talisay': { city: 'City of Talisay', province: 'Cebu' },
+  'city of talisay, cebu': { city: 'City of Talisay', province: 'Cebu' },
   'mandaue': { city: 'Mandaue City', province: 'Cebu' },
   'mandaue city': { city: 'Mandaue City', province: 'Cebu' },
   'lapu-lapu': { city: 'Lapu-Lapu City', province: 'Cebu' },
@@ -38,8 +42,11 @@ const CITY_ALIASES: Record<string, { city: string; province?: string }> = {
   'bogo': { city: 'Bogo City', province: 'Cebu' },
   'bogo city': { city: 'Bogo City', province: 'Cebu' },
   'minglanilla': { city: 'Minglanilla', province: 'Cebu' },
+  'minglanill': { city: 'Minglanilla', province: 'Cebu' },
   'san fernando': { city: 'San Fernando', province: 'Cebu' },
+  'sam fernando': { city: 'San Fernando', province: 'Cebu' },
   'san fernando, cebu': { city: 'San Fernando', province: 'Cebu' },
+  'aloguinsan': { city: 'Aloguinsan', province: 'Cebu' },
   'consolacion': { city: 'Consolacion', province: 'Cebu' },
   'liloan': { city: 'Liloan', province: 'Cebu' },
   'compostela': { city: 'Compostela', province: 'Cebu' },
@@ -60,8 +67,11 @@ function cleanKey(val: string): string {
   return val
     .trim()
     .toLowerCase()
-    .replace(/\s*,\s*cebu$/i, '')
-    .replace(/\s+/g, ' ');
+    .replace(/\s*,\s*philippines$/i, '')
+    .replace(/[\s,]+cebu$/i, '')
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function normalizeProvinceName(rawProvince?: string | null): string {

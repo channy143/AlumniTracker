@@ -26,10 +26,11 @@ export default function AlumniManagement() {
   const [loading, setLoading] = useState(!initialAlumniRes);
   const [loadingEligible, setLoadingEligible] = useState(false);
   const [employers, setEmployers] = useState<string[]>(initialAlumniRes?.employers ?? []);
-  const [locations, setLocations] = useState<string[]>(initialAlumniRes?.locations ?? []);
+  const [provinces, setProvinces] = useState<string[]>(initialAlumniRes?.provinces ?? []);
+  const [locationCities, setLocationCities] = useState<Array<{ city: string; province: string }>>(initialAlumniRes?.locationCities ?? []);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ course: '', year: '', employment_status: '', employer: '', location: '', archived: 'false' });
+  const [filters, setFilters] = useState({ course: '', year: '', employment_status: '', employer: '', province: '', city: '', archived: 'false' });
   const [selected, setSelected] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
@@ -109,7 +110,8 @@ export default function AlumniManagement() {
       setData(cached.data ?? []);
       setTotal(cached.total ?? 0);
       if (cached.employers) setEmployers(cached.employers);
-      if (cached.locations) setLocations(cached.locations);
+      if (cached.provinces) setProvinces(cached.provinces);
+      if (cached.locationCities) setLocationCities(cached.locationCities);
       setLoading(false);
     } else {
       setLoading(true);
@@ -119,7 +121,8 @@ export default function AlumniManagement() {
       setData(res.data);
       setTotal(res.total);
       if (res.employers) setEmployers(res.employers);
-      if (res.locations) setLocations(res.locations);
+      if (res.provinces) setProvinces(res.provinces);
+      if (res.locationCities) setLocationCities(res.locationCities);
     } catch (err: any) { if (!cached) setError(err.message || 'Failed to load alumni'); }
     finally { setLoading(false); }
   }, [page, search, filters]);
@@ -508,10 +511,37 @@ export default function AlumniManagement() {
           <option value="">All Employers</option>
           {employers.map((e) => <option key={e} value={e}>{e}</option>)}
         </select>
-        <select value={filters.location} onChange={(e) => { setFilters((f) => ({ ...f, location: e.target.value })); setPage(1); }}
-          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
-          <option value="">All Locations</option>
-          {locations.map((l) => <option key={l} value={l}>{l}</option>)}
+        <select
+          value={filters.province}
+          onChange={(e) => {
+            setFilters((f) => ({ ...f, province: e.target.value, city: '' }));
+            setPage(1);
+          }}
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400"
+        >
+          <option value="">All Provinces</option>
+          {provinces.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select
+          value={filters.city}
+          onChange={(e) => {
+            setFilters((f) => ({ ...f, city: e.target.value }));
+            setPage(1);
+          }}
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400"
+        >
+          <option value="">All Cities / Municipalities</option>
+          {Array.from(
+            new Set(
+              locationCities
+                .filter((c) => !filters.province || c.province.toLowerCase() === filters.province.toLowerCase())
+                .map((c) => c.city)
+            )
+          )
+            .sort()
+            .map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
         </select>
         <select value={filters.archived} onChange={(e) => { setFilters((f) => ({ ...f, archived: e.target.value })); setPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
