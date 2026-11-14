@@ -1,11 +1,12 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { supabase } from '../services/supabase';
 import { authenticate, getJwtSecret } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { AppError } from '../middleware/errorHandler';
-import { AuthenticatedRequest } from '../types';
+import { AuthenticatedRequest, AuthPayload } from '../types';
 import { sendOtpEmail } from '../services/email';
 import { logAudit } from '../services/auditLogger';
 import {
@@ -27,7 +28,7 @@ import {
   registerTrustedDevice,
   revokeAllTrustedDevices,
 } from '../services/trustedDeviceService';
-import { revokeToken } from '../services/revokedTokenService';
+import { revokeToken, isTokenRevoked } from '../services/revokedTokenService';
 import { markUserOffline, markUserActive } from '../services/presenceService';
 import { notifyAdmins } from './notifications';
 import {
@@ -84,9 +85,41 @@ function clientIp(req: { ip?: string; headers: Record<string, any> }): string {
  * Sign an access token for a user, enforcing role-based lifetime.
  * Returns the raw JWT string.
  */
+const ACCESS_TOKEN_MAX_AGE_MS = 25 * 60 * 1000; // 25 minutes
+
 function signAccessToken(userId: string, email: string, role: string): string {
-  const tokenExpiry = role === 'admin' ? '2h' : '7d';
-  return jwt.sign({ userId, email, role }, getJwtSecret(), { expiresIn: tokenExpiry });
+  return jwt.sign({ userId, email, role, type: 'access' }, getJwtSecret(), { expiresIn: '25m' });
+}
+
+function signRefreshToken(userId: string, email: string, role: string): string {
+  const refreshExpiry = role === 'admin' ? '12h' : '7d';
+  return jwt.sign(
+    { userId, email, role, type: 'refresh', jti: crypto.randomUUID() },
+    getJwtSecret(),
+    { expiresIn: refreshExpiry },
+  );
+}
+
+function getCookieOptions(maxAge?: number, path = '/') {
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: (isProd && process.env.COOKIE_SAMESITE === 'none' ? 'none' : 'lax') as 'lax' | 'none',
+    path,
+    ...(maxAge !== undefined ? { maxAge } : {}),
+  };
+}
+
+function setAuthCookies(res: Response, accessToken: string, refreshToken: string, role: string) {
+  const refreshMaxAge = role === 'admin' ? 12 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+  res.cookie('ctu_access_token', accessToken, getCookieOptions(ACCESS_TOKEN_MAX_AGE_MS, '/'));
+  res.cookie('ctu_refresh_token', refreshToken, getCookieOptions(refreshMaxAge, '/api/auth'));
+}
+
+function clearAuthCookies(res: Response) {
+  res.clearCookie('ctu_access_token', getCookieOptions(undefined, '/'));
+  res.clearCookie('ctu_refresh_token', getCookieOptions(undefined, '/api/auth'));
 }
 
 router.post('/send-otp', validate(sendOtpSchema), async (req, res, next) => {
@@ -226,6 +259,8 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
     }
 
     const token = signAccessToken(user.id, user.email, user.role);
+    const refreshToken = signRefreshToken(user.id, user.email, user.role);
+    setAuthCookies(res, token, refreshToken, user.role);
 
     logAudit(req, {
       action: 'AUTH_REGISTER',
@@ -248,7 +283,6 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
 
     res.status(201).json({
       user: { id: user.id, email: user.email, role: user.role, survey_completed: false },
-      token,
     });
   } catch (err) {
     next(err);
@@ -345,6 +379,8 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       const isTrusted = await verifyTrustedDevice(record.id, record.email, deviceId, deviceToken);
       if (isTrusted) {
         const token = signAccessToken(record.id, record.email, record.role);
+        const refreshToken = signRefreshToken(record.id, record.email, record.role);
+        setAuthCookies(res, token, refreshToken, record.role);
         const nowIso = new Date().toISOString();
         markUserActive(record.id);
         await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', record.id);
@@ -364,7 +400,6 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
 
         return res.json({
           user: { id: record.id, email: record.email, role: record.role, survey_completed: !!record.survey_completed },
-          token,
           trustedDevice: true,
         });
       }
@@ -385,6 +420,8 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     }
 
     const token = signAccessToken(record.id, record.email, record.role);
+    const refreshToken = signRefreshToken(record.id, record.email, record.role);
+    setAuthCookies(res, token, refreshToken, record.role);
     const nowIso = new Date().toISOString();
     markUserActive(record.id);
     await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', record.id);
@@ -404,7 +441,6 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
 
     return res.json({
       user: { id: record.id, email: record.email, role: record.role, survey_completed: !!record.survey_completed },
-      token,
     });
   } catch (err) {
     next(err);
@@ -462,6 +498,8 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
     await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', user.id);
     await supabase.from('profiles').update({ last_active_at: nowIso }).eq('user_id', user.id);
     const token = signAccessToken(user.id, user.email, user.role);
+    const refreshToken = signRefreshToken(user.id, user.email, user.role);
+    setAuthCookies(res, token, refreshToken, user.role);
 
     // Register this device as trusted and mint a device token
     const targetDeviceId = deviceId || decoded.deviceId;
@@ -486,7 +524,6 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
 
     res.json({
       user: { id: user.id, email: user.email, role: user.role, survey_completed: !!user.survey_completed },
-      token,
       trustedDeviceToken,
     });
   } catch (err) {
@@ -907,39 +944,122 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res, next) => 
 });
 
 /**
- * Rule 6: Secure Logout endpoint
- * Invalidator token on server, revokes trusted devices if requested, and logs audit event.
+ * Rotating Refresh Token endpoint
+ * Validates HttpOnly ctu_refresh_token, revokes it (single-use rotation),
+ * and issues a fresh 25-minute ctu_access_token + rotated ctu_refresh_token.
  */
-router.post('/logout', authenticate, async (req: AuthenticatedRequest, res, next) => {
+router.post('/refresh', async (req, res, next) => {
   try {
-    const token = req.token;
-    const userId = req.user!.userId;
-    const exp = req.user?.exp;
+    const refreshToken = (req as any).cookies?.ctu_refresh_token;
+    if (!refreshToken) {
+      clearAuthCookies(res);
+      return res.status(401).json({ message: 'Refresh token missing' });
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(refreshToken, getJwtSecret());
+    } catch {
+      clearAuthCookies(res);
+      return res.status(401).json({ message: 'Invalid or expired refresh token' });
+    }
+
+    if (decoded?.type !== 'refresh' || !decoded?.userId) {
+      clearAuthCookies(res);
+      return res.status(401).json({ message: 'Invalid refresh token' });
+    }
+
+    const revoked = await isTokenRevoked(refreshToken);
+    if (revoked) {
+      clearAuthCookies(res);
+      return res.status(401).json({ message: 'Refresh token has been revoked' });
+    }
+
+    // Revoke the old refresh token immediately (single-use rotation)
+    await revokeToken(refreshToken, decoded.userId, decoded.exp, 'refresh_rotation');
+
+    const { data: userRec } = await supabase
+      .from('users')
+      .select('id, email, role, is_active, is_archived')
+      .eq('id', decoded.userId)
+      .maybeSingle();
+
+    if (!userRec) {
+      return res.status(401).json({
+        code: 'ACCOUNT_DELETED',
+        message: 'Your account has been deleted by an administrator.',
+      });
+    }
+
+    if (userRec.is_active === false || userRec.is_archived) {
+      return res.status(401).json({
+        code: 'ACCOUNT_DISABLED',
+        message: 'Your account has been deactivated or archived by an administrator.',
+      });
+    }
+
+    const nextAccess = signAccessToken(userRec.id, userRec.email, userRec.role);
+    const nextRefresh = signRefreshToken(userRec.id, userRec.email, userRec.role);
+    setAuthCookies(res, nextAccess, nextRefresh, userRec.role);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Rule 6: Secure Logout endpoint
+ * Invalidates access + refresh tokens on server, clears HttpOnly cookies,
+ * revokes trusted devices if requested, and logs audit event.
+ */
+router.post('/logout', async (req, res, next) => {
+  try {
+    const accessToken = (req as any).cookies?.ctu_access_token ||
+      (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : undefined);
+    const refreshToken = (req as any).cookies?.ctu_refresh_token;
     const { allDevices } = req.body || {};
 
-    if (token) {
-      await revokeToken(token, userId, exp, allDevices ? 'all_devices' : 'logout');
+    let userId: string | undefined;
+    let userEmail: string | undefined;
+    let userRole: string | undefined;
+
+    for (const tok of [accessToken, refreshToken]) {
+      if (!tok) continue;
+      try {
+        const decoded = jwt.verify(tok, getJwtSecret(), { ignoreExpiration: true }) as any;
+        if (decoded?.userId) {
+          userId = userId || decoded.userId;
+          userEmail = userEmail || decoded.email;
+          userRole = userRole || decoded.role;
+          await revokeToken(tok, decoded.userId, decoded.exp, allDevices ? 'all_devices' : 'logout');
+        }
+      } catch {}
     }
 
-    if (allDevices) {
-      await revokeAllTrustedDevices(userId);
+    clearAuthCookies(res);
+
+    if (userId) {
+      if (allDevices) {
+        await revokeAllTrustedDevices(userId);
+      }
+
+      // Immediately mark user offline in presence system
+      await markUserOffline(userId);
+
+      // Log the secure session termination
+      await logAudit(req, {
+        actorId: userId,
+        actorName: userEmail || 'User',
+        actorRole: userRole || 'alumni',
+        action: 'USER_LOGOUT',
+        entity: 'auth',
+        entityId: userId,
+        details: { allDevices: !!allDevices, method: 'secure_logout' },
+        severity: 'info',
+        status: 'success',
+      });
     }
-
-    // Immediately mark user offline in presence system
-    await markUserOffline(userId);
-
-    // Log the secure session termination
-    await logAudit(req, {
-      actorId: userId,
-      actorName: req.user?.email || 'User',
-      actorRole: req.user?.role || 'alumni',
-      action: 'USER_LOGOUT',
-      entity: 'auth',
-      entityId: userId,
-      details: { allDevices: !!allDevices, method: 'secure_logout' },
-      severity: 'info',
-      status: 'success',
-    });
 
     res.json({ success: true, message: 'Successfully logged out and session terminated' });
   } catch (err) {
@@ -1018,6 +1138,88 @@ router.post('/report-incident', authenticate, async (req: AuthenticatedRequest, 
     res.json({
       success: true,
       message: 'Security incident reported to system administrators. Thank you for protecting account integrity.',
+      incidentId: incident.id,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Allows a user whose account was just deleted or disabled while logged in
+ * to file a report before being signed out and redirected to the landing page.
+ */
+router.post('/account-deleted-report', async (req, res, next) => {
+  try {
+    const token =
+      (req as any).cookies?.ctu_access_token ||
+      (req as any).cookies?.ctu_refresh_token ||
+      (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : undefined);
+
+    if (!token) {
+      throw new AppError('Authentication token is required to file a report', 401);
+    }
+
+    let decoded: AuthPayload;
+    try {
+      decoded = jwt.verify(token, getJwtSecret()) as AuthPayload;
+    } catch {
+      throw new AppError('Session is invalid or expired', 401);
+    }
+
+    const { description } = req.body || {};
+    const trimmed = typeof description === 'string' ? description.trim() : '';
+    if (!trimmed) {
+      throw new AppError('Please provide details for your report', 400);
+    }
+
+    const reporterLabel = decoded.email || decoded.userId;
+    const fullDescription = `[Deleted/Disabled Account Report - ${reporterLabel}]: ${trimmed}`;
+
+    const { data: incident, error } = await supabase
+      .from('security_incidents')
+      .insert({
+        reported_by: null,
+        incident_type: 'other',
+        description: fullDescription,
+        severity: 'high',
+        status: 'open',
+        ip_address: clientIp(req),
+        user_agent: req.headers['user-agent'] as string,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[account-deleted-report] Database insert failed:', error);
+      throw new AppError('Failed to submit report', 500);
+    }
+
+    await logAudit(req, {
+      actorId: decoded.userId,
+      actorName: reporterLabel,
+      actorRole: decoded.role || 'alumni',
+      action: 'ACCOUNT_DELETION_REPORTED',
+      entity: 'security_incidents',
+      entityId: incident.id,
+      details: {
+        descriptionPreview: trimmed.slice(0, 150),
+      },
+      severity: 'warning',
+      status: 'success',
+    });
+
+    notifyAdmins({
+      type: 'security',
+      title: '⚠️ Account Deletion Report Filed',
+      message: `${reporterLabel} filed a report regarding account removal: "${trimmed.slice(0, 120)}${trimmed.length > 120 ? '...' : ''}"`,
+      link: '/admin/activity',
+    });
+
+    clearAuthCookies(res);
+    res.json({
+      success: true,
+      message: 'Your report has been submitted to administrators.',
       incidentId: incident.id,
     });
   } catch (err) {

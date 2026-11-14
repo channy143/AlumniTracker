@@ -92,7 +92,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      setToken(res.token!, rememberMe);
+      setToken('httponly', rememberMe);
       const loggedUser = {
         id: res.user!.id,
         email: res.user!.email,
@@ -183,7 +183,7 @@ export default function LoginPage() {
         saveTrustedDeviceToken(email, res.trustedDeviceToken);
       }
 
-      setToken(res.token!, rememberMe);
+      setToken('httponly', rememberMe);
       const loggedUser = {
         id: res.user!.id,
         email: res.user!.email,

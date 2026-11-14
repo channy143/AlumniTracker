@@ -1,92 +1,66 @@
-import { useEffect, useRef } from 'react';
-import { useAuthStore } from '@/store/authStore';
-import { authApi } from '@/services/api';
+import { useEffect, useRef, useState } from 'react';
+import { useAuthStore } from '../store/authStore';
+import { authApi } from '../services/api';
 
-const clearToken = () => localStorage.removeItem('access_token');
-
-function decodeToken(token: string): { userId: string; email: string; role: string } | null {
+function purgeLegacyTokens() {
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    if (!payload.userId || !payload.email || !payload.role) return null;
-    return { userId: payload.userId, email: payload.email, role: payload.role };
+    localStorage.removeItem('access_token');
+    sessionStorage.removeItem('access_token');
   } catch {
-    return null;
-  }
-}
-
-function isTokenExpired(token: string): boolean {
-  try {
-    const parts = token.split('.');
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    return payload.exp * 1000 < Date.now();
-  } catch {
-    return true;
+    // ignore storage errors
   }
 }
 
 export function useAuth() {
-  const { user, token, setUser, setLoading, logout, syncToken } = useAuthStore();
+  const { user, setUser, setToken, logout } = useAuthStore();
+  const [checking, setChecking] = useState<boolean>(user === null);
   const calledRef = useRef(false);
 
   useEffect(() => {
-    if (token && !user && !calledRef.current) {
-      calledRef.current = true;
+    purgeLegacyTokens();
 
-      // Decode JWT locally to restore session without server roundtrip
-      if (isTokenExpired(token)) {
-        clearToken();
-        logout();
-        setLoading(false);
-        return;
-      }
-
-      const decoded = decodeToken(token);
-      if (!decoded) {
-        clearToken();
-        logout();
-        setLoading(false);
-        return;
-      }
-
-      setUser({
-        id: decoded.userId,
-        email: decoded.email,
-        role: decoded.role as 'admin' | 'staff' | 'alumni',
-        is_verified: false,
-        created_at: '',
-      } as any);
-
-      // Background-fetch full user info — ignore failure (session already restored)
-      authApi.me().then((res) => {
-        if (res?.user) setUser(res.user);
-      }).catch(() => {});
-
-      setLoading(false);
-    } else if (!token) {
-      setLoading(false);
+    if (user !== null) {
+      setChecking(false);
+      return;
     }
-  }, [token]);
+
+    if (calledRef.current) return;
+    calledRef.current = true;
+    setChecking(true);
+
+    authApi
+      .me()
+      .then((res) => {
+        if (res?.user) {
+          setToken('httponly');
+          setUser(res.user);
+        } else {
+          setToken(undefined);
+          setUser(null);
+        }
+      })
+      .catch(() => {
+        setToken(undefined);
+        setUser(null);
+      })
+      .finally(() => {
+        setChecking(false);
+      });
+  }, [user, setUser, setToken]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'access_token' && syncToken()) {
-        calledRef.current = false;
-      }
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible' && syncToken()) {
-        calledRef.current = false;
+      if (e.key === 'ctu_auth_logout') {
+        setUser(null);
+        setToken(undefined);
+        setChecking(false);
       }
     };
     window.addEventListener('storage', onStorage);
-    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       window.removeEventListener('storage', onStorage);
-      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [syncToken]);
+  }, [setUser, setToken]);
 
-  return { user, loading: user === null && token !== null, logout };
+  return { user, loading: checking && user === null, logout };
 }

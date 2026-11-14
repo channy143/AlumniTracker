@@ -5,6 +5,7 @@ import { useHeartbeat } from '@/hooks/useHeartbeat';
 import MainLayout from '@/components/layout/MainLayout';
 import AuthLayout from '@/components/layout/AuthLayout';
 import ScrollToTop from '@/components/layout/ScrollToTop';
+import AccountDeletedModal from '@/components/security/AccountDeletedModal';
 
 import LandingPage from '@/pages/landing/LandingPage';
 import LoginPage from '@/pages/auth/LoginPage';
@@ -114,6 +115,7 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
+      <AccountDeletedModal />
       <Routes>
       <Route path="/" element={<IndexRoute />}>
         <Route index element={<DashboardPage />} />

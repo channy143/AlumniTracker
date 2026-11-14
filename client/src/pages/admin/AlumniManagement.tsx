@@ -41,7 +41,12 @@ export default function AlumniManagement() {
   const [savingDetail, setSavingDetail] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', idNumber: '', program: '', yearGraduated: '' });
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'registered' | 'eligible'>('registered');
+  const [tab, setTab] = useState<'registered' | 'eligible' | 'deleted'>('registered');
+  const [deletedAlumni, setDeletedAlumni] = useState<any[]>([]);
+  const [loadingDeleted, setLoadingDeleted] = useState(false);
+  const [deletedMigrationRequired, setDeletedMigrationRequired] = useState(false);
+  const [restoringDeletedId, setRestoringDeletedId] = useState<string | null>(null);
+  const [purgingDeletedId, setPurgingDeletedId] = useState<string | null>(null);
   const [eligible, setEligible] = useState<any[]>(
     Array.isArray(initialEligibleRes) ? initialEligibleRes.filter((e: any) => !e.user_id) : []
   );
@@ -128,6 +133,29 @@ export default function AlumniManagement() {
   }, [page, search, filters]);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadDeleted = useCallback(async () => {
+    setLoadingDeleted(true);
+    try {
+      const res = await adminApi.alumniDeletedList({
+        search,
+        course: filters.course,
+        year: filters.year,
+      });
+      setDeletedAlumni(res?.data ?? []);
+      setDeletedMigrationRequired(Boolean(res?.migrationRequired));
+    } catch (err: any) {
+      addNotification(err?.message || 'Failed to load deleted alumni', 'error');
+    } finally {
+      setLoadingDeleted(false);
+    }
+  }, [search, filters.course, filters.year, addNotification]);
+
+  useEffect(() => {
+    if (tab === 'deleted') {
+      loadDeleted();
+    }
+  }, [tab, loadDeleted]);
 
   const totalPages = Math.ceil(total / limit);
 
@@ -309,19 +337,48 @@ export default function AlumniManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Permanently delete this alumni? This cannot be undone.')) return;
+    if (!window.confirm('Delete this alumni? You can still restore them later from the Deleted / Trash tab.')) return;
     setDeletingAlumni(id);
     try {
-      await adminApi.alumniDelete(id);
-      addNotification('Alumni deleted permanently', 'success');
+      const res = await adminApi.alumniDelete(id);
+      addNotification(res?.message || 'Alumni moved to Deleted / Trash', 'success');
       if (showDetail && detailData?.id === id) {
         setShowDetail(false);
       }
       load();
+      if (tab === 'deleted') loadDeleted();
     } catch (err: any) {
       addNotification(err.response?.data?.message || err.message || 'Failed to delete', 'error');
     } finally {
       setDeletingAlumni(null);
+    }
+  };
+
+  const handleRestoreDeleted = async (deletedId: string) => {
+    setRestoringDeletedId(deletedId);
+    try {
+      const res = await adminApi.alumniDeletedRestore(deletedId);
+      addNotification(res?.message || 'Alumni account restored successfully', 'success');
+      loadDeleted();
+      load();
+    } catch (err: any) {
+      addNotification(err?.message || 'Failed to restore deleted alumni', 'error');
+    } finally {
+      setRestoringDeletedId(null);
+    }
+  };
+
+  const handlePurgeDeleted = async (deletedId: string) => {
+    if (!window.confirm('Permanently delete this alumni record? This cannot be undone.')) return;
+    setPurgingDeletedId(deletedId);
+    try {
+      const res = await adminApi.alumniDeletedPurge(deletedId);
+      addNotification(res?.message || 'Alumni permanently deleted', 'success');
+      loadDeleted();
+    } catch (err: any) {
+      addNotification(err?.message || 'Failed to permanently delete', 'error');
+    } finally {
+      setPurgingDeletedId(null);
     }
   };
 
@@ -467,7 +524,13 @@ export default function AlumniManagement() {
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div>
           <h1 className="text-base font-bold text-gray-900">Alumni Management</h1>
-          <p className="text-xs text-gray-500">{tab === 'registered' ? `${total} registered alumni` : `${eligible.length} eligible (unclaimed) alumni`}</p>
+          <p className="text-xs text-gray-500">
+            {tab === 'registered'
+              ? `${total} registered alumni`
+              : tab === 'eligible'
+              ? `${eligible.length} eligible (unclaimed) alumni`
+              : `${deletedAlumni.length} deleted alumni`}
+          </p>
         </div>
         <div data-tour="alumni-top-actions" className="flex flex-wrap gap-2">
           {tab === 'registered' && <button onClick={handleExport} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Export CSV</button>}
@@ -483,6 +546,9 @@ export default function AlumniManagement() {
         </button>
         <button onClick={() => { setTab('eligible'); setEligPage(1); }} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'eligible' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
           Eligible / Unclaimed
+        </button>
+        <button onClick={() => setTab('deleted')} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'deleted' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
+          Deleted / Trash
         </button>
       </div>
 
@@ -664,6 +730,83 @@ export default function AlumniManagement() {
         </>
       )}
         </>
+      )}
+
+      {tab === 'deleted' && (
+        loadingDeleted ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="bg-white border border-gray-200 animate-pulse">
+                <div className="w-full h-44 bg-gray-200" />
+                <div className="p-[13px] space-y-2">
+                  <div className="h-3 bg-gray-200 rounded w-3/4" />
+                  <div className="h-2 bg-gray-200 rounded w-1/2" />
+                  <div className="h-2 bg-gray-200 rounded w-2/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : deletedMigrationRequired ? (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-4 rounded-lg text-xs">
+            <p className="font-semibold mb-1">Database Migration Required for Deleted / Trash</p>
+            <p>Run <code className="bg-amber-100 px-1 py-0.5 rounded">supabase/migration_deleted_alumni.sql</code> in your Supabase SQL Editor to enable restoring deleted alumni. Until then, clicking Delete safely moves alumni to Archived.</p>
+          </div>
+        ) : deletedAlumni.length === 0 ? (
+          <div className="text-center py-12 text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">
+            {search || filters.course || filters.year ? 'No deleted alumni match your filters' : 'No deleted alumni in trash'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {deletedAlumni.map((item: any) => {
+              const nameParts = String(item.full_name || '').trim().split(/\s+/);
+              const initials = ((nameParts[0]?.[0] || '') + (nameParts[nameParts.length - 1]?.[0] || '')).toUpperCase() || '?';
+              return (
+                <div key={item.id} className="bg-white border border-red-200/80 hover:shadow-md transition-shadow flex flex-col">
+                  <div className="relative">
+                    <div className="w-full h-44 bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center overflow-hidden">
+                      {item.avatar_url ? (
+                        <img src={item.avatar_url} alt="" className="w-full h-full object-cover opacity-80" />
+                      ) : (
+                        <span className="text-2xl font-bold text-red-400">{initials}</span>
+                      )}
+                    </div>
+                    <div className="absolute top-1.5 right-1.5">
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-red-100 text-red-700">
+                        Deleted
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-[15px] flex-1 flex flex-col gap-1">
+                    <p className="text-xs font-semibold text-gray-900 leading-tight">{item.full_name || item.email}</p>
+                    <div className="space-y-0.5 text-[10px] text-gray-500">
+                      <p><span className="text-gray-400">ID:</span> {item.id_number || '---'}</p>
+                      <p><span className="text-gray-400">Course:</span> {item.program ? courseShort(item.program) : '---'}</p>
+                      <p><span className="text-gray-400">Batch:</span> {item.batch_year || '---'}</p>
+                      <p className="truncate"><span className="text-gray-400">Email:</span> {item.email}</p>
+                      <p><span className="text-gray-400">Deleted:</span> {item.deleted_at ? new Date(item.deleted_at).toLocaleDateString() : '---'}</p>
+                    </div>
+                  </div>
+                  <div className="px-2.5 pb-2.5 flex flex-wrap gap-1">
+                    <button
+                      onClick={() => handleRestoreDeleted(item.id)}
+                      disabled={restoringDeletedId === item.id || purgingDeletedId === item.id}
+                      className="text-[10px] px-2.5 py-1 font-medium bg-teal-50 text-teal-700 rounded-md hover:bg-teal-100 disabled:opacity-40 cursor-pointer"
+                    >
+                      {restoringDeletedId === item.id ? 'Restoring...' : 'Restore'}
+                    </button>
+                    <button
+                      onClick={() => handlePurgeDeleted(item.id)}
+                      disabled={restoringDeletedId === item.id || purgingDeletedId === item.id}
+                      className="text-[10px] px-2 py-1 font-medium bg-red-50 text-red-600 rounded-md hover:bg-red-100 disabled:opacity-40 cursor-pointer"
+                    >
+                      {purgingDeletedId === item.id ? 'Deleting...' : 'Delete Permanently'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
 
       {tab === 'eligible' && (

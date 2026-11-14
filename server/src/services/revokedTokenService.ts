@@ -35,7 +35,7 @@ export async function revokeToken(
   token: string,
   userId: string,
   expTimestamp?: number,
-  reason: 'logout' | 'all_devices' | 'password_change' | 'security_incident' | 'admin_revocation' = 'logout',
+  reason: 'logout' | 'all_devices' | 'password_change' | 'security_incident' | 'admin_revocation' | 'refresh_rotation' = 'logout',
 ): Promise<void> {
   const hash = hashToken(token);
   const now = Math.floor(Date.now() / 1000);

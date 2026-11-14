@@ -115,10 +115,12 @@ router.post('/heartbeat', authenticate, async (req: AuthenticatedRequest, res, n
 router.post('/offline', async (req: Request, res: Response) => {
   try {
     let userId: string | null = null;
+    const cookieToken = (req as any).cookies?.ctu_access_token;
     const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    const tokenCandidate = cookieToken || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : undefined);
+    if (tokenCandidate) {
       try {
-        const decoded = jwt.verify(authHeader.split(' ')[1], getJwtSecret()) as any;
+        const decoded = jwt.verify(tokenCandidate, getJwtSecret()) as any;
         userId = decoded.userId;
       } catch {}
     }

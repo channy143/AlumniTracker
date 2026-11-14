@@ -33,6 +33,26 @@ app.use(cors({
   credentials: true,
 }));
 app.use(helmet());
+app.use((req, _res, next) => {
+  const cookies: Record<string, string> = {};
+  const header = req.headers.cookie;
+  if (header) {
+    header.split(';').forEach((part) => {
+      const idx = part.indexOf('=');
+      if (idx > 0) {
+        const key = part.slice(0, idx).trim();
+        const val = part.slice(idx + 1).trim();
+        try {
+          cookies[key] = decodeURIComponent(val);
+        } catch {
+          cookies[key] = val;
+        }
+      }
+    });
+  }
+  (req as any).cookies = cookies;
+  next();
+});
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 

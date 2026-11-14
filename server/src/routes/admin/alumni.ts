@@ -414,6 +414,62 @@ router.get('/export', async (req, res, next) => {
   }
 });
 
+router.get('/deleted', async (req, res, next) => {
+  try {
+    const search = ((req.query.search as string) || '').trim().toLowerCase();
+    const course = ((req.query.course as string) || '').trim().toLowerCase();
+    const year = ((req.query.year as string) || '').trim();
+
+    const { data, error } = await supabase
+      .from('deleted_alumni')
+      .select('id, original_user_id, email, full_name, id_number, program, batch_year, deleted_by, deleted_at, snapshot')
+      .order('deleted_at', { ascending: false });
+
+    if (error && (error.code === '42P01' || error.code === 'PGRST205')) {
+      return res.json({ data: [], migrationRequired: true });
+    }
+    if (error) throw new AppError(error.message, 500);
+
+    let rows = (data || []).map((row: any) => ({
+      id: row.id,
+      original_user_id: row.original_user_id,
+      email: row.email,
+      full_name: row.full_name,
+      id_number: row.id_number,
+      program: row.program,
+      batch_year: row.batch_year,
+      deleted_at: row.deleted_at,
+      avatar_url: row.snapshot?.profile?.avatar_url || null,
+      employment_status:
+        row.snapshot?.employment?.[0]?.employment_status ||
+        row.snapshot?.profile?.employment_status ||
+        null,
+      company_name:
+        row.snapshot?.employment?.[0]?.company_name ||
+        row.snapshot?.profile?.company_name ||
+        null,
+    }));
+
+    if (search) {
+      rows = rows.filter((r: any) =>
+        (r.full_name || '').toLowerCase().includes(search) ||
+        (r.email || '').toLowerCase().includes(search) ||
+        (r.id_number || '').toLowerCase().includes(search)
+      );
+    }
+    if (course) {
+      rows = rows.filter((r: any) => (r.program || '').toLowerCase().includes(course));
+    }
+    if (year) {
+      rows = rows.filter((r: any) => String(r.batch_year || '') === year);
+    }
+
+    res.json({ data: rows, migrationRequired: false });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const { data: user, error } = await supabase
@@ -723,6 +779,121 @@ router.get('/:id/employment', async (req, res, next) => {
   }
 });
 
+router.post('/deleted/:deletedId/restore', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { deletedId } = req.params;
+    const { data: trashRow, error: findErr } = await supabase
+      .from('deleted_alumni')
+      .select('*')
+      .eq('id', deletedId)
+      .maybeSingle();
+
+    if (findErr && (findErr.code === '42P01' || findErr.code === 'PGRST205')) {
+      throw new AppError('Deleted alumni table is not available. Run migration_deleted_alumni.sql first.', 400);
+    }
+    if (findErr) throw new AppError(findErr.message, 500);
+    if (!trashRow) throw new AppError('Deleted alumni record not found', 404);
+
+    const snapshot = trashRow.snapshot || {};
+    const userRow = snapshot.user;
+    if (!userRow || !userRow.id || !userRow.email) {
+      throw new AppError('Deleted alumni snapshot is incomplete and cannot be restored', 400);
+    }
+
+    // Check if a user with the same ID or email already exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id, email')
+      .or(`id.eq.${userRow.id},email.eq.${userRow.email}`)
+      .maybeSingle();
+
+    if (existingUser) {
+      throw new AppError(`Cannot restore: an account with email ${userRow.email} already exists.`, 409);
+    }
+
+    const { error: userInsertErr } = await supabase.from('users').insert({
+      ...userRow,
+      is_active: true,
+      is_archived: false,
+      updated_at: new Date().toISOString(),
+    });
+    if (userInsertErr) throw new AppError(userInsertErr.message, 500);
+
+    if (snapshot.profile) {
+      const { error: profErr } = await supabase.from('profiles').insert(snapshot.profile);
+      if (profErr) {
+        // Roll back user insert if profile fails
+        await supabase.from('users').delete().eq('id', userRow.id);
+        throw new AppError(profErr.message, 500);
+      }
+    }
+
+    const restoreOps: PromiseLike<any>[] = [];
+    if (Array.isArray(snapshot.education) && snapshot.education.length > 0) {
+      restoreOps.push(supabase.from('education').insert(snapshot.education));
+    }
+    if (Array.isArray(snapshot.employment) && snapshot.employment.length > 0) {
+      restoreOps.push(supabase.from('employment').insert(snapshot.employment));
+    }
+    if (Array.isArray(snapshot.skills) && snapshot.skills.length > 0) {
+      restoreOps.push(supabase.from('skills').insert(snapshot.skills));
+    }
+    if (Array.isArray(snapshot.survey_responses) && snapshot.survey_responses.length > 0) {
+      restoreOps.push(supabase.from('survey_responses').insert(snapshot.survey_responses));
+    }
+    if (Array.isArray(snapshot.eligibleIds) && snapshot.eligibleIds.length > 0) {
+      restoreOps.push(
+        supabase.from('alumni_eligible').update({ user_id: userRow.id }).in('id', snapshot.eligibleIds)
+      );
+    }
+
+    await Promise.allSettled(restoreOps);
+    await supabase.from('deleted_alumni').delete().eq('id', deletedId);
+
+    logAudit(req, {
+      action: 'ALUMNI_RESTORED_FROM_TRASH',
+      entity: 'alumni',
+      entityId: userRow.id,
+      severity: 'info',
+      status: 'success',
+      details: { restoredUserId: userRow.id, email: userRow.email },
+    });
+
+    res.json({ message: 'Alumni account restored successfully', userId: userRow.id });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/deleted/:deletedId', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { deletedId } = req.params;
+    const { data: trashRow } = await supabase
+      .from('deleted_alumni')
+      .select('id, original_user_id, email')
+      .eq('id', deletedId)
+      .maybeSingle();
+
+    if (!trashRow) throw new AppError('Deleted alumni record not found', 404);
+
+    const { error } = await supabase.from('deleted_alumni').delete().eq('id', deletedId);
+    if (error) throw new AppError(error.message, 500);
+
+    logAudit(req, {
+      action: 'ALUMNI_PERMANENTLY_DELETED',
+      entity: 'alumni',
+      entityId: trashRow.original_user_id,
+      severity: 'critical',
+      status: 'success',
+      details: { targetAlumniId: trashRow.original_user_id, email: trashRow.email },
+    });
+
+    res.json({ message: 'Alumni permanently deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.delete('/:id', async (req: AuthenticatedRequest, res, next) => {
   try {
     const targetId = req.params.id;
@@ -735,7 +906,7 @@ router.delete('/:id', async (req: AuthenticatedRequest, res, next) => {
     // Verify user exists and has role 'alumni'
     const { data: targetUser, error: findError } = await supabase
       .from('users')
-      .select('id, email, role')
+      .select('*')
       .eq('id', targetId)
       .maybeSingle();
 
@@ -745,14 +916,78 @@ router.delete('/:id', async (req: AuthenticatedRequest, res, next) => {
       throw new AppError('Only alumni accounts can be deleted from Alumni Management', 400);
     }
 
-    // Clean up/unlink dependent records so foreign keys never block permanent deletion
+    // Fetch full snapshot before deleting so the alumni can be restored later
     const { data: targetProfile } = await supabase
       .from('profiles')
-      .select('id')
+      .select('*')
       .eq('user_id', targetId)
       .maybeSingle();
     const profileId = targetProfile?.id;
 
+    const [eduRes, empRes, skillRes, surveyRes, eligRes] = await Promise.all([
+      profileId ? supabase.from('education').select('*').eq('profile_id', profileId) : Promise.resolve({ data: [] }),
+      profileId ? supabase.from('employment').select('*').eq('profile_id', profileId) : Promise.resolve({ data: [] }),
+      profileId ? supabase.from('skills').select('*').eq('profile_id', profileId) : Promise.resolve({ data: [] }),
+      supabase.from('survey_responses').select('*').eq('user_id', targetId),
+      supabase.from('alumni_eligible').select('id').eq('user_id', targetId),
+    ]);
+
+    const eduRows = (eduRes as any).data || [];
+    const empRows = (empRes as any).data || [];
+    const skillRows = (skillRes as any).data || [];
+    const surveyRows = (surveyRes as any).data || [];
+    const eligibleIds = ((eligRes as any).data || []).map((r: any) => r.id);
+
+    const fullName = targetProfile
+      ? `${targetProfile.first_name || ''} ${targetProfile.last_name || ''}`.trim()
+      : targetUser.email;
+
+    const snapshot = {
+      user: targetUser,
+      profile: targetProfile || null,
+      education: eduRows,
+      employment: empRows,
+      skills: skillRows,
+      survey_responses: surveyRows,
+      eligibleIds,
+    };
+
+    const { error: trashErr } = await supabase.from('deleted_alumni').insert({
+      original_user_id: targetId,
+      email: targetUser.email,
+      full_name: fullName || null,
+      id_number: targetProfile?.id_number || null,
+      program: eduRows[0]?.program || null,
+      batch_year: eduRows[0]?.year_graduated ? String(eduRows[0].year_graduated) : null,
+      snapshot,
+      deleted_by: req.user?.userId || null,
+    });
+
+    if (trashErr && (trashErr.code === '42P01' || trashErr.code === 'PGRST205')) {
+      // Fallback: if deleted_alumni table hasn't been migrated yet, soft-archive so data is never lost
+      const { error: archiveErr } = await supabase
+        .from('users')
+        .update({ is_archived: true, is_active: false })
+        .eq('id', targetId);
+      if (archiveErr) throw new AppError(archiveErr.message, 500);
+
+      logAudit(req, {
+        action: 'ALUMNI_SOFT_ARCHIVED_ON_DELETE',
+        entity: 'alumni',
+        entityId: targetId,
+        severity: 'warning',
+        status: 'success',
+        details: { targetAlumniId: targetId, email: targetUser.email },
+      });
+
+      return res.json({
+        message: 'Alumni moved to Archived so they can still be restored (run migration_deleted_alumni.sql for Deleted / Trash)',
+        softArchived: true,
+      });
+    }
+    if (trashErr) throw new AppError(trashErr.message, 500);
+
+    // Clean up/unlink dependent records so foreign keys never block deletion from active tables
     const cleanupOps: PromiseLike<any>[] = [
       supabase.from('alumni_eligible').update({ user_id: null }).eq('user_id', targetId),
       supabase.from('audit_logs').update({ user_id: null }).eq('user_id', targetId),
@@ -786,10 +1021,10 @@ router.delete('/:id', async (req: AuthenticatedRequest, res, next) => {
       entityId: targetId,
       severity: 'critical',
       status: 'success',
-      details: { targetAlumniId: targetId, email: targetUser.email },
+      details: { targetAlumniId: targetId, email: targetUser.email, restorable: true },
     });
 
-    res.json({ message: 'Alumni deleted permanently' });
+    res.json({ message: 'Alumni moved to Deleted / Trash. You can restore them anytime.' });
   } catch (err) {
     next(err);
   }

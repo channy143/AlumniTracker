@@ -348,7 +348,7 @@ export default function RegisterPage() {
         birthDate: identity.birthDate || undefined,
         otp,
       });
-      setToken(res.token);
+      setToken('httponly');
       setUser(res.user);
       navigate('/survey/onboarding');
     } catch (err: any) {

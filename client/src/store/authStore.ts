@@ -3,24 +3,12 @@ import { User } from '@/types';
 import { authApi } from '@/services/api';
 import { clearAllCache } from '@/utils/apiCache';
 
-const STORAGE_KEY = 'access_token';
-
-const getStoredToken = () => localStorage.getItem(STORAGE_KEY);
-
-function setStoredToken(token: string, _persist: boolean) {
-  localStorage.setItem(STORAGE_KEY, token);
-}
-
-function removeStoredToken() {
-  localStorage.removeItem(STORAGE_KEY);
-}
-
 interface AuthState {
   user: (User & { role: 'admin' | 'staff' | 'alumni' }) | null;
   token: string | null;
   loading: boolean;
-  setUser: (user: User & { role: 'admin' | 'staff' | 'alumni' }) => void;
-  setToken: (token: string, persist?: boolean) => void;
+  setUser: (user: (User & { role: 'admin' | 'staff' | 'alumni' }) | null) => void;
+  setToken: (token?: string, persist?: boolean) => void;
   setLoading: (loading: boolean) => void;
   logout: (allDevices?: boolean) => Promise<void>;
   syncToken: () => boolean;
@@ -34,44 +22,46 @@ function clearIdPromptFlags() {
   } catch {}
 }
 
+function clearLegacyTokens() {
+  try {
+    localStorage.removeItem('access_token');
+    sessionStorage.removeItem('access_token');
+  } catch {}
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: getStoredToken(),
+  token: null,
   loading: true,
-  setUser: (user) => set({ user }),
-  setToken: (token, persist = true) => {
+  setUser: (user) => {
+    try {
+      if (user?.id) sessionStorage.setItem('ctu_cache_uid', String(user.id));
+      else sessionStorage.removeItem('ctu_cache_uid');
+    } catch {}
+    set({ user, loading: false });
+  },
+  setToken: (_token?: string, _persist = true) => {
     clearAllCache();
     clearIdPromptFlags();
-    setStoredToken(token, persist);
-    set({ token });
+    clearLegacyTokens();
+    set({ token: 'httponly' });
   },
   setLoading: (loading) => set({ loading }),
   logout: async (allDevices = false) => {
     try {
-      const token = getStoredToken();
-      if (token) {
-        await authApi.logout(allDevices);
-      }
+      await authApi.logout(allDevices);
     } catch (err) {
       console.warn('[authStore] Backend logout notification failed (local session cleared):', err);
     } finally {
       clearAllCache();
       clearIdPromptFlags();
-      removeStoredToken();
-      set({ user: null, token: null });
+      clearLegacyTokens();
+      try {
+        sessionStorage.removeItem('ctu_cache_uid');
+        localStorage.setItem('ctu_auth_logout', String(Date.now()));
+      } catch {}
+      set({ user: null, token: null, loading: false });
     }
   },
-  syncToken: () => {
-    const stored = getStoredToken();
-    let changed = false;
-    set((state) => {
-      if (stored !== state.token) {
-        changed = true;
-        clearAllCache();
-        return { token: stored, user: stored ? null : null, loading: stored ? true : false };
-      }
-      return {};
-    });
-    return changed;
-  },
+  syncToken: () => false,
 }));

@@ -53,14 +53,72 @@ export class ApiError extends Error {
   }
 }
 
+const AUTH_NO_REFRESH_ENDPOINTS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/mfa-verify',
+  '/auth/refresh',
+  '/auth/logout',
+];
+
+let refreshPromise: Promise<boolean> | null = null;
+
+function shouldAttemptRefresh(endpoint: string): boolean {
+  return !AUTH_NO_REFRESH_ENDPOINTS.some((prefix) => endpoint.startsWith(prefix));
+}
+
+function dispatchAccountDeletedIfNeeded(error: any): boolean {
+  if (error?.code === 'ACCOUNT_DELETED' || error?.code === 'ACCOUNT_DISABLED') {
+    clearAllCache();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('auth:account-deleted', {
+          detail: {
+            code: error.code,
+            message:
+              error.message ||
+              (error.code === 'ACCOUNT_DISABLED'
+                ? 'Your account has been deactivated or archived by an administrator.'
+                : 'Your account has been deleted by an administrator.'),
+          },
+        })
+      );
+    }
+    return true;
+  }
+  return false;
+}
+
+async function tryRefreshToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        dispatchAccountDeletedIfNeeded(err);
+      }
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
+  _retried = false,
 ): Promise<T> {
-  const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
@@ -69,6 +127,7 @@ async function request<T>(
   try {
     response = await fetch(url, {
       ...options,
+      credentials: 'include',
       headers,
     });
   } catch (netErr: any) {
@@ -80,10 +139,18 @@ async function request<T>(
   }
 
   if (!response.ok) {
-    if (response.status === 401) {
-      clearAllCache();
-    }
     const error = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      if (!dispatchAccountDeletedIfNeeded(error)) {
+        if (!_retried && shouldAttemptRefresh(endpoint)) {
+          const refreshed = await tryRefreshToken();
+          if (refreshed) {
+            return request<T>(endpoint, options, true);
+          }
+        }
+        clearAllCache();
+      }
+    }
     let cooldown = error.cooldownSeconds;
     if (!cooldown && response.headers.get('Retry-After')) {
       const parsed = parseInt(response.headers.get('Retry-After')!, 10);
@@ -181,45 +248,46 @@ export const api = {
     invalidateForMutation(endpoint);
     return res;
   },
-  download: (endpoint: string) => {
-    const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-    return fetch(`${API_BASE}${endpoint}`, {
+  download: async (endpoint: string, _retried = false): Promise<Response> => {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'GET',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    }).then(async (res) => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Download failed');
-      }
-      return res;
+      credentials: 'include',
     });
+    if (res.status === 401 && !_retried && shouldAttemptRefresh(endpoint)) {
+      const refreshed = await tryRefreshToken();
+      if (refreshed) return api.download(endpoint, true);
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Download failed');
+    }
+    return res;
   },
-  blob: (endpoint: string) => {
-    const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-    return fetch(`${API_BASE}${endpoint}`, {
+  blob: async (endpoint: string, _retried = false): Promise<Blob> => {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'GET',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    }).then(async (res) => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || `Download failed: ${res.statusText}`);
-      }
-      return res.blob();
+      credentials: 'include',
     });
+    if (res.status === 401 && !_retried && shouldAttemptRefresh(endpoint)) {
+      const refreshed = await tryRefreshToken();
+      if (refreshed) return api.blob(endpoint, true);
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `Download failed: ${res.statusText}`);
+    }
+    return res.blob();
   },
-  upload: <T>(endpoint: string, formData: FormData) => {
-    const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
+  upload: async <T>(endpoint: string, formData: FormData, _retried = false): Promise<T> => {
     return fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      credentials: 'include',
       body: formData,
     }).then(async (res) => {
+      if (res.status === 401 && !_retried && shouldAttemptRefresh(endpoint)) {
+        const refreshed = await tryRefreshToken();
+        if (refreshed) return api.upload<T>(endpoint, formData, true);
+      }
       if (!res.ok) {
         if (res.status === 413) {
           throw new ApiError('The uploaded file is too large (maximum size is 10MB). Please compress the document or choose a smaller file.', 413);
@@ -272,7 +340,7 @@ export const authApi = {
   login: (email: string, password: string, deviceId?: string, deviceToken?: string) =>
     api.post<LoginResponse>('/auth/login', { email, password, deviceId, deviceToken }),
   mfaVerify: (email: string, otp: string, mfaToken: string, deviceId?: string) =>
-    api.post<{ user: any; token: string; trustedDeviceToken?: string }>('/auth/mfa-verify', { email, otp, mfaToken, deviceId }),
+    api.post<{ user: any; token?: string; trustedDeviceToken?: string }>('/auth/mfa-verify', { email, otp, mfaToken, deviceId }),
   verifyAlumni: (dataOrStudentId: VerifyAlumniPayload | string, birthDate?: string) => {
     if (typeof dataOrStudentId === 'string') {
       return api.post<VerifyAlumniResponse>('/auth/verify-alumni', { studentId: dataOrStudentId, birthDate });
@@ -280,7 +348,8 @@ export const authApi = {
     return api.post<VerifyAlumniResponse>('/auth/verify-alumni', dataOrStudentId);
   },
   register: (data: any) =>
-    api.post<{ user: any; token: string }>('/auth/register', data),
+    api.post<{ user: any; token?: string }>('/auth/register', data),
+  refresh: () => api.post<{ ok: boolean }>('/auth/refresh', {}),
   sendOtp: (email: string, turnstileToken?: string) =>
     api.post<{ message: string }>('/auth/send-otp', { email, turnstileToken }),
   forgotPassword: (email: string, turnstileToken?: string) =>
@@ -302,6 +371,8 @@ export const authApi = {
     api.post<{ success: boolean; message: string }>('/auth/logout', { allDevices }),
   reportIncident: (data: { incidentType: string; description: string; severity?: string }) =>
     api.post<{ success: boolean; message: string; incidentId: string }>('/auth/report-incident', data),
+  reportDeletedAccount: (description: string) =>
+    api.post<{ success: boolean; message: string; incidentId: string }>('/auth/account-deleted-report', { description }),
 };
 
 export const profileApi = {
@@ -440,7 +511,13 @@ export const adminApi = {
   alumniGet: (id: string) => api.get<any>(`/admin/alumni/${id}`),
   alumniCreate: (data: any) => api.post<any>('/admin/alumni', data),
   alumniUpdate: (id: string, data: any) => api.put<any>(`/admin/alumni/${id}`, data),
-  alumniDelete: (id: string) => api.delete(`/admin/alumni/${id}`),
+  alumniDelete: (id: string) => api.delete<{ message: string; softArchived?: boolean }>(`/admin/alumni/${id}`),
+  alumniDeletedList: (params: Record<string, any> = {}) =>
+    api.get<{ data: any[]; migrationRequired?: boolean }>(`/admin/alumni/deleted?${toQuery(params)}`),
+  alumniDeletedRestore: (deletedId: string) =>
+    api.post<{ message: string; userId: string }>(`/admin/alumni/deleted/${deletedId}/restore`, {}),
+  alumniDeletedPurge: (deletedId: string) =>
+    api.delete<{ message: string }>(`/admin/alumni/deleted/${deletedId}`),
   alumniArchive: (id: string) => api.put<any>(`/admin/alumni/${id}/archive`, {}),
   alumniRestore: (id: string) => api.put<any>(`/admin/alumni/${id}/restore`, {}),
   alumniVerify: (id: string) => api.put<any>(`/admin/alumni/${id}/verify`, {}),
@@ -652,18 +729,13 @@ export const messagesApi = {
     api.post<{ seen: boolean }>('/messages/policy-notice/seen', {}),
   heartbeat: () => api.post<{ success: boolean; last_active_at: string }>('/messages/heartbeat', {}),
   offline: () => {
-    const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      const blob = new Blob([JSON.stringify({ token })], { type: 'application/json' });
-      navigator.sendBeacon(`${API_BASE}/messages/offline`, blob);
-    } else {
-      fetch(`${API_BASE}/messages/offline`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ token }),
-        keepalive: true,
-      }).catch(() => {});
-    }
+    fetch(`${API_BASE}/messages/offline`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+      keepalive: true,
+    }).catch(() => {});
   },
   getPresence: (profileIds: string[]) =>
     api.get<Record<string, { is_online: boolean; last_active_at: string | null }>>(

@@ -17,14 +17,11 @@ const MAX_STORAGE_BYTES = 200_000; // Skip persisting oversized payloads (>200KB
 
 function decodeUserNamespace(): string {
   try {
-    const token =
-      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('access_token')) ||
-      (typeof localStorage !== 'undefined' && localStorage.getItem('access_token'));
-    if (!token) return 'anon';
-    const parts = token.split('.');
-    if (parts.length !== 3) return 'auth';
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    return String(payload.userId || payload.sub || 'auth');
+    if (typeof sessionStorage !== 'undefined') {
+      const uid = sessionStorage.getItem('ctu_cache_uid');
+      if (uid) return uid;
+    }
+    return 'anon';
   } catch {
     return 'anon';
   }

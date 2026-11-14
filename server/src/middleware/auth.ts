@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { AuthenticatedRequest, AuthPayload } from '../types';
 import { isTokenRevoked } from '../services/revokedTokenService';
 import { markUserActive } from '../services/presenceService';
+import { supabase } from '../services/supabase';
 
 export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -14,17 +15,23 @@ export function getJwtSecret(): string {
 const MAX_ADMIN_TOKEN_AGE_SECONDS = 2 * 60 * 60; // 2 hours
 
 export async function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  const cookieToken = (req as any).cookies?.ctu_access_token;
   const authHeader = req.headers.authorization;
+  const bearerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : undefined;
+  const token = cookieToken || bearerToken;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!token) {
     return res.status(401).json({ message: 'Authentication required' });
   }
-
-  const token = authHeader.split(' ')[1];
 
   try {
     const secret = getJwtSecret();
     const decoded = jwt.verify(token, secret) as AuthPayload;
+
+    // Refresh tokens cannot be used as access tokens
+    if ((decoded as any).type === 'refresh') {
+      return res.status(401).json({ message: 'Invalid access token' });
+    }
 
     // Check if token has been revoked / logged out (Rule 6)
     const revoked = await isTokenRevoked(token);
@@ -43,6 +50,27 @@ export async function authenticate(req: AuthenticatedRequest, res: Response, nex
       if (tokenAge > MAX_ADMIN_TOKEN_AGE_SECONDS) {
         return res.status(401).json({ message: 'Admin token has expired. Please log in again.' });
       }
+    }
+
+    // Verify account still exists and is active/not archived
+    const { data: userRec, error: userErr } = await supabase
+      .from('users')
+      .select('id, is_active, is_archived')
+      .eq('id', decoded.userId)
+      .maybeSingle();
+
+    if (!userErr && !userRec) {
+      return res.status(401).json({
+        code: 'ACCOUNT_DELETED',
+        message: 'Your account has been deleted by an administrator.',
+      });
+    }
+
+    if (!userErr && userRec && (userRec.is_active === false || userRec.is_archived)) {
+      return res.status(401).json({
+        code: 'ACCOUNT_DISABLED',
+        message: 'Your account has been deactivated or archived by an administrator.',
+      });
     }
 
     req.user = decoded;
