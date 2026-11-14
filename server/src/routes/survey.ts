@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { notifyAdmins } from './notifications';
+import { normalizeCityName, normalizeProvinceName, normalizePhPhone } from '../utils/formatLocation';
 
 const STANDARD_QUESTIONS = [
   { id: 'personal_info', section: 'Personal Information', type: 'section' },
@@ -274,6 +275,12 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
 
     // Sync relevant profile information if provided
     const profileUpdates: Record<string, any> = {};
+    if (responses?.firstName && !isEvasiveInput(responses.firstName)) {
+      profileUpdates.first_name = String(responses.firstName).trim();
+    }
+    if (responses?.lastName && !isEvasiveInput(responses.lastName)) {
+      profileUpdates.last_name = String(responses.lastName).trim();
+    }
     const studentIdVal = responses?.studentId || responses?.id_number || responses?.idNumber;
     if (studentIdVal && !isEvasiveInput(studentIdVal)) {
       profileUpdates.id_number = String(studentIdVal).trim();
@@ -281,12 +288,33 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
         await supabase.from('alumni_eligible').update({ user_id: req.user!.userId }).eq('student_id', String(studentIdVal).trim());
       } catch {}
     }
-    if (responses?.phone) profileUpdates.phone = responses.phone;
-    if (responses?.gender) profileUpdates.gender = responses.gender;
+    if (responses?.phone) profileUpdates.phone = normalizePhPhone(responses.phone);
+    if (responses?.gender && responses.gender !== 'Prefer not to say') {
+      profileUpdates.gender = String(responses.gender).slice(0, 10);
+    }
     if (responses?.civilStatus) profileUpdates.civil_status = responses.civilStatus;
-    if (responses?.address && !isEvasiveInput(responses.address)) profileUpdates.address = responses.address;
-    if (responses?.city && !isEvasiveInput(responses.city)) profileUpdates.city = responses.city;
-    if (responses?.province && !isEvasiveInput(responses.province)) profileUpdates.province = responses.province;
+
+    const combinedAddress = [
+      responses?.street ? String(responses.street).trim() : '',
+      responses?.barangay ? `Brgy. ${String(responses.barangay).trim().replace(/^brgy\.?\s*/i, '')}` : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+    if (combinedAddress && !isEvasiveInput(combinedAddress)) {
+      profileUpdates.address = combinedAddress;
+    } else if (responses?.address && !isEvasiveInput(responses.address)) {
+      profileUpdates.address = responses.address;
+    }
+
+    if (responses?.city && !isEvasiveInput(responses.city)) {
+      profileUpdates.city = normalizeCityName(responses.city, responses.province);
+    }
+    if (responses?.province && !isEvasiveInput(responses.province)) {
+      profileUpdates.province = normalizeProvinceName(responses.province);
+    }
+    if (responses?.country && !isEvasiveInput(responses.country)) {
+      profileUpdates.country = String(responses.country).trim();
+    }
     if (responses?.middleName && !isEvasiveInput(responses.middleName)) profileUpdates.middle_name = responses.middleName;
 
     // Sync employment fields if provided
@@ -299,10 +327,30 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
 
     if (Object.keys(profileUpdates).length > 0) {
       profileUpdates.updated_at = new Date().toISOString();
-      await supabase
+      const { error: profErr } = await supabase
         .from('profiles')
         .update(profileUpdates)
         .eq('user_id', req.user!.userId);
+
+      if (profErr) {
+        console.error('[Survey Onboarding] Profile update error, retrying fallback:', profErr.message);
+        const fallbackUpdates = { ...profileUpdates };
+        if (profErr.message.includes('id_number') || profErr.message.includes('character varying')) {
+          delete fallbackUpdates.id_number;
+        }
+        if (profErr.message.includes('country')) {
+          delete fallbackUpdates.country;
+        }
+        if (Object.keys(fallbackUpdates).length > 1) {
+          const { error: retryErr } = await supabase
+            .from('profiles')
+            .update(fallbackUpdates)
+            .eq('user_id', req.user!.userId);
+          if (retryErr) {
+            console.error('[Survey Onboarding] Profile fallback update error:', retryErr.message);
+          }
+        }
+      }
     }
 
     // Sync education if program, year, or honors provided

@@ -69,7 +69,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [blobMood, setBlobMood] = useState<'neutral' | 'happy' | 'sad'>('neutral');
   const initialNotifications = getCached<any[]>('/notifications?limit=10') ?? [];
   const initialUnread = getCached<{ count: number }>('/notifications/unread-count')?.count ?? 0;
-  const initialAvatar = getCached<any>('/profile')?.avatar_url || null;
+  const initialProfile = getCached<any>('/profile') || null;
+  const initialAvatar = initialProfile?.avatar_url || null;
 
   const [notifications, setNotifications] = useState<any[]>(initialNotifications);
   const [unreadCount, setUnreadCount] = useState(initialUnread);
@@ -79,6 +80,10 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
+  const [profileName, setProfileName] = useState<{ first_name?: string; last_name?: string }>({
+    first_name: initialProfile?.first_name,
+    last_name: initialProfile?.last_name,
+  });
 
   const { isWarningActive, secondsRemaining, resetActivity } = useIdleTimer();
 
@@ -158,13 +163,30 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
   useEffect(() => {
     if (!user) return;
-    profileApi.get().then((p) => setAvatarUrl(p?.avatar_url || null)).catch(() => { });
+    profileApi
+      .get()
+      .then((p) => {
+        setAvatarUrl(p?.avatar_url || null);
+        setProfileName({ first_name: p?.first_name, last_name: p?.last_name });
+      })
+      .catch(() => { });
   }, [user]);
 
   useEffect(() => {
-    const handler = () => profileApi.get().then((p) => setAvatarUrl(p?.avatar_url || null)).catch(() => { });
+    const handler = () =>
+      profileApi
+        .get()
+        .then((p) => {
+          setAvatarUrl(p?.avatar_url || null);
+          setProfileName({ first_name: p?.first_name, last_name: p?.last_name });
+        })
+        .catch(() => { });
     window.addEventListener('avatar-updated', handler);
-    return () => window.removeEventListener('avatar-updated', handler);
+    window.addEventListener('ctu-profile-updated', handler);
+    return () => {
+      window.removeEventListener('avatar-updated', handler);
+      window.removeEventListener('ctu-profile-updated', handler);
+    };
   }, []);
 
   const fetchNotifications = useCallback(async () => {
@@ -441,8 +463,12 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                 <div className="w-7 h-7 rounded-full bg-blue-800 flex items-center justify-center text-white text-xs font-medium hover:ring-2 hover:ring-blue-300 transition-all overflow-hidden">
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : profileName.first_name || profileName.last_name ? (
+                    getInitials(profileName.first_name || '', profileName.last_name || '')
+                  ) : user?.email ? (
+                    getInitials(user.email[0], user.email[1] || '')
                   ) : (
-                    user?.email ? getInitials(user.email[0], user.email[1] || '') : '?'
+                    '?'
                   )}
                 </div>
               </button>

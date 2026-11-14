@@ -428,7 +428,7 @@ function ValueCard({ value, index, revealed }: { value: (typeof values)[0]; inde
 
 function AlumniChatCard({ img, name, batch, body, tag }: { img: string; name: string; batch: string; body: string; tag: string }) {
   return (
-    <Card className="w-56 sm:w-60 border-gray-200/80 bg-white/95 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow">
+    <Card className="w-72 border-gray-200/80 bg-white/95 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-center gap-2.5">
           <Avatar className="size-9 border border-ctu-marigold/30">
@@ -1459,12 +1459,12 @@ export default function LandingPage() {
               transition={{ duration: 0.65, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
               className="lg:col-span-7"
             >
-              <div className="border border-gray-200 rounded-2xl bg-slate-50/70 relative flex h-[420px] sm:h-[460px] w-full flex-row items-center justify-center overflow-hidden gap-2 [perspective:500px] shadow-inner">
+              <div className="border border-gray-200 rounded-2xl bg-slate-50/70 relative flex h-[420px] sm:h-[460px] w-full flex-row items-center justify-center overflow-hidden gap-2 [perspective:400px] shadow-inner">
                 <div
-                  className="flex flex-row items-center gap-3"
+                  className="flex flex-row items-center gap-4"
                   style={{
                     transform:
-                      'translateX(0px) translateY(0px) translateZ(-80px) rotateX(16deg) rotateY(-8deg) rotateZ(10deg)',
+                      'translateX(-40px) translateY(0px) translateZ(-60px) rotateX(16deg) rotateY(-8deg) rotateZ(12deg)',
                   }}
                 >
                   <Marquee vertical pauseOnHover repeat={3} className="[--duration:36s]">

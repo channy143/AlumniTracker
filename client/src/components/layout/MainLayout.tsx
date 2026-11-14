@@ -10,6 +10,7 @@ import {
 import Sidebar from './Sidebar';
 import Header from './Header';
 import NotificationContainer from '../ui/Notification';
+import MissingIdNumberModal from '../ui/MissingIdNumberModal';
 import DockedChatBox from '@/components/chat/DockedChatBox';
 import AlumniOnboardingTour from '@/components/tour/AlumniOnboardingTour';
 
@@ -56,6 +57,7 @@ export default function MainLayout() {
   return (
     <div className="min-h-screen flex bg-gray-50">
       <NotificationContainer />
+      {!isAdminPath && <MissingIdNumberModal />}
       <Sidebar
         mobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}

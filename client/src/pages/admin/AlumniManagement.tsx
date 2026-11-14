@@ -64,7 +64,7 @@ export default function AlumniManagement() {
   const normalizeStatus = (s: string) => {
     if (!s) return 'Unemployed';
     const lower = String(s).toLowerCase().trim();
-    if (lower === 'student' || lower === 'unemployed' || lower === 'null') return 'Unemployed';
+    if (lower === 'student' || lower === 'unemployed' || lower === 'null' || lower === 'n/a' || lower === 'na') return 'Unemployed';
     if (lower === 'seeking' || lower === 'seeking opportunities') return 'Seeking Opportunities';
     if (lower === 'employed' || lower === 'full-time' || lower === 'part-time') return 'Employed';
     if (lower === 'self-employed' || lower === 'freelance' || lower === 'entrepreneur') return 'Self-employed';
@@ -572,7 +572,7 @@ export default function AlumniManagement() {
                     </div>
                     <div className="absolute top-1.5 right-1.5">
                       <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${statusBadge(emp?.employment_status || p.employment_status)}`}>
-                        {normalizeStatus(emp?.employment_status || p.employment_status) || 'N/A'}
+                        {normalizeStatus(emp?.employment_status || p.employment_status) || 'Unemployed'}
                       </span>
                     </div>
                   </div>

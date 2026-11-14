@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { addActivity } from '../services/activityStore';
 import { validateResumeContent } from '../utils/validateResume';
+import { normalizeCityName, normalizeProvinceName, normalizePhPhone } from '../utils/formatLocation';
 import { notifyAdmins } from './notifications';
 import {
   updateProfileSchema,
@@ -58,6 +59,55 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       }
     }
 
+    // Backfill any missing profile fields from the user's onboarding survey response
+    if (
+      profile &&
+      (!profile.phone || !profile.address || !profile.city || !profile.province || !profile.middle_name || !profile.employment_status)
+    ) {
+      try {
+        const { data: onboardingResp } = await supabase
+          .from('survey_responses')
+          .select('responses')
+          .eq('survey_id', '00000000-0000-0000-0000-000000000001')
+          .eq('user_id', req.user!.userId)
+          .maybeSingle();
+
+        const r = onboardingResp?.responses;
+        if (r && typeof r === 'object') {
+          const backfill: Record<string, any> = {};
+          const combinedAddr = [
+            r.street ? String(r.street).trim() : '',
+            r.barangay ? `Brgy. ${String(r.barangay).trim().replace(/^brgy\.?\s*/i, '')}` : '',
+          ]
+            .filter(Boolean)
+            .join(', ');
+          const resolvedAddress = combinedAddr || (r.address ? String(r.address).trim() : '');
+
+          if (!profile.first_name && r.firstName) backfill.first_name = String(r.firstName).trim();
+          if (!profile.last_name && r.lastName) backfill.last_name = String(r.lastName).trim();
+          if (!profile.middle_name && r.middleName) backfill.middle_name = String(r.middleName).trim();
+          if (!profile.phone && r.phone) backfill.phone = normalizePhPhone(r.phone);
+          if (!profile.address && resolvedAddress) backfill.address = resolvedAddress;
+          if (!profile.province && r.province) backfill.province = normalizeProvinceName(r.province);
+          if (!profile.city && r.city) backfill.city = normalizeCityName(r.city, r.province);
+          if (!profile.employment_status) {
+            const st = String(r.employmentStatus || '').trim();
+            backfill.employment_status = !st || st.toLowerCase() === 'n/a' ? 'Unemployed' : st;
+          }
+
+          if (Object.keys(backfill).length > 0) {
+            Object.assign(profile, backfill);
+            await supabase
+              .from('profiles')
+              .update({ ...backfill, updated_at: new Date().toISOString() })
+              .eq('user_id', req.user!.userId);
+          }
+        }
+      } catch (backfillErr) {
+        console.error('[Profile GET] Onboarding backfill error:', backfillErr);
+      }
+    }
+
     res.json(profile);
   } catch (err) {
     next(err);
@@ -99,9 +149,15 @@ router.get('/resume', authenticate, async (req: AuthenticatedRequest, res, next)
 router.put('/', authenticate, validate(updateProfileSchema), async (req: AuthenticatedRequest, res, next) => {
   try {
     const db = createUserScopedClient(req.token!);
+    const updates = { ...req.body };
+    if (updates.phone !== undefined) updates.phone = updates.phone ? normalizePhPhone(updates.phone) : null;
+    if (updates.province !== undefined) updates.province = updates.province ? normalizeProvinceName(updates.province) : null;
+    if (updates.city !== undefined) updates.city = updates.city ? normalizeCityName(updates.city, updates.province) : null;
+    if (updates.gender !== undefined && updates.gender) updates.gender = String(updates.gender).slice(0, 10);
+
     const { data: profile, error } = await db
       .from('profiles')
-      .update(req.body)
+      .update(updates)
       .eq('user_id', req.user!.userId)
       .select()
       .single();

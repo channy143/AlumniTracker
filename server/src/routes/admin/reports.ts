@@ -28,6 +28,14 @@ function matchesProgramFilter(rawProgram: string | null | undefined, filter: str
   return raw.includes(f) || long.includes(f) || (!!filterLong && long.includes(filterLong));
 }
 
+function normalizeReportEmploymentStatus(raw?: string | null): string {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed || ['n/a', 'na', 'none', 'unknown', 'not specified', 'null'].includes(trimmed.toLowerCase())) {
+    return 'Unemployed';
+  }
+  return trimmed;
+}
+
 function clientIp(req: any): string {
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) {
@@ -246,7 +254,7 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
     if (empStatusFilter) {
       users = users.filter((u: any) => {
         const currentEmp = (u.employment || []).find((e: any) => e.is_current) || (u.employment || [])[0];
-        return (currentEmp?.employment_status || u.profile?.employment_status || '').toLowerCase() === empStatusFilter.toLowerCase();
+        return normalizeReportEmploymentStatus(currentEmp?.employment_status || u.profile?.employment_status).toLowerCase() === empStatusFilter.toLowerCase();
       });
     }
 
@@ -262,7 +270,7 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
         'Degree Program': ed.program ? formatProgramLongName(ed.program) : '',
         'Major': ed.major || '',
         'Graduation Year': ed.year_graduated || '',
-        'Employment Status': emp.employment_status || u.profile?.employment_status || 'N/A',
+        'Employment Status': normalizeReportEmploymentStatus(emp.employment_status || u.profile?.employment_status),
         'Current Position': emp.position || '',
         'Current Company': emp.company_name || '',
         'Industry': emp.company_industry || '',
@@ -342,7 +350,7 @@ router.get('/employment', async (req: AuthenticatedRequest, res, next) => {
       );
     }
     if (statusFilter) {
-      employment = employment.filter((e: any) => (e.employment_status || '').toLowerCase() === statusFilter.toLowerCase());
+      employment = employment.filter((e: any) => normalizeReportEmploymentStatus(e.employment_status).toLowerCase() === statusFilter.toLowerCase());
     }
     if (jobTypeFilter) {
       employment = employment.filter((e: any) => (e.job_type || '').toLowerCase() === jobTypeFilter.toLowerCase());
@@ -360,7 +368,7 @@ router.get('/employment', async (req: AuthenticatedRequest, res, next) => {
       'Company Name': e.company_name || '',
       'Industry': e.company_industry || '',
       'Position / Job Title': e.position || '',
-      'Employment Status': e.employment_status || '',
+      'Employment Status': normalizeReportEmploymentStatus(e.employment_status),
       'Job Type': e.job_type || '',
       'Current Position': e.is_current ? 'Yes' : 'No',
       'Salary Range': e.salary_range || 'Undisclosed',
@@ -488,7 +496,7 @@ router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) =>
     }
     if (empStatusFilter) {
       records = records.filter((r) => {
-        const st = r.employment?.employment_status || r.profile?.employment_status || '';
+        const st = normalizeReportEmploymentStatus(r.employment?.employment_status || r.profile?.employment_status);
         return st.toLowerCase() === empStatusFilter.toLowerCase();
       });
     }
@@ -526,7 +534,7 @@ router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) =>
         'ID Number': r.profile?.id_number || '',
         'Degree Program': r.education?.program ? formatProgramLongName(r.education.program) : '',
         'Graduation Year': r.education?.year_graduated || '',
-        'Employment Status': emp?.employment_status || r.profile?.employment_status || 'N/A',
+        'Employment Status': normalizeReportEmploymentStatus(emp?.employment_status || r.profile?.employment_status),
         'Company Name': emp?.company_name || '',
         'Position / Job Title': emp?.position || '',
         'Current Position': emp ? (emp.is_current ? 'Yes' : 'No') : '',
@@ -1408,7 +1416,7 @@ router.get('/system-master', async (req: AuthenticatedRequest, res, next) => {
           'ID Number': prof.id_number || '',
           'Program': edu.program ? formatProgramLongName(edu.program) : '',
           'Batch': edu.year_graduated || '',
-          'Employment Status': emp.employment_status || prof.employment_status || 'N/A',
+          'Employment Status': normalizeReportEmploymentStatus(emp.employment_status || prof.employment_status),
           'Company': emp.company_name || '',
           'Position': emp.position || '',
           'Registered At': u.created_at || '',

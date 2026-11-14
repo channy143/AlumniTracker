@@ -26,6 +26,14 @@ interface AuthState {
   syncToken: () => boolean;
 }
 
+function clearIdPromptFlags() {
+  try {
+    Object.keys(sessionStorage).forEach((k) => {
+      if (k.startsWith('ctu_id_prompt_seen:')) sessionStorage.removeItem(k);
+    });
+  } catch {}
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: getStoredToken(),
@@ -33,6 +41,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUser: (user) => set({ user }),
   setToken: (token, persist = true) => {
     clearAllCache();
+    clearIdPromptFlags();
     setStoredToken(token, persist);
     set({ token });
   },
@@ -47,6 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.warn('[authStore] Backend logout notification failed (local session cleared):', err);
     } finally {
       clearAllCache();
+      clearIdPromptFlags();
       removeStoredToken();
       set({ user: null, token: null });
     }

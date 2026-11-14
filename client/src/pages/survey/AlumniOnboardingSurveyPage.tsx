@@ -5,8 +5,17 @@ import { CheckCircleIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/store/authStore';
 import { surveyApi } from '@/services/api';
 import { useUIStore } from '@/store/uiStore';
-import { getCached } from '@/utils/apiCache';
+import { getCached, invalidateCachePrefixes } from '@/utils/apiCache';
 import { SkeletonSurveyForm } from '@/components/ui/Skeleton';
+import { formatProgramLongName } from '@/utils/formatProgram';
+import { generateYears } from '@/utils/helpers';
+import {
+  PsgcOption,
+  fetchPhProvinces,
+  fetchPhCitiesByProvince,
+  fetchPhBarangaysByCity,
+  normalizeCityForMatch,
+} from '@/utils/phLocations';
 
 interface ConsentData {
   agreed: boolean;
@@ -51,15 +60,121 @@ export default function AlumniOnboardingSurveyPage() {
     phone: cachedProf?.phone || '',
     gender: cachedProf?.gender || 'Prefer not to say',
     civilStatus: cachedProf?.civilStatus || 'Single',
-    address: cachedProf?.address || '',
+    country: 'Philippines',
+    province: cachedProf?.province || '',
+    provinceCode: '',
     city: cachedProf?.city || '',
-    province: cachedProf?.province || 'Cebu',
-    currentResidenceLocation: 'Within Cebu / Naga City',
+    cityCode: '',
+    barangay: '',
+    barangayCode: '',
+    street: '',
+    address: cachedProf?.address || '',
+    currentResidenceLocation: 'Same as address above',
+    currentResidenceProvince: '',
+    currentResidenceProvinceCode: '',
+    currentResidenceCity: '',
+    currentResidenceCountry: '',
   });
+
+  // PSGC cascading location options
+  const [phProvinces, setPhProvinces] = useState<PsgcOption[]>([]);
+  const [phCities, setPhCities] = useState<PsgcOption[]>([]);
+  const [phBarangays, setPhBarangays] = useState<PsgcOption[]>([]);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [loadingBarangays, setLoadingBarangays] = useState(false);
+  const [resCities, setResCities] = useState<PsgcOption[]>([]);
+  const [loadingResCities, setLoadingResCities] = useState(false);
+
+  useEffect(() => {
+    fetchPhProvinces().then(setPhProvinces);
+  }, []);
+
+  useEffect(() => {
+    if (!personalInfo.province || phProvinces.length === 0) return;
+    const matched = phProvinces.find(
+      (p) =>
+        p.code === personalInfo.provinceCode ||
+        p.name.toLowerCase() === personalInfo.province.toLowerCase() ||
+        p.name.toLowerCase().includes(personalInfo.province.toLowerCase())
+    );
+    if (matched && matched.code !== personalInfo.provinceCode) {
+      setPersonalInfo((prev) => ({ ...prev, province: matched.name, provinceCode: matched.code }));
+    }
+  }, [personalInfo.province, personalInfo.provinceCode, phProvinces]);
+
+  useEffect(() => {
+    if (!personalInfo.provinceCode) {
+      setPhCities([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingCities(true);
+    fetchPhCitiesByProvince(personalInfo.provinceCode)
+      .then((list) => {
+        if (cancelled) return;
+        setPhCities(list);
+        if (personalInfo.city) {
+          const target = normalizeCityForMatch(personalInfo.city);
+          const matched = list.find(
+            (c) =>
+              c.code === personalInfo.cityCode ||
+              c.name.toLowerCase() === personalInfo.city.toLowerCase() ||
+              normalizeCityForMatch(c.name) === target
+          );
+          if (matched && (matched.code !== personalInfo.cityCode || matched.name !== personalInfo.city)) {
+            setPersonalInfo((prev) => ({ ...prev, city: matched.name, cityCode: matched.code }));
+          }
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCities(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [personalInfo.provinceCode]);
+
+  useEffect(() => {
+    if (!personalInfo.cityCode) {
+      setPhBarangays([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingBarangays(true);
+    fetchPhBarangaysByCity(personalInfo.cityCode)
+      .then((list) => {
+        if (!cancelled) setPhBarangays(list);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingBarangays(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [personalInfo.cityCode]);
+
+  useEffect(() => {
+    if (!personalInfo.currentResidenceProvinceCode) {
+      setResCities([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingResCities(true);
+    fetchPhCitiesByProvince(personalInfo.currentResidenceProvinceCode)
+      .then((list) => {
+        if (!cancelled) setResCities(list);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingResCities(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [personalInfo.currentResidenceProvinceCode]);
 
   // Step 3: Academic Background
   const [academicInfo, setAcademicInfo] = useState({
-    program: cachedProf?.program || '',
+    program: cachedProf?.program ? formatProgramLongName(cachedProf.program) : '',
     yearGraduated: cachedProf?.yearGraduated ? String(cachedProf.yearGraduated) : '',
     honors: cachedProf?.honors && cachedProf.honors !== 'None' ? cachedProf.honors : '',
     licensureStatus: 'Not Applicable',
@@ -75,7 +190,7 @@ export default function AlumniOnboardingSurveyPage() {
   });
 
   const [employmentInfo, setEmploymentInfo] = useState({
-    employmentStatus: cachedProf?.employment_status || 'Unemployed',
+    employmentStatus: 'Unemployed',
     currentJobTitle: cachedProf?.current_job_title || '',
     companyName: cachedProf?.company_name || '',
     industry: cachedProf?.industry || '',
@@ -120,12 +235,12 @@ export default function AlumniOnboardingSurveyPage() {
             civilStatus: res.profile.civilStatus || prev.civilStatus,
             address: res.profile.address || prev.address,
             city: res.profile.city || prev.city,
-            province: res.profile.province || prev.province || 'Cebu',
+            province: res.profile.province || prev.province,
           }));
 
           setAcademicInfo((prev) => ({
             ...prev,
-            program: res.profile.program || prev.program,
+            program: res.profile.program ? formatProgramLongName(res.profile.program) : prev.program,
             yearGraduated: res.profile.yearGraduated ? String(res.profile.yearGraduated) : prev.yearGraduated,
             honors: res.profile.honors && res.profile.honors !== 'None' ? res.profile.honors : prev.honors,
           }));
@@ -133,7 +248,7 @@ export default function AlumniOnboardingSurveyPage() {
           if (res.profile.employment_status || res.profile.current_job_title) {
             setEmploymentInfo((prev) => ({
               ...prev,
-              employmentStatus: res.profile.employment_status || prev.employmentStatus,
+              employmentStatus: 'Unemployed',
               currentJobTitle: res.profile.current_job_title || prev.currentJobTitle,
               companyName: res.profile.company_name || prev.companyName,
               industry: res.profile.industry || prev.industry,
@@ -239,16 +354,34 @@ export default function AlumniOnboardingSurveyPage() {
         setValidationError('Please provide a valid 11-digit Philippine mobile number (e.g. 0917 123 4567 or +63 917 123 4567).');
         return false;
       }
+      if (personalInfo.country === 'Philippines' && !personalInfo.province.trim()) {
+        setValidationError('Please select your Province.');
+        return false;
+      }
       if (!personalInfo.city.trim()) {
-        setValidationError('Please specify your City / Municipality.');
+        setValidationError('Please select or specify your City / Municipality.');
         return false;
       }
       if (isEvasiveInput(personalInfo.city)) {
         setValidationError('Please provide your actual City / Municipality (evasive answers like "secret" are not accepted).');
         return false;
       }
-      if (personalInfo.address.trim() && isEvasiveInput(personalInfo.address)) {
-        setValidationError('Please enter a valid Street / Barangay address or leave it blank.');
+      if (personalInfo.country === 'Philippines' && !personalInfo.barangay.trim()) {
+        setValidationError('Please select or enter your Barangay.');
+        return false;
+      }
+      if (personalInfo.street.trim() && isEvasiveInput(personalInfo.street)) {
+        setValidationError('Please enter a valid Street / House No. or leave it blank.');
+        return false;
+      }
+      if (personalInfo.currentResidenceLocation === 'Elsewhere in the Philippines') {
+        if (!personalInfo.currentResidenceProvince.trim() || !personalInfo.currentResidenceCity.trim()) {
+          setValidationError('Please select your current Province and City / Municipality.');
+          return false;
+        }
+      }
+      if (personalInfo.currentResidenceLocation === 'Abroad' && !personalInfo.currentResidenceCountry.trim()) {
+        setValidationError('Please specify the country where you currently reside.');
         return false;
       }
     } else if (currentStep === 3) {
@@ -342,10 +475,18 @@ export default function AlumniOnboardingSurveyPage() {
     if (!validateCurrentStep(step)) return;
     setSubmitting(true);
     try {
+      const combinedAddress = [
+        personalInfo.street.trim(),
+        personalInfo.barangay.trim() ? `Brgy. ${personalInfo.barangay.trim().replace(/^brgy\.?\s*/i, '')}` : '',
+      ]
+        .filter(Boolean)
+        .join(', ');
+
       const payload = {
         consent,
         responses: {
           ...personalInfo,
+          address: combinedAddress || personalInfo.address,
           ...academicInfo,
           ...skillsInfo,
           ...feedbackInfo,
@@ -354,6 +495,7 @@ export default function AlumniOnboardingSurveyPage() {
       };
 
       await surveyApi.submitOnboarding(payload);
+      invalidateCachePrefixes(['/profile', '/surveys/onboarding', '/employment']);
 
       if (user) {
         setUser({ ...user, survey_completed: true });
@@ -639,7 +781,7 @@ export default function AlumniOnboardingSurveyPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Contact / Mobile No. <span className="text-red-500 font-bold ml-0.5">*</span>
+                        Mobile No. <span className="text-red-500 font-bold ml-0.5">*</span>
                       </label>
                       <input
                         type="tel"
@@ -681,46 +823,271 @@ export default function AlumniOnboardingSurveyPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        City / Municipality <span className="text-red-500 font-bold ml-0.5">*</span>
+                        Country <span className="text-red-500 font-bold ml-0.5">*</span>
                       </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. City of Naga, Cebu"
-                        value={personalInfo.city}
-                        onChange={(e) => setPersonalInfo((p) => ({ ...p, city: e.target.value }))}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
-                      />
+                      <select
+                        value={personalInfo.country}
+                        onChange={(e) => {
+                          const c = e.target.value;
+                          setPersonalInfo((p) => ({
+                            ...p,
+                            country: c,
+                            ...(c !== 'Philippines' ? { province: '', provinceCode: '', city: '', cityCode: '', barangay: '', barangayCode: '' } : {}),
+                          }));
+                        }}
+                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                      >
+                        <option value="Philippines">Philippines</option>
+                        <option value="Other">Outside the Philippines</option>
+                      </select>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-gray-100">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Street / Barangay Address <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="House No., Street, Barangay"
-                        value={personalInfo.address}
-                        onChange={(e) => setPersonalInfo((p) => ({ ...p, address: e.target.value }))}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
-                      />
+                  {/* Permanent / Home Address (PSGC Cascading Dropdowns) */}
+                  <div className="pt-2 border-t border-gray-100 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+                        Permanent / Home Address
+                      </span>
+                      <span className="text-[10px] text-gray-400">Standardized PSGC location</span>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Current Living Location <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
-                      </label>
-                      <select
-                        value={personalInfo.currentResidenceLocation}
-                        onChange={(e) => setPersonalInfo((p) => ({ ...p, currentResidenceLocation: e.target.value }))}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
-                      >
-                        <option value="Within Cebu / Naga City">Within Cebu / Naga City</option>
-                        <option value="Metro Manila / NCR">Metro Manila / NCR</option>
-                        <option value="Other Philippine Region">Other Philippine Region</option>
-                        <option value="Overseas / OFW">Overseas / OFW</option>
-                      </select>
-                    </div>
+
+                    {personalInfo.country === 'Philippines' ? (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Province <span className="text-red-500 font-bold ml-0.5">*</span>
+                            </label>
+                            <select
+                              value={personalInfo.provinceCode}
+                              onChange={(e) => {
+                                const code = e.target.value;
+                                const found = phProvinces.find((p) => p.code === code);
+                                setPersonalInfo((p) => ({
+                                  ...p,
+                                  provinceCode: code,
+                                  province: found?.name || '',
+                                  city: '',
+                                  cityCode: '',
+                                  barangay: '',
+                                  barangayCode: '',
+                                }));
+                              }}
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                            >
+                              <option value="">Select province</option>
+                              {phProvinces.map((prov) => (
+                                <option key={prov.code} value={prov.code}>
+                                  {prov.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              City / Municipality <span className="text-red-500 font-bold ml-0.5">*</span>
+                            </label>
+                            <select
+                              value={personalInfo.cityCode}
+                              disabled={!personalInfo.provinceCode || loadingCities}
+                              onChange={(e) => {
+                                const code = e.target.value;
+                                const found = phCities.find((c) => c.code === code);
+                                setPersonalInfo((p) => ({
+                                  ...p,
+                                  cityCode: code,
+                                  city: found?.name || '',
+                                  barangay: '',
+                                  barangayCode: '',
+                                }));
+                              }}
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                            >
+                              <option value="">
+                                {loadingCities ? 'Loading cities...' : personalInfo.provinceCode ? 'Select city / municipality' : 'Select province first'}
+                              </option>
+                              {phCities.map((c) => (
+                                <option key={c.code} value={c.code}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Barangay <span className="text-red-500 font-bold ml-0.5">*</span>
+                            </label>
+                            {phBarangays.length > 0 ? (
+                              <select
+                                value={personalInfo.barangayCode}
+                                disabled={!personalInfo.cityCode || loadingBarangays}
+                                onChange={(e) => {
+                                  const code = e.target.value;
+                                  const found = phBarangays.find((b) => b.code === code);
+                                  setPersonalInfo((p) => ({
+                                    ...p,
+                                    barangayCode: code,
+                                    barangay: found?.name || '',
+                                  }));
+                                }}
+                                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                              >
+                                <option value="">{loadingBarangays ? 'Loading barangays...' : 'Select barangay'}</option>
+                                {phBarangays.map((b) => (
+                                  <option key={b.code} value={b.code}>
+                                    {b.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                disabled={!personalInfo.cityCode}
+                                placeholder={!personalInfo.cityCode ? 'Select city first' : loadingBarangays ? 'Loading barangays...' : 'Enter barangay'}
+                                value={personalInfo.barangay}
+                                onChange={(e) => setPersonalInfo((p) => ({ ...p, barangay: e.target.value, barangayCode: '' }))}
+                                className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 disabled:bg-gray-100 disabled:text-gray-400"
+                              />
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Street / House No. <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="House No., Street, Subdivision"
+                              value={personalInfo.street}
+                              onChange={(e) => setPersonalInfo((p) => ({ ...p, street: e.target.value }))}
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Currently Residing <span className="text-gray-400 font-normal text-[11px] ml-1">(Where you live now)</span>
+                            </label>
+                            <select
+                              value={personalInfo.currentResidenceLocation}
+                              onChange={(e) =>
+                                setPersonalInfo((p) => ({
+                                  ...p,
+                                  currentResidenceLocation: e.target.value,
+                                  ...(e.target.value === 'Same as address above'
+                                    ? { currentResidenceProvince: '', currentResidenceProvinceCode: '', currentResidenceCity: '', currentResidenceCountry: '' }
+                                    : {}),
+                                }))
+                              }
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                            >
+                              <option value="Same as address above">Same as address above</option>
+                              <option value="Elsewhere in the Philippines">Elsewhere in the Philippines</option>
+                              <option value="Abroad">Abroad</option>
+                            </select>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            City / State / Country <span className="text-red-500 font-bold ml-0.5">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Enter city and country"
+                            value={personalInfo.city}
+                            onChange={(e) => setPersonalInfo((p) => ({ ...p, city: e.target.value }))}
+                            className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Street Address <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="House No., Street, District"
+                            value={personalInfo.street}
+                            onChange={(e) => setPersonalInfo((p) => ({ ...p, street: e.target.value }))}
+                            className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Reveal second residence fields only if living elsewhere */}
+                    {personalInfo.country === 'Philippines' && personalInfo.currentResidenceLocation === 'Elsewhere in the Philippines' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-2.5 rounded-lg bg-orange-50/60 border border-orange-100">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Current Province <span className="text-red-500 font-bold ml-0.5">*</span>
+                          </label>
+                          <select
+                            value={personalInfo.currentResidenceProvinceCode}
+                            onChange={(e) => {
+                              const code = e.target.value;
+                              const found = phProvinces.find((p) => p.code === code);
+                              setPersonalInfo((p) => ({
+                                ...p,
+                                currentResidenceProvinceCode: code,
+                                currentResidenceProvince: found?.name || '',
+                                currentResidenceCity: '',
+                              }));
+                            }}
+                            className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                          >
+                            <option value="">Select current province</option>
+                            {phProvinces.map((prov) => (
+                              <option key={prov.code} value={prov.code}>
+                                {prov.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Current City / Municipality <span className="text-red-500 font-bold ml-0.5">*</span>
+                          </label>
+                          <select
+                            value={personalInfo.currentResidenceCity}
+                            disabled={!personalInfo.currentResidenceProvinceCode || loadingResCities}
+                            onChange={(e) => setPersonalInfo((p) => ({ ...p, currentResidenceCity: e.target.value }))}
+                            className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                          >
+                            <option value="">
+                              {loadingResCities ? 'Loading cities...' : personalInfo.currentResidenceProvinceCode ? 'Select current city' : 'Select province first'}
+                            </option>
+                            {resCities.map((c) => (
+                              <option key={c.code} value={c.name}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {personalInfo.country === 'Philippines' && personalInfo.currentResidenceLocation === 'Abroad' && (
+                      <div className="p-2.5 rounded-lg bg-orange-50/60 border border-orange-100">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Country Currently Residing In <span className="text-red-500 font-bold ml-0.5">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Enter country (e.g. Singapore, UAE, Japan)"
+                          value={personalInfo.currentResidenceCountry}
+                          onChange={(e) => setPersonalInfo((p) => ({ ...p, currentResidenceCountry: e.target.value }))}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                        />
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -740,27 +1107,54 @@ export default function AlumniOnboardingSurveyPage() {
                       <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Degree / Program Graduated at CTU">
                         Degree / Program <span className="text-red-500 font-bold ml-0.5">*</span>
                       </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. BTLED, BSIT, BIT"
+                      <select
                         value={academicInfo.program}
                         onChange={(e) => setAcademicInfo((a) => ({ ...a, program: e.target.value }))}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
-                      />
+                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                      >
+                        <option value="">Select degree / program</option>
+                        {(() => {
+                          const basePrograms = [
+                            'Bachelor of Science in Information Technology',
+                            'Bachelor of Industrial Technology',
+                            'Bachelor of Elementary Education',
+                            'Bachelor of Secondary Education major in Mathematics',
+                            'Bachelor of Technology and Livelihood Education',
+                          ];
+                          const current = academicInfo.program ? formatProgramLongName(academicInfo.program) : '';
+                          if (current && !basePrograms.includes(current)) {
+                            basePrograms.unshift(current);
+                          }
+                          return basePrograms.map((prog) => (
+                            <option key={prog} value={prog}>
+                              {prog}
+                            </option>
+                          ));
+                        })()}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Graduation Year <span className="text-red-500 font-bold ml-0.5">*</span>
                       </label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 2024"
-                        min={1980}
-                        max={2030}
+                      <select
                         value={academicInfo.yearGraduated}
                         onChange={(e) => setAcademicInfo((a) => ({ ...a, yearGraduated: e.target.value }))}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
-                      />
+                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                      >
+                        <option value="">Select year</option>
+                        {(() => {
+                          const years = generateYears(2014, Math.max(2027, new Date().getFullYear())).map(String);
+                          if (academicInfo.yearGraduated && !years.includes(academicInfo.yearGraduated)) {
+                            years.unshift(academicInfo.yearGraduated);
+                          }
+                          return years.map((y) => (
+                            <option key={y} value={y}>
+                              {y}
+                            </option>
+                          ));
+                        })()}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Academic Honors / Latin Honors">
@@ -958,7 +1352,7 @@ export default function AlumniOnboardingSurveyPage() {
                           Current Employment Information
                         </label>
                         <p className="text-[11px] text-gray-500">
-                          Alumni who already have a job may record their existing employment to reflect immediately on their career profile.
+                          Employment status is set to Unemployed by default for now. You can update your employment status and details anytime in Edit Profile.
                         </p>
                       </div>
                     </div>
@@ -969,11 +1363,9 @@ export default function AlumniOnboardingSurveyPage() {
                           Employment Status <span className="text-red-500 font-bold ml-0.5">*</span>
                         </label>
                         <select
-                          value={employmentInfo.employmentStatus}
-                          onChange={(e) =>
-                            setEmploymentInfo((emp) => ({ ...emp, employmentStatus: e.target.value }))
-                          }
-                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                          value="Unemployed"
+                          disabled
+                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none bg-gray-50 text-gray-600 cursor-not-allowed"
                         >
                           <option value="Unemployed">Unemployed / Seeking First Job</option>
                           <option value="Employed">Employed (Full-time / Part-time)</option>
@@ -981,6 +1373,9 @@ export default function AlumniOnboardingSurveyPage() {
                           <option value="Seeking Opportunities">Seeking Opportunities</option>
                           <option value="Retired">Retired</option>
                         </select>
+                        <p className="text-[11px] text-amber-700 mt-1">
+                          This will be updated in your Edit Profile page once you are ready to submit your employment details.
+                        </p>
                       </div>
 
                       {employmentInfo.employmentStatus !== 'Unemployed' && (

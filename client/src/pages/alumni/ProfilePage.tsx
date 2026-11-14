@@ -15,6 +15,14 @@ import { getCached } from '@/utils/apiCache';
 import { playTing } from '@/utils/helpers';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
 import { formatProgramLongName } from '@/utils/formatProgram';
+import {
+  splitAddressStreetAndBarangay,
+  combineAddressStreetAndBarangay,
+  formatPhPhoneDisplay,
+  normalizePhPhone,
+  isValidPhPhone,
+} from '@/utils/phLocations';
+import { PhLocationFields } from '@/components/ui/PhLocationFields';
 import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authStore';
 import { clearTrustedDeviceToken } from '@/utils/device';
@@ -95,6 +103,10 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
   const [profile, setProfile] = useState<any>(() => getCached('/profile') || null);
   const [editing, setEditing] = useState(false);
+  const editingRef = useRef(editing);
+  useEffect(() => {
+    editingRef.current = editing;
+  }, [editing]);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [form, setForm] = useState<any>({});
@@ -245,9 +257,32 @@ export default function ProfilePage() {
     };
   }, [profile]);
 
-  const loadProfile = async () => {
+  useEffect(() => {
+    const refreshSilently = () => {
+      if (document.visibilityState === 'visible') {
+        loadProfile(true);
+        loadCareerData();
+      }
+    };
+    const handleProfileUpdated = () => {
+      loadProfile(true);
+      loadCareerData();
+    };
+    const interval = window.setInterval(refreshSilently, 10000);
+    window.addEventListener('focus', refreshSilently);
+    document.addEventListener('visibilitychange', refreshSilently);
+    window.addEventListener('ctu-profile-updated', handleProfileUpdated);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshSilently);
+      document.removeEventListener('visibilitychange', refreshSilently);
+      window.removeEventListener('ctu-profile-updated', handleProfileUpdated);
+    };
+  }, []);
+
+  const loadProfile = async (silent = false) => {
     try {
-      if (getCached('/profile') === undefined && !profile) setLoading(true);
+      if (!silent && getCached('/profile') === undefined && !profile) setLoading(true);
       const data = await profileApi.get();
       setProfile(data);
       let currentJobType = '';
@@ -290,36 +325,56 @@ export default function ProfilePage() {
           ? JSON.parse(data.privacy_settings)
           : data.privacy_settings) || defaultPrivacy;
 
-        setForm({
-          first_name: data.first_name || '',
-          last_name: data.last_name || '',
-          email: data.email || '',
-          phone: data.phone || '',
-          address: data.address || '',
-          city: data.city || '',
-          province: data.province || '',
-          bio: data.bio || '',
-          employment_status: data.employment_status || '',
-          current_job_title: data.current_job_title || '',
-          company_name: data.company_name || '',
-          industry: data.industry || '',
-          salary_range: currentSalary,
-          job_type: currentJobType,
-          start_date: currentStartDate,
-          proof_type: currentProofType,
-          proof_type_other: currentProofTypeOther,
-          proof_url: currentProofUrl,
-          privacy_settings: parsedPrivacy,
-        });
+        const resolvedEmpStatus = data.employment_status || 'Unemployed';
+        const isNotEmployedStatus = ['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(
+          String(resolvedEmpStatus).trim().toLowerCase()
+        );
+        const { street: parsedStreet, barangay: parsedBarangay } = splitAddressStreetAndBarangay(data.address);
 
-        if (currentProofUrl) {
-          const isUploaded = currentProofUrl.includes('/storage/v1/object/public/profiles') || currentProofUrl.includes('employment-proofs');
-          setProofSubmissionTab(isUploaded ? 'upload' : 'link');
-          const cleanName = currentProofUrl.split('/').pop()?.split('?')[0] || 'Uploaded Document';
-          setProofFileInfo({ name: decodeURIComponent(cleanName), url: currentProofUrl });
+        if (editingRef.current) {
+          setForm((prev: any) => ({
+            ...prev,
+            id_number: data.id_number || prev.id_number || '',
+          }));
         } else {
-          setProofSubmissionTab('upload');
-          setProofFileInfo(null);
+          setForm({
+            first_name: data.first_name || '',
+            middle_name: data.middle_name || '',
+            last_name: data.last_name || '',
+            id_number: data.id_number || '',
+            email: data.email || '',
+            phone: formatPhPhoneDisplay(data.phone || ''),
+            gender: data.gender || '',
+            civil_status: data.civil_status || '',
+            country: data.country || 'Philippines',
+            address: data.address || '',
+            street: parsedStreet,
+            barangay: parsedBarangay,
+            city: data.city || '',
+            province: data.province || '',
+            bio: data.bio || '',
+            employment_status: resolvedEmpStatus,
+            current_job_title: isNotEmployedStatus ? '' : (data.current_job_title || ''),
+            company_name: isNotEmployedStatus ? '' : (data.company_name || ''),
+            industry: isNotEmployedStatus ? '' : (data.industry || ''),
+            salary_range: isNotEmployedStatus ? '' : currentSalary,
+            job_type: isNotEmployedStatus ? '' : currentJobType,
+            start_date: isNotEmployedStatus ? '' : currentStartDate,
+            proof_type: currentProofType,
+            proof_type_other: isNotEmployedStatus ? '' : currentProofTypeOther,
+            proof_url: isNotEmployedStatus ? '' : currentProofUrl,
+            privacy_settings: parsedPrivacy,
+          });
+
+          if (currentProofUrl) {
+            const isUploaded = currentProofUrl.includes('/storage/v1/object/public/profiles') || currentProofUrl.includes('employment-proofs');
+            setProofSubmissionTab(isUploaded ? 'upload' : 'link');
+            const cleanName = currentProofUrl.split('/').pop()?.split('?')[0] || 'Uploaded Document';
+            setProofFileInfo({ name: decodeURIComponent(cleanName), url: currentProofUrl });
+          } else {
+            setProofSubmissionTab('upload');
+            setProofFileInfo(null);
+          }
         }
       }
       setError('');
@@ -359,12 +414,27 @@ export default function ProfilePage() {
         }
       }
 
+      if (form.phone && !isValidPhPhone(form.phone)) {
+        setError('Please enter a valid Philippine mobile number (e.g. 0917 123 4567).');
+        setSaving(false);
+        return;
+      }
+
+      const combinedAddress = combineAddressStreetAndBarangay(form.street, form.barangay);
+
       const payload: any = {};
       if (form.first_name !== undefined) payload.first_name = form.first_name;
       if (form.last_name !== undefined) payload.last_name = form.last_name;
-      if (form.middle_name !== undefined) payload.middle_name = form.middle_name;
-      if (form.phone !== undefined) payload.phone = form.phone;
-      if (form.address !== undefined) payload.address = form.address;
+      if (form.middle_name !== undefined) payload.middle_name = form.middle_name || null;
+      if (form.phone !== undefined) payload.phone = form.phone ? normalizePhPhone(form.phone) : null;
+      if (form.gender !== undefined) payload.gender = form.gender || null;
+      if (form.civil_status !== undefined) payload.civil_status = form.civil_status || null;
+      if (form.country !== undefined) payload.country = form.country || 'Philippines';
+      if (form.street !== undefined || form.barangay !== undefined) {
+        payload.address = combinedAddress || null;
+      } else if (form.address !== undefined) {
+        payload.address = form.address;
+      }
       if (form.city !== undefined) payload.city = form.city;
       if (form.province !== undefined) payload.province = form.province;
       if (form.headline !== undefined) payload.headline = form.headline;
@@ -752,14 +822,15 @@ export default function ProfilePage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-lg text-center py-12">
           <p className="text-red-600">{error}</p>
-          <button onClick={loadProfile} className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">Retry</button>
+          <button onClick={() => loadProfile(false)} className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">Retry</button>
         </div>
       </div>
     );
   }
 
   const initials = profile
-    ? `${(profile.first_name || '')[0] || ''}${(profile.last_name || '')[0] || ''}`
+    ? `${(profile.first_name || '')[0] || ''}${(profile.last_name || '')[0] || ''}`.toUpperCase() ||
+      (user?.email ? `${user.email[0] || ''}${user.email[1] || ''}`.toUpperCase() : '?')
     : '?';
   const fullName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}` : '';
   const firstEdu = profile?.education?.[0];
@@ -947,28 +1018,86 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">First Name</label>
-                        <input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                        <input value={form.first_name || ''} onChange={(e) => setForm({ ...form, first_name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Middle Name <span className="text-gray-400 font-normal">(Optional)</span></label>
+                        <input value={form.middle_name || ''} onChange={(e) => setForm({ ...form, middle_name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
                       </div>
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Last Name</label>
-                        <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                        <input value={form.last_name || ''} onChange={(e) => setForm({ ...form, last_name: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Phone</label>
-                        <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                        <label className="block text-xs text-gray-500 mb-1">Student / Alumni ID</label>
+                        <input
+                          value={form.id_number || 'Not on file'}
+                          disabled
+                          className="w-full border border-gray-200 bg-gray-50 text-gray-500 rounded-lg px-3 py-2 text-sm outline-none cursor-not-allowed"
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">City</label>
-                        <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                        <label className="block text-xs text-gray-500 mb-1">Mobile No.</label>
+                        <input
+                          type="tel"
+                          placeholder="e.g. 0917 123 4567"
+                          value={form.phone || ''}
+                          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400"
+                        />
                       </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Province</label>
-                        <input value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Gender</label>
+                          <select
+                            value={form.gender || ''}
+                            onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                          >
+                            <option value="">Prefer not to say</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Non-binary">Non-binary</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Civil Status</label>
+                          <select
+                            value={form.civil_status || ''}
+                            onChange={(e) => setForm({ ...form, civil_status: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                          >
+                            <option value="">Select status</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                            <option value="Widowed">Widowed</option>
+                            <option value="Separated">Separated</option>
+                          </select>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Address</label>
-                        <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400" />
-                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <PhLocationFields
+                        value={{
+                          country: form.country || 'Philippines',
+                          province: form.province || '',
+                          city: form.city || '',
+                          barangay: form.barangay || '',
+                          street: form.street || '',
+                        }}
+                        onChange={(loc) =>
+                          setForm({
+                            ...form,
+                            country: loc.country,
+                            province: loc.province,
+                            city: loc.city,
+                            barangay: loc.barangay,
+                            street: loc.street,
+                            address: combineAddressStreetAndBarangay(loc.street, loc.barangay),
+                          })
+                        }
+                      />
                     </div>
                   </div>
 
@@ -978,6 +1107,13 @@ export default function ProfilePage() {
                   </div>
 
                   <div data-tour="profile-edit-employment-section">
+                    {(() => {
+                      const effectiveStatus = form.employment_status || 'Unemployed';
+                      const isFormNotEmployed = ['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(
+                        String(effectiveStatus).trim().toLowerCase()
+                      );
+                      return (
+                        <>
                     <SectionLine label="Employment Information" />
                     <p className="text-[11px] text-gray-500 mt-1 mb-2.5">
                       Maintain your current employment status and workplace details. You can update these anytime.
@@ -988,7 +1124,7 @@ export default function ProfilePage() {
                           Employment Status
                         </label>
                         <select
-                          value={form.employment_status || 'Unemployed'}
+                          value={effectiveStatus}
                           onChange={(e) => {
                             const newStatus = e.target.value;
                             const isNotEmployed = newStatus === 'Unemployed' || newStatus === 'Seeking Opportunities' || newStatus === 'Retired';
@@ -1023,10 +1159,10 @@ export default function ProfilePage() {
                           Current Position / Title
                         </label>
                         <input
-                          value={form.current_job_title || ''}
+                          value={isFormNotEmployed ? '' : (form.current_job_title || '')}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, current_job_title: e.target.value }))}
-                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
-                          placeholder={form.employment_status === 'Self-employed' ? 'e.g. Freelance Developer, Consultant' : (form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'N/A' : 'e.g. Software Engineer, Teacher'}
+                          disabled={isFormNotEmployed}
+                          placeholder={effectiveStatus === 'Self-employed' ? 'e.g. Freelance Developer, Consultant' : isFormNotEmployed ? 'N/A' : 'e.g. Software Engineer, Teacher'}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
                         />
                       </div>
@@ -1035,10 +1171,10 @@ export default function ProfilePage() {
                           Company / Organization
                         </label>
                         <input
-                          value={form.company_name || ''}
+                          value={isFormNotEmployed ? '' : (form.company_name || '')}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, company_name: e.target.value }))}
-                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
-                          placeholder={form.employment_status === 'Self-employed' ? 'e.g. Business Name or Client (Optional)' : (form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'N/A' : 'e.g. Google, Accenture, DepEd'}
+                          disabled={isFormNotEmployed}
+                          placeholder={effectiveStatus === 'Self-employed' ? 'e.g. Business Name or Client (Optional)' : isFormNotEmployed ? 'N/A' : 'e.g. Google, Accenture, DepEd'}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
                         />
                       </div>
@@ -1047,12 +1183,12 @@ export default function ProfilePage() {
                           Industry
                         </label>
                         <select
-                          value={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? '' : (form.industry || '')}
+                          value={isFormNotEmployed ? '' : (form.industry || '')}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, industry: e.target.value }))}
-                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
+                          disabled={isFormNotEmployed}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                         >
-                          <option value="">{(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'N/A' : 'Select Industry'}</option>
+                          <option value="">{isFormNotEmployed ? 'N/A' : 'Select Industry'}</option>
                           <option value="Information Technology">Information Technology</option>
                           <option value="Education / Academia">Education / Academia</option>
                           <option value="Industrial & Manufacturing">Industrial & Manufacturing</option>
@@ -1070,12 +1206,12 @@ export default function ProfilePage() {
                           Monthly Salary Range (₱)
                         </label>
                         <select
-                          value={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? '' : (form.salary_range || '')}
+                          value={isFormNotEmployed ? '' : (form.salary_range || '')}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, salary_range: e.target.value }))}
-                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
+                          disabled={isFormNotEmployed}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                         >
-                          <option value="">{(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'N/A' : 'Select Salary Range'}</option>
+                          <option value="">{isFormNotEmployed ? 'N/A' : 'Select Salary Range'}</option>
                           <option value="Below ₱20,000">Below ₱20,000</option>
                           <option value="₱20,000–₱40,000">₱20,000–₱40,000</option>
                           <option value="₱40,000–₱60,000">₱40,000–₱60,000</option>
@@ -1088,12 +1224,12 @@ export default function ProfilePage() {
                           Employment Type
                         </label>
                         <select
-                          value={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? '' : (form.job_type || 'full-time')}
+                          value={isFormNotEmployed ? '' : (form.job_type || 'full-time')}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, job_type: e.target.value }))}
-                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
+                          disabled={isFormNotEmployed}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                         >
-                          {(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') && <option value="">N/A</option>}
+                          {isFormNotEmployed && <option value="">N/A</option>}
                           <option value="full-time">Full-time</option>
                           <option value="part-time">Part-time</option>
                           <option value="contract">Contractual</option>
@@ -1106,15 +1242,18 @@ export default function ProfilePage() {
                           Date of Employment / Start Date
                         </label>
                         <input
-                          type={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'text' : 'date'}
-                          value={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? '' : (form.start_date || '')}
+                          type={isFormNotEmployed ? 'text' : 'date'}
+                          value={isFormNotEmployed ? '' : (form.start_date || '')}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, start_date: e.target.value }))}
-                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
-                          placeholder={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'N/A' : undefined}
+                          disabled={isFormNotEmployed}
+                          placeholder={isFormNotEmployed ? 'N/A' : undefined}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                         />
                       </div>
                     </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* Proof of Employment for Q-Pro Accreditation */}
@@ -1149,15 +1288,15 @@ export default function ProfilePage() {
                           Submit verified evidence of your placement (COE, payslip, contract, or ID) for institutional quality assurance.
                         </p>
 
-                        {(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') && (
+                        {['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(String(form.employment_status || 'Unemployed').trim().toLowerCase()) && (
                           <div className="mb-3 p-2.5 rounded-lg bg-orange-50/80 border border-orange-100 text-[11px] text-orange-800 flex items-center gap-2">
                             <span>💡 Proof of employment submission is disabled while your status is Unemployed / Seeking / Retired. Once you secure employment or freelance work, update your status above to submit your proof.</span>
                           </div>
                         )}
 
                         <fieldset
-                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
-                          className={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'opacity-55 pointer-events-none select-none' : ''}
+                          disabled={['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(String(form.employment_status || 'Unemployed').trim().toLowerCase())}
+                          className={['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(String(form.employment_status || 'Unemployed').trim().toLowerCase()) ? 'opacity-55 pointer-events-none select-none' : ''}
                         >
                         {/* Proof Type & Specification */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">

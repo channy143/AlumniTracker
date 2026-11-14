@@ -4,6 +4,7 @@ import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
 import { formatProgramLongName } from '../../utils/formatProgram';
+import { normalizeCityName, normalizeProvinceName } from '../../utils/formatLocation';
 import { logAudit } from '../../services/auditLogger';
 import { AuthenticatedRequest } from '../../types';
 import { buildDpaCsv } from '../../utils/csvExport';
@@ -80,8 +81,10 @@ router.get('/', async (req, res, next) => {
 
     (allProfiles || []).forEach((p: any) => {
       if (p.company_name?.trim()) distinctEmployerSet.add(p.company_name.trim());
-      if (p.city?.trim()) distinctLocationSet.add(p.city.trim());
-      if (p.province?.trim()) distinctLocationSet.add(p.province.trim());
+      const normCity = normalizeCityName(p.city, p.province);
+      const normProv = normalizeProvinceName(p.province);
+      if (normCity) distinctLocationSet.add(normCity);
+      if (normProv) distinctLocationSet.add(normProv);
     });
     (allEmployment || []).forEach((e: any) => {
       if (e.company_name?.trim()) distinctEmployerSet.add(e.company_name.trim());
@@ -177,7 +180,7 @@ router.get('/', async (req, res, next) => {
           return lower === 'self-employed' || lower === 'entrepreneur' || lower === 'freelance';
         }
         if (target === 'unemployed') {
-          return !lower || lower === 'unemployed' || lower === 'seeking' || lower === 'seeking opportunities' || lower === 'null';
+          return !lower || lower === 'unemployed' || lower === 'seeking' || lower === 'seeking opportunities' || lower === 'null' || lower === 'n/a' || lower === 'na' || lower === 'none' || lower === 'not specified';
         }
         if (target === 'seeking opportunities' || target === 'seeking') {
           return lower === 'seeking' || lower === 'seeking opportunities';
@@ -200,14 +203,26 @@ router.get('/', async (req, res, next) => {
       });
     }
 
-    // Location filter
+    // Location filter (normalized so legacy "Naga" / "Naga City" / "City of Naga" all match)
     if (location.trim()) {
-      const target = location.trim().toLowerCase();
+      const rawTarget = location.trim().toLowerCase();
+      const normTargetCity = normalizeCityName(location).toLowerCase();
+      const normTargetProv = normalizeProvinceName(location).toLowerCase();
       filtered = filtered.filter((u: any) => {
         const p = u.profile;
-        const city = (p?.city || '').trim().toLowerCase();
-        const prov = (p?.province || '').trim().toLowerCase();
-        return city === target || prov === target || `${city}, ${prov}`.includes(target);
+        const rawCity = (p?.city || '').trim().toLowerCase();
+        const rawProv = (p?.province || '').trim().toLowerCase();
+        const normCity = normalizeCityName(p?.city, p?.province).toLowerCase();
+        const normProv = normalizeProvinceName(p?.province).toLowerCase();
+        return (
+          rawCity === rawTarget ||
+          rawProv === rawTarget ||
+          normCity === rawTarget ||
+          normProv === rawTarget ||
+          (normTargetCity && normCity === normTargetCity) ||
+          (normTargetProv && normProv === normTargetProv) ||
+          `${normCity}, ${normProv}`.includes(rawTarget)
+        );
       });
     }
 
@@ -290,7 +305,10 @@ router.get('/export', async (req, res, next) => {
           'Degree Program': ed.program ? formatProgramLongName(ed.program) : '',
           'Major': ed.major || '',
           'Graduation Year': ed.year_graduated || '',
-          'Employment Status': emp.employment_status || u.profile?.employment_status || 'N/A',
+          'Employment Status': (() => {
+            const raw = String(emp.employment_status || u.profile?.employment_status || '').trim();
+            return !raw || ['n/a', 'na', 'none', 'unknown', 'not specified', 'null'].includes(raw.toLowerCase()) ? 'Unemployed' : raw;
+          })(),
           'Current Position': emp.position || u.profile?.current_job_title || '',
           'Current Company': emp.company_name || u.profile?.company_name || '',
           'Industry': emp.company_industry || u.profile?.industry || '',
