@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
+import { notifyAllAlumniByEmail } from '../../services/email';
 
 const router = Router();
 const upload = multer({
@@ -124,6 +125,16 @@ router.post('/', async (req, res, next) => {
     const { data, error } = await supabase.from('feed_posts').insert(payload).select().single();
 
     if (error) throw new AppError(error.message, 500);
+
+    void notifyAllAlumniByEmail({
+      kind: 'event',
+      title: name,
+      content: description || '',
+      date,
+      time,
+      location,
+    }).catch((err) => console.error('[Event Email Error]', err));
+
     res.status(201).json(mapRow(data));
   } catch (err) { next(err); }
 });

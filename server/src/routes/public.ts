@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase';
+import { formatProgramLongName } from '../utils/formatProgram';
 
 const router = Router();
 
@@ -8,11 +9,12 @@ const router = Router();
 // honest values instead of fabricated numbers.
 router.get('/stats', async (_req, res, next) => {
   try {
-    const [usersRes, profilesRes, employmentRes, educationRes, connectionsRes, jobsRes] = await Promise.all([
+    const [usersRes, profilesRes, employmentRes, educationRes, whitelistRes, connectionsRes, jobsRes] = await Promise.all([
       supabase.from('users').select('id').eq('role', 'alumni'),
       supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, headline, employment_status'),
       supabase.from('employment').select('profile_id, employment_status, is_current'),
-      supabase.from('education').select('profile_id, program, graduation_year'),
+      supabase.from('education').select('profile_id, program, year_graduated'),
+      supabase.from('graduate_whitelist').select('program'),
       supabase.from('connections').select('id').eq('status', 'accepted'),
       supabase
         .from('job_postings')
@@ -24,6 +26,7 @@ router.get('/stats', async (_req, res, next) => {
     const profiles = profilesRes.data || [];
     const employment = employmentRes.data || [];
     const programs = educationRes.data || [];
+    const whitelistPrograms = whitelistRes.data || [];
     const matches = connectionsRes.data || [];
 
     const totalAlumni = profiles.length || alumniUsers.length;
@@ -33,24 +36,38 @@ router.get('/stats', async (_req, res, next) => {
         .filter((e: any) => e.is_current && ['employed', 'self-employed', 'entrepreneur'].includes(e.employment_status))
         .map((e: any) => e.profile_id)
     );
+    const unemployedIds = new Set(
+      employment
+        .filter((e: any) => e.is_current && String(e.employment_status || '').toLowerCase() === 'unemployed')
+        .map((e: any) => e.profile_id)
+    );
     profiles.forEach((p: any) => {
       const s = String(p.employment_status || '').toLowerCase();
       if (['employed', 'self-employed', 'entrepreneur'].includes(s)) employedIds.add(p.id);
+      else if (s === 'unemployed') unemployedIds.add(p.id);
     });
     const employed = profileIds.size > 0
       ? [...employedIds].filter((id) => profileIds.has(id)).length
       : employedIds.size;
+    const unemployedCount = profileIds.size > 0
+      ? [...unemployedIds].filter((id) => profileIds.has(id) && !employedIds.has(id)).length
+      : 0;
+    const unreportedCount = Math.max(0, totalAlumni - employed - unemployedCount);
     const employmentRate = totalAlumni > 0 ? Math.round((employed / totalAlumni) * 100) : 0;
-    const programsTracked = new Set(programs.map((p: any) => p.program).filter(Boolean)).size;
+    const trackedProgramSet = new Set([
+      ...programs.map((p: any) => (p.program ? formatProgramLongName(String(p.program).trim()) : '')).filter(Boolean),
+      ...whitelistPrograms.map((w: any) => (w.program ? formatProgramLongName(String(w.program).trim()) : '')).filter(Boolean),
+    ]);
+    const programsTracked = trackedProgramSet.size;
     const now = Date.now();
     const avatarByUserId = new Map<string, string>();
     profiles.forEach((p: any) => {
       if (p.user_id && p.avatar_url) avatarByUserId.set(String(p.user_id), p.avatar_url);
     });
-    const eduByProfileId = new Map<string, { program?: string; graduation_year?: number }>();
+    const eduByProfileId = new Map<string, { program?: string; year_graduated?: number }>();
     programs.forEach((e: any) => {
       if (e.profile_id && !eduByProfileId.has(String(e.profile_id))) {
-        eduByProfileId.set(String(e.profile_id), { program: e.program, graduation_year: e.graduation_year });
+        eduByProfileId.set(String(e.profile_id), { program: e.program, year_graduated: e.year_graduated });
       }
     });
 
@@ -60,7 +77,7 @@ router.get('/stats', async (_req, res, next) => {
       .map((p: any) => {
         const edu = eduByProfileId.get(String(p.id));
         const programPart = edu?.program || 'CTU-Naga Alumni';
-        const yearPart = edu?.graduation_year ? ` '${String(edu.graduation_year).slice(-2)}` : '';
+        const yearPart = edu?.year_graduated ? ` '${String(edu.year_graduated).slice(-2)}` : '';
         const rolePart = p.headline ? ` · ${p.headline}` : '';
         return {
           id: String(p.id),
@@ -90,6 +107,11 @@ router.get('/stats', async (_req, res, next) => {
     res.json({
       totalAlumni,
       employmentRate,
+      employmentBreakdown: {
+        employedCount: employed,
+        unemployedCount,
+        unreportedCount,
+      },
       mentorshipMatches: matches.length || 0,
       programsTracked,
       activeJobsCount: activeJobs.length,

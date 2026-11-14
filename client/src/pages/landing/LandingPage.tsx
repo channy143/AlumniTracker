@@ -428,7 +428,7 @@ function ValueCard({ value, index, revealed }: { value: (typeof values)[0]; inde
 
 function AlumniChatCard({ img, name, batch, body, tag }: { img: string; name: string; batch: string; body: string; tag: string }) {
   return (
-    <Card className="w-72 border-gray-200/80 bg-white/95 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow">
+    <Card className="w-56 sm:w-60 border-gray-200/80 bg-white/95 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-center gap-2.5">
           <Avatar className="size-9 border border-ctu-marigold/30">
@@ -461,9 +461,15 @@ export default function LandingPage() {
   const [showHeader, setShowHeader] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('');
+  const [careerHovered, setCareerHovered] = useState(false);
   const [stats, setStats] = useState<{
     totalAlumni: number;
     employmentRate: number;
+    employmentBreakdown?: {
+      employedCount: number;
+      unemployedCount: number;
+      unreportedCount: number;
+    };
     mentorshipMatches: number;
     programsTracked: number;
     activeJobsCount?: number;
@@ -757,37 +763,70 @@ export default function LandingPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-20 sm:py-24 text-center relative z-10 w-full">
-          <div ref={heroTaglineRef} style={{ transition: 'opacity 0.15s ease-out' }} className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md text-white/90 text-sm rounded-full mb-8 border border-white/10">
-            <SparklesIcon className="w-4 h-4 text-ctu-marigold" />
-            Bridging Education to Eternity
+          <div ref={heroTaglineRef} style={{ transition: 'opacity 0.15s ease-out' }}>
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md text-white/90 text-sm rounded-full mb-8 border border-white/10"
+            >
+              <SparklesIcon className="w-4 h-4 text-ctu-marigold" />
+              Bridging Education to Eternity
+            </motion.div>
           </div>
 
-          <h1 ref={heroHeadlineRef} style={{ transition: 'opacity 0.15s ease-out' }} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold font-display leading-[0.95] tracking-tight">
-            <span className="text-white">Your Journey</span>
-            <br />
-            <span className="text-ctu-marigold">Never Ends Here</span>
-          </h1>
-
-          <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-ctu-marigold to-transparent mx-auto mt-8 origin-center" />
-
-          <p ref={heroDescRef} style={{ transition: 'opacity 0.15s ease-out' }} className="text-lg md:text-xl text-white/70 mt-8 max-w-2xl mx-auto leading-relaxed font-light">
-            CTU-Naga Alumni Network helps graduates advance their careers, connect with fellow alumni, and discover new opportunities.
-          </p>
-
-          <div ref={heroButtonsRef} style={{ transition: 'opacity 0.15s ease-out' }} className="flex flex-wrap justify-center gap-4 mt-10">
-            <Link
-              to="/auth/register"
-              className="group text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl font-medium inline-flex items-center gap-2 transition-all text-white bg-ctu-marigold hover:bg-[#d4893a] hover:shadow-xl hover:shadow-ctu-marigold/20 hover:scale-[1.02] active:scale-[0.98]"
+          <div ref={heroHeadlineRef} style={{ transition: 'opacity 0.15s ease-out' }}>
+            <motion.h1
+              initial={{ opacity: 0, y: 28 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.75, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+              className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold font-display leading-[0.95] tracking-tight"
             >
-              Join the Community
-              <ArrowRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link
-              to="/auth/login"
-              className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl font-medium transition-all text-white/80 border border-white/20 hover:bg-white/10 hover:text-white hover:border-white/40 backdrop-blur-sm"
+              <span className="text-white">Your Journey</span>
+              <br />
+              <span className="text-ctu-marigold">Never Ends Here</span>
+            </motion.h1>
+          </div>
+
+          <motion.div
+            initial={{ scaleX: 0, opacity: 0 }}
+            animate={{ scaleX: 1, opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="w-24 h-0.5 bg-gradient-to-r from-transparent via-ctu-marigold to-transparent mx-auto mt-8 origin-center"
+          />
+
+          <div ref={heroDescRef} style={{ transition: 'opacity 0.15s ease-out' }}>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.65, delay: 0.34, ease: [0.22, 1, 0.36, 1] }}
+              className="text-lg md:text-xl text-white/70 mt-8 max-w-2xl mx-auto leading-relaxed font-light"
             >
-              Sign In
-            </Link>
+              CTU-Naga Alumni Network helps graduates advance their careers, connect with fellow alumni, and discover new opportunities.
+            </motion.p>
+          </div>
+
+          <div ref={heroButtonsRef} style={{ transition: 'opacity 0.15s ease-out' }}>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.65, delay: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-wrap justify-center gap-4 mt-10"
+            >
+              <Link
+                to="/auth/register"
+                className="group text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl font-medium inline-flex items-center gap-2 transition-all text-white bg-ctu-marigold hover:bg-[#d4893a] hover:shadow-xl hover:shadow-ctu-marigold/20 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Join the Community
+                <ArrowRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+              </Link>
+              <Link
+                to="/auth/login"
+                className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl font-medium transition-all text-white/80 border border-white/20 hover:bg-white/10 hover:text-white hover:border-white/40 backdrop-blur-sm"
+              >
+                Sign In
+              </Link>
+            </motion.div>
           </div>
         </div>
 
@@ -817,7 +856,6 @@ export default function LandingPage() {
       >
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-ctu-gold/20 to-transparent" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(212,175,55,0.03),transparent_70%)]" />
-        <div className="absolute top-0 left-1/2 w-px h-full bg-gradient-to-b from-transparent via-ctu-gold/10 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-ctu-gold/10 to-transparent" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 w-full relative z-10">
@@ -825,44 +863,30 @@ export default function LandingPage() {
             initial="hidden"
             animate={statsRevealed ? 'visible' : 'hidden'}
             variants={container}
-            className="grid lg:grid-cols-2 gap-4 sm:gap-10 items-end mb-6 sm:mb-8"
+            className="mb-6 sm:mb-8"
           >
-            <div>
-              <motion.span variants={fadeUp} className="text-ctu-gold text-xs uppercase tracking-[0.25em] font-semibold flex items-center gap-3">
-                <span className="w-8 h-px bg-ctu-gold/60" />
-                By the Numbers
-              </motion.span>
-              <motion.h2 variants={fadeUp} className="text-3xl sm:text-5xl font-bold font-display text-white mt-3 leading-[1.02]">
-                <span className="text-ctu-marigold">{stats ? `${stats.totalAlumni.toLocaleString()}+` : '0+'}</span>{' '}
-                Alumni Strong
-              </motion.h2>
-            </div>
-            <motion.p variants={fadeUp} className="text-gray-400 text-sm sm:text-base leading-relaxed max-w-md lg:ml-auto font-light">
-              A growing community of graduates who continue to learn, connect,
-              and build a legacy that spans generations across industries.
-            </motion.p>
+            <motion.span variants={fadeUp} className="text-ctu-gold text-xs uppercase tracking-[0.25em] font-semibold flex items-center gap-3">
+              <span className="w-8 h-px bg-ctu-gold/60" />
+              By the Numbers
+            </motion.span>
+            <motion.h2 variants={fadeUp} className="text-3xl sm:text-5xl font-bold font-display text-white mt-3 leading-[1.02]">
+              <span className="text-ctu-marigold">{stats ? `${stats.totalAlumni.toLocaleString()}+` : '0+'}</span>{' '}
+              Alumni Strong
+            </motion.h2>
           </motion.div>
 
           <BentoGridShowcase
             revealed={statsRevealed}
             integrations={
-              <div className="h-full rounded-2xl bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-between backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-[0.2em] text-ctu-gold font-semibold">Academic Reach</span>
-                  <AcademicCapIcon className="w-5 h-5 text-ctu-gold" />
-                </div>
-                <div className="mt-3">
-                  <div className="text-3xl sm:text-4xl font-bold font-display text-white">
-                    {stats ? `${stats.programsTracked}+` : '0+'}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Degree programs tracked across CTU-Naga Extension Campus.
-                  </p>
-                </div>
+              <div className="pr-2 pt-0.5 pb-1">
+                <p className="text-gray-300 text-sm sm:text-base leading-relaxed font-light">
+                  A growing community of graduates who continue to learn, connect,
+                  and build a legacy that spans generations across industries.
+                </p>
               </div>
             }
             mainFeature={
-              <div className="h-full rounded-2xl bg-gradient-to-b from-ctu-blue/40 via-[#13223b] to-[#0b1324] border border-ctu-gold/25 p-6 flex flex-col justify-between shadow-lg">
+              <div className="h-full rounded-none bg-gradient-to-b from-ctu-blue/40 via-[#13223b] to-[#0b1324] border border-ctu-gold/25 p-6 flex flex-col justify-between shadow-lg">
                 <div>
                   <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ctu-marigold/15 text-ctu-marigold text-[11px] font-semibold uppercase tracking-wider">
                     <SparklesIcon className="w-3.5 h-3.5" />
@@ -894,94 +918,175 @@ export default function LandingPage() {
               </div>
             }
             featureTags={
-              <div className="h-full rounded-2xl bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-between backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
-                <span className="text-[11px] uppercase tracking-[0.2em] text-ctu-marigold font-semibold">
-                  Tracked Metrics
-                </span>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <span className="px-2.5 py-1 rounded-full bg-white/10 text-xs text-white/90 font-medium">
-                    CHED Tracer Ready
+              <div className="h-full rounded-none bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-between backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] uppercase tracking-[0.2em] text-ctu-marigold font-semibold">
+                    Tracked Metrics
                   </span>
-                  <span className="px-2.5 py-1 rounded-full bg-ctu-marigold/20 text-xs text-ctu-marigold font-medium">
-                    Registrar Verified
-                  </span>
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-xs text-emerald-300 font-medium">
-                    Live Career Data
-                  </span>
-                  <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-xs text-blue-300 font-medium">
-                    Consent-First
-                  </span>
+                  <AcademicCapIcon className="w-5 h-5 text-ctu-gold" />
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-3 text-xs">
+                  <div>
+                    <div className="text-white font-semibold">{stats ? `${stats.programsTracked}+` : '0+'} Programs</div>
+                    <div className="text-gray-400 text-[11px]">CTU-Naga degrees</div>
+                  </div>
+                  <div>
+                    <div className="text-white font-semibold">Employment</div>
+                    <div className="text-gray-400 text-[11px]">Jobs &amp; career status</div>
+                  </div>
+                  <div>
+                    <div className="text-white font-semibold">Tracer Surveys</div>
+                    <div className="text-gray-400 text-[11px]">CHED-aligned data</div>
+                  </div>
+                  <div>
+                    <div className="text-white font-semibold">Registrar Check</div>
+                    <div className="text-gray-400 text-[11px]">Verified graduates</div>
+                  </div>
                 </div>
               </div>
             }
             secondaryFeature={
-              <div className="h-full rounded-2xl bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-between backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
+              <div className="h-full rounded-none bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-center backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] uppercase tracking-[0.2em] text-blue-300 font-semibold">Connections</span>
                   <HandRaisedIcon className="w-5 h-5 text-blue-300" />
                 </div>
-                <div className="mt-3">
-                  <div className="text-3xl sm:text-4xl font-bold font-display text-white">
-                    {stats ? stats.mentorshipMatches.toLocaleString() : '0'}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Mentorship &amp; peer alumni connections accepted.
-                  </p>
+                <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+                  Mentorship &amp; peer alumni connections accepted.
+                </p>
+                <div className="mt-3 text-5xl sm:text-6xl font-bold font-display text-white leading-none">
+                  {stats ? stats.mentorshipMatches.toLocaleString() : '0'}
                 </div>
               </div>
             }
             statistic={
-              <div className="h-full rounded-2xl bg-white/[0.05] border border-white/10 p-6 flex flex-col justify-between backdrop-blur-sm hover:border-emerald-400/30 transition-colors">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-[0.2em] text-emerald-300 font-semibold">
-                    Career Outcomes
-                  </span>
-                  <ChartBarIcon className="w-5 h-5 text-emerald-300" />
-                </div>
-
-                <div className="my-4">
-                  <div className="text-5xl sm:text-6xl font-bold font-display text-ctu-marigold leading-none">
-                    {stats ? `${stats.employmentRate}%` : '0%'}
+              <div
+                onMouseEnter={() => setCareerHovered(true)}
+                onMouseLeave={() => setCareerHovered(false)}
+                onClick={() => setCareerHovered((v) => !v)}
+                className="relative h-full min-h-[260px] cursor-pointer"
+              >
+                {/* Whole Default Card: Slides down on hover */}
+                <motion.div
+                  initial={false}
+                  animate={{ y: careerHovered ? 140 : 0, opacity: careerHovered ? 0 : 1 }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  className="h-full w-full rounded-none bg-white/[0.05] border border-white/10 p-6 flex flex-col justify-between backdrop-blur-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] uppercase tracking-[0.2em] text-emerald-300 font-semibold">
+                      Career Outcomes
+                    </span>
+                    <ChartBarIcon className="w-5 h-5 text-emerald-300" />
                   </div>
-                  <p className="text-sm font-semibold text-white mt-2">Employment Rate</p>
-                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                    Graduates currently employed, self-employed, or leading businesses.
+
+                  <div className="my-4">
+                    <div className="text-5xl sm:text-6xl font-bold font-display text-ctu-marigold leading-none">
+                      {stats ? `${stats.employmentRate}%` : '0%'}
+                    </div>
+                    <p className="text-sm font-semibold text-white mt-2">Employment Rate</p>
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                      Graduates currently employed, self-employed, or leading businesses.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="w-full h-2 bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-ctu-marigold to-emerald-400 transition-all duration-1000"
+                        style={{ width: `${Math.min(100, stats?.employmentRate ?? 0)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[11px] text-gray-400 mt-1.5">
+                      <span>0%</span>
+                      <span className="text-emerald-300/80">Hover for breakdown</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Whole Analytics Card: Slides in from the right */}
+                <motion.div
+                  initial={false}
+                  animate={{ x: careerHovered ? '0%' : '120%', opacity: careerHovered ? 1 : 0 }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  className={`absolute inset-0 rounded-none bg-[#111c33] border border-emerald-400/35 p-6 flex flex-col justify-between shadow-2xl ${
+                    careerHovered ? 'pointer-events-auto' : 'pointer-events-none'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] uppercase tracking-[0.2em] text-ctu-marigold font-semibold">
+                      Why It&apos;s {stats ? `${stats.employmentRate}%` : '0%'}
+                    </span>
+                    <ChartBarIcon className="w-5 h-5 text-ctu-marigold" />
+                  </div>
+
+                  <div className="space-y-3 my-2">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-emerald-300 font-medium">Employed / Self-Employed</span>
+                        <span className="text-white font-semibold">
+                          {stats?.employmentBreakdown?.employedCount ?? 0} of {stats?.totalAlumni ?? 0}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-400"
+                          style={{
+                            width: `${stats?.totalAlumni ? Math.round(((stats.employmentBreakdown?.employedCount ?? 0) / stats.totalAlumni) * 100) : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-300 font-medium">Unreported / Pending Survey</span>
+                        <span className="text-white font-semibold">
+                          {stats?.employmentBreakdown?.unreportedCount ?? (stats?.totalAlumni ?? 0)}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full bg-ctu-marigold/80"
+                          style={{
+                            width: `${stats?.totalAlumni ? Math.round(((stats.employmentBreakdown?.unreportedCount ?? stats.totalAlumni) / stats.totalAlumni) * 100) : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {(stats?.employmentBreakdown?.unemployedCount ?? 0) > 0 && (
+                      <div className="flex justify-between text-xs text-gray-400">
+                        <span>Seeking Employment</span>
+                        <span className="text-white font-medium">{stats?.employmentBreakdown?.unemployedCount}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-gray-400 leading-relaxed border-t border-white/10 pt-2.5">
+                    Most tracked alumni profiles haven&apos;t submitted their current job or tracer survey yet.
                   </p>
-                </div>
-
-                <div>
-                  <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-ctu-marigold to-emerald-400 transition-all duration-1000"
-                      style={{ width: `${Math.min(100, stats?.employmentRate ?? 0)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[11px] text-gray-400 mt-1.5">
-                    <span>0%</span>
-                    <span>100%</span>
-                  </div>
-                </div>
+                </motion.div>
               </div>
             }
             journey={
-              <div className="h-full rounded-2xl bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-between backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
+              <div className="h-full rounded-none bg-white/[0.04] border border-white/10 p-5 flex flex-col justify-center backdrop-blur-sm hover:border-ctu-gold/30 transition-colors">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] uppercase tracking-[0.2em] text-ctu-marigold font-semibold">Career Portal</span>
                   <BriefcaseIcon className="w-5 h-5 text-ctu-marigold" />
                 </div>
+                <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+                  Active verified job openings
+                </p>
                 <div className="mt-3 flex items-end justify-between gap-2">
-                  <div>
-                    <div className="text-3xl sm:text-4xl font-bold font-display text-white">
-                      {stats?.activeJobsCount ?? 0}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Active verified job openings
-                    </p>
+                  <div className="text-5xl sm:text-6xl font-bold font-display text-white leading-none">
+                    {stats?.activeJobsCount ?? 0}
                   </div>
                   <button
                     type="button"
                     onClick={() => scrollTo('jobs')}
-                    className="text-xs font-semibold text-ctu-marigold hover:underline inline-flex items-center gap-1 shrink-0"
+                    className="text-xs font-semibold text-ctu-marigold hover:underline inline-flex items-center gap-1 shrink-0 pb-1"
                   >
                     View <ArrowRightIcon className="w-3.5 h-3.5" />
                   </button>
@@ -1354,12 +1459,12 @@ export default function LandingPage() {
               transition={{ duration: 0.65, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
               className="lg:col-span-7"
             >
-              <div className="border border-gray-200 rounded-2xl bg-slate-50/70 relative flex h-[420px] sm:h-[460px] w-full flex-row items-center justify-center overflow-hidden gap-2 [perspective:400px] shadow-inner">
+              <div className="border border-gray-200 rounded-2xl bg-slate-50/70 relative flex h-[420px] sm:h-[460px] w-full flex-row items-center justify-center overflow-hidden gap-2 [perspective:500px] shadow-inner">
                 <div
-                  className="flex flex-row items-center gap-4"
+                  className="flex flex-row items-center gap-3"
                   style={{
                     transform:
-                      'translateX(-40px) translateY(0px) translateZ(-60px) rotateX(16deg) rotateY(-8deg) rotateZ(12deg)',
+                      'translateX(0px) translateY(0px) translateZ(-80px) rotateX(16deg) rotateY(-8deg) rotateZ(10deg)',
                   }}
                 >
                   <Marquee vertical pauseOnHover repeat={3} className="[--duration:36s]">

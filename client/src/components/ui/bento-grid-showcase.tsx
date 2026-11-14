@@ -67,34 +67,32 @@ export const BentoGridShowcase = ({
         className
       )}
     >
-      {/* Slot 1: Integrations (1,1) */}
-      <motion.div variants={itemVariants} className="md:col-span-1 md:row-span-1">
-        {integrations}
-      </motion.div>
+      {/* Column 1: Description (natural height, top-aligned) + 2 Cards expanding to fill remaining space */}
+      <div className="md:col-span-1 md:row-span-3 flex flex-col gap-4">
+        <motion.div variants={itemVariants} className="shrink-0">
+          {integrations}
+        </motion.div>
+        <motion.div variants={itemVariants} className="flex-1">
+          {secondaryFeature}
+        </motion.div>
+        <motion.div variants={itemVariants} className="flex-1">
+          {journey}
+        </motion.div>
+      </div>
 
-      {/* Slot 2: Main Feature (1,2) - Spans 3 rows */}
+      {/* Column 2: Main Feature (Spans 3 rows) */}
       <motion.div variants={itemVariants} className="md:col-span-1 md:row-span-3">
         {mainFeature}
       </motion.div>
 
-      {/* Slot 3: Feature Tags (1,3) */}
+      {/* Column 3 Top: Feature Tags */}
       <motion.div variants={itemVariants} className="md:col-span-1 md:row-span-1">
         {featureTags}
       </motion.div>
 
-      {/* Slot 4: Secondary Feature (2,1) */}
-      <motion.div variants={itemVariants} className="md:col-span-1 md:row-span-1">
-        {secondaryFeature}
-      </motion.div>
-
-      {/* Slot 5: Statistic (2,3) - Spans 2 rows */}
+      {/* Column 3 Bottom: Statistic (Spans 2 rows) */}
       <motion.div variants={itemVariants} className="md:col-span-1 md:row-span-2">
         {statistic}
-      </motion.div>
-
-      {/* Slot 6: Journey (3,1) */}
-      <motion.div variants={itemVariants} className="md:col-span-1 md:row-span-1">
-        {journey}
       </motion.div>
     </motion.div>
   );

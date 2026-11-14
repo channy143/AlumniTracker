@@ -1,6 +1,16 @@
 import nodemailer from 'nodemailer';
 import path from 'path';
 import fs from 'fs';
+import { supabase } from './supabase';
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function createTransporter() {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
@@ -89,4 +99,112 @@ export async function sendOtpEmail(to: string, otp: string): Promise<void> {
       </div>
     `,
   });
+}
+
+export interface AlumniBroadcastEmailPayload {
+  kind: 'announcement' | 'event';
+  title: string;
+  content: string;
+  date?: string | null;
+  time?: string | null;
+  location?: string | null;
+}
+
+/**
+ * Sends a Gmail notification (via BCC batches) to all registered alumni when
+ * an admin publishes an announcement or creates an event.
+ */
+export async function notifyAllAlumniByEmail(payload: AlumniBroadcastEmailPayload): Promise<void> {
+  const { data: alumniUsers, error } = await supabase
+    .from('users')
+    .select('email')
+    .eq('role', 'alumni');
+
+  if (error) {
+    console.error('[Email Broadcast] Failed to fetch alumni emails:', error.message);
+    return;
+  }
+
+  const emails = Array.from(
+    new Set(
+      (alumniUsers || [])
+        .map((u: any) => String(u.email || '').trim())
+        .filter((e: string) => e.includes('@'))
+    )
+  );
+
+  if (emails.length === 0) return;
+
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.log(`[DEV] Would email ${emails.length} alumni for ${payload.kind}: ${payload.title}`);
+    return;
+  }
+
+  const isEvent = payload.kind === 'event';
+  const badge = isEvent ? 'Upcoming Alumni Event' : 'Official Announcement';
+  const subjectPrefix = isEvent ? 'New Event' : 'Announcement';
+  const safeTitle = escapeHtml(payload.title);
+  const safeContent = escapeHtml(payload.content || '').replace(/\n/g, '<br />');
+  const safeDate = payload.date ? escapeHtml(payload.date) : '';
+  const safeTime = payload.time ? escapeHtml(payload.time) : '';
+  const safeLocation = payload.location ? escapeHtml(payload.location) : '';
+
+  const eventDetailsHtml = isEvent && (safeDate || safeTime || safeLocation)
+    ? `
+      <div style="background: #fff7ed; border: 1px solid #ffedd5; border-radius: 8px; padding: 12px 14px; margin: 0 0 18px; font-size: 13px; color: #7c2d12; line-height: 1.6;">
+        ${safeDate ? `<div><strong>Date:</strong> ${safeDate}</div>` : ''}
+        ${safeTime ? `<div><strong>Time:</strong> ${safeTime}</div>` : ''}
+        ${safeLocation ? `<div><strong>Location:</strong> ${safeLocation}</div>` : ''}
+      </div>
+    `
+    : '';
+
+  const logoPath = getLogoPath();
+  const attachments = logoPath
+    ? [{ filename: 'logo.png', path: logoPath, cid: 'ctulogo' }]
+    : [];
+
+  const html = `
+    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px 20px; background: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0;">
+      <div style="background: linear-gradient(135deg, #003366 0%, #002244 100%); margin: -24px -20px 24px; padding: 24px 20px; border-radius: 14px 14px 0 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+          <tr>
+            <td style="width: 58px; vertical-align: middle; padding-right: 14px;">
+              <img src="${logoPath ? 'cid:ctulogo' : 'https://placehold.co/100x100?text=CTU'}" alt="CTU-Naga Logo" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px;" />
+            </td>
+            <td style="vertical-align: middle;">
+              <h1 style="color: #ffffff; font-size: 19px; margin: 0; font-weight: 700; line-height: 1.25;">CTU-Naga Alumni Tracker</h1>
+              <p style="color: #e8a050; margin: 4px 0 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;">${badge}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <h2 style="color: #0f172a; font-size: 18px; margin: 0 0 12px; line-height: 1.35;">${safeTitle}</h2>
+      ${eventDetailsHtml}
+      <p style="color: #334155; font-size: 14px; line-height: 1.65; margin: 0 0 20px;">${safeContent || 'Log in to the CTU-Naga Alumni Tracker portal to view full details.'}</p>
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0 14px;" />
+      <p style="color: #94a3b8; font-size: 11px; margin: 0; line-height: 1.4;">
+        Cebu Technological University &mdash; Naga Extension Campus<br />
+        City of Naga, Cebu, Philippines
+      </p>
+    </div>
+  `;
+
+  const BATCH_SIZE = 50;
+  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
+    const bccBatch = emails.slice(i, i + BATCH_SIZE);
+    try {
+      await transporter.sendMail({
+        from: `"CTU-Naga Alumni Tracker" <${process.env.SMTP_USER}>`,
+        to: process.env.SMTP_USER,
+        bcc: bccBatch,
+        subject: `[CTU-Naga Alumni] ${subjectPrefix}: ${payload.title}`,
+        attachments,
+        html,
+      });
+    } catch (sendErr: any) {
+      console.error(`[Email Broadcast] Batch ${i / BATCH_SIZE + 1} failed:`, sendErr?.message || sendErr);
+    }
+  }
 }

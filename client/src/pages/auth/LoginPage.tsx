@@ -15,6 +15,7 @@ export default function LoginPage() {
 
   // Field error states
   const [hasError, setHasError] = useState(false);
+  const [loginErrorMsg, setLoginErrorMsg] = useState<string | null>(null);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
 
   // Rate limit cooldown state
@@ -58,12 +59,19 @@ export default function LoginPage() {
 
   const clearCredentialsError = () => {
     if (hasError) setHasError(false);
+    if (loginErrorMsg) setLoginErrorMsg(null);
     if (remainingAttempts !== null) setRemainingAttempts(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearCredentialsError();
+
+    if (!navigator.onLine) {
+      setHasError(true);
+      setLoginErrorMsg('No internet connection. Please check your network and try again.');
+      return;
+    }
 
     if (rateLimitCooldown > 0) {
       setHasError(true);
@@ -103,11 +111,26 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       setHasError(true);
+      const isNetworkFailure =
+        !navigator.onLine ||
+        err?.status === 0 ||
+        err?.status === 503 ||
+        /internet|network|failed to fetch|offline|unreachable/i.test(String(err?.message || ''));
+
+      if (isNetworkFailure) {
+        setLoginErrorMsg('No internet connection. Please check your network and try again.');
+        setRemainingAttempts(null);
+        return;
+      }
+
       const cooldown = err.cooldownSeconds || (err.status === 429 ? 30 : 0);
       if (cooldown > 0) {
         setRateLimitCooldown(cooldown);
       } else if (err.remainingAttempts !== undefined) {
         setRemainingAttempts(err.remainingAttempts);
+      } else if (err?.status >= 500) {
+        setLoginErrorMsg(err.message || 'The service is temporarily unavailable. Please try again shortly.');
+        setRemainingAttempts(null);
       } else {
         setRemainingAttempts(null);
       }
@@ -333,11 +356,13 @@ export default function LoginPage() {
             </button>
           </div>
 
-          {/* Under password field: exact message matching the user screenshot */}
+          {/* Under password field: network/server error, cooldown, or wrong password */}
           {hasError && (
             <FieldErrorAlert
               message={
-                rateLimitCooldown > 0 ? (
+                loginErrorMsg ? (
+                  loginErrorMsg
+                ) : rateLimitCooldown > 0 ? (
                   `Too many unsuccessful attempts. Please try again in ${rateLimitCooldown} seconds.`
                 ) : remainingAttempts !== null && remainingAttempts > 0 ? (
                   <>

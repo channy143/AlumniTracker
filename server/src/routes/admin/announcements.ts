@@ -3,6 +3,7 @@ import multer from 'multer';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { createBroadcastNotification } from '../notifications';
+import { notifyAllAlumniByEmail } from '../../services/email';
 
 const router = Router();
 const upload = multer({
@@ -107,6 +108,11 @@ router.post('/', async (req, res, next) => {
         message: data.content?.slice(0, 120) ? `${data.content.slice(0, 120)}...` : 'A new announcement has been published.',
         link: `/announcements?id=${data.id}`,
       });
+      void notifyAllAlumniByEmail({
+        kind: 'announcement',
+        title: data.title,
+        content: data.content || '',
+      }).catch((err) => console.error('[Announcement Email Error]', err));
     }
 
     res.status(201).json(data);
@@ -140,8 +146,32 @@ router.put('/:id', async (req, res, next) => {
 
     payload.updated_at = new Date().toISOString();
 
+    const { data: existing } = await supabase
+      .from('announcements')
+      .select('status, title, content')
+      .eq('id', req.params.id)
+      .single();
+
     const { error } = await supabase.from('announcements').update(payload).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
+
+    if (status === 'published' && existing?.status !== 'published') {
+      const finalTitle = title ?? existing?.title ?? 'Announcement';
+      const finalContent = content ?? existing?.content ?? '';
+      await createBroadcastNotification({
+        role: 'alumni',
+        type: 'announcement',
+        title: `📢 ${finalTitle}`,
+        message: finalContent?.slice(0, 120) ? `${finalContent.slice(0, 120)}...` : 'A new announcement has been published.',
+        link: `/announcements?id=${req.params.id}`,
+      });
+      void notifyAllAlumniByEmail({
+        kind: 'announcement',
+        title: finalTitle,
+        content: finalContent,
+      }).catch((err) => console.error('[Announcement Email Error]', err));
+    }
+
     res.json({ message: 'Announcement updated' });
   } catch (err) {
     next(err);

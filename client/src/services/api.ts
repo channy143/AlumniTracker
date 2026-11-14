@@ -789,6 +789,11 @@ export const publicApi = {
     api.get<{
       totalAlumni: number;
       employmentRate: number;
+      employmentBreakdown?: {
+        employedCount: number;
+        unemployedCount: number;
+        unreportedCount: number;
+      };
       mentorshipMatches: number;
       programsTracked: number;
       activeJobsCount?: number;

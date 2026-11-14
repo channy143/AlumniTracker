@@ -267,6 +267,21 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       .eq('email', email)
       .single();
 
+    if (user.error && user.error.code !== 'PGRST116') {
+      const msg = String(user.error.message || '').toLowerCase();
+      if (
+        msg.includes('fetch failed') ||
+        msg.includes('network') ||
+        msg.includes('enotfound') ||
+        msg.includes('econnrefused') ||
+        msg.includes('etimedout')
+      ) {
+        return res.status(503).json({
+          message: 'No internet connection or authentication service is unreachable. Please check your connection and try again.',
+        });
+      }
+    }
+
     // Regardless of whether the account exists or the password is correct, if
     // this (email, IP) is temporarily rate-limited, block with 429 and a
     // generic message. This check MUST run before password validation so a
