@@ -346,8 +346,11 @@ export default function ProfilePage() {
       setSaving(true);
       setError('');
 
-      // Pre-save validation for proof link if provided
-      if (form.proof_url) {
+      const preSaveStatus = String(form.employment_status || 'Unemployed').toLowerCase();
+      const preSaveNotEmployed = preSaveStatus === 'unemployed' || preSaveStatus.includes('seeking') || preSaveStatus === 'retired';
+
+      // Pre-save validation for proof link if provided (only when employed / self-employed)
+      if (!preSaveNotEmployed && form.proof_url) {
         const trimmed = String(form.proof_url).trim();
         if (trimmed && !trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
           setError('Proof document link must be a valid URL starting with http:// or https://');
@@ -395,7 +398,7 @@ export default function ProfilePage() {
           current_job_title: isNotEmployed ? null : (form.current_job_title || null),
           company_name: isNotEmployed ? null : (form.company_name || null),
           industry: isNotEmployed ? null : (form.industry || null),
-          salary_range: form.salary_range || null,
+          salary_range: isNotEmployed ? null : (form.salary_range || null),
         });
 
         // Sync employment record and proof of employment for accreditation (Q-Pro)
@@ -992,7 +995,18 @@ export default function ProfilePage() {
                             setForm((prev: any) => ({
                               ...prev,
                               employment_status: newStatus,
-                              ...(isNotEmployed ? { current_job_title: '', company_name: '' } : {})
+                              ...(isNotEmployed
+                                ? {
+                                    current_job_title: '',
+                                    company_name: '',
+                                    industry: '',
+                                    salary_range: '',
+                                    job_type: '',
+                                    start_date: '',
+                                    proof_url: '',
+                                    proof_type_other: '',
+                                  }
+                                : { job_type: prev.job_type || 'full-time' })
                             }));
                           }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
@@ -1033,11 +1047,12 @@ export default function ProfilePage() {
                           Industry
                         </label>
                         <select
-                          value={form.industry || ''}
+                          value={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? '' : (form.industry || '')}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, industry: e.target.value }))}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                         >
-                          <option value="">Select Industry</option>
+                          <option value="">{(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'N/A' : 'Select Industry'}</option>
                           <option value="Information Technology">Information Technology</option>
                           <option value="Education / Academia">Education / Academia</option>
                           <option value="Industrial & Manufacturing">Industrial & Manufacturing</option>
@@ -1055,11 +1070,12 @@ export default function ProfilePage() {
                           Monthly Salary Range (₱)
                         </label>
                         <select
-                          value={form.salary_range || ''}
+                          value={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? '' : (form.salary_range || '')}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, salary_range: e.target.value }))}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                         >
-                          <option value="">Select Salary Range</option>
+                          <option value="">{(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'N/A' : 'Select Salary Range'}</option>
                           <option value="Below ₱20,000">Below ₱20,000</option>
                           <option value="₱20,000–₱40,000">₱20,000–₱40,000</option>
                           <option value="₱40,000–₱60,000">₱40,000–₱60,000</option>
@@ -1072,10 +1088,12 @@ export default function ProfilePage() {
                           Employment Type
                         </label>
                         <select
-                          value={form.job_type || 'full-time'}
+                          value={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? '' : (form.job_type || 'full-time')}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, job_type: e.target.value }))}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                         >
+                          {(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') && <option value="">N/A</option>}
                           <option value="full-time">Full-time</option>
                           <option value="part-time">Part-time</option>
                           <option value="contract">Contractual</option>
@@ -1088,10 +1106,12 @@ export default function ProfilePage() {
                           Date of Employment / Start Date
                         </label>
                         <input
-                          type="date"
-                          value={form.start_date || ''}
+                          type={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'text' : 'date'}
+                          value={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? '' : (form.start_date || '')}
                           onChange={(e) => setForm((prev: any) => ({ ...prev, start_date: e.target.value }))}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
+                          placeholder={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'N/A' : undefined}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                         />
                       </div>
                     </div>
@@ -1131,10 +1151,14 @@ export default function ProfilePage() {
 
                         {(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') && (
                           <div className="mb-3 p-2.5 rounded-lg bg-orange-50/80 border border-orange-100 text-[11px] text-orange-800 flex items-center gap-2">
-                            <span>💡 When you secure employment or freelance work, submit your Certificate of Employment (COE), Company ID, or Contract here for institutional Q-Pro verification.</span>
+                            <span>💡 Proof of employment submission is disabled while your status is Unemployed / Seeking / Retired. Once you secure employment or freelance work, update your status above to submit your proof.</span>
                           </div>
                         )}
 
+                        <fieldset
+                          disabled={form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired'}
+                          className={(form.employment_status === 'Unemployed' || form.employment_status === 'Seeking Opportunities' || form.employment_status === 'Retired') ? 'opacity-55 pointer-events-none select-none' : ''}
+                        >
                         {/* Proof Type & Specification */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                           <div>
@@ -1328,6 +1352,7 @@ export default function ProfilePage() {
                               </div>
                             </div>
                           </div>
+                        </fieldset>
                         </div>
 
                   <div>

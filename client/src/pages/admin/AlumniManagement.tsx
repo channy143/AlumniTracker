@@ -165,7 +165,7 @@ export default function AlumniManagement() {
       phone: p.phone || '',
       email: detailData.email || '',
       birth_date: p.birth_date ? p.birth_date.split('T')[0] : '',
-      gender: p.gender || 'Prefer not to say',
+      gender: p.gender || '',
       civil_status: p.civil_status || 'Single',
       address: p.address || '',
       city: p.city || '',
@@ -875,13 +875,13 @@ export default function AlumniManagement() {
                         Gender <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
                       </label>
                       <select
-                        value={editForm.gender || 'Prefer not to say'}
+                        value={editForm.gender || ''}
                         onChange={(e) => setEditForm((f: any) => ({ ...f, gender: e.target.value }))}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-500 text-xs bg-white"
                       >
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
-                        <option value="Prefer not to say">Prefer not to say</option>
+                        <option value="">Prefer not to say</option>
                       </select>
                     </div>
                     <div>

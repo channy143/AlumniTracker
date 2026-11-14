@@ -489,6 +489,14 @@ router.put('/:id', async (req: AuthenticatedRequest, res, next) => {
       if (profilePayload.id_number !== undefined && String(profilePayload.id_number).trim() === '') {
         profilePayload.id_number = null;
       }
+      if (profilePayload.gender !== undefined) {
+        const g = String(profilePayload.gender || '').trim();
+        if (!g || g.toLowerCase() === 'prefer not to say') {
+          profilePayload.gender = null;
+        } else if (g.length > 10) {
+          profilePayload.gender = g.slice(0, 10);
+        }
+      }
 
       if (existingProf) {
         const { error: profileError } = await supabase
