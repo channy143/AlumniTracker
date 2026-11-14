@@ -349,7 +349,19 @@ router.get('/export', async (req, res, next) => {
       });
     }
 
-    res.json(users);
+    const sortedUsers = [...users].sort((a: any, b: any) => {
+      const aLast = String(a.profile?.last_name || '').trim();
+      const bLast = String(b.profile?.last_name || '').trim();
+      const lastCmp = aLast.localeCompare(bLast, undefined, { sensitivity: 'base', numeric: true });
+      if (lastCmp !== 0) return lastCmp;
+      const aFirst = String(a.profile?.first_name || '').trim();
+      const bFirst = String(b.profile?.first_name || '').trim();
+      const firstCmp = aFirst.localeCompare(bFirst, undefined, { sensitivity: 'base', numeric: true });
+      if (firstCmp !== 0) return firstCmp;
+      return String(a.email || '').localeCompare(String(b.email || ''), undefined, { sensitivity: 'base', numeric: true });
+    });
+
+    res.json(sortedUsers);
   } catch (err) {
     next(err);
   }

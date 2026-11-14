@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
+import { sortRowsAlphabetically } from '../../utils/csvExport';
+import { formatProgramLongName } from '../../utils/formatProgram';
 
 async function safeData(query: any): Promise<any[]> {
   try { const { data } = await query; return data || []; }
@@ -19,8 +21,9 @@ function abbreviateProgram(name: string): string {
 
 function buildCsv(rows: Record<string, any>[]): string {
   if (rows.length === 0) return '';
-  const headers = Object.keys(rows[0]);
-  const csv = rows.map((r) => headers.map((h) => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(','));
+  const sortedRows = sortRowsAlphabetically(rows);
+  const headers = Object.keys(sortedRows[0]);
+  const csv = sortedRows.map((r) => headers.map((h) => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(','));
   return [headers.join(','), ...csv].join('\n');
 }
 
@@ -89,9 +92,11 @@ router.get('/employment-by-course', async (req, res, next) => {
     education?.forEach((e) => {
       if (!e.program) return;
       if (year && String(e.year_graduated) !== year) return;
-      if (!courseStats[e.program]) courseStats[e.program] = { total: 0, employed: 0 };
-      courseStats[e.program].total++;
-      if (isEmployed(e.profile_id)) courseStats[e.program].employed++;
+      const prog = formatProgramLongName(e.program);
+      if (!prog) return;
+      if (!courseStats[prog]) courseStats[prog] = { total: 0, employed: 0 };
+      courseStats[prog].total++;
+      if (isEmployed(e.profile_id)) courseStats[prog].employed++;
     });
 
     const data = Object.entries(courseStats).map(([course, stats]) => ({
@@ -285,7 +290,7 @@ router.get('/degree-alignment', async (req, res, next) => {
     const { data: education } = await supabase.from('education').select('profile_id, program');
     const { data: employment } = await supabase.from('employment').select('profile_id, company_industry, is_current');
 
-    const eduMap = new Map(education?.map((e) => [e.profile_id, e.program]) || []);
+    const eduMap = new Map(education?.map((e) => [e.profile_id, e.program ? formatProgramLongName(e.program) : e.program]) || []);
     const empIndustries = new Map<string, string[]>();
     employment?.forEach((e) => {
       if (e.is_current && e.company_industry) {
@@ -297,8 +302,8 @@ router.get('/degree-alignment', async (req, res, next) => {
 
     const INDUSTRY_KEYWORDS = [
       { keywords: ['education', 'teaching', 'school', 'training', 'academic'], industries: ['Education', 'Academic', 'School'] },
-      { keywords: ['industrial technology', 'technology', 'engineering', 'industrial', 'manufacturing'], industries: ['Technology', 'Industrial', 'Engineering', 'Manufacturing'] },
       { keywords: ['information technology', 'computer', 'software', 'it ', ' data'], industries: ['Information Technology', 'IT', 'Software', 'Computer'] },
+      { keywords: ['industrial technology', 'technology', 'engineering', 'industrial', 'manufacturing'], industries: ['Technology', 'Industrial', 'Engineering', 'Manufacturing'] },
       { keywords: ['accounting', 'business', 'finance', 'management', 'commerce'], industries: ['Accounting', 'Business', 'Finance'] },
       { keywords: ['education, ', 'education and', 'teacher'], industries: ['Education'] },
       { keywords: ['tourism', 'hospitality', 'hotel', 'restaurant'], industries: ['Tourism', 'Hospitality'] },

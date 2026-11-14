@@ -12,6 +12,8 @@ const PROGRAM_MAP: Record<string, string> = {
   'bsit': 'Bachelor of Science in Information Technology',
   'it': 'Bachelor of Science in Information Technology',
   'informationtechnology': 'Bachelor of Science in Information Technology',
+  'bachelorofscienceinformationtechnology': 'Bachelor of Science in Information Technology',
+  'bachelorofscienceandinformationtechnology': 'Bachelor of Science in Information Technology',
   'bscs': 'Bachelor of Science in Computer Science',
   'cs': 'Bachelor of Science in Computer Science',
   'computerscience': 'Bachelor of Science in Computer Science',
@@ -180,6 +182,15 @@ const PROGRAM_MAP: Record<string, string> = {
   'bsfisheries': 'Bachelor of Science in Fisheries',
 };
 
+const CANONICAL_PROGRAM_MAP: Record<string, string> = Object.values(PROGRAM_MAP).reduce(
+  (acc, canonical) => {
+    const norm = canonical.toLowerCase().replace(/[\s\.\-_/]/g, '');
+    if (!acc[norm]) acc[norm] = canonical;
+    return acc;
+  },
+  {} as Record<string, string>
+);
+
 /**
  * Normalizes any program string or abbreviation to its full canonical title.
  * If already a full title or unrecognized, cleans and returns the best representation.
@@ -215,6 +226,9 @@ export function formatProgramLongName(rawProgram: string | null | undefined): st
   const key = trimmed.toLowerCase().replace(/[\s\.\-_/]/g, '');
   if (PROGRAM_MAP[key]) {
     return PROGRAM_MAP[key] + batchSuffix;
+  }
+  if (CANONICAL_PROGRAM_MAP[key]) {
+    return CANONICAL_PROGRAM_MAP[key] + batchSuffix;
   }
 
   // Handle BIT with majors (e.g. "BIT - Automotive", "BIT in Electrical", "BIT Major in Drafting")

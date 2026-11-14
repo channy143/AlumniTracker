@@ -20,16 +20,34 @@ function createTransporter() {
   });
 }
 
-function getLogoPath(): string | null {
-  const possiblePaths = [
-    path.resolve(process.cwd(), 'image/logo.png'),
-    path.resolve(process.cwd(), '../image/logo.png'),
-    path.resolve(__dirname, '../../../image/logo.png'),
-    path.resolve(__dirname, '../../../../image/logo.png'),
-    path.resolve(process.cwd(), 'client/public/logo.png'),
-    path.resolve(__dirname, '../../../client/public/logo.png'),
+function getAlumiLogoAttachment(): { filename: string; path: string; cid: string; contentType: string } | null {
+  const candidates = [
+    { rel: 'image/alumi-animated.gif', filename: 'alumi-animated.gif', contentType: 'image/gif' },
+    { rel: 'client/public/image/alumi-animated.gif', filename: 'alumi-animated.gif', contentType: 'image/gif' },
+    { rel: 'image/mascot.png', filename: 'mascot.png', contentType: 'image/png' },
+    { rel: 'client/public/image/mascot.png', filename: 'mascot.png', contentType: 'image/png' },
+    { rel: 'image/logo.png', filename: 'logo.png', contentType: 'image/png' },
+    { rel: 'client/public/logo.png', filename: 'logo.png', contentType: 'image/png' },
   ];
-  return possiblePaths.find((p) => fs.existsSync(p)) || null;
+
+  for (const c of candidates) {
+    const possiblePaths = [
+      path.resolve(process.cwd(), c.rel),
+      path.resolve(process.cwd(), '..', c.rel),
+      path.resolve(__dirname, '../../..', c.rel),
+      path.resolve(__dirname, '../../../..', c.rel),
+    ];
+    const found = possiblePaths.find((p) => fs.existsSync(p));
+    if (found) {
+      return {
+        filename: c.filename,
+        path: found,
+        cid: 'alumimascot',
+        contentType: c.contentType,
+      };
+    }
+  }
+  return null;
 }
 
 export async function sendOtpEmail(to: string, otp: string): Promise<void> {
@@ -39,16 +57,8 @@ export async function sendOtpEmail(to: string, otp: string): Promise<void> {
     return;
   }
 
-  const logoPath = getLogoPath();
-  const attachments = logoPath
-    ? [
-        {
-          filename: 'logo.png',
-          path: logoPath,
-          cid: 'ctulogo',
-        },
-      ]
-    : [];
+  const logoAttachment = getAlumiLogoAttachment();
+  const attachments = logoAttachment ? [logoAttachment] : [];
 
   await transporter.sendMail({
     from: `"CTU-Naga Alumni Tracker" <${process.env.SMTP_USER}>`,
@@ -61,7 +71,7 @@ export async function sendOtpEmail(to: string, otp: string): Promise<void> {
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
             <tr>
               <td style="width: 58px; vertical-align: middle; padding-right: 14px;">
-                <img src="${logoPath ? 'cid:ctulogo' : 'https://placehold.co/100x100?text=CTU'}" alt="CTU-Naga Logo" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);" />
+                <img src="${logoAttachment ? 'cid:alumimascot' : 'https://placehold.co/100x100?text=Alumi'}" alt="Alumi — CTU-Naga Mascot" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);" />
               </td>
               <td style="vertical-align: middle;">
                 <h1 style="color: #ffffff; font-size: 19px; margin: 0; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em;">CTU-Naga Alumni Tracker</h1>
@@ -160,10 +170,8 @@ export async function notifyAllAlumniByEmail(payload: AlumniBroadcastEmailPayloa
     `
     : '';
 
-  const logoPath = getLogoPath();
-  const attachments = logoPath
-    ? [{ filename: 'logo.png', path: logoPath, cid: 'ctulogo' }]
-    : [];
+  const logoAttachment = getAlumiLogoAttachment();
+  const attachments = logoAttachment ? [logoAttachment] : [];
 
   const html = `
     <div style="font-family: 'Inter', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px 20px; background: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0;">
@@ -171,7 +179,7 @@ export async function notifyAllAlumniByEmail(payload: AlumniBroadcastEmailPayloa
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
           <tr>
             <td style="width: 58px; vertical-align: middle; padding-right: 14px;">
-              <img src="${logoPath ? 'cid:ctulogo' : 'https://placehold.co/100x100?text=CTU'}" alt="CTU-Naga Logo" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px;" />
+              <img src="${logoAttachment ? 'cid:alumimascot' : 'https://placehold.co/100x100?text=Alumi'}" alt="Alumi — CTU-Naga Mascot" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px;" />
             </td>
             <td style="vertical-align: middle;">
               <h1 style="color: #ffffff; font-size: 19px; margin: 0; font-weight: 700; line-height: 1.25;">CTU-Naga Alumni Tracker</h1>

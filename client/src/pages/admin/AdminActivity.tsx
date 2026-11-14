@@ -589,7 +589,14 @@ export default function AdminActivity() {
       'Admin Notes',
       'Resolved At',
     ];
-    const rows = filteredIncidents.map((inc) => {
+    const sortedIncidents = [...filteredIncidents].sort((a, b) => {
+      const aName = a.reporter ? `${a.reporter.first_name || ''} ${a.reporter.last_name || ''}`.trim() : 'Anonymous / User';
+      const bName = b.reporter ? `${b.reporter.first_name || ''} ${b.reporter.last_name || ''}`.trim() : 'Anonymous / User';
+      const nameCmp = aName.localeCompare(bName, undefined, { sensitivity: 'base', numeric: true });
+      if (nameCmp !== 0) return nameCmp;
+      return String(a.incident_type || '').localeCompare(String(b.incident_type || ''), undefined, { sensitivity: 'base', numeric: true });
+    });
+    const rows = sortedIncidents.map((inc) => {
       const reporterName = inc.reporter ? `${inc.reporter.first_name || ''} ${inc.reporter.last_name || ''}`.trim() : 'Anonymous / User';
       const reporterEmail = inc.reporter?.email || 'N/A';
       return [

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
+import { createBroadcastNotification } from '../notifications';
 import { notifyAllAlumniByEmail } from '../../services/email';
 
 const router = Router();
@@ -125,6 +126,14 @@ router.post('/', async (req, res, next) => {
     const { data, error } = await supabase.from('feed_posts').insert(payload).select().single();
 
     if (error) throw new AppError(error.message, 500);
+
+    await createBroadcastNotification({
+      role: 'alumni',
+      type: 'event',
+      title: `📅 ${name}`,
+      message: description ? `${description.slice(0, 120)}${description.length > 120 ? '...' : ''}` : 'A new alumni event has been announced.',
+      link: '/feed',
+    });
 
     void notifyAllAlumniByEmail({
       kind: 'event',

@@ -3,7 +3,8 @@ import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { AuthenticatedRequest } from '../../types';
 import { logAudit } from '../../services/auditLogger';
-import { buildDpaCsv } from '../../utils/csvExport';
+import { buildDpaCsv, sortRowsAlphabetically } from '../../utils/csvExport';
+import { formatProgramLongName } from '../../utils/formatProgram';
 
 const router = Router();
 
@@ -17,6 +18,15 @@ function groupBy<T extends Record<string, any>>(arr: T[], key: string): Record<s
 }
 
 const buildCsv = buildDpaCsv;
+
+function matchesProgramFilter(rawProgram: string | null | undefined, filter: string): boolean {
+  const f = filter.trim().toLowerCase();
+  if (!f) return true;
+  const raw = (rawProgram || '').toLowerCase();
+  const long = formatProgramLongName(rawProgram).toLowerCase();
+  const filterLong = formatProgramLongName(filter).toLowerCase();
+  return raw.includes(f) || long.includes(f) || (!!filterLong && long.includes(filterLong));
+}
 
 function clientIp(req: any): string {
   const forwarded = req.headers['x-forwarded-for'];
@@ -225,7 +235,7 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
     }
     if (programFilter) {
       users = users.filter((u: any) =>
-        (u.education || []).some((e: any) => (e.program || '').toLowerCase().includes(programFilter.toLowerCase()))
+        (u.education || []).some((e: any) => matchesProgramFilter(e.program, programFilter))
       );
     }
     if (batchFilter) {
@@ -249,7 +259,7 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
         'First Name': u.profile?.first_name || '',
         'Last Name': u.profile?.last_name || '',
         'ID Number': u.profile?.id_number || '',
-        'Degree Program': ed.program || '',
+        'Degree Program': ed.program ? formatProgramLongName(ed.program) : '',
         'Major': ed.major || '',
         'Graduation Year': ed.year_graduated || '',
         'Employment Status': emp.employment_status || u.profile?.employment_status || 'N/A',
@@ -280,7 +290,7 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows, raw: users });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows), raw: users });
   } catch (err) {
     next(err);
   }
@@ -323,7 +333,7 @@ router.get('/employment', async (req: AuthenticatedRequest, res, next) => {
 
     if (programFilter) {
       employment = employment.filter((e: any) =>
-        (e.education || []).some((ed: any) => (ed.program || '').toLowerCase().includes(programFilter.toLowerCase()))
+        (e.education || []).some((ed: any) => matchesProgramFilter(ed.program, programFilter))
       );
     }
     if (batchFilter) {
@@ -345,7 +355,7 @@ router.get('/employment', async (req: AuthenticatedRequest, res, next) => {
       'Alumni Name': `${e.profile?.first_name || ''} ${e.profile?.last_name || ''}`.trim(),
       'Email': e.profile?.email || '',
       'ID Number': e.profile?.id_number || '',
-      'Degree Program': e.education?.[0]?.program || '',
+      'Degree Program': e.education?.[0]?.program ? formatProgramLongName(e.education[0].program) : '',
       'Graduation Year': e.education?.[0]?.year_graduated || '',
       'Company Name': e.company_name || '',
       'Industry': e.company_industry || '',
@@ -372,7 +382,7 @@ router.get('/employment', async (req: AuthenticatedRequest, res, next) => {
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows, raw: employment });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows), raw: employment });
   } catch (err) {
     next(err);
   }
@@ -468,7 +478,7 @@ router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) =>
 
     if (programFilter) {
       records = records.filter((r) =>
-        (r.education?.program || '').toLowerCase().includes(programFilter.toLowerCase())
+        matchesProgramFilter(r.education?.program, programFilter)
       );
     }
     if (batchFilter) {
@@ -514,7 +524,7 @@ router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) =>
         'Alumni Name': `${r.profile?.first_name || ''} ${r.profile?.last_name || ''}`.trim() || r.user?.email || '',
         'Email': r.user?.email || r.profile?.email || '',
         'ID Number': r.profile?.id_number || '',
-        'Degree Program': r.education?.program || '',
+        'Degree Program': r.education?.program ? formatProgramLongName(r.education.program) : '',
         'Graduation Year': r.education?.year_graduated || '',
         'Employment Status': emp?.employment_status || r.profile?.employment_status || 'N/A',
         'Company Name': emp?.company_name || '',
@@ -542,7 +552,7 @@ router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) =>
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows) });
   } catch (err) {
     next(err);
   }
@@ -598,7 +608,7 @@ router.get('/career-progress', async (req: AuthenticatedRequest, res, next) => {
       return posList.map((p: any, idx: number) => ({
         'Alumni Name': `${cp.profile?.first_name || ''} ${cp.profile?.last_name || ''}`.trim(),
         'Email': cp.profile?.email || '',
-        'Degree Program': cp.education?.program || '',
+        'Degree Program': cp.education?.program ? formatProgramLongName(cp.education.program) : '',
         'Graduation Year': cp.education?.year_graduated || '',
         'Position Order': idx + 1,
         'Company': p.company_name,
@@ -625,7 +635,7 @@ router.get('/career-progress', async (req: AuthenticatedRequest, res, next) => {
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows) });
   } catch (err) {
     next(err);
   }
@@ -705,7 +715,7 @@ router.get('/salary-distribution', async (req: AuthenticatedRequest, res, next) 
 
     res.json({
       summary: { totalReported, avgSalary, highestSalary, lowestSalary },
-      data: rows,
+      data: sortRowsAlphabetically(rows),
       brackets: Object.entries(brackets).map(([range, count]) => ({ range, count })),
     });
   } catch (err) {
@@ -739,7 +749,8 @@ router.get('/employment-by-course', async (req: AuthenticatedRequest, res, next)
       if (!e.program) return;
       if (yearFilter && String(e.year_graduated) !== String(yearFilter)) return;
 
-      const prog = e.program.trim();
+      const prog = formatProgramLongName(e.program);
+      if (!prog) return;
       if (!courseStats[prog]) courseStats[prog] = { total: 0, employed: 0, selfEmployed: 0, unemployed: 0 };
       courseStats[prog].total++;
 
@@ -780,7 +791,7 @@ router.get('/employment-by-course', async (req: AuthenticatedRequest, res, next)
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows) });
   } catch (err) {
     next(err);
   }
@@ -847,7 +858,7 @@ router.get('/batch-employment', async (req: AuthenticatedRequest, res, next) => 
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows) });
   } catch (err) {
     next(err);
   }
@@ -867,8 +878,8 @@ router.get('/degree-alignment', async (req: AuthenticatedRequest, res, next) => 
 
     const INDUSTRY_KEYWORDS = [
       { keywords: ['education', 'teaching', 'school', 'training', 'academic', 'beed', 'bsed', 'btled'], industries: ['Education', 'Academic', 'School'] },
-      { keywords: ['industrial technology', 'technology', 'engineering', 'industrial', 'manufacturing', 'bit'], industries: ['Technology', 'Industrial', 'Engineering', 'Manufacturing'] },
       { keywords: ['information technology', 'computer', 'software', 'it ', 'data', 'developer', 'programmer', 'bsit'], industries: ['Information Technology', 'IT', 'Software', 'Computer'] },
+      { keywords: ['industrial technology', 'technology', 'engineering', 'industrial', 'manufacturing', 'bit'], industries: ['Technology', 'Industrial', 'Engineering', 'Manufacturing'] },
       { keywords: ['accounting', 'business', 'finance', 'management', 'commerce'], industries: ['Accounting', 'Business', 'Finance'] },
       { keywords: ['hospitality', 'hotel', 'restaurant', 'food', 'tourism', 'he'], industries: ['Hospitality', 'Tourism', 'Food & Beverage'] },
     ];
@@ -878,7 +889,8 @@ router.get('/degree-alignment', async (req: AuthenticatedRequest, res, next) => 
 
     (education || []).forEach((e: any) => {
       if (!e.program) return;
-      const prog = e.program.trim();
+      const prog = formatProgramLongName(e.program);
+      if (!prog) return;
       if (!alignmentStats[prog]) alignmentStats[prog] = { total: 0, aligned: 0 };
       alignmentStats[prog].total++;
 
@@ -921,7 +933,7 @@ router.get('/degree-alignment', async (req: AuthenticatedRequest, res, next) => 
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows) });
   } catch (err) {
     next(err);
   }
@@ -983,7 +995,7 @@ router.get('/employer', async (req: AuthenticatedRequest, res, next) => {
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows, raw: companies });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows), raw: companies });
   } catch (err) {
     next(err);
   }
@@ -1035,7 +1047,7 @@ router.get('/surveys', async (req: AuthenticatedRequest, res, next) => {
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows, raw: surveys });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows), raw: surveys });
   } catch (err) {
     next(err);
   }
@@ -1074,20 +1086,96 @@ router.get('/survey/:id', async (req: AuthenticatedRequest, res, next) => {
       }));
     }
 
+    // Build ordered, human-readable columns from survey.questions + any extra response keys
+    const questionLabelMap = new Map<string, string>();
+    const orderedKeys: string[] = [];
+    const seenKeys = new Set<string>();
+
+    if (Array.isArray(survey.questions)) {
+      survey.questions.forEach((q: any) => {
+        if (!q || !q.id || q.type === 'section') return;
+        const key = String(q.id);
+        if (q.label) questionLabelMap.set(key, String(q.label));
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          orderedKeys.push(key);
+        }
+      });
+    }
+
+    responses.forEach((r: any) => {
+      const respObj = typeof r.responses === 'object' && r.responses !== null ? r.responses : {};
+      Object.keys(respObj).forEach((k) => {
+        if (!seenKeys.has(k)) {
+          seenKeys.add(k);
+          orderedKeys.push(k);
+        }
+      });
+    });
+
+    const formatColumnLabel = (key: string): string => {
+      if (questionLabelMap.has(key)) return questionLabelMap.get(key)!;
+      return key
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .trim();
+    };
+
+    const formatAnswerValue = (key: string, val: any): string => {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+      if (Array.isArray(val)) return val.map((item) => formatAnswerValue(key, item)).filter(Boolean).join('; ');
+      if (typeof val === 'object') {
+        if ('agreed' in val) return val.agreed ? 'Agreed' : 'Declined';
+        return Object.entries(val)
+          .map(([subK, subV]) => `${formatColumnLabel(subK)}: ${formatAnswerValue(subK, subV)}`)
+          .join('; ');
+      }
+      const str = String(val).trim();
+      if (!str) return '';
+      if (/^(program|degree|course|degree_program|program_graduated)$/i.test(key)) {
+        return formatProgramLongName(str);
+      }
+      return str;
+    };
+
+    // Ensure unique column headers in case two keys share a label
+    const keyToHeader = new Map<string, string>();
+    const usedHeaders = new Set<string>([
+      'Survey Title',
+      'Respondent Name',
+      'Respondent Email',
+      'Student ID',
+      'Submission Timestamp',
+    ]);
+    orderedKeys.forEach((k) => {
+      let header = formatColumnLabel(k);
+      if (usedHeaders.has(header)) {
+        let suffix = 2;
+        while (usedHeaders.has(`${header} (${suffix})`)) suffix++;
+        header = `${header} (${suffix})`;
+      }
+      usedHeaders.add(header);
+      keyToHeader.set(k, header);
+    });
+
     const rows = responses.map((r: any) => {
       const respObj = typeof r.responses === 'object' && r.responses !== null ? r.responses : {};
-      const answerSummary = Object.entries(respObj)
-        .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
-        .join(' | ');
-
-      return {
+      const row: Record<string, any> = {
         'Survey Title': survey.title,
         'Respondent Name': `${r.profile?.first_name || ''} ${r.profile?.last_name || ''}`.trim() || 'Anonymous',
         'Respondent Email': r.user?.email || 'N/A',
         'Student ID': r.profile?.id_number || 'N/A',
         'Submission Timestamp': r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '',
-        'Survey Answers': answerSummary,
       };
+
+      orderedKeys.forEach((k) => {
+        const header = keyToHeader.get(k)!;
+        row[header] = formatAnswerValue(k, respObj[k]);
+      });
+
+      return row;
     });
 
     await recordReportExport(req, {
@@ -1104,7 +1192,7 @@ router.get('/survey/:id', async (req: AuthenticatedRequest, res, next) => {
       return res.send(buildCsv(rows));
     }
 
-    res.json({ survey, count: rows.length, data: rows });
+    res.json({ survey, count: rows.length, data: sortRowsAlphabetically(rows) });
   } catch (err) {
     next(err);
   }
@@ -1121,26 +1209,30 @@ router.get('/skills', async (req: AuthenticatedRequest, res, next) => {
       .from('skills')
       .select('name, category, proficiency_level, is_verified, profile_id');
 
-    const skillCounts: Record<string, { count: number; verifiedCount: number; category: string; avgProficiency: number[] }> = {};
+    const skillCounts: Record<string, { displayName: string; count: number; verifiedCount: number; category: string; avgProficiency: number[] }> = {};
 
     (skillsData || []).forEach((s: any) => {
       const name = (s.name || '').trim();
       if (!name) return;
-      if (!skillCounts[name]) {
-        skillCounts[name] = { count: 0, verifiedCount: 0, category: s.category || 'General', avgProficiency: [] };
+      const key = name.toLowerCase();
+      if (!skillCounts[key]) {
+        skillCounts[key] = { displayName: name, count: 0, verifiedCount: 0, category: s.category || 'General', avgProficiency: [] };
+      } else if (skillCounts[key].displayName === skillCounts[key].displayName.toLowerCase() && name !== name.toLowerCase()) {
+        // Prefer mixed/capitalized casing for display when available
+        skillCounts[key].displayName = name;
       }
-      skillCounts[name].count++;
-      if (s.is_verified) skillCounts[name].verifiedCount++;
-      if (s.proficiency_level) skillCounts[name].avgProficiency.push(Number(s.proficiency_level));
+      skillCounts[key].count++;
+      if (s.is_verified) skillCounts[key].verifiedCount++;
+      if (s.proficiency_level) skillCounts[key].avgProficiency.push(Number(s.proficiency_level));
     });
 
-    const rows = Object.entries(skillCounts)
-      .map(([name, s]) => {
+    const rows = Object.values(skillCounts)
+      .map((s) => {
         const avg = s.avgProficiency.length > 0
           ? (s.avgProficiency.reduce((a, b) => a + b, 0) / s.avgProficiency.length).toFixed(1)
           : 'N/A';
         return {
-          'Skill Name': name,
+          'Skill Name': s.displayName,
           'Category': s.category,
           'Alumni Count': s.count,
           'Verified Skills Count': s.verifiedCount,
@@ -1162,7 +1254,7 @@ router.get('/skills', async (req: AuthenticatedRequest, res, next) => {
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows) });
   } catch (err) {
     next(err);
   }
@@ -1218,7 +1310,7 @@ router.get('/jobs', async (req: AuthenticatedRequest, res, next) => {
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: rows, raw: jobs });
+    res.json({ count: rows.length, data: sortRowsAlphabetically(rows), raw: jobs });
   } catch (err) {
     next(err);
   }
@@ -1290,7 +1382,7 @@ router.get('/system-master', async (req: AuthenticatedRequest, res, next) => {
           'Email': u.email,
           'Name': `${prof.first_name || ''} ${prof.last_name || ''}`.trim(),
           'ID Number': prof.id_number || '',
-          'Program': edu.program || '',
+          'Program': edu.program ? formatProgramLongName(edu.program) : '',
           'Batch': edu.year_graduated || '',
           'Employment Status': emp.employment_status || prof.employment_status || 'N/A',
           'Company': emp.company_name || '',

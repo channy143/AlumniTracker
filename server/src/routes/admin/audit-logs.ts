@@ -252,8 +252,14 @@ router.get('/export', async (req, res, next) => {
       'Event Details',
     ];
 
+    const sortedRows = [...rows].sort((a: any, b: any) => {
+      const actorCmp = String(a.actor_name || 'System').localeCompare(String(b.actor_name || 'System'), undefined, { sensitivity: 'base', numeric: true });
+      if (actorCmp !== 0) return actorCmp;
+      return String(a.action || '').localeCompare(String(b.action || ''), undefined, { sensitivity: 'base', numeric: true });
+    });
+
     const csvLines = [headers.join(',')];
-    rows.forEach((r: any) => {
+    sortedRows.forEach((r: any) => {
       csvLines.push([
         escapeCsv(r.created_at),
         escapeCsv(r.severity || 'info'),

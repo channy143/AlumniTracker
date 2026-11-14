@@ -1379,7 +1379,23 @@ export default function ProfilePage() {
                           <div className="flex-1 min-w-0 space-y-1">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                               <input value={edu.program || ''} onChange={(e) => { const next = [...editEducation]; next[i] = { ...next[i], program: e.target.value }; setEditEducation(next); }} placeholder="Program / Degree" className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-orange-400" />
-                              <input type="number" value={edu.year_graduated || ''} onChange={(e) => { const next = [...editEducation]; next[i] = { ...next[i], year_graduated: parseInt(e.target.value) || '' }; setEditEducation(next); }} placeholder="Year" className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-orange-400" />
+                              <select
+                                value={edu.year_graduated || ''}
+                                onChange={(e) => { const next = [...editEducation]; next[i] = { ...next[i], year_graduated: e.target.value ? parseInt(e.target.value, 10) : '' }; setEditEducation(next); }}
+                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-orange-400 bg-white"
+                              >
+                                <option value="">Select Year</option>
+                                {(() => {
+                                  const maxYear = new Date().getFullYear() + 2;
+                                  const years: number[] = [];
+                                  for (let y = maxYear; y >= 1970; y--) years.push(y);
+                                  const currentVal = edu.year_graduated ? parseInt(String(edu.year_graduated), 10) : null;
+                                  if (currentVal && !years.includes(currentVal)) years.unshift(currentVal);
+                                  return years.map((y) => (
+                                    <option key={y} value={y}>{y}</option>
+                                  ));
+                                })()}
+                              </select>
                             </div>
                             <input value={edu.institution || edu.campus || ''} onChange={(e) => { const next = [...editEducation]; next[i] = { ...next[i], institution: e.target.value, campus: e.target.value }; setEditEducation(next); }} placeholder="Institution" className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none focus:border-orange-400" />
                             <select

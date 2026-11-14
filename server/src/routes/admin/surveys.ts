@@ -3,6 +3,7 @@ import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { createSurveyNotifications } from '../notifications';
 import { buildDpaCsv } from '../../utils/csvExport';
+import { formatProgramLongName } from '../../utils/formatProgram';
 import { logAudit } from '../../services/auditLogger';
 
 const STANDARD_QUESTIONS = [
@@ -504,7 +505,7 @@ router.get('/:id/responses/export', async (req, res, next) => {
           'Province': resp.province || '',
           'Address': resp.address || '',
           'Current Residence Location': resp.currentResidenceLocation || '',
-          'Degree Program': resp.program || '',
+          'Degree Program': resp.program ? formatProgramLongName(resp.program) : '',
           'Graduation Year': resp.yearGraduated ? String(resp.yearGraduated) : '',
           'Academic Honors': resp.honors || '',
           'Licensure Status': resp.licensureStatus || '',
