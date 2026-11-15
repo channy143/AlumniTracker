@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
+import { requireAdminSudo } from '../../middleware/sudo';
+import { adminSensitiveLimiter } from '../../middleware/rateLimiter';
+import { clearAdminSecurityPolicyCache } from '../../services/sessionSecurityService';
+import { logAudit } from '../../services/auditLogger';
 
 const router = Router();
 
@@ -15,6 +19,9 @@ const DEFAULT_SETTINGS = {
   colleges: ['College of Education', 'College of Technology'],
   employment_types: ['full-time', 'part-time', 'contract', 'freelance', 'internship'],
   industries: ['Technology', 'Education', 'Healthcare', 'Finance', 'Manufacturing', 'Retail', 'Construction', 'Government'],
+  require_admin_mfa: true,
+  admin_idle_timeout_minutes: 15,
+  require_sudo_for_sensitive: true,
 };
 
 router.get('/', async (_req, res, next) => {
@@ -33,7 +40,7 @@ router.get('/', async (_req, res, next) => {
   }
 });
 
-router.put('/', async (req, res, next) => {
+router.put('/', adminSensitiveLimiter, requireAdminSudo, async (req, res, next) => {
   try {
     const { data: existing } = await supabase
       .from('settings')
@@ -55,6 +62,19 @@ router.put('/', async (req, res, next) => {
       if (error && (error.code === '42P01' || error.code === 'PGRST205')) return res.json({ message: 'Settings table not available' });
       if (error) throw new AppError(error.message, 500);
     }
+
+    clearAdminSecurityPolicyCache();
+    logAudit(req, {
+      action: 'ADMIN_SETTINGS_UPDATED',
+      entity: 'settings',
+      severity: 'warning',
+      status: 'success',
+      details: {
+        require_admin_mfa: req.body?.require_admin_mfa,
+        admin_idle_timeout_minutes: req.body?.admin_idle_timeout_minutes,
+        require_sudo_for_sensitive: req.body?.require_sudo_for_sensitive,
+      },
+    });
 
     res.json({ message: 'Settings updated' });
   } catch (err) {

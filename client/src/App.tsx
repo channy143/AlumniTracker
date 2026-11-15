@@ -2,10 +2,13 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useHeartbeat } from '@/hooks/useHeartbeat';
+import { useAdminIdleTimeout } from '@/hooks/useAdminIdleTimeout';
 import MainLayout from '@/components/layout/MainLayout';
 import AuthLayout from '@/components/layout/AuthLayout';
 import ScrollToTop from '@/components/layout/ScrollToTop';
 import AccountDeletedModal from '@/components/security/AccountDeletedModal';
+import AdminSudoModal from '@/components/security/AdminSudoModal';
+import AdminIdleTimeoutModal from '@/components/security/AdminIdleTimeoutModal';
 
 import LandingPage from '@/pages/landing/LandingPage';
 import LoginPage from '@/pages/auth/LoginPage';
@@ -112,10 +115,18 @@ function IndexRoute() {
 export default function App() {
   useAuth();
   useHeartbeat();
+  const idleTimeout = useAdminIdleTimeout();
   return (
     <>
       <ScrollToTop />
       <AccountDeletedModal />
+      <AdminSudoModal />
+      <AdminIdleTimeoutModal
+        open={idleTimeout.showWarning}
+        secondsLeft={idleTimeout.secondsLeft}
+        onStaySignedIn={idleTimeout.staySignedIn}
+        onLogoutNow={idleTimeout.logoutNow}
+      />
       <Routes>
       <Route path="/" element={<IndexRoute />}>
         <Route index element={<DashboardPage />} />

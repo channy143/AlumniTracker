@@ -4,6 +4,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { supabase } from '../services/supabase';
 import { authenticate, getJwtSecret } from '../middleware/auth';
+import { signAdminSudoCookie, clearAdminSudoCookie } from '../middleware/sudo';
+import {
+  getAdminSecurityPolicy,
+  invalidateUserSessions,
+  isTokenBeforeSessionCutoff,
+} from '../services/sessionSecurityService';
 import { validate } from '../middleware/validate';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest, AuthPayload } from '../types';
@@ -374,9 +380,15 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     // Successful password match -> clear failed counters.
     resetFailedAttempts(identifier, ip);
 
-    // If MFA is enabled, check if this device is recognized and trusted.
-    if (record.mfa_enabled) {
-      const isTrusted = await verifyTrustedDevice(record.id, record.email, deviceId, deviceToken);
+    const policy = record.role === 'admin' ? await getAdminSecurityPolicy() : null;
+    const mustRequireMfa = record.role === 'admin' ? Boolean(policy?.requireAdminMfa) || Boolean(record.mfa_enabled) : Boolean(record.mfa_enabled);
+
+    // If MFA is required, check if this device is recognized and trusted (non-admin only when admin MFA is mandatory).
+    if (mustRequireMfa) {
+      const allowTrustedBypass = !(record.role === 'admin' && policy?.requireAdminMfa);
+      const isTrusted = allowTrustedBypass
+        ? await verifyTrustedDevice(record.id, record.email, deviceId, deviceToken)
+        : false;
       if (isTrusted) {
         const token = signAccessToken(record.id, record.email, record.role);
         const refreshToken = signRefreshToken(record.id, record.email, record.role);
@@ -405,10 +417,12 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       }
 
       // If device is not trusted / first login on this device, send OTP code.
+      const adminMfaDeliveryEmail = process.env.ADMIN_MFA_EMAIL?.trim() || 'shirochan1106@gmail.com';
       const cooldown = await getOtpCooldownMs('mfa', record.email);
       if (cooldown === 0) {
         const { code: otp } = await createOtp('mfa', record.email);
-        await sendOtpEmail(record.email, otp);
+        const deliveryEmail = record.role === 'admin' ? adminMfaDeliveryEmail : record.email;
+        await sendOtpEmail(deliveryEmail, otp);
       }
 
       const mfaPending = jwt.sign(
@@ -501,10 +515,37 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
     const refreshToken = signRefreshToken(user.id, user.email, user.role);
     setAuthCookies(res, token, refreshToken, user.role);
 
-    // Register this device as trusted and mint a device token
+    const policy = user.role === 'admin' ? await getAdminSecurityPolicy() : null;
+    const allowTrustedRegister = !(user.role === 'admin' && policy?.requireAdminMfa);
+
+    if (user.role === 'admin') {
+      const ip = clientIp(req);
+      try {
+        const { data: prevUser, error: prevErr } = await supabase
+          .from('users')
+          .select('last_login_ip')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (!prevErr) {
+          if (prevUser?.last_login_ip && prevUser.last_login_ip !== ip) {
+            notifyAdmins({
+              type: 'security',
+              title: '🛡️ Admin Login From New IP',
+              message: `Administrator ${user.email} signed in from a new IP address (${ip}).`,
+              link: '/admin/activity',
+            });
+          }
+          await supabase.from('users').update({ last_login_ip: ip }).eq('id', user.id);
+        }
+      } catch {
+        // Ignore if last_login_ip column is not yet migrated
+      }
+    }
+
+    // Register this device as trusted and mint a device token (skipped for admins when mandatory MFA is active)
     const targetDeviceId = deviceId || decoded.deviceId;
     let trustedDeviceToken: string | undefined;
-    if (targetDeviceId) {
+    if (targetDeviceId && allowTrustedRegister) {
       trustedDeviceToken = mintTrustedDeviceToken(user.id, user.email, targetDeviceId);
       const userAgent = (req.headers['user-agent'] as string) || 'Recognized Browser';
       await registerTrustedDevice(user.id, targetDeviceId, userAgent);
@@ -712,12 +753,17 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res, n
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const { error } = await supabase
+    const { data: resetUser, error } = await supabase
       .from('users')
       .update({ password_hash: hashedPassword })
-      .eq('email', email);
+      .eq('email', email)
+      .select('id')
+      .single();
 
     if (error) throw new AppError(error.message, 500);
+    if (resetUser?.id) {
+      await invalidateUserSessions(resetUser.id);
+    }
 
     res.json({ message: 'Password reset successfully' });
   } catch (err) {
@@ -749,6 +795,8 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
       .eq('id', req.user!.userId);
 
     if (updateError) throw new AppError(updateError.message, 500);
+
+    await invalidateUserSessions(req.user!.userId);
 
     logAudit(req, {
       action: 'AUTH_PASSWORD_CHANGED',
@@ -825,12 +873,14 @@ router.post('/send-mfa-code', validate(mfaSendCodeSchema), async (req, res, next
     const { email, mfaToken } = req.body;
     const authHeader = req.headers.authorization;
     let tokenEmail: string | undefined;
+    let tokenRole: string | undefined;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       try {
         const decoded = jwt.verify(token, getJwtSecret()) as any;
         tokenEmail = decoded.email;
+        tokenRole = decoded.role;
       } catch {
         throw new AppError('Invalid or expired token', 401);
       }
@@ -841,6 +891,7 @@ router.post('/send-mfa-code', validate(mfaSendCodeSchema), async (req, res, next
           throw new AppError('Invalid verification token', 401);
         }
         tokenEmail = decoded.email;
+        tokenRole = decoded.role;
       } catch {
         throw new AppError('Invalid or expired verification token', 401);
       }
@@ -859,7 +910,9 @@ router.post('/send-mfa-code', validate(mfaSendCodeSchema), async (req, res, next
     }
 
     const { code: otp } = await createOtp('mfa', email);
-    await sendOtpEmail(email, otp);
+    const adminMfaDeliveryEmail = process.env.ADMIN_MFA_EMAIL?.trim() || 'shirochan1106@gmail.com';
+    const deliveryEmail = tokenRole === 'admin' ? adminMfaDeliveryEmail : email;
+    await sendOtpEmail(deliveryEmail, otp);
     res.json({ message: 'Verification code sent to your email' });
   } catch (err) {
     next(err);
@@ -937,7 +990,16 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res, next) => 
       lastName = profile.last_name || '';
     }
 
-    res.json({ user: { ...user, first_name: firstName, last_name: lastName, survey_completed: !!user.survey_completed } });
+    const policy = user.role === 'admin' ? await getAdminSecurityPolicy() : null;
+    res.json({
+      user: {
+        ...user,
+        first_name: firstName,
+        last_name: lastName,
+        survey_completed: !!user.survey_completed,
+        ...(policy ? { admin_idle_timeout_minutes: policy.adminIdleTimeoutMinutes } : {}),
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -953,6 +1015,7 @@ router.post('/refresh', async (req, res, next) => {
     const refreshToken = (req as any).cookies?.ctu_refresh_token;
     if (!refreshToken) {
       clearAuthCookies(res);
+    clearAdminSudoCookie(res);
       return res.status(401).json({ message: 'Refresh token missing' });
     }
 
@@ -961,17 +1024,20 @@ router.post('/refresh', async (req, res, next) => {
       decoded = jwt.verify(refreshToken, getJwtSecret());
     } catch {
       clearAuthCookies(res);
+    clearAdminSudoCookie(res);
       return res.status(401).json({ message: 'Invalid or expired refresh token' });
     }
 
     if (decoded?.type !== 'refresh' || !decoded?.userId) {
       clearAuthCookies(res);
+    clearAdminSudoCookie(res);
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
     const revoked = await isTokenRevoked(refreshToken);
     if (revoked) {
       clearAuthCookies(res);
+    clearAdminSudoCookie(res);
       return res.status(401).json({ message: 'Refresh token has been revoked' });
     }
 
@@ -995,6 +1061,14 @@ router.post('/refresh', async (req, res, next) => {
       return res.status(401).json({
         code: 'ACCOUNT_DISABLED',
         message: 'Your account has been deactivated or archived by an administrator.',
+      });
+    }
+
+    if (isTokenBeforeSessionCutoff(decoded.userId, decoded.iat, (userRec as any).token_valid_after)) {
+      clearAuthCookies(res);
+    clearAdminSudoCookie(res);
+      return res.status(401).json({
+        message: 'Session invalidated due to a security or role update. Please log in again.',
       });
     }
 
@@ -1038,6 +1112,7 @@ router.post('/logout', async (req, res, next) => {
     }
 
     clearAuthCookies(res);
+    clearAdminSudoCookie(res);
 
     if (userId) {
       if (allDevices) {
@@ -1217,11 +1292,68 @@ router.post('/account-deleted-report', async (req, res, next) => {
     });
 
     clearAuthCookies(res);
+    clearAdminSudoCookie(res);
     res.json({
       success: true,
       message: 'Your report has been submitted to administrators.',
       incidentId: incident.id,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Step-up password verification ("Sudo Mode") for sensitive admin actions.
+ */
+router.post('/sudo-verify', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      throw new AppError('Admin privileges required', 403);
+    }
+    const { password } = req.body || {};
+    if (!password || typeof password !== 'string') {
+      throw new AppError('Password is required', 400);
+    }
+
+    const { data: userRec, error } = await supabase
+      .from('users')
+      .select('id, email, password_hash')
+      .eq('id', req.user.userId)
+      .maybeSingle();
+
+    if (error || !userRec) {
+      throw new AppError('Account not found', 404);
+    }
+
+    const valid = await bcrypt.compare(password, userRec.password_hash);
+    if (!valid) {
+      await logAudit(req, {
+        actorId: req.user.userId,
+        actorName: req.user.email,
+        actorRole: 'admin',
+        action: 'ADMIN_SUDO_FAILED',
+        entity: 'auth',
+        severity: 'warning',
+        status: 'failure',
+        details: { reason: 'Incorrect password during step-up confirmation' },
+      });
+      throw new AppError('Incorrect password', 401);
+    }
+
+    signAdminSudoCookie(res, req.user.userId);
+    await logAudit(req, {
+      actorId: req.user.userId,
+      actorName: req.user.email,
+      actorRole: 'admin',
+      action: 'ADMIN_SUDO_VERIFIED',
+      entity: 'auth',
+      severity: 'info',
+      status: 'success',
+      details: { ttlMinutes: 10 },
+    });
+
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

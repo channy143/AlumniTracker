@@ -112,10 +112,30 @@ async function tryRefreshToken(): Promise<boolean> {
   return refreshPromise;
 }
 
+let sudoPromise: Promise<boolean> | null = null;
+
+function requestAdminSudo(): Promise<boolean> {
+  if (sudoPromise) return sudoPromise;
+  sudoPromise = new Promise<boolean>((resolve) => {
+    window.dispatchEvent(
+      new CustomEvent('auth:sudo-required', {
+        detail: {
+          resolve: (verified: boolean) => {
+            sudoPromise = null;
+            resolve(verified);
+          },
+        },
+      })
+    );
+  });
+  return sudoPromise;
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
   _retried = false,
+  _sudoRetried = false,
 ): Promise<T> {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -145,10 +165,16 @@ async function request<T>(
         if (!_retried && shouldAttemptRefresh(endpoint)) {
           const refreshed = await tryRefreshToken();
           if (refreshed) {
-            return request<T>(endpoint, options, true);
+            return request<T>(endpoint, options, true, _sudoRetried);
           }
         }
         clearAllCache();
+      }
+    }
+    if (response.status === 403 && error?.code === 'SUDO_REQUIRED' && !_sudoRetried) {
+      const verified = await requestAdminSudo();
+      if (verified) {
+        return request<T>(endpoint, options, _retried, true);
       }
     }
     let cooldown = error.cooldownSeconds;
@@ -248,37 +274,45 @@ export const api = {
     invalidateForMutation(endpoint);
     return res;
   },
-  download: async (endpoint: string, _retried = false): Promise<Response> => {
+  download: async (endpoint: string, _retried = false, _sudoRetried = false): Promise<Response> => {
     const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'GET',
       credentials: 'include',
     });
     if (res.status === 401 && !_retried && shouldAttemptRefresh(endpoint)) {
       const refreshed = await tryRefreshToken();
-      if (refreshed) return api.download(endpoint, true);
+      if (refreshed) return api.download(endpoint, true, _sudoRetried);
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 403 && err?.code === 'SUDO_REQUIRED' && !_sudoRetried) {
+        const verified = await requestAdminSudo();
+        if (verified) return api.download(endpoint, _retried, true);
+      }
       throw new Error(err.message || 'Download failed');
     }
     return res;
   },
-  blob: async (endpoint: string, _retried = false): Promise<Blob> => {
+  blob: async (endpoint: string, _retried = false, _sudoRetried = false): Promise<Blob> => {
     const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'GET',
       credentials: 'include',
     });
     if (res.status === 401 && !_retried && shouldAttemptRefresh(endpoint)) {
       const refreshed = await tryRefreshToken();
-      if (refreshed) return api.blob(endpoint, true);
+      if (refreshed) return api.blob(endpoint, true, _sudoRetried);
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 403 && err?.code === 'SUDO_REQUIRED' && !_sudoRetried) {
+        const verified = await requestAdminSudo();
+        if (verified) return api.blob(endpoint, _retried, true);
+      }
       throw new Error(err.message || `Download failed: ${res.statusText}`);
     }
     return res.blob();
   },
-  upload: async <T>(endpoint: string, formData: FormData, _retried = false): Promise<T> => {
+  upload: async <T>(endpoint: string, formData: FormData, _retried = false, _sudoRetried = false): Promise<T> => {
     return fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
       credentials: 'include',
@@ -286,13 +320,17 @@ export const api = {
     }).then(async (res) => {
       if (res.status === 401 && !_retried && shouldAttemptRefresh(endpoint)) {
         const refreshed = await tryRefreshToken();
-        if (refreshed) return api.upload<T>(endpoint, formData, true);
+        if (refreshed) return api.upload<T>(endpoint, formData, true, _sudoRetried);
       }
       if (!res.ok) {
         if (res.status === 413) {
           throw new ApiError('The uploaded file is too large (maximum size is 10MB). Please compress the document or choose a smaller file.', 413);
         }
         const err = await res.json().catch(() => ({}));
+        if (res.status === 403 && err?.code === 'SUDO_REQUIRED' && !_sudoRetried) {
+          const verified = await requestAdminSudo();
+          if (verified) return api.upload<T>(endpoint, formData, _retried, true);
+        }
         throw new ApiError(err.message || 'File upload failed. Please try again.', res.status);
       }
       invalidateForMutation(endpoint);
@@ -369,6 +407,8 @@ export const authApi = {
     api.post<{ message: string }>('/auth/revoke-devices', {}),
   logout: (allDevices?: boolean) =>
     api.post<{ success: boolean; message: string }>('/auth/logout', { allDevices }),
+  sudoVerify: (password: string) =>
+    api.post<{ ok: boolean }>('/auth/sudo-verify', { password }),
   reportIncident: (data: { incidentType: string; description: string; severity?: string }) =>
     api.post<{ success: boolean; message: string; incidentId: string }>('/auth/report-incident', data),
   reportDeletedAccount: (description: string) =>

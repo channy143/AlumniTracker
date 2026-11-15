@@ -20,6 +20,8 @@ import eligibleAlumniRouter from './eligibleAlumni';
 import securityIncidentsRouter from './security-incidents';
 import { logAudit } from '../../services/auditLogger';
 import { AuthenticatedRequest } from '../../types';
+import { requireAdminSudo } from '../../middleware/sudo';
+import { adminSensitiveLimiter } from '../../middleware/rateLimiter';
 
 function groupBy<T extends Record<string, any>>(arr: T[], key: string): Record<string, T[]> {
   return (arr || []).reduce((acc: Record<string, T[]>, item: T) => {
@@ -51,7 +53,7 @@ router.use('/audit-logs', auditLogsRouter);
 router.use('/eligible-alumni', eligibleAlumniRouter);
 router.use('/security-incidents', securityIncidentsRouter);
 
-router.get('/export', async (req: AuthenticatedRequest, res, next) => {
+router.get('/export', adminSensitiveLimiter, requireAdminSudo, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { data: profilesData } = await supabase.from('profiles').select('*');
     const profileIds = (profilesData || []).map((p: any) => p.id).filter(Boolean);

@@ -8,6 +8,9 @@ import { normalizeCityName, normalizeProvinceName } from '../../utils/formatLoca
 import { logAudit } from '../../services/auditLogger';
 import { AuthenticatedRequest } from '../../types';
 import { buildDpaCsv } from '../../utils/csvExport';
+import { requireAdminSudo } from '../../middleware/sudo';
+import { adminSensitiveLimiter } from '../../middleware/rateLimiter';
+import { invalidateUserSessions } from '../../services/sessionSecurityService';
 
 const router = Router();
 
@@ -683,6 +686,8 @@ router.put('/:id/archive', async (req, res, next) => {
     if (error && error.code === '42703') return res.json({ message: 'Archive column not available on this database' });
     if (error) throw new AppError(error.message, 500);
 
+    await invalidateUserSessions(req.params.id);
+
     logAudit(req, {
       action: 'ALUMNI_ARCHIVED',
       entity: 'alumni',
@@ -739,7 +744,7 @@ router.put('/:id/verify', async (req, res, next) => {
   }
 });
 
-router.post('/:id/reset-password', async (req: AuthenticatedRequest, res, next) => {
+router.post('/:id/reset-password', adminSensitiveLimiter, requireAdminSudo, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { newPassword } = req.body;
     if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
@@ -748,6 +753,8 @@ router.post('/:id/reset-password', async (req: AuthenticatedRequest, res, next) 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     const { error } = await supabase.from('users').update({ password_hash: hashedPassword }).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
+
+    await invalidateUserSessions(req.params.id);
 
     logAudit(req, {
       action: 'ALUMNI_PASSWORD_RESET',
@@ -865,7 +872,7 @@ router.post('/deleted/:deletedId/restore', async (req: AuthenticatedRequest, res
   }
 });
 
-router.delete('/deleted/:deletedId', async (req: AuthenticatedRequest, res, next) => {
+router.delete('/deleted/:deletedId', adminSensitiveLimiter, requireAdminSudo, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { deletedId } = req.params;
     const { data: trashRow } = await supabase

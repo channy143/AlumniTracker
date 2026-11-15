@@ -140,6 +140,66 @@ export default function SystemSettings() {
             {(settings?.industries || []).length === 0 && <p className="text-xs text-gray-400">No industries configured.</p>}
           </div>
         </div>
+
+        <div className="p-4">
+          <h2 className="text-sm font-semibold text-gray-900 mb-1">Admin Security Policy</h2>
+          <p className="text-xs text-gray-500 mb-3">Controls authentication, session timeout, and step-up verification for administrator accounts.</p>
+          <div className="space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings?.require_admin_mfa ?? true}
+                onChange={(e) => setSettings((s: any) => ({ ...s, require_admin_mfa: e.target.checked }))}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+              />
+              <div>
+                <span className="block text-xs font-medium text-gray-800">Require MFA on every admin login</span>
+                <span className="block text-xs text-gray-500">Bypasses trusted-device skipping for administrator accounts.</span>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings?.require_sudo_for_sensitive ?? true}
+                onChange={(e) => setSettings((s: any) => ({ ...s, require_sudo_for_sensitive: e.target.checked }))}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+              />
+              <div>
+                <span className="block text-xs font-medium text-gray-800">Require password confirmation (Sudo Mode) for sensitive actions</span>
+                <span className="block text-xs text-gray-500">Prompts for password before role changes, password resets, permanent deletes, full exports, and settings updates.</span>
+              </div>
+            </label>
+
+            <div className="max-w-xs">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Admin Inactivity Idle Timeout (minutes)
+              </label>
+              <input
+                type="number"
+                min={5}
+                max={120}
+                value={settings?.admin_idle_timeout_minutes ?? 15}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setSettings((s: any) => ({
+                    ...s,
+                    admin_idle_timeout_minutes: Number.isNaN(val) ? 15 : val,
+                  }));
+                }}
+                onBlur={() => {
+                  setSettings((s: any) => {
+                    const current = Number(s?.admin_idle_timeout_minutes ?? 15);
+                    const clamped = Math.min(Math.max(Number.isFinite(current) ? current : 15, 5), 120);
+                    return { ...s, admin_idle_timeout_minutes: clamped };
+                  });
+                }}
+                className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">Allowed range: 5 to 120 minutes (default 15).</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

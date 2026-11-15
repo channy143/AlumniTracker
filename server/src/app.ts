@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter, authLimiter, writeLimiter } from './middleware/rateLimiter';
+import { csrfProtection } from './middleware/csrf';
 import authRoutes from './routes/auth';
 import profileRoutes from './routes/profile';
 import employmentRoutes from './routes/employment';
@@ -53,6 +54,7 @@ app.use((req, _res, next) => {
   (req as any).cookies = cookies;
   next();
 });
+app.use(csrfProtection);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 

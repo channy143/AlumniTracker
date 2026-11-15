@@ -4,6 +4,7 @@ import { AuthenticatedRequest, AuthPayload } from '../types';
 import { isTokenRevoked } from '../services/revokedTokenService';
 import { markUserActive } from '../services/presenceService';
 import { supabase } from '../services/supabase';
+import { isTokenBeforeSessionCutoff } from '../services/sessionSecurityService';
 
 export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -52,12 +53,27 @@ export async function authenticate(req: AuthenticatedRequest, res: Response, nex
       }
     }
 
-    // Verify account still exists and is active/not archived
-    const { data: userRec, error: userErr } = await supabase
+    // Verify account still exists, is active/not archived, and token wasn't issued before cutoff
+    let userRec: any = null;
+    let userErr: any = null;
+    const primaryRes = await supabase
       .from('users')
-      .select('id, is_active, is_archived')
+      .select('id, is_active, is_archived, token_valid_after')
       .eq('id', decoded.userId)
       .maybeSingle();
+
+    if (primaryRes.error && primaryRes.error.code === '42703') {
+      const fallbackRes = await supabase
+        .from('users')
+        .select('id, is_active, is_archived')
+        .eq('id', decoded.userId)
+        .maybeSingle();
+      userRec = fallbackRes.data;
+      userErr = fallbackRes.error;
+    } else {
+      userRec = primaryRes.data;
+      userErr = primaryRes.error;
+    }
 
     if (!userErr && !userRec) {
       return res.status(401).json({
@@ -70,6 +86,12 @@ export async function authenticate(req: AuthenticatedRequest, res: Response, nex
       return res.status(401).json({
         code: 'ACCOUNT_DISABLED',
         message: 'Your account has been deactivated or archived by an administrator.',
+      });
+    }
+
+    if (isTokenBeforeSessionCutoff(decoded.userId, decoded.iat, userRec?.token_valid_after)) {
+      return res.status(401).json({
+        message: 'Session invalidated due to a security or role update. Please log in again.',
       });
     }
 

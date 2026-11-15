@@ -315,12 +315,10 @@ export default function AlumniOnboardingSurveyPage() {
     return false;
   };
 
-  const validateCurrentStep = (currentStep: number): boolean => {
-    setValidationError('');
+  const getStepValidationError = (currentStep: number): string => {
     if (currentStep === 1) {
       if (!consent.agreed) {
-        setValidationError('Please check the agreement box to accept the Data Privacy Consent.');
-        return false;
+        return 'Please check the agreement box to accept the Data Privacy Consent.';
       }
       if (
         !consent.collectProcess ||
@@ -329,131 +327,123 @@ export default function AlumniOnboardingSurveyPage() {
         !consent.promotionalDiscounts ||
         !consent.jobOpportunities
       ) {
-        setValidationError('Please check all authorization checkboxes to authorize processing of your alumni information.');
-        return false;
+        return 'Please check all authorization checkboxes to authorize processing of your alumni information.';
       }
     } else if (currentStep === 2) {
-      if (!personalInfo.studentId.trim()) {
-        setValidationError('Please enter your Student or Alumni ID number.');
-        return false;
+      const trimmedStudentId = personalInfo.studentId.trim();
+      if (!trimmedStudentId) {
+        return 'Please enter your Student or Alumni ID number.';
       }
-      if (isEvasiveInput(personalInfo.studentId)) {
-        setValidationError('Please enter your actual Student or Alumni ID (evasive answers like "secret" are not accepted).');
-        return false;
+      if (isEvasiveInput(trimmedStudentId)) {
+        return 'Please enter your actual Student or Alumni ID (evasive answers like "secret" are not accepted).';
+      }
+      const studentIdAlnum = trimmedStudentId.replace(/[^a-zA-Z0-9]/g, '');
+      if (studentIdAlnum.length < 3 || !/\d/.test(studentIdAlnum)) {
+        return 'Please enter a valid Student or Alumni ID (must include digits, e.g. CTU-2021-0001).';
       }
       if (!personalInfo.phone.trim()) {
-        setValidationError('Please enter your contact / mobile number.');
-        return false;
+        return 'Please enter your contact / mobile number.';
       }
       if (isEvasiveInput(personalInfo.phone)) {
-        setValidationError('Please provide a valid Philippine mobile number (e.g. 0917 123 4567).');
-        return false;
+        return 'Please provide a valid Philippine mobile number (e.g. 0917 123 4567).';
       }
       const digits = personalInfo.phone.replace(/[^0-9+]/g, '');
       if (!/^(09\d{9}|\+639\d{9}|639\d{9}|9\d{9})$/.test(digits)) {
-        setValidationError('Please provide a valid 11-digit Philippine mobile number (e.g. 0917 123 4567 or +63 917 123 4567).');
-        return false;
+        return 'Please provide a valid 11-digit Philippine mobile number (e.g. 0917 123 4567 or +63 917 123 4567).';
       }
       if (personalInfo.country === 'Philippines' && !personalInfo.province.trim()) {
-        setValidationError('Please select your Province.');
-        return false;
+        return 'Please select your Province.';
       }
       if (!personalInfo.city.trim()) {
-        setValidationError('Please select or specify your City / Municipality.');
-        return false;
+        return 'Please select or specify your City / Municipality.';
       }
       if (isEvasiveInput(personalInfo.city)) {
-        setValidationError('Please provide your actual City / Municipality (evasive answers like "secret" are not accepted).');
-        return false;
+        return 'Please provide your actual City / Municipality (evasive answers like "secret" are not accepted).';
       }
       if (personalInfo.country === 'Philippines' && !personalInfo.barangay.trim()) {
-        setValidationError('Please select or enter your Barangay.');
-        return false;
+        return 'Please select or enter your Barangay.';
       }
       if (personalInfo.street.trim() && isEvasiveInput(personalInfo.street)) {
-        setValidationError('Please enter a valid Street / House No. or leave it blank.');
-        return false;
+        return 'Please enter a valid Street / House No. or leave it blank.';
       }
       if (personalInfo.currentResidenceLocation === 'Elsewhere in the Philippines') {
         if (!personalInfo.currentResidenceProvince.trim() || !personalInfo.currentResidenceCity.trim()) {
-          setValidationError('Please select your current Province and City / Municipality.');
-          return false;
+          return 'Please select your current Province and City / Municipality.';
         }
       }
       if (personalInfo.currentResidenceLocation === 'Abroad' && !personalInfo.currentResidenceCountry.trim()) {
-        setValidationError('Please specify the country where you currently reside.');
-        return false;
+        return 'Please specify the country where you currently reside.';
       }
     } else if (currentStep === 3) {
       if (!academicInfo.program.trim()) {
-        setValidationError('Please specify your Degree / Program.');
-        return false;
+        return 'Please specify your Degree / Program.';
       }
       if (isEvasiveInput(academicInfo.program)) {
-        setValidationError('Please enter your actual Degree or Program (evasive answers like "secret" are not accepted).');
-        return false;
+        return 'Please enter your actual Degree or Program (evasive answers like "secret" are not accepted).';
       }
       if (!academicInfo.yearGraduated.trim()) {
-        setValidationError('Please provide your graduation year.');
-        return false;
+        return 'Please provide your graduation year.';
       }
       const yr = parseInt(academicInfo.yearGraduated.trim(), 10);
       if (isNaN(yr) || yr < 1980 || yr > 2030) {
-        setValidationError('Please enter a valid 4-digit graduation year between 1980 and 2030.');
-        return false;
+        return 'Please enter a valid 4-digit graduation year between 1980 and 2030.';
       }
       if (academicInfo.licensureStatus === 'Passed') {
         if (!academicInfo.licensureExamName.trim()) {
-          setValidationError('Please specify your Board / Licensure Exam or Title.');
-          return false;
+          return 'Please specify your Board / Licensure Exam or Title.';
         }
         if (isEvasiveInput(academicInfo.licensureExamName)) {
-          setValidationError('Please provide your actual Exam / License Title (evasive answers like "secret" are not accepted).');
-          return false;
+          return 'Please provide your actual Exam / License Title (evasive answers like "secret" are not accepted).';
         }
       } else if (academicInfo.licensureExamName.trim() && isEvasiveInput(academicInfo.licensureExamName)) {
-        setValidationError('Please enter a valid Exam / License Title or leave it blank.');
-        return false;
+        return 'Please enter a valid Exam / License Title or leave it blank.';
       }
     } else if (currentStep === 4) {
       if (!employmentInfo.employmentStatus) {
-        setValidationError('Please select your current Employment Status.');
-        return false;
+        return 'Please select your current Employment Status.';
       }
       if (employmentInfo.employmentStatus === 'Employed' || employmentInfo.employmentStatus === 'Self-employed') {
+        if (!employmentInfo.jobType) {
+          return 'Please select your Employment Type.';
+        }
         if (!employmentInfo.currentJobTitle.trim()) {
-          setValidationError('Please enter your Current Job Title / Position.');
-          return false;
+          return 'Please enter your Current Job Title / Position.';
         }
         if (isEvasiveInput(employmentInfo.currentJobTitle)) {
-          setValidationError('Please enter your actual Job Title (evasive answers like "secret" are not accepted).');
-          return false;
+          return 'Please enter your actual Job Title (evasive answers like "secret" are not accepted).';
         }
         if (!employmentInfo.companyName.trim()) {
-          setValidationError('Please enter your Company / Organization Name.');
-          return false;
+          return 'Please enter your Company / Organization Name.';
         }
         if (isEvasiveInput(employmentInfo.companyName)) {
-          setValidationError('Please enter your actual Company Name (evasive answers like "secret" are not accepted).');
-          return false;
+          return 'Please enter your actual Company Name (evasive answers like "secret" are not accepted).';
         }
         if (!employmentInfo.industry) {
-          setValidationError('Please select your Industry / Field.');
-          return false;
+          return 'Please select your Industry / Field.';
         }
       }
     } else if (currentStep === 5) {
       if (!feedbackInfo.curriculumRelevance) {
-        setValidationError('Please select your rating for Curriculum Relevance.');
-        return false;
+        return 'Please select your rating for Curriculum Relevance.';
+      }
+      if (!feedbackInfo.facultyRating || !feedbackInfo.facilitiesRating || !feedbackInfo.studentServicesRating) {
+        return 'Please complete all institutional rating fields.';
       }
       if (feedbackInfo.suggestions.trim() && isEvasiveInput(feedbackInfo.suggestions)) {
-        setValidationError('Please provide constructive suggestions or leave the field blank.');
-        return false;
+        return 'Please provide constructive suggestions or leave the field blank.';
       }
     }
-    return true;
+    return '';
   };
+
+  const validateCurrentStep = (currentStep: number): boolean => {
+    const err = getStepValidationError(currentStep);
+    setValidationError(err);
+    return !err;
+  };
+
+  const currentStepError = getStepValidationError(step);
+  const canProceedCurrentStep = !currentStepError;
 
   const handleNext = () => {
     if (!validateCurrentStep(step)) return;
@@ -1635,21 +1625,29 @@ export default function AlumniOnboardingSurveyPage() {
           </div>
 
           {/* Bottom Actions - Matches SurveyPage.tsx exactly */}
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 shrink-0">
-            <button
-              type="button"
-              onClick={handlePrev}
-              disabled={step === 1 || submitting}
-              className="px-4 py-2 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              Previous
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-4 pt-3 border-t border-gray-100 shrink-0">
+            <div className="flex items-center justify-between sm:justify-start gap-3">
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={step === 1 || submitting}
+                className="px-4 py-2 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Previous
+              </button>
+              {!canProceedCurrentStep && (
+                <span className="text-[11px] text-amber-700 font-medium">
+                  {currentStepError}
+                </span>
+              )}
+            </div>
 
             <button
               type="button"
               onClick={handleNext}
-              disabled={submitting}
-              className="px-6 py-2 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 cursor-pointer shadow-xs"
+              disabled={submitting || !canProceedCurrentStep}
+              title={!canProceedCurrentStep ? currentStepError : undefined}
+              className="px-6 py-2 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer shadow-xs self-end sm:self-auto"
             >
               {submitting ? (
                 'Submitting...'

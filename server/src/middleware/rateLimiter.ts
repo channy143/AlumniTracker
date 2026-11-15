@@ -46,3 +46,15 @@ export const writeLimiter = rateLimit({
   message: { message: 'Too many write requests, please try again later.' },
 });
 
+// Strict limiter for sensitive admin actions (role changes, password resets, exports, permanent deletes).
+export const adminSensitiveLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: process.env.NODE_ENV === 'production' ? 30 : 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) =>
+    process.env.NODE_ENV !== 'production' &&
+    (req.ip === '127.0.0.1' || req.ip === '::1' || Boolean(req.ip?.includes('127.0.0.1'))),
+  message: { message: 'Too many sensitive admin operations. Please wait a few minutes and try again.' },
+});
+
