@@ -16,6 +16,40 @@ function normalize(s: string): string {
   return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
+const INDUSTRY_CATEGORY_MATCHERS: Array<{ name: string; pattern: RegExp }> = [
+  {
+    name: 'BPO',
+    pattern: /\b(bpo|call center|outsourc\w*|customer service|contact center|telemarket\w*|virtual assistant)\b/i,
+  },
+  {
+    name: 'Education',
+    pattern: /\b(educat\w*|esl|teach\w*|academic\w*|school\w*|universit\w*|college\w*|academ\w*|tutor\w*|deped|ched|edtech|instruct\w*|professor\w*|faculty|training center|learning center)\b/i,
+  },
+  {
+    name: 'Agriculture',
+    pattern: /\b(agricultur\w*|farm\w*|agribusiness|crop\w*|livestock|fisheries|aquaculture|agritech)\b/i,
+  },
+  {
+    name: 'Information Technology',
+    pattern: /\b(information technology|technolog\w*|tech|software|developer|engineer\w*|it|cloud|cybersecurity|data science|programming)\b/i,
+  },
+];
+
+function categorizeIndustry(raw: string, companyName?: string, jobTitle?: string): string | null {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return null;
+  for (const { name, pattern } of INDUSTRY_CATEGORY_MATCHERS) {
+    if (pattern.test(trimmed)) return name;
+  }
+  const fallbackText = `${companyName || ''} ${jobTitle || ''}`.trim();
+  if (fallbackText) {
+    for (const { name, pattern } of INDUSTRY_CATEGORY_MATCHERS) {
+      if (pattern.test(fallbackText)) return name;
+    }
+  }
+  return 'Other';
+}
+
 const router = Router();
 
 let partnershipSupported: boolean | null = null;
@@ -223,7 +257,9 @@ router.get('/statistics', async (req, res, next) => {
       partnerCompanies: partnershipTracked
         ? employerList.filter((e: any) => companyMap.get(normalize(e.name))?.partnership_status === 'partner').length
         : null,
-      industriesRepresented: new Set(records.map((r: any) => String(r.company_industry || '').trim()).filter(Boolean)).size,
+      industriesRepresented: new Set(
+        records.map((r: any) => categorizeIndustry(r.company_industry, r.company_name, r.job_title)).filter(Boolean)
+      ).size,
       newEmployersThisYear: employerList.filter((e: any) => e.hireYears.size > 0 && Math.min(...e.hireYears) === currentYear).length,
       averageAlumniPerEmployer: employerList.length > 0
         ? Math.round(employerList.reduce((a, e: any) => a + e.alumni.size, 0) / employerList.length * 10) / 10
@@ -245,14 +281,21 @@ router.get('/statistics', async (req, res, next) => {
 
     const industryCount: Record<string, number> = {};
     records.forEach((r: any) => {
-      const ind = String(r.company_industry || '').trim();
-      if (!ind) return;
-      industryCount[ind] = (industryCount[ind] || 0) + 1;
+      const category = categorizeIndustry(r.company_industry, r.company_name, r.job_title);
+      if (!category) return;
+      industryCount[category] = (industryCount[category] || 0) + 1;
     });
-    const industryTotal = Math.max(records.length, 1);
+    const industryTotal = Math.max(
+      Object.values(industryCount).reduce((sum, n) => sum + n, 0),
+      1
+    );
     const industryDistribution = Object.entries(industryCount)
       .map(([industry, count]) => ({ industry, count, percentage: Math.round((count / industryTotal) * 100) }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => {
+        if (a.industry === 'Other' && b.industry !== 'Other') return 1;
+        if (b.industry === 'Other' && a.industry !== 'Other') return -1;
+        return b.count - a.count || a.industry.localeCompare(b.industry);
+      });
 
     const growthCount: Record<number, number> = {};
     employerList.forEach((e: any) => {

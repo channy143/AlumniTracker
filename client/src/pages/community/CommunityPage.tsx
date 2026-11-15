@@ -826,8 +826,8 @@ export default function CommunityPage() {
                                         onClick={() => c.author_id && navigate(`/directory/${c.author_id}`)}
                                         className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center text-[10px] shrink-0 overflow-hidden cursor-pointer shadow-2xs"
                                       >
-                                        {c.author_avatar ? (
-                                          <img src={c.author_avatar} alt="" className="w-full h-full object-cover" />
+                                        {c.author_avatar && (c.author_avatar.startsWith('http') || c.author_avatar.startsWith('/') || c.author_avatar.startsWith('data:image/')) ? (
+                                          <img src={c.author_avatar} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                         ) : (
                                           (c.author_name || 'A').charAt(0).toUpperCase()
                                         )}
@@ -972,8 +972,8 @@ export default function CommunityPage() {
                                               onClick={() => reply.author_id && navigate(`/directory/${reply.author_id}`)}
                                               className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-bold flex items-center justify-center text-[9px] shrink-0 overflow-hidden cursor-pointer"
                                             >
-                                              {reply.author_avatar ? (
-                                                <img src={reply.author_avatar} alt="" className="w-full h-full object-cover" />
+                                              {reply.author_avatar && (reply.author_avatar.startsWith('http') || reply.author_avatar.startsWith('/') || reply.author_avatar.startsWith('data:image/')) ? (
+                                                <img src={reply.author_avatar} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                               ) : (
                                                 (reply.author_name || 'A').charAt(0).toUpperCase()
                                               )}

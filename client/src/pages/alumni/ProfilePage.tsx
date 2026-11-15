@@ -832,7 +832,12 @@ export default function ProfilePage() {
     ? `${(profile.first_name || '')[0] || ''}${(profile.last_name || '')[0] || ''}`.toUpperCase() ||
       (user?.email ? `${user.email[0] || ''}${user.email[1] || ''}`.toUpperCase() : '?')
     : '?';
-  const fullName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}` : '';
+  const fullName = profile
+    ? [profile.first_name, profile.middle_name, profile.last_name]
+        .map((s) => (s || '').trim())
+        .filter(Boolean)
+        .join(' ')
+    : '';
   const firstEdu = profile?.education?.[0];
   const programInfo = firstEdu ? (formatProgramLongName(firstEdu.program) || firstEdu.program || '') : '';
   const batchInfo = firstEdu?.year_graduated || '';

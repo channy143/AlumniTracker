@@ -420,9 +420,21 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       });
     }
 
-    // Enrich with author_profile_id and mentioned_profiles
-    const allUserIds = [post.user_id, ...(comments || []).map((c: any) => c.user_id)].filter(Boolean);
-    const authorProfileMap = await getProfileIdByUserIdMap(allUserIds);
+    // Enrich with author_profile_id, live avatar_url, and mentioned_profiles
+    const allUserIds = Array.from(new Set([post.user_id, ...(comments || []).map((c: any) => c.user_id)].filter(Boolean)));
+    const [authorProfileMap, { data: avatarProfiles }] = await Promise.all([
+      getProfileIdByUserIdMap(allUserIds),
+      allUserIds.length > 0
+        ? supabase.from('profiles').select('user_id, avatar_url').in('user_id', allUserIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const avatarByUserId = new Map<string, string | null>();
+    (avatarProfiles || []).forEach((p: any) => {
+      if (p?.user_id) avatarByUserId.set(p.user_id, p.avatar_url || null);
+    });
+    const isImageUrl = (val: any) =>
+      typeof val === 'string' && (val.startsWith('http') || val.startsWith('/') || val.startsWith('data:image/'));
+
     const hasAnyMention =
       (typeof post.content === 'string' && post.content.includes('@')) ||
       (comments || []).some((c: any) => typeof c.content === 'string' && c.content.includes('@'));
@@ -436,8 +448,11 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       const cMentions = hasAnyMention && typeof c.content === 'string' && c.content.includes('@')
         ? matchMentionsInText(c.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
         : [];
+      const liveAvatar = c.user_id ? avatarByUserId.get(c.user_id) : null;
+      const resolvedAvatar = isImageUrl(liveAvatar) ? liveAvatar : (isImageUrl(c.author_avatar) ? c.author_avatar : null);
       const enriched = {
         ...c,
+        author_avatar: resolvedAvatar,
         author_profile_id: c.user_id ? (authorProfileMap.get(c.user_id) || null) : null,
         mentioned_profiles: cMentions,
         like_count: c.like_count || 0,
@@ -935,9 +950,7 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
     const displayName = profile
       ? `${profile.first_name} ${profile.last_name}`
       : req.user!.email;
-    const avatar = profile?.avatar_url || (profile
-      ? `${profile.first_name[0]}${profile.last_name[0]}`
-      : req.user!.email[0].toUpperCase());
+    const avatar = profile?.avatar_url || null;
 
     const { data: comment, error } = await supabase
       .from('feed_post_comments')

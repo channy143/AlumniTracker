@@ -738,26 +738,6 @@ export default function CareerAnalytics({ defaultTab }: { defaultTab?: 'analytic
                 </div>
               ) : <p className="text-xs text-gray-400 text-center py-8">No employment timeline data available.</p>}
             </Card>
-
-            <Card title="Demographics: Age Distribution (Accreditation)">
-              {(demographics.ageDistribution || []).some((a: any) => a.count > 0) ? (
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={demographics.ageDistribution}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                      <Tooltip formatter={(value: number) => [`${value} alumni`, 'Count']} />
-                      <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#8b5cf6" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : <p className="text-xs text-gray-400 text-center py-8">No age demographic data available.</p>}
-            </Card>
-
-            <Card title="Demographics: Gender Ratio (PESO / Q-Pro)">
-              <GenderDoughnut data={demographics.genderDistribution} />
-            </Card>
           </div>
 
           {/* CTU Graduate Tracer & Registration Survey Section */}

@@ -1320,8 +1320,8 @@ export default function FeedPostCard({
                           c.author_profile_id || c.user_id ? 'cursor-pointer hover:opacity-85' : ''
                         }`}
                       >
-                        {c.author_avatar ? (
-                          <img src={c.author_avatar} alt="" className="w-full h-full object-cover" />
+                        {c.author_avatar && (c.author_avatar.startsWith('http') || c.author_avatar.startsWith('/') || c.author_avatar.startsWith('data:image/')) ? (
+                          <img src={c.author_avatar} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                         ) : (
                           c.author?.[0]?.toUpperCase() || 'U'
                         )}
@@ -1473,8 +1473,8 @@ export default function FeedPostCard({
                                     : ''
                                 }`}
                               >
-                                {reply.author_avatar ? (
-                                  <img src={reply.author_avatar} alt="" className="w-full h-full object-cover" />
+                                {reply.author_avatar && (reply.author_avatar.startsWith('http') || reply.author_avatar.startsWith('/') || reply.author_avatar.startsWith('data:image/')) ? (
+                                  <img src={reply.author_avatar} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                 ) : (
                                   reply.author?.[0]?.toUpperCase() || 'U'
                                 )}
