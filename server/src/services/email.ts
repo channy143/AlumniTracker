@@ -20,8 +20,15 @@ function createTransporter() {
   });
 }
 
-function getAlumiLogoAttachment(): { filename: string; path: string; cid: string; contentType: string } | null {
+function getAlumiLogoAttachment(): {
+  filename: string;
+  path: string;
+  cid: string;
+  contentType: string;
+  contentDisposition: 'inline';
+} | null {
   const candidates = [
+    { rel: 'assets/alumi-animated.gif', filename: 'alumi-animated.gif', contentType: 'image/gif' },
     { rel: 'image/alumi-animated.gif', filename: 'alumi-animated.gif', contentType: 'image/gif' },
     { rel: 'client/public/image/alumi-animated.gif', filename: 'alumi-animated.gif', contentType: 'image/gif' },
     { rel: 'image/mascot.png', filename: 'mascot.png', contentType: 'image/png' },
@@ -34,6 +41,7 @@ function getAlumiLogoAttachment(): { filename: string; path: string; cid: string
     const possiblePaths = [
       path.resolve(process.cwd(), c.rel),
       path.resolve(process.cwd(), '..', c.rel),
+      path.resolve(__dirname, '../..', c.rel),
       path.resolve(__dirname, '../../..', c.rel),
       path.resolve(__dirname, '../../../..', c.rel),
     ];
@@ -44,10 +52,16 @@ function getAlumiLogoAttachment(): { filename: string; path: string; cid: string
         path: found,
         cid: 'alumimascot',
         contentType: c.contentType,
+        contentDisposition: 'inline',
       };
     }
   }
   return null;
+}
+
+function getAlumiFallbackUrl(): string {
+  const clientUrl = (process.env.CLIENT_URL || '').trim().replace(/\/$/, '');
+  return clientUrl ? `${clientUrl}/image/alumi-animated.gif` : 'https://placehold.co/100x100?text=Alumi';
 }
 
 export async function sendOtpEmail(to: string, otp: string): Promise<void> {
@@ -71,7 +85,7 @@ export async function sendOtpEmail(to: string, otp: string): Promise<void> {
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
             <tr>
               <td style="width: 58px; vertical-align: middle; padding-right: 14px;">
-                <img src="${logoAttachment ? 'cid:alumimascot' : 'https://placehold.co/100x100?text=Alumi'}" alt="Alumi — CTU-Naga Mascot" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);" />
+                <img src="${logoAttachment ? 'cid:alumimascot' : getAlumiFallbackUrl()}" alt="Alumi — CTU-Naga Mascot" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);" />
               </td>
               <td style="vertical-align: middle;">
                 <h1 style="color: #ffffff; font-size: 19px; margin: 0; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em;">CTU-Naga Alumni Tracker</h1>
@@ -179,7 +193,7 @@ export async function notifyAllAlumniByEmail(payload: AlumniBroadcastEmailPayloa
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
           <tr>
             <td style="width: 58px; vertical-align: middle; padding-right: 14px;">
-              <img src="${logoAttachment ? 'cid:alumimascot' : 'https://placehold.co/100x100?text=Alumi'}" alt="Alumi — CTU-Naga Mascot" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px;" />
+              <img src="${logoAttachment ? 'cid:alumimascot' : getAlumiFallbackUrl()}" alt="Alumi — CTU-Naga Mascot" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px;" />
             </td>
             <td style="vertical-align: middle;">
               <h1 style="color: #ffffff; font-size: 19px; margin: 0; font-weight: 700; line-height: 1.25;">CTU-Naga Alumni Tracker</h1>

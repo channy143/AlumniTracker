@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { logAudit } from '../services/auditLogger';
+import { validateJobTitle } from '../utils/validateJobTitle';
 
 const router = Router();
 const upload = multer({
@@ -110,6 +111,12 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
 
     if (!profile) throw new AppError('Profile not found', 404);
 
+    if (req.body.position !== undefined) {
+      const check = validateJobTitle(req.body.position);
+      if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);
+      req.body.position = check.cleaned;
+    }
+
     if (req.body.proof_url) {
       const trimmed = String(req.body.proof_url).trim();
       if (trimmed && !trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
@@ -172,6 +179,11 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
     }
 
     const updatePayload: any = { ...req.body };
+    if (updatePayload.position !== undefined) {
+      const check = validateJobTitle(updatePayload.position);
+      if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);
+      updatePayload.position = check.cleaned;
+    }
     if (updatePayload.proof_url) {
       const trimmed = String(updatePayload.proof_url).trim();
       if (trimmed && !trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {

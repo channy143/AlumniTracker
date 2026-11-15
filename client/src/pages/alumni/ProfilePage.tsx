@@ -27,6 +27,7 @@ import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authStore';
 import { clearTrustedDeviceToken } from '@/utils/device';
 import { isPasswordStrong, checkPasswordCriteria } from '@/utils/validation';
+import { validateJobTitle, COMMON_JOB_TITLES } from '@/utils/validateJobTitle';
 import { getHumanErrorMessage } from '@/utils/errorMapper';
 import CreatePostBox from '@/components/dashboard/CreatePostBox';
 import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
@@ -404,7 +405,18 @@ export default function ProfilePage() {
       const preSaveStatus = String(form.employment_status || 'Unemployed').toLowerCase();
       const preSaveNotEmployed = preSaveStatus === 'unemployed' || preSaveStatus.includes('seeking') || preSaveStatus === 'retired';
 
-      // Pre-save validation for proof link if provided (only when employed / self-employed)
+      // Pre-save validation for job title and proof link (only when employed / self-employed)
+      let validatedJobTitle: string | null = null;
+      if (!preSaveNotEmployed) {
+        const jobTitleCheck = validateJobTitle(form.current_job_title);
+        if (!jobTitleCheck.valid) {
+          setError(jobTitleCheck.error || 'Please enter a valid job title.');
+          setSaving(false);
+          return;
+        }
+        validatedJobTitle = jobTitleCheck.cleaned;
+      }
+
       if (!preSaveNotEmployed && form.proof_url) {
         const trimmed = String(form.proof_url).trim();
         if (trimmed && !trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
@@ -465,7 +477,7 @@ export default function ProfilePage() {
 
         await profileApi.updateCareer({
           employment_status: status,
-          current_job_title: isNotEmployed ? null : (form.current_job_title || null),
+          current_job_title: isNotEmployed ? null : validatedJobTitle,
           company_name: isNotEmployed ? null : (form.company_name || null),
           industry: isNotEmployed ? null : (form.industry || null),
           salary_range: isNotEmployed ? null : (form.salary_range || null),
@@ -483,7 +495,7 @@ export default function ProfilePage() {
 
             const empPayload: any = {
               company_name: form.company_name || (status === 'Self-employed' ? 'Self-employed / Business' : 'Organization'),
-              position: form.current_job_title || 'Position',
+              position: validatedJobTitle,
               company_industry: form.industry || null,
               job_type: form.job_type || 'full-time',
               start_date: form.start_date || (current?.start_date ? String(current.start_date).slice(0, 10) : new Date().toISOString().slice(0, 10)),
@@ -1161,15 +1173,37 @@ export default function ProfilePage() {
                       </div>
                       <div>
                         <label className="text-xs text-gray-600 font-medium mb-1 block">
-                          Current Position / Title
+                          Current Position / Title {!isFormNotEmployed && <span className="text-red-500">*</span>}
                         </label>
-                        <input
-                          value={isFormNotEmployed ? '' : (form.current_job_title || '')}
-                          onChange={(e) => setForm((prev: any) => ({ ...prev, current_job_title: e.target.value }))}
-                          disabled={isFormNotEmployed}
-                          placeholder={effectiveStatus === 'Self-employed' ? 'e.g. Freelance Developer, Consultant' : isFormNotEmployed ? 'N/A' : 'e.g. Software Engineer, Teacher'}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                        />
+                        {(() => {
+                          const rawTitle = isFormNotEmployed ? '' : (form.current_job_title || '');
+                          const titleCheck = rawTitle.trim() ? validateJobTitle(rawTitle) : null;
+                          const showInlineErr = !isFormNotEmployed && titleCheck && !titleCheck.valid;
+                          return (
+                            <>
+                              <input
+                                list="profile-job-title-options"
+                                value={rawTitle}
+                                onChange={(e) => setForm((prev: any) => ({ ...prev, current_job_title: e.target.value }))}
+                                disabled={isFormNotEmployed}
+                                placeholder={effectiveStatus === 'Self-employed' ? 'e.g. Freelance Developer, Consultant' : isFormNotEmployed ? 'N/A' : 'e.g. Software Engineer, Teacher'}
+                                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-white disabled:bg-gray-100 disabled:text-gray-400 ${
+                                  showInlineErr
+                                    ? 'border-red-400 focus:border-red-500'
+                                    : 'border-gray-300 focus:border-orange-400'
+                                }`}
+                              />
+                              <datalist id="profile-job-title-options">
+                                {COMMON_JOB_TITLES.map((title) => (
+                                  <option key={title} value={title} />
+                                ))}
+                              </datalist>
+                              {showInlineErr && (
+                                <p className="mt-1 text-[11px] text-red-600">{titleCheck?.error}</p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                       <div>
                         <label className="text-xs text-gray-600 font-medium mb-1 block">

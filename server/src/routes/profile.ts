@@ -8,6 +8,7 @@ import { AuthenticatedRequest } from '../types';
 import { addActivity } from '../services/activityStore';
 import { validateResumeContent } from '../utils/validateResume';
 import { normalizeCityName, normalizeProvinceName, normalizePhPhone } from '../utils/formatLocation';
+import { validateJobTitle } from '../utils/validateJobTitle';
 import { notifyAdmins } from './notifications';
 import {
   updateProfileSchema,
@@ -154,6 +155,15 @@ router.put('/', authenticate, validate(updateProfileSchema), async (req: Authent
     if (updates.province !== undefined) updates.province = updates.province ? normalizeProvinceName(updates.province) : null;
     if (updates.city !== undefined) updates.city = updates.city ? normalizeCityName(updates.city, updates.province) : null;
     if (updates.gender !== undefined && updates.gender) updates.gender = String(updates.gender).slice(0, 10);
+    if (updates.current_job_title !== undefined) {
+      if (updates.current_job_title === null || String(updates.current_job_title).trim() === '') {
+        updates.current_job_title = null;
+      } else {
+        const check = validateJobTitle(updates.current_job_title);
+        if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);
+        updates.current_job_title = check.cleaned;
+      }
+    }
 
     const { data: profile, error } = await db
       .from('profiles')
@@ -212,7 +222,19 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
       if (lowerStatus === 'unemployed' || lowerStatus === 'seeking opportunities' || lowerStatus === 'retired') {
         updates.current_job_title = null;
         updates.company_name = null;
+      } else if (updates.current_job_title !== undefined) {
+        if (updates.current_job_title === null || String(updates.current_job_title).trim() === '') {
+          updates.current_job_title = null;
+        } else {
+          const check = validateJobTitle(updates.current_job_title);
+          if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);
+          updates.current_job_title = check.cleaned;
+        }
       }
+    } else if (updates.current_job_title !== undefined && updates.current_job_title !== null && String(updates.current_job_title).trim() !== '') {
+      const check = validateJobTitle(updates.current_job_title);
+      if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);
+      updates.current_job_title = check.cleaned;
     }
 
     const { data: profile, error } = await db
