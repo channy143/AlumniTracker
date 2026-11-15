@@ -91,7 +91,29 @@ const INVALID_JOB_TITLE_TERMS = new Set([
   'wala',
   'secret lang',
   'ambot',
+  'random',
+  'hello',
+  'hi',
+  'hey',
+  'bruh',
+  'bro',
+  'lol',
+  'haha',
+  'hehe',
+  'blah',
+  'foo',
+  'bar',
+  'baz',
+  'lorem',
+  'ipsum',
+  'dummy',
+  'fake',
+  'botbot',
+  'ewan',
+  'basta',
 ]);
+
+const KEYBOARD_MASH_PATTERN = /(asdf|qwer|zxcv|hjkl|uiop|fghj|dfgh|cvbn|tyui|ghjk)/i;
 
 export function validateJobTitle(raw: unknown): {
   valid: boolean;
@@ -126,12 +148,40 @@ export function validateJobTitle(raw: unknown): {
     };
   }
 
-  if (/^(.)\1+$/i.test(alphaOnly)) {
+  if (/^(.)\1+$/i.test(alphaOnly) || /(.)\1{3,}/i.test(alphaOnly)) {
     return {
       valid: false,
       cleaned,
       error: 'Please enter a real job title instead of repeated characters.',
     };
+  }
+
+  if (KEYBOARD_MASH_PATTERN.test(alphaOnly)) {
+    return {
+      valid: false,
+      cleaned,
+      error: 'Please enter a real job title.',
+    };
+  }
+
+  // Reject gibberish words (4+ letters with no vowels, or 6+ consecutive consonants)
+  const words = cleaned.split(/\s+/);
+  for (const w of words) {
+    const lettersOnly = w.replace(/[^a-zA-Z]/g, '');
+    if (lettersOnly.length >= 4 && !/[aeiouy]/i.test(lettersOnly)) {
+      return {
+        valid: false,
+        cleaned,
+        error: `"${w}" does not look like a valid word in a job title.`,
+      };
+    }
+    if (/[bcdfghjklmnpqrstvwxz]{6,}/i.test(lettersOnly)) {
+      return {
+        valid: false,
+        cleaned,
+        error: `"${w}" does not look like a valid job title.`,
+      };
+    }
   }
 
   if (!/^[a-zA-Z0-9\s\-./,&()'+]+$/.test(cleaned)) {

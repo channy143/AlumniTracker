@@ -27,7 +27,7 @@ import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authStore';
 import { clearTrustedDeviceToken } from '@/utils/device';
 import { isPasswordStrong, checkPasswordCriteria } from '@/utils/validation';
-import { validateJobTitle, COMMON_JOB_TITLES } from '@/utils/validateJobTitle';
+import { validateJobTitle } from '@/utils/validateJobTitle';
 import { getHumanErrorMessage } from '@/utils/errorMapper';
 import CreatePostBox from '@/components/dashboard/CreatePostBox';
 import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
@@ -1173,7 +1173,7 @@ export default function ProfilePage() {
                       </div>
                       <div>
                         <label className="text-xs text-gray-600 font-medium mb-1 block">
-                          Current Position / Title {!isFormNotEmployed && <span className="text-red-500">*</span>}
+                          Current Position / Title
                         </label>
                         {(() => {
                           const rawTitle = isFormNotEmployed ? '' : (form.current_job_title || '');
@@ -1182,7 +1182,6 @@ export default function ProfilePage() {
                           return (
                             <>
                               <input
-                                list="profile-job-title-options"
                                 value={rawTitle}
                                 onChange={(e) => setForm((prev: any) => ({ ...prev, current_job_title: e.target.value }))}
                                 disabled={isFormNotEmployed}
@@ -1193,11 +1192,6 @@ export default function ProfilePage() {
                                     : 'border-gray-300 focus:border-orange-400'
                                 }`}
                               />
-                              <datalist id="profile-job-title-options">
-                                {COMMON_JOB_TITLES.map((title) => (
-                                  <option key={title} value={title} />
-                                ))}
-                              </datalist>
                               {showInlineErr && (
                                 <p className="mt-1 text-[11px] text-red-600">{titleCheck?.error}</p>
                               )}
