@@ -174,11 +174,15 @@ export function getInflight<T = any>(endpoint: string): Promise<T> | undefined {
 export function setInflight<T = any>(endpoint: string, promise: Promise<T>): void {
   const key = fullKey(endpoint);
   INFLIGHT_MAP.set(key, promise);
-  promise.finally(() => {
-    if (INFLIGHT_MAP.get(key) === promise) {
-      INFLIGHT_MAP.delete(key);
-    }
-  });
+  promise
+    .finally(() => {
+      if (INFLIGHT_MAP.get(key) === promise) {
+        INFLIGHT_MAP.delete(key);
+      }
+    })
+    .catch(() => {
+      // Prevent duplicate "Uncaught (in promise)" console noise; callers handle `promise` directly.
+    });
 }
 
 export function invalidateCachePrefixes(prefixes: string | string[]): void {

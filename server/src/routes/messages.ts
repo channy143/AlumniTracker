@@ -1381,7 +1381,7 @@ router.post('/', authenticate, validate(sendMessageSchema), async (req: Authenti
 router.get('/unread/count', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const profileId = await getProfileIdForUser(req.user!.userId);
-    if (!profileId) throw new AppError('Profile not found', 404);
+    if (!profileId) return res.json({ count: 0 });
 
     const { count, error } = await supabase
       .from('messages')
