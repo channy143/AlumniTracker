@@ -7,6 +7,7 @@ import { buildDpaCsv } from '../../utils/csvExport';
 import { formatProgramLongName } from '../../utils/formatProgram';
 import { logAudit } from '../../services/auditLogger';
 import { AuthenticatedRequest } from '../../types';
+import { toTitleCaseName } from '../../utils/validateJobTitle';
 
 const STANDARD_QUESTIONS = [
   { id: 'personal_info', section: 'Personal Information', type: 'section' },
@@ -485,9 +486,9 @@ router.get('/:id/responses/export', async (req, res, next) => {
       .select('*')
       .eq('survey_id', req.params.id);
 
-    const { data: survey } = await supabase.from('surveys').select('*').eq('id', req.params.id).single();
+    const { data: survey } = await supabase.from('surveys').select('*').eq('id', req.params.id).maybeSingle();
     const isOnboarding = req.params.id === ONBOARDING_SURVEY_ID || (survey && survey.title?.includes('Registration'));
-    const questions = survey ? getQuestionsForSurvey(survey) : STANDARD_QUESTIONS;
+    const questions = isOnboarding ? ONBOARDING_QUESTIONS : (survey ? getQuestionsForSurvey(survey) : STANDARD_QUESTIONS);
 
     let result = responses || [];
     const userIds = result.map((r: any) => r.user_id).filter(Boolean);
@@ -508,8 +509,13 @@ router.get('/:id/responses/export', async (req, res, next) => {
     const csvRows = (result || []).map((r: any) => {
       const p = r.user?.profile;
       const resp = r.responses || {};
-      const name = p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : `${resp.firstName || ''} ${resp.lastName || ''}`.trim();
+      const rawName = p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : `${resp.firstName || ''} ${resp.lastName || ''}`.trim();
+      const name = toTitleCaseName(rawName);
       const email = r.user?.email || resp.email || '';
+      const submittedAtRaw = r.submitted_at || resp.submitted_at || '';
+      const submittedAtManila = submittedAtRaw
+        ? new Date(submittedAtRaw).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
+        : '';
 
       if (isOnboarding) {
         const consent = resp.consent || {};
@@ -525,10 +531,15 @@ router.get('/:id/responses/export', async (req, res, next) => {
           'Address': resp.address || '',
           'Current Residence Location': resp.currentResidenceLocation || '',
           'Degree Program': resp.program ? formatProgramLongName(resp.program) : '',
+          'Major': resp.major || '',
           'Graduation Year': resp.yearGraduated ? String(resp.yearGraduated) : '',
           'Academic Honors': resp.honors || '',
           'Licensure Status': resp.licensureStatus || '',
           'Licensure Exam Name': resp.licensureExamName || '',
+          'Employment Status': resp.employmentStatus || '',
+          'Current Job Title': resp.currentJobTitle || '',
+          'Company / Organization': resp.companyName || '',
+          'Industry': resp.industry || '',
           'Reasons for Enrolling at CTU': Array.isArray(resp.reasonsForEnrolling) ? resp.reasonsForEnrolling.join('; ') : '',
           'Post-Grad / Further Studies': resp.furtherStudies || '',
           'Certifications': resp.postGradCertifications || '',
@@ -545,7 +556,7 @@ router.get('/:id/responses/export', async (req, res, next) => {
           'Auth - Congratulatory Banners': consent.congratulatoryBanners ? 'Yes' : 'No',
           'Auth - Promotional Discounts': consent.promotionalDiscounts ? 'Yes' : 'No',
           'Auth - Job Opportunities': consent.jobOpportunities ? 'Yes' : 'No',
-          'Submitted At': r.submitted_at || resp.submitted_at || '',
+          'Submitted At': submittedAtManila,
         };
       }
 
@@ -556,9 +567,16 @@ router.get('/:id/responses/export', async (req, res, next) => {
       (questions || []).forEach((q: any) => {
         if (q.type === 'section') return;
         const val = resp[q.id];
-        row[q.label || q.id] = Array.isArray(val) ? val.join('; ') : String(val ?? '');
+        let formatted = '';
+        if (Array.isArray(val)) formatted = val.join('; ');
+        else if (val !== null && typeof val === 'object') {
+          formatted = Object.entries(val).map(([k, v]) => `${k}: ${v}`).join('; ');
+        } else {
+          formatted = String(val ?? '');
+        }
+        row[q.label || q.id] = formatted;
       });
-      row['Submitted At'] = r.submitted_at || '';
+      row['Submitted At'] = submittedAtManila;
       return row;
     });
 

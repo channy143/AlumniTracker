@@ -356,7 +356,7 @@ export default function ReportsPage() {
     try {
       addNotification('Compiling Master Institutional Workbook across all live datasets...', 'info');
 
-      const [alumniRes, empRes, proofsRes, compRes, salaryRes, courseRes, batchRes, skillsRes, tracerRes] =
+      const [alumniRes, empRes, proofsRes, compRes, salaryRes, courseRes, batchRes, alignmentRes, careerRes, ojtRes, skillsRes, tracerRes] =
         await Promise.all([
           adminApi.reportAlumni({ ...activeParams, format: 'json' }),
           adminApi.reportEmployment({ ...activeParams, format: 'json' }),
@@ -365,6 +365,9 @@ export default function ReportsPage() {
           adminApi.reportSalaryDistribution({ format: 'json' }),
           adminApi.reportEmploymentByCourse({ ...activeParams, format: 'json' }),
           adminApi.reportBatchEmployment({ format: 'json' }),
+          adminApi.reportDegreeAlignment({ format: 'json' }),
+          adminApi.reportCareerProgress({ format: 'json' }),
+          adminApi.reportOjtClearance({ format: 'json' }),
           adminApi.reportSkills({ format: 'json' }),
           adminApi.reportSurveys({ format: 'json' }),
         ]);
@@ -376,11 +379,14 @@ export default function ReportsPage() {
         { Parameter: 'Institution', Value: 'Cebu Technological University - Naga Campus' },
         { Parameter: 'System', Value: 'CTU-Naga Alumni Connect — Centralized Graduate Tracer' },
         { Parameter: 'Compliance', Value: 'Republic Act No. 10173 (Data Privacy Act of 2012)' },
-        { Parameter: 'Generated Date', Value: new Date().toLocaleString() },
+        { Parameter: 'Generated Date', Value: new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) },
         { Parameter: 'Degree Filter', Value: selectedCourse || 'All Programs' },
         { Parameter: 'Batch Filter', Value: selectedBatch || 'All Batches' },
-        { Parameter: 'Total Alumni Tracked', Value: stats?.totalAlumni || 0 },
-        { Parameter: 'Total Employed Tracked', Value: stats?.totalEmployed || 0 },
+        { Parameter: 'Total Registered Accounts', Value: stats?.totalAlumni || 0 },
+        { Parameter: 'Graduated Alumni (<= Current Year)', Value: stats?.totalGraduates ?? 0 },
+        { Parameter: 'Current Students (> Current Year)', Value: stats?.totalStudents ?? 0 },
+        { Parameter: 'Total Employed Graduates', Value: stats?.totalEmployed || 0 },
+        { Parameter: 'Active OJT Deployments', Value: stats?.activeOjtCount ?? 0 },
         { Parameter: 'Registered Partner Companies', Value: stats?.totalCompanies || 0 },
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(coverData), 'Institutional Overview');
@@ -427,13 +433,31 @@ export default function ReportsPage() {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(batchRows), 'Batch Absorption Rates');
       }
 
-      // Sheet 8: Skills Inventory
+      // Sheet 8: Degree Alignment
+      const alignmentRows = alignmentRes.data || [];
+      if (alignmentRows.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(alignmentRows), 'Degree Alignment');
+      }
+
+      // Sheet 9: Career Progression
+      const careerRows = careerRes.data || [];
+      if (careerRows.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(careerRows), 'Career Progression');
+      }
+
+      // Sheet 10: 4th-Year OJT & Graduation Clearance
+      const ojtRows = ojtRes.data || [];
+      if (ojtRows.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ojtRows), 'OJT Clearance');
+      }
+
+      // Sheet 11: Skills Inventory
       const skillsRows = skillsRes.data || [];
       if (skillsRows.length > 0) {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(skillsRows), 'Skills Inventory');
       }
 
-      // Sheet 9: Tracer Surveys Summary
+      // Sheet 12: Tracer Surveys Summary
       const tracerRows = tracerRes.data || [];
       if (tracerRows.length > 0) {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tracerRows), 'Tracer Surveys');

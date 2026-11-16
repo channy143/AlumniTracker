@@ -4,13 +4,14 @@ import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
 import { formatProgramLongName } from '../../utils/formatProgram';
-import { normalizeCityName, normalizeProvinceName } from '../../utils/formatLocation';
+import { normalizeCityName, normalizeProvinceName, normalizePhPhone } from '../../utils/formatLocation';
 import { logAudit } from '../../services/auditLogger';
 import { AuthenticatedRequest } from '../../types';
 import { buildDpaCsv } from '../../utils/csvExport';
 import { requireAdminSudo } from '../../middleware/sudo';
 import { adminSensitiveLimiter } from '../../middleware/rateLimiter';
 import { invalidateUserSessions } from '../../services/sessionSecurityService';
+import { normalizeIndustry, normalizeSalaryRange, toTitleCaseName } from '../../utils/validateJobTitle';
 
 const router = Router();
 
@@ -279,7 +280,7 @@ router.get('/export', async (req, res, next) => {
     const format = (req.query.format as string) || 'json';
     const { data: usersData } = await supabase
       .from('users')
-      .select('id, email, role, is_verified, is_archived, last_login, created_at')
+      .select('id, email, role, is_verified, is_archived, survey_completed, last_login, created_at')
       .eq('role', 'alumni')
       .order('created_at', { ascending: false });
 
@@ -326,30 +327,71 @@ router.get('/export', async (req, res, next) => {
     });
 
     if (format === 'csv') {
+      const currentYear = new Date().getFullYear();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const invalidTerms = new Set(['position', 'current position', 'organization', 'company', 'imong mama', 'n/a', 'na', 'none', 'null', 'test', 'sample']);
+      const isValidEmp = (e: any) => {
+        if (!e) return false;
+        const p = String(e.position || '').trim();
+        const c = String(e.company_name || '').trim();
+        return p.length >= 2 && c.length >= 2 && !invalidTerms.has(p.toLowerCase()) && !invalidTerms.has(c.toLowerCase());
+      };
+      const isOjt = (e: any) =>
+        String(e?.record_category || '').toLowerCase() === 'ojt' ||
+        String(e?.job_type || '').toLowerCase() === 'internship' ||
+        String(e?.employment_status || '').toLowerCase() === 'ojt';
+      const isCurr = (e: any) => !e?.end_date || String(e.end_date).trim().toLowerCase() === 'present';
+
       const rows = users.map((u: any) => {
         const ed = (u.education || [])[0] || {};
-        const emp = (u.employment || []).find((e: any) => e.is_current) || (u.employment || [])[0] || {};
+        const isStudent = Boolean(ed.year_graduated && Number(ed.year_graduated) > currentYear);
+        const emp = (u.employment || []).find((e: any) => !isOjt(e) && isCurr(e) && isValidEmp(e)) || null;
+        const ojt = (u.employment || []).find((e: any) => isOjt(e) && isCurr(e) && isValidEmp(e)) || null;
+
+        let derivedStatus = 'Not reported';
+        if (emp) {
+          const st = String(emp.employment_status || u.profile?.employment_status || '').trim();
+          derivedStatus = ['employed', 'self-employed'].includes(st.toLowerCase())
+            ? st.charAt(0).toUpperCase() + st.slice(1).toLowerCase()
+            : 'Employed';
+        } else if (isStudent) {
+          derivedStatus = 'Student';
+        } else {
+          const raw = String(u.profile?.employment_status || '').trim();
+          const lower = raw.toLowerCase();
+          if (
+            raw &&
+            !['n/a', 'na', 'none', 'unknown', 'not specified', 'null', 'employed', 'self-employed'].includes(lower) &&
+            !(u.survey_completed === false && lower === 'unemployed')
+          ) {
+            derivedStatus = raw;
+          }
+        }
+
+        const isEmailValid = emailRegex.test(String(u.email || '').trim());
         return {
           'Email Address': u.email || '',
-          'First Name': u.profile?.first_name || '',
-          'Last Name': u.profile?.last_name || '',
+          'First Name': toTitleCaseName(u.profile?.first_name || ''),
+          'Last Name': toTitleCaseName(u.profile?.last_name || ''),
           'ID Number': u.profile?.id_number || '',
           'Degree Program': ed.program ? formatProgramLongName(ed.program) : '',
           'Major': ed.major || '',
           'Graduation Year': ed.year_graduated || '',
-          'Employment Status': (() => {
-            const raw = String(emp.employment_status || u.profile?.employment_status || '').trim();
-            return !raw || ['n/a', 'na', 'none', 'unknown', 'not specified', 'null'].includes(raw.toLowerCase()) ? 'Unemployed' : raw;
-          })(),
-          'Current Position': emp.position || u.profile?.current_job_title || '',
-          'Current Company': emp.company_name || u.profile?.company_name || '',
-          'Industry': emp.company_industry || u.profile?.industry || '',
-          'Salary Range': emp.salary_range || u.profile?.salary_range || '',
-          'Phone': u.profile?.phone || '',
+          'Graduate Status': isStudent ? 'Student' : (ed.year_graduated ? 'Alumni' : 'Unverified'),
+          'Employment Status': derivedStatus,
+          'Current Position': emp?.position || '',
+          'Current Company': emp?.company_name || '',
+          'Industry': emp ? (normalizeIndustry(emp.company_industry) || emp.company_industry || '') : '',
+          'Salary Range': emp ? (normalizeSalaryRange(emp.salary_range) || '') : '',
+          'OJT Site (School / Company)': ojt?.company_name || '',
+          'OJT Role': ojt?.position || '',
+          'Phone': u.profile?.phone ? normalizePhPhone(u.profile.phone) : '',
           'City': u.profile?.city || '',
           'Province': u.profile?.province || '',
-          'Verified': u.is_verified ? 'Yes' : 'No',
-          'Registered Date': u.created_at ? new Date(u.created_at).toLocaleDateString() : '',
+          'Verified': u.is_verified && isEmailValid ? 'Yes' : 'No',
+          'Registered Date': u.created_at
+            ? new Date(u.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })
+            : '',
         };
       });
 

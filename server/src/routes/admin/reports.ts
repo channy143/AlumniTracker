@@ -161,6 +161,7 @@ async function recordReportExport(
 // -----------------------------------------------------------------------------
 router.get('/stats', async (_req: AuthenticatedRequest, res, next) => {
   try {
+    const currentYear = new Date().getFullYear();
     const [
       usersRes,
       empRes,
@@ -171,9 +172,10 @@ router.get('/stats', async (_req: AuthenticatedRequest, res, next) => {
       skillsRes,
       exportsRes,
       profilesRes,
+      eduRes,
     ] = await Promise.all([
-      supabase.from('users').select('id, is_archived').eq('role', 'alumni'),
-      supabase.from('employment').select('profile_id, employment_status, is_current'),
+      supabase.from('users').select('id, is_archived, survey_completed').eq('role', 'alumni'),
+      supabase.from('employment').select('*'),
       supabase.from('companies').select('id', { count: 'exact', head: true }),
       supabase.from('surveys').select('id', { count: 'exact', head: true }),
       supabase.from('survey_responses').select('id', { count: 'exact', head: true }),
@@ -181,27 +183,51 @@ router.get('/stats', async (_req: AuthenticatedRequest, res, next) => {
       supabase.from('skills').select('name'),
       supabase.from('report_exports').select('id', { count: 'exact', head: true }),
       supabase.from('profiles').select('id, user_id, employment_status'),
+      supabase.from('education').select('profile_id, year_graduated'),
     ]);
 
     const activeAlumniUsers = (usersRes.data || []).filter((u: any) => !u.is_archived);
     const activeUserIds = new Set(activeAlumniUsers.map((u: any) => u.id));
     const profileByUserId = new Map((profilesRes.data || []).map((p: any) => [p.user_id, p]));
+    const eduByProfId = groupBy(eduRes.data || [], 'profile_id');
 
-    const empStatusMap = new Map<string, string>();
+    const validCurrentWorkByProfile = new Map<string, any>();
+    let activeOjtCount = 0;
     (empRes.data || []).forEach((e: any) => {
-      if (e.is_current) empStatusMap.set(e.profile_id, e.employment_status);
+      if (!isReportValidEmployment(e)) return;
+      if (isOjtRecord(e)) {
+        if (isCurrentByEndDate(e)) activeOjtCount++;
+        return;
+      }
+      if (isCurrentByEndDate(e) && !validCurrentWorkByProfile.has(e.profile_id)) {
+        validCurrentWorkByProfile.set(e.profile_id, e);
+      }
     });
 
     let employed = 0;
     let selfEmployed = 0;
     let unemployed = 0;
+    let students = 0;
+    let notReported = 0;
 
     activeAlumniUsers.forEach((u: any) => {
       const p = profileByUserId.get(u.id);
-      const raw = p?.employment_status || (p ? empStatusMap.get(p.id) : '') || '';
-      const lower = String(raw).toLowerCase().trim();
-      if (lower === 'employed') employed++;
-      else if (['self-employed', 'entrepreneur', 'freelance'].includes(lower)) selfEmployed++;
+      const ed = p ? (eduByProfId[p.id] || [])[0] : null;
+      const isStudent = Boolean(ed?.year_graduated && Number(ed.year_graduated) > currentYear);
+      const validEmp = p ? validCurrentWorkByProfile.get(p.id) : null;
+      const status = normalizeReportEmploymentStatus(
+        validEmp?.employment_status || p?.employment_status,
+        {
+          hasValidEmployment: Boolean(validEmp),
+          isStudent,
+          surveyCompleted: Boolean(u.survey_completed),
+        }
+      ).toLowerCase();
+
+      if (status === 'employed') employed++;
+      else if (['self-employed', 'entrepreneur', 'freelance'].includes(status)) selfEmployed++;
+      else if (status === 'student') students++;
+      else if (status === 'not reported') notReported++;
       else unemployed++;
     });
 
@@ -209,10 +235,14 @@ router.get('/stats', async (_req: AuthenticatedRequest, res, next) => {
 
     res.json({
       totalAlumni: activeUserIds.size,
+      totalGraduates: activeUserIds.size - students,
+      totalStudents: students,
       totalEmployed: employed + selfEmployed,
       employed,
       selfEmployed,
       unemployed,
+      notReported,
+      activeOjtCount,
       totalCompanies: companiesRes.count || 0,
       totalSurveys: surveysRes.count || 0,
       totalSurveyResponses: responsesRes.count || 0,
@@ -609,11 +639,12 @@ router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) =>
 
     const { data: usersData, error: uErr } = await supabase
       .from('users')
-      .select('id, email, is_verified, is_archived, created_at')
+      .select('id, email, is_verified, is_archived, survey_completed, created_at')
       .eq('role', 'alumni')
       .order('created_at', { ascending: false });
 
     if (uErr) throw new AppError(uErr.message, 500);
+    const currentYear = new Date().getFullYear();
     const activeUsers = (usersData || []).filter((u: any) => !u.is_archived);
     const userIds = activeUsers.map((u: any) => u.id).filter(Boolean);
 
@@ -635,7 +666,7 @@ router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) =>
           supabase.from('employment').select('*').in('profile_id', profileIds).order('is_current', { ascending: false }).order('start_date', { ascending: false }),
         ]);
         education = edRes.data || [];
-        employment = empRes.data || [];
+        employment = (empRes.data || []).filter((e: any) => isReportValidEmployment(e));
       }
     }
 
@@ -681,7 +712,15 @@ router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) =>
     }
     if (empStatusFilter) {
       records = records.filter((r) => {
-        const st = normalizeReportEmploymentStatus(r.employment?.employment_status || r.profile?.employment_status);
+        const emp = r.employment;
+        const isStudent = Boolean(r.education?.year_graduated && Number(r.education.year_graduated) > currentYear);
+        const st = emp && isOjtRecord(emp)
+          ? 'OJT / Practice Teaching'
+          : normalizeReportEmploymentStatus(emp?.employment_status || r.profile?.employment_status, {
+              hasValidEmployment: Boolean(emp && isCurrentByEndDate(emp)),
+              isStudent,
+              surveyCompleted: Boolean(r.user?.survey_completed),
+            });
         return st.toLowerCase() === empStatusFilter.toLowerCase();
       });
     }
@@ -702,10 +741,12 @@ router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) =>
 
     const rows = records.map((r) => {
       const emp = r.employment;
+      const isOjt = emp ? isOjtRecord(emp) : false;
+      const isStudent = Boolean(r.education?.year_graduated && Number(r.education.year_graduated) > currentYear);
       const hasProof = Boolean(emp?.proof_url);
       const verificationStatus = !emp
         ? 'No Employment Record'
-        : emp.is_verified
+        : emp.is_verified || emp.clearance_verified
           ? 'Verified'
           : emp.verification_status === 'rejected'
             ? 'Rejected'
@@ -713,21 +754,32 @@ router.get('/employment-proofs', async (req: AuthenticatedRequest, res, next) =>
               ? 'Pending Verification'
               : 'No Proof Submitted';
 
+      const derivedStatus = isOjt
+        ? 'OJT / Practice Teaching'
+        : normalizeReportEmploymentStatus(emp?.employment_status || r.profile?.employment_status, {
+            hasValidEmployment: Boolean(emp && isCurrentByEndDate(emp)),
+            isStudent,
+            surveyCompleted: Boolean(r.user?.survey_completed),
+          });
+
       return {
-        'Alumni Name': `${r.profile?.first_name || ''} ${r.profile?.last_name || ''}`.trim() || r.user?.email || '',
+        'Alumni Name': `${toTitleCaseName(r.profile?.first_name || '')} ${toTitleCaseName(r.profile?.last_name || '')}`.trim() || r.user?.email || '',
         'Email': r.user?.email || r.profile?.email || '',
         'ID Number': r.profile?.id_number || '',
         'Degree Program': r.education?.program ? formatProgramLongName(r.education.program) : '',
         'Graduation Year': r.education?.year_graduated || '',
-        'Employment Status': normalizeReportEmploymentStatus(emp?.employment_status || r.profile?.employment_status),
+        'Record Category': emp ? (isOjt ? 'OJT / Practice Teaching' : 'Employment') : '',
+        'Employment Status': derivedStatus,
         'Company Name': emp?.company_name || '',
         'Position / Job Title': emp?.position || '',
-        'Current Position': emp ? (emp.is_current ? 'Yes' : 'No') : '',
+        'Current Position': emp ? (isCurrentByEndDate(emp) ? 'Yes' : 'No') : '',
         'Proof Document Type': hasProof ? (formatProofTypeLabel(emp?.proof_type) || 'Uploaded Document') : 'None',
         'Proof File URL': emp?.proof_url || '',
         'Verification Status': verificationStatus,
         'Start Date': emp?.start_date || '',
-        'Updated At': emp?.updated_at ? new Date(emp.updated_at).toLocaleDateString() : '',
+        'Updated At': emp?.updated_at
+          ? new Date(emp.updated_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })
+          : '',
       };
     });
 
@@ -781,22 +833,27 @@ router.get('/career-progress', async (req: AuthenticatedRequest, res, next) => {
     const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
     const eduMap = new Map(education.map((ed: any) => [ed.profile_id, ed]));
 
+    const currentYear = new Date().getFullYear();
     const careerPaths: Record<string, any> = {};
     employment.forEach((e: any) => {
-      const titleCheck = validateJobTitle(e.position);
-      const companyCheck = validateCompanyName(e.company_name);
-      if (!titleCheck.valid || !companyCheck.valid) return;
+      if (isOjtRecord(e) || !isReportValidEmployment(e)) return;
 
       const pid = e.profile_id;
+      const ed = eduMap.get(pid);
+      const gradYear = ed?.year_graduated ? Number(ed.year_graduated) : NaN;
+      if (!Number.isFinite(gradYear) || gradYear > currentYear) return;
+
+      const cleanedComp = String(e.company_name || '').trim();
+      const cleanedPos = String(e.position || '').trim();
       if (!careerPaths[pid]) {
         careerPaths[pid] = {
           profile: profileMap.get(pid) || {},
-          education: eduMap.get(pid) || {},
+          education: ed || {},
           positions: [],
         };
       }
-      const normComp = companyCheck.cleaned.toLowerCase();
-      const normPos = titleCheck.cleaned.toLowerCase();
+      const normComp = cleanedComp.toLowerCase();
+      const normPos = cleanedPos.toLowerCase();
       const existingDup = careerPaths[pid].positions.find(
         (existing: any) =>
           existing.company_name.trim().toLowerCase() === normComp &&
@@ -805,7 +862,7 @@ router.get('/career-progress', async (req: AuthenticatedRequest, res, next) => {
       const normalizedInd = normalizeIndustry(e.company_industry) || e.company_industry || '';
       if (existingDup) {
         // Merge duplicate (same company & position): keep earliest start_date and latest end/current status
-        if (e.is_current) {
+        if (isCurrentByEndDate(e)) {
           existingDup.is_current = true;
           existingDup.end_date = null;
         } else if (!existingDup.is_current && e.end_date && (!existingDup.end_date || e.end_date > existingDup.end_date)) {
@@ -819,8 +876,8 @@ router.get('/career-progress', async (req: AuthenticatedRequest, res, next) => {
 
       careerPaths[pid].positions.push({
         ...e,
-        company_name: companyCheck.cleaned,
-        position: titleCheck.cleaned,
+        company_name: cleanedComp,
+        position: cleanedPos,
         company_industry: normalizedInd,
       });
     });
@@ -890,41 +947,41 @@ router.get('/salary-distribution', async (req: AuthenticatedRequest, res, next) 
 
     const { data: employment } = await supabase
       .from('employment')
-      .select('salary_range, company_industry, position, company_name, profile_id')
-      .eq('is_current', true)
+      .select('salary_range, company_industry, position, company_name, profile_id, job_type, employment_status, end_date, is_current, record_category')
       .not('salary_range', 'is', null);
 
     const brackets: Record<string, number> = {
-      'Below ₱10,000': 0,
-      '₱10,001 - ₱20,000': 0,
-      '₱20,001 - ₱30,000': 0,
-      '₱30,001 - ₱50,000': 0,
-      '₱50,001 - ₱75,000': 0,
-      '₱75,001 - ₱100,000': 0,
+      'Below ₱20,000': 0,
+      '₱20,000–₱40,000': 0,
+      '₱40,000–₱60,000': 0,
+      '₱60,000–₱80,000': 0,
+      '₱80,000–₱100,000': 0,
       'Above ₱100,000': 0,
     };
 
-    const industrySalaries: Record<string, number[]> = {};
+    const midpointMap: Record<string, number> = {
+      'Below ₱20,000': 15000,
+      '₱20,000–₱40,000': 30000,
+      '₱40,000–₱60,000': 50000,
+      '₱60,000–₱80,000': 70000,
+      '₱80,000–₱100,000': 90000,
+      'Above ₱100,000': 110000,
+    };
+
+    const seenProfiles = new Set<string>();
     const parsedValues: number[] = [];
 
     (employment || []).forEach((e: any) => {
-      const clean = String(e.salary_range).replace(/[₱,,\s]/g, '');
-      const parts = clean.split('-').map((n) => parseFloat(n)).filter((n) => !isNaN(n));
-      if (parts.length > 0) {
-        const avg = parts.length === 1 ? parts[0] : (parts[0] + parts[1]) / 2;
-        parsedValues.push(avg);
+      if (isOjtRecord(e) || !isCurrentByEndDate(e) || !isReportValidEmployment(e)) return;
+      if (seenProfiles.has(e.profile_id)) return;
 
-        if (avg <= 10000) brackets['Below ₱10,000']++;
-        else if (avg <= 20000) brackets['₱10,001 - ₱20,000']++;
-        else if (avg <= 30000) brackets['₱20,001 - ₱30,000']++;
-        else if (avg <= 50000) brackets['₱30,001 - ₱50,000']++;
-        else if (avg <= 75000) brackets['₱50,001 - ₱75,000']++;
-        else if (avg <= 100000) brackets['₱75,001 - ₱100,000']++;
-        else brackets['Above ₱100,000']++;
+      const canonical = normalizeSalaryRange(e.salary_range);
+      if (!canonical || canonical === 'Prefer not to say') return;
 
-        const ind = e.company_industry || 'Unspecified';
-        if (!industrySalaries[ind]) industrySalaries[ind] = [];
-        industrySalaries[ind].push(avg);
+      if (brackets[canonical] !== undefined) {
+        seenProfiles.add(e.profile_id);
+        brackets[canonical]++;
+        parsedValues.push(midpointMap[canonical]);
       }
     });
 
@@ -955,7 +1012,7 @@ router.get('/salary-distribution', async (req: AuthenticatedRequest, res, next) 
 
     res.json({
       summary: { totalReported, avgSalary, highestSalary, lowestSalary },
-      data: sortRowsAlphabetically(rows),
+      data: rows,
       brackets: Object.entries(brackets).map(([range, count]) => ({ range, count })),
     });
   } catch (err) {
@@ -970,37 +1027,71 @@ router.get('/employment-by-course', async (req: AuthenticatedRequest, res, next)
   try {
     const format = (req.query.format as string) || 'json';
     const yearFilter = req.query.year || req.query.batch;
+    const currentYear = new Date().getFullYear();
 
-    const [{ data: education }, { data: profiles }, { data: employment }] = await Promise.all([
+    const [{ data: education }, { data: profiles }, { data: employment }, { data: users }] = await Promise.all([
       supabase.from('education').select('profile_id, program, year_graduated'),
-      supabase.from('profiles').select('id, employment_status'),
-      supabase.from('employment').select('profile_id, employment_status, is_current').eq('is_current', true),
+      supabase.from('profiles').select('id, user_id, employment_status'),
+      supabase.from('employment').select('*'),
+      supabase.from('users').select('id, is_archived, survey_completed').eq('role', 'alumni'),
     ]);
 
-    const empStatusMap = new Map<string, string>();
-    (employment || []).forEach((e: any) => {
-      empStatusMap.set(e.profile_id, (e.employment_status || '').toLowerCase());
-    });
+    const userById = new Map((users || []).map((u: any) => [u.id, u]));
     const profMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+    const empByProf = new Map<string, any>();
+    (employment || []).forEach((e: any) => {
+      if (!isOjtRecord(e) && isCurrentByEndDate(e) && isReportValidEmployment(e) && !empByProf.has(e.profile_id)) {
+        empByProf.set(e.profile_id, e);
+      }
+    });
 
-    const courseStats: Record<string, { total: number; employed: number; selfEmployed: number; unemployed: number }> = {};
+    const seenGradProg = new Set<string>();
+    const courseStats: Record<string, { total: number; responded: number; employed: number; selfEmployed: number; unemployed: number; notReported: number }> = {};
 
     (education || []).forEach((e: any) => {
       if (!e.program) return;
-      if (yearFilter && String(e.year_graduated) !== String(yearFilter)) return;
+      const gradYear = e.year_graduated ? Number(e.year_graduated) : NaN;
+      if (yearFilter) {
+        if (String(e.year_graduated) !== String(yearFilter)) return;
+      } else if (!Number.isFinite(gradYear) || gradYear > currentYear) {
+        return; // Exclude current 4th-year students unless specifically filtering that batch
+      }
+
+      const p = profMap.get(e.profile_id);
+      const u = p ? userById.get(p.user_id) : null;
+      if (u?.is_archived) return;
 
       const prog = formatProgramLongName(e.program);
       if (!prog) return;
-      if (!courseStats[prog]) courseStats[prog] = { total: 0, employed: 0, selfEmployed: 0, unemployed: 0 };
+
+      const key = `${e.profile_id}::${prog.toLowerCase()}`;
+      if (seenGradProg.has(key)) return;
+      seenGradProg.add(key);
+
+      if (!courseStats[prog]) {
+        courseStats[prog] = { total: 0, responded: 0, employed: 0, selfEmployed: 0, unemployed: 0, notReported: 0 };
+      }
       courseStats[prog].total++;
 
-      const p = profMap.get(e.profile_id);
-      const raw = p?.employment_status || empStatusMap.get(e.profile_id) || '';
-      const status = String(raw).toLowerCase().trim();
+      const validEmp = empByProf.get(e.profile_id);
+      const derived = normalizeReportEmploymentStatus(validEmp?.employment_status || p?.employment_status, {
+        hasValidEmployment: Boolean(validEmp),
+        isStudent: Boolean(Number.isFinite(gradYear) && gradYear > currentYear),
+        surveyCompleted: Boolean(u?.survey_completed),
+      }).toLowerCase();
 
-      if (status === 'employed') courseStats[prog].employed++;
-      else if (status === 'self-employed' || status === 'entrepreneur' || status === 'freelance') courseStats[prog].selfEmployed++;
-      else courseStats[prog].unemployed++;
+      if (derived === 'employed') {
+        courseStats[prog].employed++;
+        courseStats[prog].responded++;
+      } else if (['self-employed', 'entrepreneur', 'freelance'].includes(derived)) {
+        courseStats[prog].selfEmployed++;
+        courseStats[prog].responded++;
+      } else if (derived === 'not reported' || derived === 'student') {
+        courseStats[prog].notReported++;
+      } else {
+        courseStats[prog].unemployed++;
+        courseStats[prog].responded++;
+      }
     });
 
     const rows = Object.entries(courseStats)
@@ -1009,10 +1100,13 @@ router.get('/employment-by-course', async (req: AuthenticatedRequest, res, next)
         return {
           'Academic Program': program,
           'Total Graduates': s.total,
+          'Respondents': s.responded,
           'Employed Count': s.employed,
           'Self-Employed Count': s.selfEmployed,
           'Unemployed / Seeking': s.unemployed,
-          'Employment Rate (%)': s.total > 0 ? `${Math.round((employedTotal / s.total) * 100)}%` : '0%',
+          'Not Reported': s.notReported,
+          'Employment Rate (Graduates %)': s.total > 0 ? `${Math.round((employedTotal / s.total) * 100)}%` : 'N/A',
+          'Employment Rate (Respondents %)': s.responded > 0 ? `${Math.round((employedTotal / s.responded) * 100)}%` : 'N/A',
         };
       })
       .sort((a, b) => b['Total Graduates'] - a['Total Graduates']);
@@ -1031,7 +1125,7 @@ router.get('/employment-by-course', async (req: AuthenticatedRequest, res, next)
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: sortRowsAlphabetically(rows) });
+    res.json({ count: rows.length, data: rows });
   } catch (err) {
     next(err);
   }
@@ -1043,35 +1137,59 @@ router.get('/employment-by-course', async (req: AuthenticatedRequest, res, next)
 router.get('/batch-employment', async (req: AuthenticatedRequest, res, next) => {
   try {
     const format = (req.query.format as string) || 'json';
+    const currentYear = new Date().getFullYear();
 
-    const [{ data: education }, { data: profiles }, { data: employment }] = await Promise.all([
+    const [{ data: education }, { data: profiles }, { data: employment }, { data: users }] = await Promise.all([
       supabase.from('education').select('profile_id, year_graduated'),
-      supabase.from('profiles').select('id, employment_status'),
-      supabase.from('employment').select('profile_id, is_current, employment_status').eq('is_current', true),
+      supabase.from('profiles').select('id, user_id, employment_status'),
+      supabase.from('employment').select('*'),
+      supabase.from('users').select('id, is_archived, survey_completed').eq('role', 'alumni'),
     ]);
 
-    const empMap = new Map<string, string>();
-    (employment || []).forEach((e: any) => {
-      empMap.set(e.profile_id, (e.employment_status || '').toLowerCase());
-    });
+    const userById = new Map((users || []).map((u: any) => [u.id, u]));
     const profMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+    const empByProf = new Map<string, any>();
+    (employment || []).forEach((e: any) => {
+      if (!isOjtRecord(e) && isCurrentByEndDate(e) && isReportValidEmployment(e) && !empByProf.has(e.profile_id)) {
+        empByProf.set(e.profile_id, e);
+      }
+    });
 
-    const batchStats: Record<string, { total: number; employed: number; unemployed: number }> = {};
+    const seenProfileBatch = new Set<string>();
+    const batchStats: Record<string, { total: number; responded: number; employed: number; unemployed: number; notReported: number }> = {};
 
     (education || []).forEach((e: any) => {
       if (!e.year_graduated) return;
-      const batch = String(e.year_graduated);
-      if (!batchStats[batch]) batchStats[batch] = { total: 0, employed: 0, unemployed: 0 };
-      batchStats[batch].total++;
+      const gradYear = Number(e.year_graduated);
+      if (!Number.isFinite(gradYear) || gradYear > currentYear) return;
 
       const p = profMap.get(e.profile_id);
-      const raw = p?.employment_status || empMap.get(e.profile_id) || '';
-      const st = String(raw).toLowerCase().trim();
+      const u = p ? userById.get(p.user_id) : null;
+      if (u?.is_archived) return;
 
-      if (st === 'employed' || st === 'self-employed' || st === 'entrepreneur' || st === 'freelance') {
+      const batch = String(e.year_graduated);
+      const dedupKey = `${e.profile_id}::${batch}`;
+      if (seenProfileBatch.has(dedupKey)) return;
+      seenProfileBatch.add(dedupKey);
+
+      if (!batchStats[batch]) batchStats[batch] = { total: 0, responded: 0, employed: 0, unemployed: 0, notReported: 0 };
+      batchStats[batch].total++;
+
+      const validEmp = empByProf.get(e.profile_id);
+      const derived = normalizeReportEmploymentStatus(validEmp?.employment_status || p?.employment_status, {
+        hasValidEmployment: Boolean(validEmp),
+        isStudent: false,
+        surveyCompleted: Boolean(u?.survey_completed),
+      }).toLowerCase();
+
+      if (derived === 'employed' || ['self-employed', 'entrepreneur', 'freelance'].includes(derived)) {
         batchStats[batch].employed++;
+        batchStats[batch].responded++;
+      } else if (derived === 'not reported') {
+        batchStats[batch].notReported++;
       } else {
         batchStats[batch].unemployed++;
+        batchStats[batch].responded++;
       }
     });
 
@@ -1079,9 +1197,12 @@ router.get('/batch-employment', async (req: AuthenticatedRequest, res, next) => 
       .map(([batch, s]) => ({
         'Graduation Batch': batch,
         'Graduates Tracked': s.total,
+        'Respondents': s.responded,
         'Employed Graduates': s.employed,
         'Unemployed / Seeking': s.unemployed,
-        'Employment Rate (%)': s.total > 0 ? `${Math.round((s.employed / s.total) * 100)}%` : '0%',
+        'Not Reported': s.notReported,
+        'Employment Rate (Graduates %)': s.total > 0 ? `${Math.round((s.employed / s.total) * 100)}%` : 'N/A',
+        'Employment Rate (Respondents %)': s.responded > 0 ? `${Math.round((s.employed / s.responded) * 100)}%` : 'N/A',
       }))
       .sort((a, b) => Number(b['Graduation Batch']) - Number(a['Graduation Batch']));
 
@@ -1098,7 +1219,7 @@ router.get('/batch-employment', async (req: AuthenticatedRequest, res, next) => 
       return res.send(buildCsv(rows));
     }
 
-    res.json({ count: rows.length, data: sortRowsAlphabetically(rows) });
+    res.json({ count: rows.length, data: rows });
   } catch (err) {
     next(err);
   }
@@ -1246,7 +1367,7 @@ router.get('/employer', async (req: AuthenticatedRequest, res, next) => {
     const [{ data: companies }, { data: jobs }, { data: employment }] = await Promise.all([
       supabase.from('companies').select('*').order('name', { ascending: true }),
       supabase.from('job_postings').select('company_name'),
-      supabase.from('employment').select('company_name').eq('is_current', true),
+      supabase.from('employment').select('profile_id, company_name, position, job_type, employment_status, end_date, is_current, record_category'),
     ]);
 
     const jobCounts: Record<string, number> = {};
@@ -1255,10 +1376,13 @@ router.get('/employer', async (req: AuthenticatedRequest, res, next) => {
       if (c) jobCounts[c] = (jobCounts[c] || 0) + 1;
     });
 
-    const alumniHiredCounts: Record<string, number> = {};
+    const alumniHiredProfiles: Record<string, Set<string>> = {};
     (employment || []).forEach((e: any) => {
+      if (isOjtRecord(e) || !isCurrentByEndDate(e) || !isReportValidEmployment(e)) return;
       const c = (e.company_name || '').trim().toLowerCase();
-      if (c) alumniHiredCounts[c] = (alumniHiredCounts[c] || 0) + 1;
+      if (!c || !e.profile_id) return;
+      if (!alumniHiredProfiles[c]) alumniHiredProfiles[c] = new Set();
+      alumniHiredProfiles[c].add(String(e.profile_id));
     });
 
     const rows = (companies || []).map((c: any) => {
@@ -1274,8 +1398,10 @@ router.get('/employer', async (req: AuthenticatedRequest, res, next) => {
         'Contact Phone': c.contact_phone || '',
         'Verification Status': c.is_verified ? 'Verified Partner' : 'Pending Verification',
         'Active Job Openings': jobCounts[nameKey] || 0,
-        'Alumni Currently Employed': alumniHiredCounts[nameKey] || 0,
-        'Partnership Registered': c.created_at ? new Date(c.created_at).toLocaleDateString() : '',
+        'Alumni Currently Employed': alumniHiredProfiles[nameKey]?.size || 0,
+        'Partnership Registered': c.created_at
+          ? new Date(c.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })
+          : '',
       };
     });
 
@@ -1517,7 +1643,7 @@ router.get('/survey/:id', async (req: AuthenticatedRequest, res, next) => {
 
     const rows = responses.map((r: any) => {
       const respObj = typeof r.responses === 'object' && r.responses !== null ? r.responses : {};
-      const profileName = `${r.profile?.first_name || ''} ${r.profile?.last_name || ''}`.trim();
+      const profileName = `${toTitleCaseName(r.profile?.first_name || '')} ${toTitleCaseName(r.profile?.last_name || '')}`.trim();
       const respFullName =
         respObj.full_name ||
         respObj.fullName ||
@@ -1532,10 +1658,12 @@ router.get('/survey/:id', async (req: AuthenticatedRequest, res, next) => {
 
       const row: Record<string, any> = {
         'Survey Title': survey.title,
-        'Respondent Name': profileName || respFullName || 'Anonymous',
+        'Respondent Name': profileName || toTitleCaseName(respFullName) || 'Anonymous',
         'Respondent Email': r.user?.email || respObj.email || respObj.emailAddress || 'N/A',
         'Student ID': r.profile?.id_number || respObj.studentId || respObj.student_id || respObj.idNumber || 'N/A',
-        'Submission Timestamp': r.submitted_at ? new Date(r.submitted_at).toLocaleString() : '',
+        'Submission Timestamp': r.submitted_at
+          ? new Date(r.submitted_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
+          : '',
       };
 
       orderedKeys.forEach((k) => {
@@ -1655,13 +1783,13 @@ router.get('/jobs', async (req: AuthenticatedRequest, res, next) => {
         'Company Name': j.company_name,
         'Location': j.location,
         'Job Type': j.job_type,
-        'Salary Range': j.salary_range || 'Undisclosed',
+        'Salary Range': normalizeSalaryRange(j.salary_range) || j.salary_range || 'Not specified',
         'Alumni Exclusive': j.is_alumni_exclusive ? 'Yes' : 'No',
         'Total Applicants': a.total,
         'Pending Review': a.pending,
         'Accepted Hires': a.accepted,
-        'Expiration Date': j.expires_at ? new Date(j.expires_at).toLocaleDateString() : '',
-        'Date Posted': j.created_at ? new Date(j.created_at).toLocaleDateString() : '',
+        'Expiration Date': j.expires_at ? new Date(j.expires_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : '',
+        'Date Posted': j.created_at ? new Date(j.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : '',
       };
     });
 
@@ -1700,7 +1828,7 @@ router.get('/system-master', async (req: AuthenticatedRequest, res, next) => {
       { data: surveys },
       { data: jobs },
     ] = await Promise.all([
-      supabase.from('users').select('id, email, role, is_verified, is_active, created_at'),
+      supabase.from('users').select('id, email, role, is_verified, is_active, is_archived, survey_completed, created_at'),
       supabase.from('profiles').select('*'),
       supabase.from('education').select('*'),
       supabase.from('employment').select('*'),
@@ -1708,6 +1836,9 @@ router.get('/system-master', async (req: AuthenticatedRequest, res, next) => {
       supabase.from('surveys').select('*'),
       supabase.from('job_postings').select('*'),
     ]);
+
+    const currentYear = new Date().getFullYear();
+    const activeUsers = (users || []).filter((u: any) => !u.is_archived);
 
     const result = {
       institutionalMetadata: {
@@ -1741,21 +1872,32 @@ router.get('/system-master', async (req: AuthenticatedRequest, res, next) => {
 
     if (format === 'csv') {
       // Create a flat summary table for CSV
-      const rows = (users || []).map((u: any) => {
+      const rows = activeUsers.map((u: any) => {
         const prof = (profiles || []).find((p: any) => p.user_id === u.id) || {};
         const edu = (education || []).find((e: any) => e.profile_id === prof.id) || {};
-        const emp = (employment || []).find((e: any) => e.profile_id === prof.id && e.is_current) || {};
+        const isStudent = Boolean(edu.year_graduated && Number(edu.year_graduated) > currentYear);
+        const emp = (employment || []).find(
+          (e: any) => e.profile_id === prof.id && !isOjtRecord(e) && isCurrentByEndDate(e) && isReportValidEmployment(e)
+        ) || {};
+        const derivedStatus = normalizeReportEmploymentStatus(emp.employment_status || prof.employment_status, {
+          hasValidEmployment: Boolean(emp.company_name),
+          isStudent,
+          surveyCompleted: Boolean(u.survey_completed),
+        });
         return {
           'User ID': u.id,
           'Email': u.email,
-          'Name': `${prof.first_name || ''} ${prof.last_name || ''}`.trim(),
+          'Name': `${toTitleCaseName(prof.first_name || '')} ${toTitleCaseName(prof.last_name || '')}`.trim(),
           'ID Number': prof.id_number || '',
           'Program': edu.program ? formatProgramLongName(edu.program) : '',
           'Batch': edu.year_graduated || '',
-          'Employment Status': normalizeReportEmploymentStatus(emp.employment_status || prof.employment_status),
+          'Graduate Status': isStudent ? 'Student' : (edu.year_graduated ? 'Alumni' : 'Unverified'),
+          'Employment Status': derivedStatus,
           'Company': emp.company_name || '',
           'Position': emp.position || '',
-          'Registered At': u.created_at || '',
+          'Registered At': u.created_at
+            ? new Date(u.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })
+            : '',
         };
       });
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
