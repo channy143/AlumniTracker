@@ -183,15 +183,21 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       }
     }
 
+    const rawStatus = String(req.body.employment_status || '').trim().toLowerCase();
+    const validEmpStatus = ['employed', 'self-employed', 'unemployed', 'seeking opportunities', 'retired'].includes(rawStatus)
+      ? rawStatus
+      : 'employed';
+
     const hasProof = Boolean(req.body.proof_url);
+    const { record_category: _omitCat, ...safeBody } = req.body || {};
     const basePayload: Record<string, any> = {
-      ...req.body,
+      ...safeBody,
       company_name: companyCheck.cleaned,
       position: posCheck.cleaned,
       company_industry: normalizedIndustry,
       salary_range: normalizedSalary,
-      employment_status: req.body.employment_status || (isOjt ? 'ojt' : 'Employed'),
-      job_type: isOjt ? 'internship' : (req.body.job_type || 'full-time'),
+      employment_status: validEmpStatus,
+      job_type: isOjt ? 'internship' : (req.body.job_type ? String(req.body.job_type).toLowerCase() : 'full-time'),
       start_date: existingSameRole?.start_date ? String(existingSameRole.start_date).slice(0, 10) : startDateStr,
       end_date: endDateStr,
       is_current: endDateStr === null,
@@ -209,7 +215,7 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
         .eq('id', existingSameRole.id)
         .select()
         .single();
-      if (updErr && updErr.code === '42703') {
+      if (updErr && (updErr.code === '42703' || updErr.code === 'PGRST204')) {
         ({ data: updatedEmp, error: updErr } = await db
           .from('employment')
           .update(basePayload)
@@ -227,7 +233,7 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       .select()
       .single();
 
-    if (error && error.code === '42703') {
+    if (error && (error.code === '42703' || error.code === 'PGRST204')) {
       ({ data: employment, error } = await db
         .from('employment')
         .insert(basePayload)
@@ -276,6 +282,15 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
     }
 
     const updatePayload: any = { ...req.body };
+    if (updatePayload.employment_status !== undefined) {
+      const rawUpdStatus = String(updatePayload.employment_status || '').trim().toLowerCase();
+      updatePayload.employment_status = ['employed', 'self-employed', 'unemployed', 'seeking opportunities', 'retired'].includes(rawUpdStatus)
+        ? rawUpdStatus
+        : 'employed';
+    }
+    if (updatePayload.salary_range !== undefined) {
+      updatePayload.salary_range = normalizeSalaryRange(updatePayload.salary_range);
+    }
     if (updatePayload.position !== undefined) {
       const check = validateJobTitle(updatePayload.position);
       if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);

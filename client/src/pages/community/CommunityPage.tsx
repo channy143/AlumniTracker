@@ -26,6 +26,7 @@ import { dedupeCommentTree, countAllComments } from '@/utils/helpers';
 import { getCached } from '@/utils/apiCache';
 import MentionInput from '@/components/ui/MentionInput';
 import MentionText from '@/components/ui/MentionText';
+import ExpandablePostText from '@/components/ui/ExpandablePostText';
 import { MentionCandidate } from '@/hooks/useMentionPeople';
 
 const FORUM_TAGS = [
@@ -754,12 +755,11 @@ export default function CommunityPage() {
                       <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-snug">
                         {post.title}
                       </h3>
-                      <p className="text-xs sm:text-sm text-gray-600 mt-1 whitespace-pre-wrap break-words leading-relaxed">
-                        <MentionText
-                          text={post.content}
-                          mentionedProfiles={post.mentioned_profiles}
-                        />
-                      </p>
+                      <ExpandablePostText
+                        text={post.content}
+                        mentionedProfiles={post.mentioned_profiles}
+                        className="text-xs sm:text-sm text-gray-600 mt-1 whitespace-pre-wrap break-words leading-relaxed"
+                      />
                     </div>
 
                     {/* Footer Actions: Like, Reply/Comments, Direct Connect */}

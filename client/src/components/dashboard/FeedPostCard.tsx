@@ -30,6 +30,7 @@ import { useChatStore } from '@/store/chatStore';
 import EmojiPicker from '@/components/ui/EmojiPicker';
 import MentionInput from '@/components/ui/MentionInput';
 import MentionText from '@/components/ui/MentionText';
+import ExpandablePostText from '@/components/ui/ExpandablePostText';
 import { MentionCandidate } from '@/hooks/useMentionPeople';
 
 export const REAL_REACTIONS = [
@@ -1012,15 +1013,14 @@ export default function FeedPostCard({
         )}
 
         {/* Post Content */}
-        <p className="text-sm text-gray-800 leading-relaxed mt-1.5 whitespace-pre-line">
-          <MentionText
-            text={decodeUnicode(currentPost.content)}
-            mentionedProfiles={[
-              ...(currentPost.mentioned_profiles || []),
-              ...(currentPost.tagged_friends || []),
-            ]}
-          />
-        </p>
+        <ExpandablePostText
+          text={decodeUnicode(currentPost.content)}
+          mentionedProfiles={[
+            ...(currentPost.mentioned_profiles || []),
+            ...(currentPost.tagged_friends || []),
+          ]}
+          className="text-sm text-gray-800 leading-relaxed mt-1.5 whitespace-pre-line break-words"
+        />
       </div>
 
       {/* Post Photo */}

@@ -629,35 +629,34 @@ export default function ProfilePage() {
       }
 
       // Sync independent OJT / Practice Teaching deployment (works alongside real work)
-      try {
-        if (ojtForm.active) {
-          const ojtPayload: any = {
-            record_category: 'ojt',
-            company_name: validateCompanyName(ojtForm.site_name).cleaned,
-            position: validateJobTitle(ojtForm.role_title).cleaned,
-            company_industry: ojtForm.industry,
-            job_type: 'internship',
-            employment_status: 'ojt',
-            start_date: ojtForm.start_date || new Date().toISOString().slice(0, 10),
-            end_date: null,
-            salary_range: null,
-            proof_url: ojtForm.proof_url || null,
-            proof_type: 'endorsement',
-            is_current: true,
-          };
-          if (ojtForm.id) {
-            await employmentApi.update(ojtForm.id, ojtPayload);
-          } else {
-            await employmentApi.create(ojtPayload);
+      if (ojtForm.active) {
+        const ojtPayload: any = {
+          record_category: 'ojt',
+          company_name: validateCompanyName(ojtForm.site_name).cleaned,
+          position: validateJobTitle(ojtForm.role_title).cleaned,
+          company_industry: ojtForm.industry,
+          job_type: 'internship',
+          employment_status: 'employed',
+          start_date: ojtForm.start_date || new Date().toISOString().slice(0, 10),
+          end_date: null,
+          salary_range: null,
+          proof_url: ojtForm.proof_url || null,
+          proof_type: 'coe',
+          is_current: true,
+        };
+        if (ojtForm.id) {
+          await employmentApi.update(ojtForm.id, ojtPayload);
+        } else {
+          const createdOjt = await employmentApi.create(ojtPayload);
+          if (createdOjt?.id) {
+            setOjtForm((prev) => ({ ...prev, id: createdOjt.id }));
           }
-        } else if (ojtForm.id) {
-          await employmentApi.update(ojtForm.id, {
-            is_current: false,
-            end_date: new Date().toISOString().slice(0, 10),
-          });
         }
-      } catch (ojtErr) {
-        console.warn('OJT deployment sync notice:', ojtErr);
+      } else if (ojtForm.id) {
+        await employmentApi.update(ojtForm.id, {
+          is_current: false,
+          end_date: new Date().toISOString().slice(0, 10),
+        });
       }
 
       if (Array.isArray(editSkills) && editSkills.length > 0) {
