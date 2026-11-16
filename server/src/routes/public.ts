@@ -12,7 +12,7 @@ router.get('/stats', async (_req, res, next) => {
     const [usersRes, profilesRes, employmentRes, educationRes, whitelistRes, connectionsRes, jobsRes] = await Promise.all([
       supabase.from('users').select('id').eq('role', 'alumni'),
       supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, headline, employment_status'),
-      supabase.from('employment').select('profile_id, employment_status, is_current'),
+      supabase.from('employment').select('profile_id, record_category, job_type, company_name, position, employment_status, is_current, end_date'),
       supabase.from('education').select('profile_id, program, year_graduated'),
       supabase.from('graduate_whitelist').select('program'),
       supabase.from('connections').select('id').eq('status', 'accepted'),
@@ -31,14 +31,29 @@ router.get('/stats', async (_req, res, next) => {
 
     const totalAlumni = profiles.length || alumniUsers.length;
     const profileIds = new Set(profiles.map((p: any) => p.id));
+    const isOjtOrPlaceholder = (e: any) => {
+      const cat = String(e?.record_category || '').toLowerCase();
+      const jt = String(e?.job_type || '').toLowerCase();
+      const st = String(e?.employment_status || '').toLowerCase();
+      const comp = String(e?.company_name || '').trim().toLowerCase();
+      const pos = String(e?.position || '').trim().toLowerCase();
+      if (cat === 'ojt' || jt === 'internship' || st === 'ojt') return true;
+      if (comp.length < 2 || pos.length < 2 || ['organization', 'company', 'n/a', 'na', 'none', 'null'].includes(comp) || ['position', 'current position', 'n/a', 'na', 'none', 'null'].includes(pos)) {
+        return true;
+      }
+      return false;
+    };
+    const regularCurrentEmp = employment.filter(
+      (e: any) => (e.is_current || !e.end_date) && !isOjtOrPlaceholder(e)
+    );
     const employedIds = new Set(
-      employment
-        .filter((e: any) => e.is_current && ['employed', 'self-employed', 'entrepreneur'].includes(e.employment_status))
+      regularCurrentEmp
+        .filter((e: any) => ['employed', 'self-employed', 'entrepreneur'].includes(String(e.employment_status || '').toLowerCase()))
         .map((e: any) => e.profile_id)
     );
     const unemployedIds = new Set(
-      employment
-        .filter((e: any) => e.is_current && String(e.employment_status || '').toLowerCase() === 'unemployed')
+      regularCurrentEmp
+        .filter((e: any) => String(e.employment_status || '').toLowerCase() === 'unemployed')
         .map((e: any) => e.profile_id)
     );
     profiles.forEach((p: any) => {

@@ -636,7 +636,7 @@ export default function ProfilePage() {
           position: validateJobTitle(ojtForm.role_title).cleaned,
           company_industry: ojtForm.industry,
           job_type: 'internship',
-          employment_status: 'employed',
+          employment_status: (form.employment_status || 'unemployed').toLowerCase(),
           start_date: ojtForm.start_date || new Date().toISOString().slice(0, 10),
           end_date: null,
           salary_range: null,

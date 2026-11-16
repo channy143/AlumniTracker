@@ -25,7 +25,10 @@ import {
   SparklesIcon,
   ClipboardDocumentCheckIcon,
   MagnifyingGlassIcon,
+  ArrowRightIcon,
 } from '@heroicons/react/24/outline';
+import ReportDetailView from './ReportDetailView';
+import { normalizeReportRows } from './reportAnalytics';
 
 // Helper to trigger browser download of a Blob
 function downloadBlob(blob: Blob, filename: string) {
@@ -87,6 +90,13 @@ export default function ReportsPage() {
   } | null>(null);
   const [previewSearch, setPreviewSearch] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Interactive Report Detail View state
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [detailPayload, setDetailPayload] = useState<any>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailLastUpdated, setDetailLastUpdated] = useState<Date | null>(null);
 
   // Export Audit History
   const initialHistory = getCached<any[]>('/admin/reports/export-history');
@@ -334,7 +344,7 @@ export default function ReportsPage() {
     });
     try {
       const res = await fetchFn();
-      const rows = Array.isArray(res) ? res : res.data || [];
+      const rows = normalizeReportRows(reportId, res);
       setPreviewModal({
         reportId,
         title,
@@ -653,6 +663,53 @@ export default function ReportsPage() {
     },
   ];
 
+  const selectedReport = useMemo(
+    () => reportCards.find((r) => r.id === selectedReportId) || null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedReportId, stats, selectedCourse, selectedBatch, selectedStatus, selectedSurveyId]
+  );
+
+  const loadReportDetail = useCallback(
+    async (reportId: string) => {
+      const target = reportCards.find((r) => r.id === reportId);
+      if (!target) return;
+      setDetailLoading(true);
+      setDetailError(null);
+      try {
+        const res = await target.fetchLiveJson();
+        setDetailPayload(res);
+        setDetailLastUpdated(new Date());
+      } catch (err: any) {
+        setDetailError(err?.message || 'Failed to load live report dataset.');
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedCourse, selectedBatch, selectedStatus, selectedSurveyId]
+  );
+
+  const openReportDetail = (reportId: string) => {
+    setSelectedReportId(reportId);
+    setDetailPayload(null);
+    loadReportDetail(reportId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (selectedReportId && activeTab === 'reports') {
+      loadReportDetail(selectedReportId);
+    }
+  }, [selectedReportId, activeTab, loadReportDetail]);
+
+  const activeFilterLabels = useMemo(() => {
+    const labels: string[] = [];
+    if (selectedCourse) labels.push(selectedCourse);
+    if (selectedBatch) labels.push(`Batch ${selectedBatch}`);
+    if (selectedStatus) labels.push(selectedStatus);
+    return labels;
+  }, [selectedCourse, selectedBatch, selectedStatus]);
+
   // Filtered Preview Data
   const previewRows = useMemo(() => {
     if (!previewModal?.data) return [];
@@ -811,8 +868,69 @@ export default function ReportsPage() {
         </div>
       </div>
 
+          {/* Tab 1: Available Live Reports OR Selected Report Detail Workspace */}
+          {activeTab === 'reports' && selectedReport && (
+            <ReportDetailView
+              report={selectedReport}
+              payload={detailPayload}
+              loading={detailLoading}
+              error={detailError}
+              lastUpdated={detailLastUpdated}
+              generating={generating}
+              activeFilterLabels={activeFilterLabels}
+              surveysList={surveysList}
+              selectedSurveyId={selectedSurveyId}
+              onChangeSurveyId={(id) => setSelectedSurveyId(id)}
+              onBack={() => {
+                setSelectedReportId(null);
+                setDetailPayload(null);
+                setDetailError(null);
+              }}
+              onRefresh={() => loadReportDetail(selectedReport.id)}
+              onExportCsv={() =>
+                requestExport(
+                  selectedReport.title,
+                  `${selectedReport.defaultFilename}.csv`,
+                  'csv',
+                  async () => {
+                    const blob = await selectedReport.fetchCsv();
+                    downloadBlob(blob, `${selectedReport.defaultFilename}.csv`);
+                  }
+                )
+              }
+              onExportExcel={(rows) =>
+                requestExport(
+                  selectedReport.title,
+                  `${selectedReport.defaultFilename}.xlsx`,
+                  'xlsx',
+                  async () => {
+                    const exportRows = rows.length > 0 ? rows : normalizeReportRows(selectedReport.id, await selectedReport.fetchLiveJson());
+                    exportAsExcel(exportRows, `${selectedReport.defaultFilename}.xlsx`, selectedReport.title);
+                  }
+                )
+              }
+              onExportJson={() =>
+                requestExport(
+                  selectedReport.title,
+                  `${selectedReport.defaultFilename}.json`,
+                  'json',
+                  async () => {
+                    const res = detailPayload ?? (await selectedReport.fetchLiveJson());
+                    const jsonStr = JSON.stringify(res.data || res, null, 2);
+                    const blob = new Blob([jsonStr], { type: 'application/json' });
+                    downloadBlob(blob, `${selectedReport.defaultFilename}.json`);
+                  }
+                )
+              }
+              onPrint={(rows) => {
+                const printRows = rows.length > 0 ? rows : normalizeReportRows(selectedReport.id, detailPayload);
+                openPrintWindow(selectedReport.title, printRows);
+              }}
+            />
+          )}
+
       {/* Tab 1: Available Live Reports */}
-      {activeTab === 'reports' && (
+      {activeTab === 'reports' && !selectedReport && (
         <div className="space-y-4">
           {/* Institutional Filter Toolbar */}
           <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs">
@@ -888,7 +1006,16 @@ export default function ReportsPage() {
               return (
                 <div
                   key={report.id}
-                  className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all duration-150 relative group"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openReportDetail(report.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openReportDetail(report.id);
+                    }
+                  }}
+                  className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md hover:border-orange-300 transition-all duration-150 relative group cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/40"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-2">
@@ -900,14 +1027,18 @@ export default function ReportsPage() {
                       </span>
                     </div>
 
-                    <h3 className="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
-                      {report.title}
+                    <h3 className="text-sm font-bold text-gray-900 group-hover:text-orange-600 transition-colors flex items-center justify-between gap-2">
+                      <span>{report.title}</span>
+                      <ArrowRightIcon className="w-4 h-4 text-orange-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                     </h3>
                     <p className="text-xs text-gray-500 mt-1 leading-relaxed">{report.desc}</p>
 
                     {/* Specific Survey Picker if applicable */}
                     {report.hasSurveyPicker && (
-                      <div className="mt-2.5 bg-violet-50/60 p-2 rounded-lg border border-violet-100">
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-2.5 bg-violet-50/60 p-2 rounded-lg border border-violet-100"
+                      >
                         <label className="block text-[10px] font-semibold text-violet-900 mb-1">
                           Select Survey Cycle:
                         </label>
@@ -927,13 +1058,16 @@ export default function ReportsPage() {
                   </div>
 
                   {/* Actions Bar */}
-                  <div className="mt-4 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-1.5">
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-4 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-1.5"
+                  >
                     {/* Preview Button */}
                     <button
                       onClick={() =>
                         openPreview(report.id, report.title, report.desc, async () => {
                           const res = await report.fetchLiveJson();
-                          return res.data || res;
+                          return normalizeReportRows(report.id, res);
                         })
                       }
                       disabled={previewLoading}

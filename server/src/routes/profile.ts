@@ -281,12 +281,13 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
       const lowerStatus = updates.employment_status.toLowerCase();
       const { data: openRows } = await supabase
         .from('employment')
-        .select('id, company_name, position, job_type, employment_status, start_date, is_current, end_date')
+        .select('id, company_name, position, record_category, job_type, employment_status, start_date, is_current, end_date')
         .eq('profile_id', profile.id)
         .or('is_current.eq.true,end_date.is.null');
 
       const regularOpenRows = (openRows || []).filter(
         (r: any) =>
+          String(r.record_category || '').toLowerCase() !== 'ojt' &&
           String(r.job_type || '').toLowerCase() !== 'internship' &&
           String(r.employment_status || '').toLowerCase() !== 'ojt'
       );

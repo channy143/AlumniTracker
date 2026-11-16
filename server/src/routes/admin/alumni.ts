@@ -183,9 +183,14 @@ router.get('/', async (req, res, next) => {
     // Employment Status filter: accurately accounts for profiles.employment_status and employment.employment_status
     if (employmentStatus.trim()) {
       const target = employmentStatus.trim().toLowerCase();
+      const isOjtRow = (e: any) =>
+        String(e?.record_category || '').toLowerCase() === 'ojt' ||
+        String(e?.job_type || '').toLowerCase() === 'internship' ||
+        String(e?.employment_status || '').toLowerCase() === 'ojt';
       filtered = filtered.filter((u: any) => {
         const p = u.profile;
-        const emp = (p?.employment || [])[0];
+        const emps = (p?.employment || []).filter((e: any) => !isOjtRow(e));
+        const emp = emps.find((e: any) => e.is_current) || emps[0];
         const raw = p?.employment_status || emp?.employment_status || '';
         const lower = String(raw).trim().toLowerCase();
 

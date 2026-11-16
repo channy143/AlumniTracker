@@ -6,6 +6,38 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { logAudit } from '../services/auditLogger';
 import { validateJobTitle, validateCompanyName, normalizeIndustry, normalizeSalaryRange } from '../utils/validateJobTitle';
+import { notifyAdmins } from './notifications';
+
+async function notifyAdminOjtUpdate(params: {
+  profile: { first_name?: string | null; last_name?: string | null } | null;
+  fallbackEmail?: string;
+  companyName: string;
+  position: string;
+  isActive: boolean;
+}) {
+  const fullName =
+    `${params.profile?.first_name || ''} ${params.profile?.last_name || ''}`.trim() ||
+    params.fallbackEmail?.split('@')[0] ||
+    'Student';
+  const searchTerm = params.profile?.last_name?.trim() || fullName;
+  const link = `/admin/alumni?search=${encodeURIComponent(searchTerm)}`;
+
+  if (params.isActive) {
+    await notifyAdmins({
+      type: 'employment',
+      title: `🎓 OJT / Practice Teaching Update: ${fullName}`,
+      message: `${fullName} updated Currently Deployed for OJT / Practice Teaching as "${params.position}" at ${params.companyName}.`,
+      link,
+    });
+  } else {
+    await notifyAdmins({
+      type: 'employment',
+      title: `🎓 OJT / Practice Teaching Ended: ${fullName}`,
+      message: `${fullName} unmarked Currently Deployed for OJT / Practice Teaching at ${params.companyName}.`,
+      link,
+    });
+  }
+}
 
 const router = Router();
 const upload = multer({
@@ -80,7 +112,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
     const db = createUserScopedClient(req.token!);
     const { data: profile } = await db
       .from('profiles')
-      .select('id')
+      .select('id, first_name, last_name')
       .eq('user_id', req.user!.userId)
       .single();
 
@@ -105,7 +137,7 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
     const db = createUserScopedClient(req.token!);
     const { data: profile } = await db
       .from('profiles')
-      .select('id')
+      .select('id, first_name, last_name')
       .eq('user_id', req.user!.userId)
       .single();
 
@@ -184,9 +216,12 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
     }
 
     const rawStatus = String(req.body.employment_status || '').trim().toLowerCase();
-    const validEmpStatus = ['employed', 'self-employed', 'unemployed', 'seeking opportunities', 'retired'].includes(rawStatus)
+    const allowedEmpStatuses = ['employed', 'self-employed', 'unemployed', 'seeking opportunities', 'retired'];
+    const validEmpStatus = allowedEmpStatuses.includes(rawStatus)
       ? rawStatus
-      : 'employed';
+      : isOjt
+        ? 'unemployed'
+        : 'employed';
 
     const hasProof = Boolean(req.body.proof_url);
     const { record_category: _omitCat, ...safeBody } = req.body || {};
@@ -224,6 +259,15 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
           .single());
       }
       if (updErr) throw new AppError(updErr.message, 500);
+      if (isOjt) {
+        notifyAdminOjtUpdate({
+          profile,
+          fallbackEmail: req.user?.email,
+          companyName: companyCheck.cleaned,
+          position: posCheck.cleaned,
+          isActive: Boolean(updatedEmp?.is_current ?? isCurrent),
+        }).catch(() => {});
+      }
       return res.status(200).json(updatedEmp);
     }
 
@@ -243,6 +287,16 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
 
     if (error) throw new AppError(error.message, 500);
 
+    if (isOjt) {
+      notifyAdminOjtUpdate({
+        profile,
+        fallbackEmail: req.user?.email,
+        companyName: companyCheck.cleaned,
+        position: posCheck.cleaned,
+        isActive: Boolean(employment?.is_current ?? isCurrent),
+      }).catch(() => {});
+    }
+
     res.status(201).json(employment);
   } catch (err) {
     next(err);
@@ -254,7 +308,7 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
     const db = createUserScopedClient(req.token!);
     const { data: profile } = await db
       .from('profiles')
-      .select('id')
+      .select('id, first_name, last_name')
       .eq('user_id', req.user!.userId)
       .single();
 
@@ -263,7 +317,7 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
     // Rule 2 – Authorized Access: Verify ownership before update
     const { data: existing, error: findError } = await db
       .from('employment')
-      .select('id, profile_id, proof_url, start_date, end_date, is_current, job_type, employment_status')
+      .select('id, profile_id, company_name, position, company_industry, proof_url, start_date, end_date, is_current, record_category, job_type, employment_status')
       .eq('id', req.params.id)
       .maybeSingle();
 
@@ -323,20 +377,29 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       updatePayload.end_date = endStr || null;
     }
 
+    const isThisOjt =
+      String(updatePayload.record_category || existing.record_category || '').toLowerCase() === 'ojt' ||
+      String(updatePayload.job_type || existing.job_type || '').toLowerCase() === 'internship' ||
+      String(updatePayload.employment_status || existing.employment_status || '').toLowerCase() === 'ojt';
+    if (isThisOjt) {
+      updatePayload.job_type = 'internship';
+      const upSt = String(updatePayload.employment_status || '').trim().toLowerCase();
+      if (upSt && !['employed', 'self-employed', 'unemployed', 'seeking opportunities', 'retired'].includes(upSt)) {
+        delete updatePayload.employment_status;
+      }
+    }
+
     if (updatePayload.is_current === true) {
       const closeDate = effectiveStartDate || new Date().toISOString().slice(0, 10);
-      const isThisOjt =
-        String(updatePayload.record_category || '').toLowerCase() === 'ojt' ||
-        String(updatePayload.job_type || existing.job_type || '').toLowerCase() === 'internship' ||
-        String(updatePayload.employment_status || existing.employment_status || '').toLowerCase() === 'ojt';
       const { data: peerActive } = await db
         .from('employment')
-        .select('id, job_type, employment_status')
+        .select('id, record_category, job_type, employment_status')
         .eq('profile_id', existing.profile_id)
         .eq('is_current', true)
         .neq('id', req.params.id);
       for (const peer of peerActive || []) {
         const peerIsOjt =
+          String(peer.record_category || '').toLowerCase() === 'ojt' ||
           String(peer.job_type || '').toLowerCase() === 'internship' ||
           String(peer.employment_status || '').toLowerCase() === 'ojt';
         if (peerIsOjt === isThisOjt) {
@@ -370,6 +433,33 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
 
     if (error) throw new AppError(error.message, 500);
 
+    if (isThisOjt) {
+      const nextComp = String(employment?.company_name ?? existing.company_name ?? '').trim();
+      const nextPos = String(employment?.position ?? existing.position ?? '').trim();
+      const nextInd = String(employment?.company_industry ?? existing.company_industry ?? '').trim();
+      const nextStart = String(employment?.start_date ?? existing.start_date ?? '').slice(0, 10);
+      const nextProof = String(employment?.proof_url ?? existing.proof_url ?? '').trim();
+      const nextCurrent = Boolean(employment?.is_current);
+
+      const hasOjtChange =
+        nextCurrent !== Boolean(existing.is_current) ||
+        nextComp !== String(existing.company_name ?? '').trim() ||
+        nextPos !== String(existing.position ?? '').trim() ||
+        nextInd !== String(existing.company_industry ?? '').trim() ||
+        nextStart !== String(existing.start_date ?? '').slice(0, 10) ||
+        nextProof !== String(existing.proof_url ?? '').trim();
+
+      if (hasOjtChange) {
+        notifyAdminOjtUpdate({
+          profile,
+          fallbackEmail: req.user?.email,
+          companyName: nextComp || 'OJT Site',
+          position: nextPos || 'OJT Intern',
+          isActive: nextCurrent,
+        }).catch(() => {});
+      }
+    }
+
     res.json(employment);
   } catch (err) {
     next(err);
@@ -381,7 +471,7 @@ router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res, next)
     const db = createUserScopedClient(req.token!);
     const { data: profile } = await db
       .from('profiles')
-      .select('id')
+      .select('id, first_name, last_name')
       .eq('user_id', req.user!.userId)
       .single();
 

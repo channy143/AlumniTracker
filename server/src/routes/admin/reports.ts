@@ -349,17 +349,20 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
 
     if (empStatusFilter) {
       users = users.filter((u: any) => {
-        const ed = (u.education || [])[0] || {};
+        const edus = [...(u.education || [])].sort(
+          (a: any, b: any) => (Number(b?.year_graduated) || 0) - (Number(a?.year_graduated) || 0)
+        );
+        const ed = edus[0] || {};
         const isStudent = Boolean(ed.year_graduated && Number(ed.year_graduated) > currentYear);
         const validEmp = (u.employment || []).find(
-          (e: any) => isCurrentByEndDate(e) && isReportValidEmployment(e)
+          (e: any) => !isOjtRecord(e) && isCurrentByEndDate(e) && isReportValidEmployment(e)
         );
         const derivedStatus = normalizeReportEmploymentStatus(
           validEmp?.employment_status || u.profile?.employment_status,
           {
             hasValidEmployment: Boolean(validEmp),
             isStudent,
-            surveyCompleted: Boolean(u.survey_completed),
+            surveyCompleted: Boolean(u.survey_completed || u.profile?.last_updated_at),
           }
         );
         return derivedStatus.toLowerCase() === empStatusFilter.toLowerCase();
@@ -369,10 +372,13 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     const rows = users.map((u: any) => {
-      const ed = (u.education || [])[0] || {};
+      const edus = [...(u.education || [])].sort(
+        (a: any, b: any) => (Number(b?.year_graduated) || 0) - (Number(a?.year_graduated) || 0)
+      );
+      const ed = edus[0] || {};
       const isStudent = Boolean(ed.year_graduated && Number(ed.year_graduated) > currentYear);
       const validEmp = (u.employment || []).find(
-        (e: any) => isCurrentByEndDate(e) && isReportValidEmployment(e)
+        (e: any) => !isOjtRecord(e) && isCurrentByEndDate(e) && isReportValidEmployment(e)
       );
       const hasValidEmployment = Boolean(validEmp);
       const derivedEmploymentStatus = normalizeReportEmploymentStatus(
@@ -380,7 +386,7 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
         {
           hasValidEmployment,
           isStudent,
-          surveyCompleted: Boolean(u.survey_completed),
+          surveyCompleted: Boolean(u.survey_completed || u.profile?.last_updated_at),
         }
       );
 

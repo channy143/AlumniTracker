@@ -207,7 +207,7 @@ router.get('/statistics', async (req, res, next) => {
     if (profileIds.length > 0) {
       const [{ data: e }, { data: emp }, { data: sk }] = await Promise.all([
         supabase.from('education').select('profile_id, program, year_graduated, campus').in('profile_id', profileIds),
-        supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, job_type, start_date, end_date, is_current, updated_at').in('profile_id', profileIds),
+        supabase.from('employment').select('profile_id, company_name, position, company_industry, record_category, employment_status, job_type, start_date, end_date, is_current, updated_at').in('profile_id', profileIds),
         supabase.from('skills').select('profile_id, name, category, proficiency_level').in('profile_id', profileIds),
       ]);
       education = e || [];
@@ -281,7 +281,16 @@ router.get('/statistics', async (req, res, next) => {
       });
     }
 
-    const isCurrent = (e: any) => e.is_current === true;
+    const isCurrent = (e: any) => {
+      if (e.is_current !== true) return false;
+      const cat = String(e.record_category || '').toLowerCase();
+      const jt = String(e.job_type || '').toLowerCase();
+      const st = String(e.employment_status || '').toLowerCase();
+      if (cat === 'ojt' || jt === 'internship' || st === 'ojt') return false;
+      const pos = String(e.position || '').trim().toLowerCase();
+      const comp = String(e.company_name || '').trim().toLowerCase();
+      return pos.length >= 2 && comp.length >= 2 && !['organization', 'company', 'n/a', 'na', 'none', 'null'].includes(comp) && !['position', 'current position', 'n/a', 'na', 'none', 'null'].includes(pos);
+    };
     const employmentStatusOf = (p: any, mergedResp: any) => {
       const currentEmp = (empByProfile.get(p.id) || []).find(isCurrent);
       const raw =

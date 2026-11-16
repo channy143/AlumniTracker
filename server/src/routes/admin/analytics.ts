@@ -27,6 +27,26 @@ function buildCsv(rows: Record<string, any>[]): string {
   return [headers.join(','), ...csv].join('\n');
 }
 
+const JUNK_EMP_TERMS = new Set(['position', 'current position', 'organization', 'company', 'imong mama', 'n/a', 'na', 'none', 'null', 'test', 'sample']);
+function isOjtRow(e: any): boolean {
+  if (!e) return false;
+  return (
+    String(e.record_category || '').toLowerCase() === 'ojt' ||
+    String(e.job_type || '').toLowerCase() === 'internship' ||
+    String(e.employment_status || '').toLowerCase() === 'ojt'
+  );
+}
+function isValidRegularEmployment(e: any): boolean {
+  if (!e || isOjtRow(e)) return false;
+  if (e.company_name !== undefined || e.position !== undefined) {
+    const pos = String(e.position || '').trim();
+    const comp = String(e.company_name || '').trim();
+    if (pos.length < 2 || comp.length < 2) return false;
+    if (JUNK_EMP_TERMS.has(pos.toLowerCase()) || JUNK_EMP_TERMS.has(comp.toLowerCase())) return false;
+  }
+  return true;
+}
+
 const router = Router();
 
 router.get('/employment-rate', async (req, res, next) => {
@@ -44,11 +64,13 @@ router.get('/employment-rate', async (req, res, next) => {
 
     const [{ data: profiles }, { data: employment }] = await Promise.all([
       supabase.from('profiles').select('id, employment_status').in('id', profileIds),
-      supabase.from('employment').select('profile_id, employment_status, is_current').in('profile_id', profileIds).eq('is_current', true),
+      supabase.from('employment').select('profile_id, employment_status, record_category, job_type, company_name, position, is_current').in('profile_id', profileIds).eq('is_current', true),
     ]);
 
     const empMap = new Map();
-    (employment || []).forEach((e: any) => empMap.set(e.profile_id, e.employment_status));
+    (employment || []).forEach((e: any) => {
+      if (isValidRegularEmployment(e) && !empMap.has(e.profile_id)) empMap.set(e.profile_id, e.employment_status);
+    });
 
     let employedCount = 0;
     (profiles || []).forEach((p: any) => {
@@ -73,11 +95,13 @@ router.get('/employment-by-course', async (req, res, next) => {
     const [{ data: education }, { data: profiles }, { data: employment }] = await Promise.all([
       supabase.from('education').select('profile_id, program, year_graduated'),
       supabase.from('profiles').select('id, employment_status'),
-      supabase.from('employment').select('profile_id, employment_status, is_current').eq('is_current', true),
+      supabase.from('employment').select('profile_id, employment_status, record_category, job_type, company_name, position, is_current').eq('is_current', true),
     ]);
 
     const empMap = new Map();
-    (employment || []).forEach((e: any) => empMap.set(e.profile_id, e.employment_status));
+    (employment || []).forEach((e: any) => {
+      if (isValidRegularEmployment(e) && !empMap.has(e.profile_id)) empMap.set(e.profile_id, e.employment_status);
+    });
     const profMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
     const isEmployed = (profileId: string) => {
@@ -126,11 +150,13 @@ router.get('/employment-by-batch', async (_req, res, next) => {
     const [{ data: education }, { data: profiles }, { data: employment }] = await Promise.all([
       supabase.from('education').select('profile_id, year_graduated'),
       supabase.from('profiles').select('id, employment_status'),
-      supabase.from('employment').select('profile_id, employment_status, is_current').eq('is_current', true),
+      supabase.from('employment').select('profile_id, employment_status, record_category, job_type, company_name, position, is_current').eq('is_current', true),
     ]);
 
     const empMap = new Map();
-    (employment || []).forEach((e: any) => empMap.set(e.profile_id, e.employment_status));
+    (employment || []).forEach((e: any) => {
+      if (isValidRegularEmployment(e) && !empMap.has(e.profile_id)) empMap.set(e.profile_id, e.employment_status);
+    });
     const profMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
     const isEmployed = (profileId: string) => {
@@ -388,7 +414,7 @@ router.get('/career-overview', async (_req, res, next) => {
       { data: profiles },
       { data: users }
     ] = await Promise.all([
-      supabase.from('employment').select('employment_status, is_current, salary_range, profile_id'),
+      supabase.from('employment').select('employment_status, record_category, job_type, company_name, position, is_current, salary_range, profile_id'),
       supabase.from('profiles').select('id, user_id, country, employment_status'),
       supabase.from('users').select('id').eq('role', 'alumni')
     ]);
@@ -410,7 +436,7 @@ router.get('/career-overview', async (_req, res, next) => {
 
     alumniProfiles.forEach((p: any) => {
       const emps = empByProfile.get(p.id) || [];
-      const currentEmp = emps.find((e: any) => e.is_current);
+      const currentEmp = emps.find((e: any) => e.is_current && isValidRegularEmployment(e));
       const rawStatus = p.employment_status || currentEmp?.employment_status || null;
       const lower = String(rawStatus || '').toLowerCase().trim();
 
@@ -428,7 +454,7 @@ router.get('/career-overview', async (_req, res, next) => {
 
     const employedProfiles = alumniProfiles.filter((p: any) => {
       const emps = empByProfile.get(p.id) || [];
-      const currentEmp = emps.find((e: any) => e.is_current);
+      const currentEmp = emps.find((e: any) => e.is_current && isValidRegularEmployment(e));
       const rawStatus = p.employment_status || currentEmp?.employment_status || null;
       return rawStatus === 'Employed' || String(rawStatus || '').toLowerCase().trim() === 'employed';
     });
@@ -438,7 +464,7 @@ router.get('/career-overview', async (_req, res, next) => {
     const employedCountryUnknown = employedProfiles.filter((p: any) => isOverseas(p.id) === null).length;
 
     const salaries = (employment || [])
-      .filter((e: any) => e.is_current && e.salary_range)
+      .filter((e: any) => e.is_current && e.salary_range && isValidRegularEmployment(e))
       .map((e: any) => {
         const clean = String(e.salary_range).replace(/[₱,,\s]/g, '');
         const parts = clean.split('-').map((n) => parseFloat(n)).filter((n) => !isNaN(n));
@@ -536,7 +562,7 @@ router.get('/career-statistics', async (req, res, next) => {
     if (profileIds.length > 0) {
       const [{ data: e }, { data: emp }] = await Promise.all([
         supabase.from('education').select('profile_id, program, year_graduated').in('profile_id', profileIds),
-        supabase.from('employment').select('id, profile_id, company_name, position, company_industry, employment_status, job_type, start_date, end_date, is_current, salary_range, proof_url, proof_type, is_verified, verification_status, updated_at').in('profile_id', profileIds),
+        supabase.from('employment').select('id, profile_id, company_name, position, company_industry, record_category, employment_status, job_type, start_date, end_date, is_current, salary_range, proof_url, proof_type, is_verified, verification_status, updated_at').in('profile_id', profileIds),
       ]);
       education = e || [];
       employment = emp || [];
@@ -574,7 +600,7 @@ router.get('/career-statistics', async (req, res, next) => {
       });
     }
 
-    const isCurrent = (e: any) => e.is_current === true;
+    const isCurrent = (e: any) => e.is_current === true && isValidRegularEmployment(e);
     const isEmployedStatus = (s?: string) => {
       const st = String(s || '').toLowerCase();
       return ['employed', 'self-employed', 'entrepreneur'].includes(st);
@@ -593,16 +619,18 @@ router.get('/career-statistics', async (req, res, next) => {
       const currentEmp = emp.filter(isCurrent);
       if (typeFilter) {
         const isSelfEmp = status === 'Self-employed' || status === 'self-employed';
-        const matchesType = currentEmp.some((e: any) => {
-          const t = e.job_type ? String(e.job_type).toLowerCase() : '';
-          if (typeFilter === 'Self-employed') return false;
-          if (typeFilter === 'Full-time' && t === 'full-time') return true;
-          if (typeFilter === 'Part-time' && t === 'part-time') return true;
-          if (typeFilter === 'Contractual' && (t === 'contract' || t === 'contractual')) return true;
-          if (typeFilter === 'Freelance' && t === 'freelance') return true;
-          if (typeFilter === 'Internship' && t === 'internship') return true;
-          return false;
-        });
+        const matchesType =
+          typeFilter === 'Internship'
+            ? emp.some((e: any) => e.is_current === true && isOjtRow(e))
+            : currentEmp.some((e: any) => {
+                const t = e.job_type ? String(e.job_type).toLowerCase() : '';
+                if (typeFilter === 'Self-employed') return false;
+                if (typeFilter === 'Full-time' && t === 'full-time') return true;
+                if (typeFilter === 'Part-time' && t === 'part-time') return true;
+                if (typeFilter === 'Contractual' && (t === 'contract' || t === 'contractual')) return true;
+                if (typeFilter === 'Freelance' && t === 'freelance') return true;
+                return false;
+              });
         if (typeFilter === 'Self-employed' && !isSelfEmp) return false;
         if (typeFilter !== 'Self-employed' && !matchesType) return false;
       }
@@ -650,7 +678,7 @@ router.get('/career-statistics', async (req, res, next) => {
     const unemployedCount = statusCount['Unemployed'] || 0;
     const unemployedRate = Math.round((unemployedCount / employmentRateTarget) * 100);
 
-    const currentEmployment = employment.filter((e: any) => isCurrent(e) && filteredProfiles.some((p: any) => p.id === e.profile_id));
+    const currentEmployment = employment.filter((e: any) => e.is_current === true && !isOjtRow(e) && isValidRegularEmployment(e) && filteredProfiles.some((p: any) => p.id === e.profile_id));
 
     const parseSalary = (value?: string | null): number | null => {
       if (!value) return null;
