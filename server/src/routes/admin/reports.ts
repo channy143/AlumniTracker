@@ -1917,8 +1917,9 @@ router.get('/system-master', async (req: AuthenticatedRequest, res, next) => {
 router.get('/ojt-clearance', async (req: AuthenticatedRequest, res, next) => {
   try {
     const format = String(req.query.format || 'json').toLowerCase();
-    const defaultBatch = String(new Date().getFullYear() + 1); // Current graduating 4th-year cohort (e.g. 2027)
-    const batchFilter = req.query.batch !== undefined ? String(req.query.batch).trim() : defaultBatch;
+    const currentYear = new Date().getFullYear();
+    const activeCohortYears = new Set([String(currentYear), String(currentYear + 1)]);
+    const explicitBatch = req.query.batch !== undefined ? String(req.query.batch).trim() : null;
     const programFilter = String(req.query.program || '').trim();
     const statusFilter = String(req.query.status || 'all').trim().toLowerCase();
 
@@ -1937,11 +1938,16 @@ router.get('/ojt-clearance', async (req: AuthenticatedRequest, res, next) => {
       .filter((u: any) => !u.is_archived && u.is_active !== false)
       .map((u: any) => {
         const prof = profByUserId.get(u.id);
-        const edus = prof ? eduByProfId[prof.id] || [] : [];
+        const edus = prof ? [...(eduByProfId[prof.id] || [])] : [];
+        edus.sort((a: any, b: any) => (Number(b?.year_graduated) || 0) - (Number(a?.year_graduated) || 0));
         const primaryEdu = edus[0] || {};
         const emps = prof ? empByProfId[prof.id] || [] : [];
 
-        const ojtRec = emps.find((e: any) => isOjtRecord(e) && isReportValidEmployment(e)) || null;
+        // Prefer active OJT deployment first, then fall back to most recent valid OJT record
+        const ojtRec =
+          emps.find((e: any) => isOjtRecord(e) && isCurrentByEndDate(e) && isReportValidEmployment(e)) ||
+          emps.find((e: any) => isOjtRecord(e) && isReportValidEmployment(e)) ||
+          null;
         const workRec = emps.find(
           (e: any) => !isOjtRecord(e) && isCurrentByEndDate(e) && isReportValidEmployment(e)
         ) || null;
@@ -1975,8 +1981,13 @@ router.get('/ojt-clearance', async (req: AuthenticatedRequest, res, next) => {
         };
       });
 
-    if (batchFilter && batchFilter.toLowerCase() !== 'all') {
-      records = records.filter((r) => r.batchYear === batchFilter);
+    if (explicitBatch) {
+      if (explicitBatch.toLowerCase() !== 'all') {
+        records = records.filter((r) => r.batchYear === explicitBatch);
+      }
+    } else {
+      // Default view: include every student who actively logged OJT deployment OR belongs to the current/upcoming graduating cohorts
+      records = records.filter((r) => r.hasOjt || activeCohortYears.has(r.batchYear));
     }
     if (programFilter) {
       records = records.filter((r) => matchesProgramFilter(r.programRaw || r.program, programFilter));
@@ -1989,44 +2000,47 @@ router.get('/ojt-clearance', async (req: AuthenticatedRequest, res, next) => {
       records = records.filter((r) => r.clearanceVerified);
     }
 
-    const rows = records.map((r) => ({
-      'ID Number': r.idNumber,
-      'Student Name': r.studentName,
-      'Email': r.email,
-      'Degree Program': r.program,
-      'Batch Year': r.batchYear,
-      'OJT Site (School / Company)': r.ojtSite,
-      'Deployment Role': r.ojtRole,
-      'Industry / Sector': r.ojtIndustry,
-      'OJT Start Date': r.ojtStartDate,
-      'Proof Uploaded': r.hasOjt ? (r.proofUploaded ? 'Yes' : 'No') : '',
-      'Concurrent Work': r.concurrentWork,
-      'Clearance Status': r.clearanceStatus,
-    }));
+    const sortedRows = sortRowsAlphabetically(
+      records.map((r) => ({
+        'ID Number': r.idNumber,
+        'Student Name': r.studentName,
+        'Email': r.email,
+        'Degree Program': r.program,
+        'Batch Year': r.batchYear,
+        'OJT Site (School / Company)': r.ojtSite,
+        'Deployment Role': r.ojtRole,
+        'Industry / Sector': r.ojtIndustry,
+        'OJT Start Date': r.ojtStartDate,
+        'Proof Uploaded': r.hasOjt ? (r.proofUploaded ? 'Yes' : 'No') : '',
+        'Concurrent Work': r.concurrentWork,
+        'Clearance Status': r.clearanceStatus,
+      }))
+    );
 
+    const filterBatchLabel = explicitBatch || `${currentYear}-${currentYear + 1}`;
     await recordReportExport(req, {
       reportName: '4th-Year OJT & Graduation Clearance Report',
       reportType: 'ojt_clearance',
       format,
-      recordCount: rows.length,
-      filters: { batch: batchFilter, program: programFilter, status: statusFilter },
+      recordCount: sortedRows.length,
+      filters: { batch: filterBatchLabel, program: programFilter, status: statusFilter },
     });
 
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename=ojt-clearance-batch-${batchFilter || 'all'}.csv`);
-      return res.send(buildCsv(rows));
+      res.setHeader('Content-Disposition', `attachment; filename=ojt-clearance-batch-${filterBatchLabel || 'all'}.csv`);
+      return res.send(buildCsv(sortedRows));
     }
 
     res.json({
-      count: rows.length,
+      count: sortedRows.length,
       summary: {
         totalStudents: records.length,
         updatedCount: records.filter((r) => r.hasOjt).length,
         clearedCount: records.filter((r) => r.clearanceVerified).length,
         pendingCount: records.filter((r) => !r.hasOjt).length,
       },
-      data: sortRowsAlphabetically(rows),
+      data: sortedRows,
     });
   } catch (err) {
     next(err);

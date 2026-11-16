@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { adminApi } from '@/services/api';
 import { getCached } from '@/utils/apiCache';
@@ -1150,9 +1151,15 @@ export default function ReportsPage() {
       {/* --------------------------------------------------------------------- */}
       {/* Live Data Preview Modal */}
       {/* --------------------------------------------------------------------- */}
-      {previewModal && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-gray-200 overflow-hidden animate-in zoom-in-95 duration-150">
+      {previewModal && createPortal(
+        <div
+          onClick={() => setPreviewModal(null)}
+          className="fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-gray-200 overflow-hidden animate-in zoom-in-95 duration-150"
+          >
             {/* Modal Header */}
             <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-orange-50 via-white to-amber-50 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
@@ -1251,13 +1258,14 @@ export default function ReportsPage() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* --------------------------------------------------------------------- */}
       {/* Pre-Export Confidentiality Acknowledgement Modal (Rule 5 & RA 10173) */}
       {/* --------------------------------------------------------------------- */}
-      {pendingExport && (
+      {pendingExport && createPortal(
         <div className="fixed inset-0 z-[170] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-purple-200 animate-in zoom-in-95 duration-150">
             <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mb-3">
@@ -1300,7 +1308,8 @@ export default function ReportsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
