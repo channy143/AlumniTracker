@@ -231,11 +231,12 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
 
     let profileInsertPayload: Record<string, any> = {
       user_id: user.id,
-      first_name: firstName,
-      last_name: lastName,
-      middle_name: middleName || null,
-      email,
-      country: 'Philippines',
+      first_name: String(firstName || '').trim().split(/\s+/).map((w: string) => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : '').join(' '),
+      last_name: String(lastName || '').trim().split(/\s+/).map((w: string) => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : '').join(' '),
+      middle_name: middleName ? String(middleName).trim().split(/\s+/).map((w: string) => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : '').join(' ') : null,
+      email: String(email || '').trim().toLowerCase(),
+      country: null,
+      employment_status: null,
       birth_date: birthDate || null,
       id_number: studentId || eligible?.student_id || null,
     };
@@ -383,12 +384,9 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     const policy = record.role === 'admin' ? await getAdminSecurityPolicy() : null;
     const mustRequireMfa = record.role === 'admin' ? Boolean(policy?.requireAdminMfa) || Boolean(record.mfa_enabled) : Boolean(record.mfa_enabled);
 
-    // If MFA is required, check if this device is recognized and trusted (non-admin only when admin MFA is mandatory).
+    // If MFA is required, check if this device is already recognized and trusted (one-time OTP per device).
     if (mustRequireMfa) {
-      const allowTrustedBypass = !(record.role === 'admin' && policy?.requireAdminMfa);
-      const isTrusted = allowTrustedBypass
-        ? await verifyTrustedDevice(record.id, record.email, deviceId, deviceToken)
-        : false;
+      const isTrusted = await verifyTrustedDevice(record.id, record.email, deviceId, deviceToken);
       if (isTrusted) {
         const token = signAccessToken(record.id, record.email, record.role);
         const refreshToken = signRefreshToken(record.id, record.email, record.role);
@@ -397,6 +395,29 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
         markUserActive(record.id);
         await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', record.id);
         await supabase.from('profiles').update({ last_active_at: nowIso }).eq('user_id', record.id);
+
+        if (record.role === 'admin') {
+          try {
+            const { data: prevUser, error: prevErr } = await supabase
+              .from('users')
+              .select('last_login_ip')
+              .eq('id', record.id)
+              .maybeSingle();
+            if (!prevErr) {
+              if (prevUser?.last_login_ip && prevUser.last_login_ip !== ip) {
+                notifyAdmins({
+                  type: 'security',
+                  title: '🛡️ Admin Login From New IP',
+                  message: `Administrator ${record.email} signed in from a new IP address (${ip}).`,
+                  link: '/admin/activity',
+                });
+              }
+              await supabase.from('users').update({ last_login_ip: ip }).eq('id', record.id);
+            }
+          } catch {
+            // Ignore if last_login_ip column is not yet migrated
+          }
+        }
 
         logAudit(req, {
           action: 'AUTH_LOGIN_TRUSTED_DEVICE',
@@ -515,9 +536,6 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
     const refreshToken = signRefreshToken(user.id, user.email, user.role);
     setAuthCookies(res, token, refreshToken, user.role);
 
-    const policy = user.role === 'admin' ? await getAdminSecurityPolicy() : null;
-    const allowTrustedRegister = !(user.role === 'admin' && policy?.requireAdminMfa);
-
     if (user.role === 'admin') {
       const ip = clientIp(req);
       try {
@@ -542,10 +560,10 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
       }
     }
 
-    // Register this device as trusted and mint a device token (skipped for admins when mandatory MFA is active)
+    // Register this device as trusted and mint a device token (one-time OTP per recognized device)
     const targetDeviceId = deviceId || decoded.deviceId;
     let trustedDeviceToken: string | undefined;
-    if (targetDeviceId && allowTrustedRegister) {
+    if (targetDeviceId) {
       trustedDeviceToken = mintTrustedDeviceToken(user.id, user.email, targetDeviceId);
       const userAgent = (req.headers['user-agent'] as string) || 'Recognized Browser';
       await registerTrustedDevice(user.id, targetDeviceId, userAgent);

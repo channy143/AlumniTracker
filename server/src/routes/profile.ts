@@ -8,7 +8,7 @@ import { AuthenticatedRequest } from '../types';
 import { addActivity } from '../services/activityStore';
 import { validateResumeContent } from '../utils/validateResume';
 import { normalizeCityName, normalizeProvinceName, normalizePhPhone } from '../utils/formatLocation';
-import { validateJobTitle } from '../utils/validateJobTitle';
+import { validateJobTitle, validateCompanyName, normalizeIndustry, toTitleCaseName, validateStudentId } from '../utils/validateJobTitle';
 import { notifyAdmins } from './notifications';
 import {
   updateProfileSchema,
@@ -151,9 +151,20 @@ router.put('/', authenticate, validate(updateProfileSchema), async (req: Authent
   try {
     const db = createUserScopedClient(req.token!);
     const updates = { ...req.body };
+    if (updates.first_name !== undefined && updates.first_name) updates.first_name = toTitleCaseName(updates.first_name);
+    if (updates.last_name !== undefined && updates.last_name) updates.last_name = toTitleCaseName(updates.last_name);
+    if (updates.middle_name !== undefined) updates.middle_name = updates.middle_name ? toTitleCaseName(updates.middle_name) : null;
+    if (updates.id_number !== undefined && updates.id_number) {
+      const idCheck = validateStudentId(updates.id_number);
+      if (!idCheck.valid) throw new AppError(idCheck.error || 'Invalid Student ID format.', 400);
+      updates.id_number = idCheck.cleaned;
+    }
     if (updates.phone !== undefined) updates.phone = updates.phone ? normalizePhPhone(updates.phone) : null;
     if (updates.province !== undefined) updates.province = updates.province ? normalizeProvinceName(updates.province) : null;
     if (updates.city !== undefined) updates.city = updates.city ? normalizeCityName(updates.city, updates.province) : null;
+    if (!updates.city && !updates.province && updates.country === 'Philippines') {
+      updates.country = null;
+    }
     if (updates.gender !== undefined && updates.gender) updates.gender = String(updates.gender).slice(0, 10);
     if (updates.current_job_title !== undefined) {
       if (updates.current_job_title === null || String(updates.current_job_title).trim() === '') {
@@ -222,14 +233,34 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
       if (lowerStatus === 'unemployed' || lowerStatus === 'seeking opportunities' || lowerStatus === 'retired') {
         updates.current_job_title = null;
         updates.company_name = null;
-      } else if (updates.current_job_title !== undefined) {
-        if (updates.current_job_title === null || String(updates.current_job_title).trim() === '') {
-          updates.current_job_title = null;
-        } else {
-          const check = validateJobTitle(updates.current_job_title);
-          if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);
-          updates.current_job_title = check.cleaned;
+      } else {
+        if (lowerStatus === 'employed') {
+          if (!updates.current_job_title || !String(updates.current_job_title).trim()) {
+            throw new AppError('Current Position / Job Title is required when Employment Status is Employed.', 400);
+          }
+          if (!updates.company_name || !String(updates.company_name).trim()) {
+            throw new AppError('Company / Organization Name is required when Employment Status is Employed.', 400);
+          }
         }
+        if (updates.current_job_title !== undefined) {
+          if (updates.current_job_title === null || String(updates.current_job_title).trim() === '') {
+            updates.current_job_title = null;
+          } else {
+            const check = validateJobTitle(updates.current_job_title);
+            if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);
+            updates.current_job_title = check.cleaned;
+          }
+        }
+      }
+      if (updates.company_name !== undefined && updates.company_name !== null && String(updates.company_name).trim() !== '') {
+        const compCheck = validateCompanyName(updates.company_name);
+        if (!compCheck.valid) throw new AppError(compCheck.error || 'Please enter a valid company name.', 400);
+        updates.company_name = compCheck.cleaned;
+      }
+      if (updates.industry !== undefined && updates.industry !== null && String(updates.industry).trim() !== '') {
+        const normInd = normalizeIndustry(updates.industry);
+        if (!normInd) throw new AppError('Please select a valid industry from the list.', 400);
+        updates.industry = normInd;
       }
     } else if (updates.current_job_title !== undefined && updates.current_job_title !== null && String(updates.current_job_title).trim() !== '') {
       const check = validateJobTitle(updates.current_job_title);
@@ -248,8 +279,51 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
 
     if (updates.employment_status && profile) {
       const lowerStatus = updates.employment_status.toLowerCase();
-      if (lowerStatus !== 'employed') {
-        await db.from('employment').update({ is_current: false }).eq('profile_id', profile.id).eq('is_current', true);
+      if (lowerStatus !== 'employed' && lowerStatus !== 'self-employed') {
+        const today = new Date().toISOString().slice(0, 10);
+        await db.from('employment').update({ is_current: false, end_date: today }).eq('profile_id', profile.id).eq('is_current', true);
+      } else if (profile.current_job_title && profile.company_name) {
+        const { data: openRows } = await supabase
+          .from('employment')
+          .select('id, company_name, position, start_date, is_current, end_date')
+          .eq('profile_id', profile.id)
+          .or('is_current.eq.true,end_date.is.null');
+
+        const existingEmp = (openRows || [])[0] || null;
+        const normNewComp = String(profile.company_name).trim().toLowerCase();
+        const normNewPos = String(profile.current_job_title).trim().toLowerCase();
+        const isSameRole =
+          existingEmp &&
+          String(existingEmp.company_name || '').trim().toLowerCase() === normNewComp &&
+          String(existingEmp.position || '').trim().toLowerCase() === normNewPos;
+
+        const today = new Date().toISOString().slice(0, 10);
+        const empSyncPayload = {
+          profile_id: profile.id,
+          company_name: profile.company_name,
+          position: profile.current_job_title,
+          company_industry: profile.industry || null,
+          salary_range: profile.salary_range || null,
+          employment_status: lowerStatus,
+          job_type: 'full-time',
+          end_date: null,
+          is_current: true,
+        };
+
+        if (isSameRole) {
+          await supabase.from('employment').update(empSyncPayload).eq('id', existingEmp.id);
+        } else {
+          // Close all previous active positions instead of overwriting history
+          for (const prev of openRows || []) {
+            const prevStart = prev.start_date ? String(prev.start_date).slice(0, 10) : '';
+            const closeDate = prevStart && today < prevStart ? prevStart : today;
+            await supabase
+              .from('employment')
+              .update({ is_current: false, end_date: closeDate })
+              .eq('id', prev.id);
+          }
+          await supabase.from('employment').insert({ ...empSyncPayload, start_date: today });
+        }
       }
     }
 

@@ -624,6 +624,23 @@ export const adminApi = {
   surveyAnalytics: (id: string) => api.get<any>(`/admin/surveys/${id}/analytics`),
   surveyResponses: (id: string, params: Record<string, any> = {}) => api.get<any>(`/admin/surveys/${id}/responses?${toQuery(params)}`),
   surveyExportResponses: (id: string) => api.blob(`/admin/surveys/${id}/responses/export`),
+  surveyNonRespondents: (id: string, params: Record<string, any> = {}) =>
+    api.get<any>(`/admin/surveys/${id}/non-respondents?${toQuery(params)}`),
+  surveyExportNonRespondents: (id: string, params: Record<string, any> = {}) =>
+    api.blob(`/admin/surveys/${id}/non-respondents?${toQuery({ ...params, format: 'csv' })}`),
+  surveyRemind: (
+    id: string,
+    data: {
+      userIds?: string[];
+      sendToAllPending?: boolean;
+      channel?: 'in_app' | 'email' | 'both';
+      tone?: 'standard' | 'urgent' | 'custom';
+      customTitle?: string;
+      customMessage?: string;
+      bypassCooldown?: boolean;
+      includeStudents?: boolean;
+    }
+  ) => api.post<{ message: string; remindedCount: number; skippedCooldownCount: number }>(`/admin/surveys/${id}/remind`, data),
   surveyStandardQuestions: () => api.get<any[]>('/admin/surveys/standard-questions'),
 
   announcementList: (params: Record<string, any> = {}) => api.get<any>(`/admin/announcements?${toQuery(params)}`),

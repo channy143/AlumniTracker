@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { notifyAdmins } from './notifications';
 import { normalizeCityName, normalizeProvinceName, normalizePhPhone } from '../utils/formatLocation';
+import { validateJobTitle, validateCompanyName, normalizeIndustry, toTitleCaseName } from '../utils/validateJobTitle';
 
 const STANDARD_QUESTIONS = [
   { id: 'personal_info', section: 'Personal Information', type: 'section' },
@@ -313,17 +314,40 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
       profileUpdates.province = normalizeProvinceName(responses.province);
     }
     if (responses?.country && !isEvasiveInput(responses.country)) {
-      profileUpdates.country = String(responses.country).trim();
+      const hasLocation = Boolean(profileUpdates.city || profileUpdates.province);
+      const trimmedCountry = String(responses.country).trim();
+      if (hasLocation || trimmedCountry.toLowerCase() !== 'philippines') {
+        profileUpdates.country = trimmedCountry;
+      }
     }
-    if (responses?.middleName && !isEvasiveInput(responses.middleName)) profileUpdates.middle_name = responses.middleName;
+    if (responses?.firstName && !isEvasiveInput(responses.firstName)) profileUpdates.first_name = toTitleCaseName(responses.firstName);
+    if (responses?.lastName && !isEvasiveInput(responses.lastName)) profileUpdates.last_name = toTitleCaseName(responses.lastName);
+    if (responses?.middleName && !isEvasiveInput(responses.middleName)) profileUpdates.middle_name = toTitleCaseName(responses.middleName);
 
     // Sync employment fields if provided
-    if (responses?.employmentStatus) profileUpdates.employment_status = responses.employmentStatus;
-    if (responses?.currentJobTitle && !isEvasiveInput(responses.currentJobTitle)) profileUpdates.current_job_title = responses.currentJobTitle;
-    if (responses?.companyName && !isEvasiveInput(responses.companyName)) profileUpdates.company_name = responses.companyName;
-    if (responses?.industry) profileUpdates.industry = responses.industry;
-    if (responses?.salaryRange) profileUpdates.salary_range = responses.salaryRange;
-    if (responses?.jobType) profileUpdates.job_type = String(responses.jobType).toLowerCase();
+    if (responses?.employmentStatus) {
+      const empStatus = String(responses.employmentStatus).trim();
+      if (empStatus === 'Employed' || empStatus === 'Self-employed') {
+        const titleCheck = validateJobTitle(responses?.currentJobTitle);
+        const companyCheck = validateCompanyName(responses?.companyName);
+        if (titleCheck.valid && companyCheck.valid) {
+          profileUpdates.employment_status = empStatus;
+          profileUpdates.current_job_title = titleCheck.cleaned;
+          profileUpdates.company_name = companyCheck.cleaned;
+          profileUpdates.industry = normalizeIndustry(responses?.industry) || null;
+          profileUpdates.salary_range = responses?.salaryRange || null;
+          if (responses?.jobType) profileUpdates.job_type = String(responses.jobType).toLowerCase();
+        }
+      } else if (empStatus === 'Not reported' || empStatus === 'Student') {
+        profileUpdates.employment_status = null;
+        profileUpdates.current_job_title = null;
+        profileUpdates.company_name = null;
+      } else {
+        profileUpdates.employment_status = empStatus;
+        profileUpdates.current_job_title = null;
+        profileUpdates.company_name = null;
+      }
+    }
 
     if (Object.keys(profileUpdates).length > 0) {
       profileUpdates.updated_at = new Date().toISOString();
@@ -370,10 +394,14 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
         .maybeSingle();
 
       const honorsValue = responses.honors === 'None' || responses.honors === '' ? null : responses.honors;
+      const majorValue = responses.major && !isEvasiveInput(responses.major) && responses.major !== 'None'
+        ? String(responses.major).trim()
+        : null;
       const eduPayload: Record<string, any> = {
         campus: 'Naga Extension Campus',
       };
       if (responses?.program && !isEvasiveInput(responses.program)) eduPayload.program = responses.program;
+      if (responses?.major !== undefined) eduPayload.major = majorValue;
       if (responses?.yearGraduated) {
         const yr = parseInt(String(responses.yearGraduated), 10);
         if (!isNaN(yr)) eduPayload.year_graduated = yr;
@@ -398,22 +426,29 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
           .eq('is_current', true)
           .maybeSingle();
 
-        const empPayload = {
-          profile_id: profileId,
-          company_name: responses.companyName || 'Self-Employed / Independent',
-          position: responses.currentJobTitle || 'Professional',
-          company_industry: responses.industry || null,
-          employment_status: responses.employmentStatus,
-          job_type: responses.jobType ? String(responses.jobType).toLowerCase() : 'full-time',
-          salary_range: responses.salaryRange || null,
-          is_current: true,
-          start_date: new Date().toISOString().split('T')[0],
-        };
+        const titleCheck = validateJobTitle(responses.currentJobTitle);
+        const companyCheck = validateCompanyName(responses.companyName);
+        const normalizedInd = normalizeIndustry(responses.industry);
 
-        if (existingEmp) {
-          await supabase.from('employment').update(empPayload).eq('id', existingEmp.id);
-        } else {
-          await supabase.from('employment').insert(empPayload);
+        if (titleCheck.valid && companyCheck.valid && normalizedInd) {
+          const empPayload = {
+            profile_id: profileId,
+            company_name: companyCheck.cleaned,
+            position: titleCheck.cleaned,
+            company_industry: normalizedInd,
+            employment_status: responses.employmentStatus,
+            job_type: responses.jobType ? String(responses.jobType).toLowerCase() : 'full-time',
+            salary_range: responses.salaryRange || null,
+            is_current: true,
+            end_date: null,
+            start_date: new Date().toISOString().split('T')[0],
+          };
+
+          if (existingEmp) {
+            await supabase.from('employment').update(empPayload).eq('id', existingEmp.id);
+          } else {
+            await supabase.from('employment').insert(empPayload);
+          }
         }
       }
     }

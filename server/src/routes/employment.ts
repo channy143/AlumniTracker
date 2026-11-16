@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { logAudit } from '../services/auditLogger';
-import { validateJobTitle } from '../utils/validateJobTitle';
+import { validateJobTitle, validateCompanyName, normalizeIndustry, normalizeSalaryRange } from '../utils/validateJobTitle';
 
 const router = Router();
 const upload = multer({
@@ -111,11 +111,43 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
 
     if (!profile) throw new AppError('Profile not found', 404);
 
-    if (req.body.position !== undefined) {
-      const check = validateJobTitle(req.body.position);
-      if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);
-      req.body.position = check.cleaned;
+    const posCheck = validateJobTitle(req.body.position);
+    if (!posCheck.valid) throw new AppError(posCheck.error || 'Please enter a valid job title.', 400);
+
+    const companyCheck = validateCompanyName(req.body.company_name);
+    if (!companyCheck.valid) throw new AppError(companyCheck.error || 'Please enter a valid company name.', 400);
+
+    const normalizedIndustry = normalizeIndustry(req.body.company_industry);
+    if (!normalizedIndustry) {
+      throw new AppError('Please select a valid industry from the list.', 400);
     }
+
+    const startDateStr = req.body.start_date ? String(req.body.start_date).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const rawEnd = req.body.end_date && String(req.body.end_date).trim().toLowerCase() !== 'present'
+      ? String(req.body.end_date).slice(0, 10)
+      : null;
+    const isCurrent = req.body.is_current !== undefined ? Boolean(req.body.is_current) : rawEnd === null;
+    const endDateStr = isCurrent ? null : rawEnd;
+
+    if (endDateStr && startDateStr && endDateStr < startDateStr) {
+      throw new AppError('End date cannot be earlier than start date.', 400);
+    }
+
+    const normalizedSalary = normalizeSalaryRange(req.body.salary_range);
+
+    // Check for existing employment record with the same (company_name, position) for this alumnus
+    const { data: existingRows } = await db
+      .from('employment')
+      .select('id, company_name, position, start_date, end_date, is_current')
+      .eq('profile_id', profile.id);
+
+    const normComp = companyCheck.cleaned.toLowerCase();
+    const normPos = posCheck.cleaned.toLowerCase();
+    const existingSameRole = (existingRows || []).find((r: any) => {
+      const sameComp = String(r.company_name || '').trim().toLowerCase() === normComp;
+      const samePos = String(r.position || '').trim().toLowerCase() === normPos;
+      return sameComp && samePos;
+    });
 
     if (req.body.proof_url) {
       const trimmed = String(req.body.proof_url).trim();
@@ -124,13 +156,48 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       }
     }
 
+    // Auto-close any previously active (end_date IS NULL or is_current = true) position
+    if (isCurrent) {
+      const activeRows = (existingRows || []).filter(
+        (r: any) => (r.is_current || !r.end_date) && (!existingSameRole || r.id !== existingSameRole.id)
+      );
+      for (const prev of activeRows) {
+        const prevStart = prev.start_date ? String(prev.start_date).slice(0, 10) : '';
+        const closeDate = prevStart && startDateStr < prevStart ? prevStart : startDateStr;
+        await db
+          .from('employment')
+          .update({ is_current: false, end_date: closeDate })
+          .eq('id', prev.id);
+      }
+    }
+
     const hasProof = Boolean(req.body.proof_url);
     const payload = {
       ...req.body,
+      company_name: companyCheck.cleaned,
+      position: posCheck.cleaned,
+      company_industry: normalizedIndustry,
+      salary_range: normalizedSalary,
+      employment_status: req.body.employment_status || 'Employed',
+      start_date: existingSameRole?.start_date ? String(existingSameRole.start_date).slice(0, 10) : startDateStr,
+      end_date: endDateStr,
+      is_current: endDateStr === null,
       profile_id: profile.id,
       is_verified: false,
       verification_status: hasProof ? 'pending' : 'unverified',
     };
+
+    // If the alumnus already has a row for the same company + position, update it in place instead of creating a duplicate
+    if (existingSameRole) {
+      const { data: updatedEmp, error: updErr } = await db
+        .from('employment')
+        .update(payload)
+        .eq('id', existingSameRole.id)
+        .select()
+        .single();
+      if (updErr) throw new AppError(updErr.message, 500);
+      return res.status(200).json(updatedEmp);
+    }
 
     const { data: employment, error } = await db
       .from('employment')
@@ -160,7 +227,7 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
     // Rule 2 – Authorized Access: Verify ownership before update
     const { data: existing, error: findError } = await db
       .from('employment')
-      .select('id, profile_id, proof_url')
+      .select('id, profile_id, proof_url, start_date, end_date, is_current')
       .eq('id', req.params.id)
       .maybeSingle();
 
@@ -183,6 +250,42 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       const check = validateJobTitle(updatePayload.position);
       if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);
       updatePayload.position = check.cleaned;
+    }
+    if (updatePayload.company_name !== undefined) {
+      const check = validateCompanyName(updatePayload.company_name);
+      if (!check.valid) throw new AppError(check.error || 'Please enter a valid company name.', 400);
+      updatePayload.company_name = check.cleaned;
+    }
+    if (updatePayload.company_industry !== undefined) {
+      const normalizedIndustry = normalizeIndustry(updatePayload.company_industry);
+      if (!normalizedIndustry) {
+        throw new AppError('Please select a valid industry from the list.', 400);
+      }
+      updatePayload.company_industry = normalizedIndustry;
+    }
+
+    const effectiveIsCurrent = updatePayload.is_current !== undefined ? Boolean(updatePayload.is_current) : Boolean(existing.is_current);
+    const effectiveStartDate = updatePayload.start_date !== undefined
+      ? String(updatePayload.start_date).slice(0, 10)
+      : (existing.start_date ? String(existing.start_date).slice(0, 10) : '');
+    if (effectiveIsCurrent) {
+      updatePayload.end_date = null;
+    } else if (updatePayload.end_date !== undefined && updatePayload.end_date !== null) {
+      const endStr = String(updatePayload.end_date).slice(0, 10);
+      if (effectiveStartDate && endStr && endStr < effectiveStartDate) {
+        throw new AppError('End date cannot be earlier than start date.', 400);
+      }
+      updatePayload.end_date = endStr || null;
+    }
+
+    if (updatePayload.is_current === true) {
+      const closeDate = effectiveStartDate || new Date().toISOString().slice(0, 10);
+      await db
+        .from('employment')
+        .update({ is_current: false, end_date: closeDate })
+        .eq('profile_id', existing.profile_id)
+        .eq('is_current', true)
+        .neq('id', req.params.id);
     }
     if (updatePayload.proof_url) {
       const trimmed = String(updatePayload.proof_url).trim();

@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
-import { createSurveyNotifications } from '../notifications';
+import { createSurveyNotifications, createNotification } from '../notifications';
+import { sendSurveyReminderEmail } from '../../services/email';
 import { buildDpaCsv } from '../../utils/csvExport';
 import { formatProgramLongName } from '../../utils/formatProgram';
 import { logAudit } from '../../services/auditLogger';
+import { AuthenticatedRequest } from '../../types';
 
 const STANDARD_QUESTIONS = [
   { id: 'personal_info', section: 'Personal Information', type: 'section' },
@@ -168,7 +170,24 @@ router.get('/', async (req, res, next) => {
     const { data: surveys, error } = await query;
     if (error) throw new AppError(error.message, 500);
 
-    const surveysWithCounts = await Promise.all((surveys || []).map(async (survey) => {
+    const allSurveys = [...(surveys || [])];
+    const hasOnboarding = allSurveys.some((s: any) => s.id === ONBOARDING_SURVEY_ID);
+    if (!hasOnboarding && (!status || status === 'active' || status === 'published')) {
+      allSurveys.push({
+        id: ONBOARDING_SURVEY_ID,
+        title: 'First-Time Alumni Onboarding Survey',
+        description: 'Mandatory baseline graduate tracer and Data Privacy consent survey for newly registered alumni.',
+        target_type: 'all',
+        target_value: null,
+        status: 'published',
+        is_active: true,
+        is_closed: false,
+        questions: ONBOARDING_QUESTIONS,
+        created_at: new Date('2026-01-01T00:00:00Z').toISOString(),
+      });
+    }
+
+    const surveysWithCounts = await Promise.all(allSurveys.map(async (survey) => {
       const { count } = await supabase
         .from('survey_responses')
         .select('*', { count: 'exact', head: true })
@@ -736,6 +755,351 @@ router.get('/:id/analytics', async (req, res, next) => {
         agreed: dpaConsentAgreed,
         rate: responses.length > 0 ? Math.round((dpaConsentAgreed / responses.length) * 100) : 100,
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+async function resolveSurveyForCompliance(surveyId: string) {
+  if (surveyId === ONBOARDING_SURVEY_ID) {
+    const { data } = await supabase.from('surveys').select('*').eq('id', surveyId).maybeSingle();
+    return (
+      data || {
+        id: ONBOARDING_SURVEY_ID,
+        title: 'First-Time Alumni Onboarding Survey',
+        target_type: 'all',
+        target_value: null,
+        status: 'published',
+        is_active: true,
+      }
+    );
+  }
+  const { data: survey, error } = await supabase.from('surveys').select('*').eq('id', surveyId).maybeSingle();
+  if (error || !survey) throw new AppError('Survey not found', 404);
+  return survey;
+}
+
+async function computeNonRespondents(survey: any, includeStudents: boolean) {
+  const isOnboarding = survey.id === ONBOARDING_SURVEY_ID;
+  const currentYear = new Date().getFullYear();
+
+  const [{ data: usersData }, { data: profilesData }, { data: eduData }, { data: responsesData }] = await Promise.all([
+    supabase
+      .from('users')
+      .select('id, email, role, is_active, is_archived, is_verified, survey_completed, created_at')
+      .eq('role', 'alumni'),
+    supabase
+      .from('profiles')
+      .select('id, user_id, first_name, last_name, id_number, phone, employment_status'),
+    supabase
+      .from('education')
+      .select('profile_id, program, major, year_graduated'),
+    supabase
+      .from('survey_responses')
+      .select('user_id')
+      .eq('survey_id', survey.id),
+  ]);
+
+  let remindersData: any[] = [];
+  const { data: remData, error: remErr } = await supabase
+    .from('survey_reminders')
+    .select('user_id, channel, tone, sent_at')
+    .eq('survey_id', survey.id)
+    .order('sent_at', { ascending: false });
+  if (!remErr && remData) {
+    remindersData = remData;
+  }
+
+  const latestReminderByUser = new Map<string, any>();
+  for (const r of remindersData) {
+    if (r.user_id && !latestReminderByUser.has(r.user_id)) {
+      latestReminderByUser.set(r.user_id, r);
+    }
+  }
+
+  const profileByUserId = new Map((profilesData || []).map((p: any) => [p.user_id, p]));
+  const eduByProfileId = new Map<string, any[]>();
+  (eduData || []).forEach((ed: any) => {
+    if (!ed.profile_id) return;
+    if (!eduByProfileId.has(ed.profile_id)) eduByProfileId.set(ed.profile_id, []);
+    eduByProfileId.get(ed.profile_id)!.push(ed);
+  });
+
+  const respondedUserIds = new Set<string>(
+    (responsesData || []).map((r: any) => r.user_id).filter(Boolean).map(String)
+  );
+
+  const activeUsers = (usersData || []).filter((u: any) => !u.is_archived && u.is_active !== false);
+
+  const targetType = String(survey.target_type || 'all').toLowerCase();
+  const targetValue = String(survey.target_value || '').trim().toLowerCase();
+
+  const targeted = activeUsers
+    .map((u: any) => {
+      const prof = profileByUserId.get(u.id);
+      const edus = prof ? eduByProfileId.get(prof.id) || [] : [];
+      const primaryEdu = edus[0] || {};
+      const gradYear = primaryEdu.year_graduated ? Number(primaryEdu.year_graduated) : null;
+      const isStudent = Boolean(gradYear && gradYear > currentYear);
+      const programRaw = primaryEdu.program || '';
+      const programLong = programRaw ? formatProgramLongName(programRaw) : '';
+      const hasResponded = respondedUserIds.has(u.id) || (isOnboarding && Boolean(u.survey_completed));
+      const lastRem = latestReminderByUser.get(u.id) || null;
+
+      return {
+        userId: u.id,
+        email: u.email,
+        firstName: prof?.first_name || '',
+        lastName: prof?.last_name || '',
+        fullName: `${prof?.first_name || ''} ${prof?.last_name || ''}`.trim() || u.email,
+        idNumber: prof?.id_number || '',
+        phone: prof?.phone || '',
+        program: programLong,
+        programRaw,
+        major: primaryEdu.major || '',
+        yearGraduated: gradYear,
+        isStudent,
+        isVerified: Boolean(u.is_verified),
+        registeredAt: u.created_at,
+        hasResponded,
+        lastRemindedAt: lastRem?.sent_at || null,
+        lastReminderTone: lastRem?.tone || null,
+        lastReminderChannel: lastRem?.channel || null,
+      };
+    })
+    .filter((entry) => {
+      if (targetType === 'batch' && targetValue) {
+        if (String(entry.yearGraduated || '') !== targetValue) return false;
+      } else if (targetType === 'course' && targetValue) {
+        const matchesRaw = entry.programRaw.toLowerCase() === targetValue;
+        const matchesLong = entry.program.toLowerCase() === formatProgramLongName(targetValue).toLowerCase();
+        if (!matchesRaw && !matchesLong) return false;
+      }
+      if (!includeStudents && entry.isStudent) return false;
+      return true;
+    });
+
+  const nonRespondents = targeted.filter((t) => !t.hasResponded);
+  const respondedCount = targeted.length - nonRespondents.length;
+  const completionRate = targeted.length > 0 ? Math.round((respondedCount / targeted.length) * 100) : 0;
+
+  return {
+    summary: {
+      targetTotal: targeted.length,
+      respondedCount,
+      pendingCount: nonRespondents.length,
+      completionRate,
+    },
+    nonRespondents,
+  };
+}
+
+router.get('/:id/non-respondents', async (req, res, next) => {
+  try {
+    const survey = await resolveSurveyForCompliance(req.params.id);
+    const defaultIncludeStudents = survey.id === ONBOARDING_SURVEY_ID;
+    const includeStudents =
+      req.query.includeStudents !== undefined
+        ? String(req.query.includeStudents) === 'true'
+        : defaultIncludeStudents;
+
+    const search = String(req.query.search || '').trim().toLowerCase();
+    const programFilter = String(req.query.program || '').trim().toLowerCase();
+    const batchFilter = String(req.query.batch || '').trim();
+    const format = String(req.query.format || 'json').toLowerCase();
+
+    const { summary, nonRespondents } = await computeNonRespondents(survey, includeStudents);
+
+    let filtered = nonRespondents;
+    if (search) {
+      filtered = filtered.filter(
+        (r) =>
+          r.fullName.toLowerCase().includes(search) ||
+          r.email.toLowerCase().includes(search) ||
+          r.idNumber.toLowerCase().includes(search)
+      );
+    }
+    if (programFilter) {
+      filtered = filtered.filter(
+        (r) =>
+          r.program.toLowerCase().includes(programFilter) ||
+          r.programRaw.toLowerCase().includes(programFilter)
+      );
+    }
+    if (batchFilter) {
+      filtered = filtered.filter((r) => String(r.yearGraduated || '') === batchFilter);
+    }
+
+    if (format === 'csv') {
+      const csvRows = filtered.map((r) => ({
+        'Full Name': r.fullName,
+        'Email': r.email,
+        'ID Number': r.idNumber,
+        'Degree Program': r.program,
+        'Graduation Year': r.yearGraduated || '',
+        'Status': r.isStudent ? 'Student' : 'Alumni',
+        'Last Reminded': r.lastRemindedAt ? new Date(r.lastRemindedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : 'Never',
+      }));
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=survey-${survey.id}-non-respondents.csv`);
+      return res.send(buildDpaCsv(csvRows));
+    }
+
+    res.json({
+      surveyId: survey.id,
+      surveyTitle: survey.title,
+      summary,
+      nonRespondents: filtered,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/remind', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const survey = await resolveSurveyForCompliance(req.params.id);
+    const {
+      userIds,
+      sendToAllPending = false,
+      channel = 'both',
+      tone = 'standard',
+      customTitle,
+      customMessage,
+      bypassCooldown = false,
+      includeStudents,
+    } = req.body || {};
+
+    const effectiveIncludeStudents =
+      includeStudents !== undefined ? Boolean(includeStudents) : survey.id === ONBOARDING_SURVEY_ID;
+    const { nonRespondents } = await computeNonRespondents(survey, effectiveIncludeStudents);
+
+    let targets = nonRespondents;
+    if (!sendToAllPending) {
+      const requestedSet = new Set(Array.isArray(userIds) ? userIds.map(String) : []);
+      if (requestedSet.size === 0) {
+        throw new AppError('Please select at least one alumnus to remind.', 400);
+      }
+      targets = nonRespondents.filter((r) => requestedSet.has(r.userId));
+    }
+
+    if (targets.length === 0) {
+      return res.json({
+        message: 'No eligible non-respondents found to remind.',
+        remindedCount: 0,
+        skippedCooldownCount: 0,
+      });
+    }
+
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const eligibleTargets = bypassCooldown
+      ? targets
+      : targets.filter((t) => {
+          if (!t.lastRemindedAt) return true;
+          return now - new Date(t.lastRemindedAt).getTime() >= COOLDOWN_MS;
+        });
+
+    const skippedCooldownCount = targets.length - eligibleTargets.length;
+    if (eligibleTargets.length === 0) {
+      return res.json({
+        message: 'All selected alumni were already reminded within the last 24 hours.',
+        remindedCount: 0,
+        skippedCooldownCount,
+      });
+    }
+
+    const isOnboarding = survey.id === ONBOARDING_SURVEY_ID;
+    const portalLink = isOnboarding ? '/survey/onboarding' : `/surveys/${survey.id}`;
+    const isUrgent = tone === 'urgent';
+
+    let finalTitle = '';
+    let finalMessage = '';
+    if (tone === 'custom') {
+      finalTitle = String(customTitle || '').trim() || `Survey Reminder: ${survey.title}`;
+      finalMessage =
+        String(customMessage || '').trim() ||
+        `Please complete the "${survey.title}" in the CTU-Naga Alumni Tracker portal at your earliest convenience.`;
+    } else if (isUrgent) {
+      finalTitle = `Urgent Compliance Notice: ${survey.title}`;
+      finalMessage =
+        `Final reminder from CTU-Naga Alumni Affairs: Please complete "${survey.title}" immediately. ` +
+        `Your response is required for official CHED Graduate Tracer compliance, Alumni Directory verification, and university clearance processing.`;
+    } else {
+      finalTitle = `Reminder: ${survey.title}`;
+      finalMessage =
+        `Good day! We noticed you haven't completed "${survey.title}" yet. ` +
+        `Please take a few minutes to submit your response in the CTU-Naga Alumni Tracker portal to support CTU-Naga accreditation and alumni programs.`;
+    }
+
+    const validChannel = ['in_app', 'email', 'both'].includes(String(channel)) ? String(channel) : 'both';
+
+    if (validChannel === 'in_app' || validChannel === 'both') {
+      await Promise.all(
+        eligibleTargets.map((t) =>
+          createNotification({
+            userId: t.userId,
+            type: 'survey',
+            title: isUrgent ? `⚠️ ${finalTitle}` : `📋 ${finalTitle}`,
+            message: finalMessage,
+            link: portalLink,
+            surveyId: isOnboarding ? undefined : survey.id,
+          })
+        )
+      );
+    }
+
+    if (validChannel === 'email' || validChannel === 'both') {
+      await sendSurveyReminderEmail(
+        eligibleTargets.map((t) => t.email),
+        {
+          surveyTitle: survey.title,
+          subject: finalTitle,
+          message: finalMessage,
+          isUrgent,
+          portalLink,
+        }
+      );
+    }
+
+    // Best-effort log into survey_reminders (graceful if migration not yet run)
+    const reminderRows = eligibleTargets.map((t) => ({
+      survey_id: survey.id,
+      user_id: t.userId,
+      sent_by: req.user?.userId || null,
+      channel: validChannel,
+      tone: String(tone),
+      subject: finalTitle,
+      message: finalMessage,
+    }));
+    const { error: remInsertErr } = await supabase.from('survey_reminders').insert(reminderRows);
+    if (remInsertErr && remInsertErr.code !== '42P01') {
+      console.warn('[surveys] Failed to log survey_reminders:', remInsertErr.message);
+    }
+
+    await logAudit(req, {
+      actorId: req.user?.userId,
+      actorName: req.user?.email,
+      actorRole: 'admin',
+      action: 'SURVEY_REMINDER_SENT',
+      entity: 'surveys',
+      entityId: survey.id,
+      details: {
+        surveyTitle: survey.title,
+        channel: validChannel,
+        tone,
+        remindedCount: eligibleTargets.length,
+        skippedCooldownCount,
+      },
+      severity: isUrgent ? 'warning' : 'info',
+      status: 'success',
+    });
+
+    res.json({
+      message: `Sent ${validChannel === 'both' ? 'in-app + email' : validChannel} reminder to ${eligibleTargets.length} alumnus/alumni.`,
+      remindedCount: eligibleTargets.length,
+      skippedCooldownCount,
     });
   } catch (err) {
     next(err);

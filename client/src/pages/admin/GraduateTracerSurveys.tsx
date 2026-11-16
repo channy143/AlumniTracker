@@ -19,6 +19,7 @@ import {
   ArrowDownIcon,
   ArrowPathIcon,
   PencilSquareIcon,
+  BellAlertIcon,
 } from '@heroicons/react/24/outline';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -37,7 +38,7 @@ export default function GraduateTracerSurveys() {
   const [batchFilter, setBatchFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState<any>(null);
-  const [detailTab, setDetailTab] = useState<'overview' | 'questions' | 'responses' | 'analytics' | 'settings'>('overview');
+  const [detailTab, setDetailTab] = useState<'overview' | 'questions' | 'responses' | 'non-respondents' | 'analytics' | 'settings'>('overview');
   const addNotification = useUIStore((s) => s.addNotification);
   const years = generateYears(2014, new Date().getFullYear()).map(String);
 
@@ -226,6 +227,7 @@ export default function GraduateTracerSurveys() {
                 { key: 'overview', label: 'Overview' },
                 { key: 'questions', label: 'Questions & CHED Requirements' },
                 { key: 'responses', label: 'Responses' },
+                { key: 'non-respondents', label: 'Pending / Non-Respondents' },
                 { key: 'analytics', label: 'Analytics' },
                 { key: 'settings', label: 'Settings' },
               ].map(({ key, label }) => (
@@ -249,6 +251,7 @@ export default function GraduateTracerSurveys() {
           />
         )}
         {detailTab === 'responses' && <SurveyResponses survey={survey} />}
+        {detailTab === 'non-respondents' && <SurveyNonRespondents survey={survey} />}
         {detailTab === 'analytics' && <SurveyAnalytics surveyId={survey.id} />}
         {detailTab === 'settings' && <SurveySettings survey={survey} onClose={handleClose} onDuplicate={handleDuplicate} onDelete={handleDelete} onUpdate={(data: any) => { setSelectedSurvey((prev: any) => ({ ...prev, ...data })); load(); }} />}
       </div>
@@ -1684,6 +1687,430 @@ function SurveySettings({ survey, onClose, onDuplicate, onDelete, onUpdate }: {
           <div className="flex items-center gap-2 pt-2">
             <button type="button" onClick={handleSave} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">Save</button>
             <button type="button" onClick={() => setEditing(false)} className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SurveyNonRespondents({ survey }: { survey: any }) {
+  const isOnboarding = survey.id === '00000000-0000-0000-0000-000000000001';
+  const [data, setData] = useState<any[]>([]);
+  const [summary, setSummary] = useState<{ targetTotal: number; respondedCount: number; pendingCount: number; completionRate: number }>({
+    targetTotal: 0,
+    respondedCount: 0,
+    pendingCount: 0,
+    completionRate: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [programFilter, setProgramFilter] = useState('');
+  const [batchFilter, setBatchFilter] = useState('');
+  const [includeStudents, setIncludeStudents] = useState(isOnboarding);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [remindTargetIds, setRemindTargetIds] = useState<string[] | null>(null);
+  const [remindAllMode, setRemindAllMode] = useState(false);
+  const [channel, setChannel] = useState<'both' | 'in_app' | 'email'>('both');
+  const [tone, setTone] = useState<'standard' | 'urgent' | 'custom'>('urgent');
+  const [customTitle, setCustomTitle] = useState('');
+  const [customMessage, setCustomMessage] = useState('');
+  const [bypassCooldown, setBypassCooldown] = useState(false);
+  const [sending, setSending] = useState(false);
+  const addNotification = useUIStore((s) => s.addNotification);
+
+  const loadNonRespondents = async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.surveyNonRespondents(survey.id, {
+        search: search || undefined,
+        program: programFilter || undefined,
+        batch: batchFilter || undefined,
+        includeStudents: String(includeStudents),
+      });
+      setData(res?.nonRespondents || []);
+      if (res?.summary) setSummary(res.summary);
+    } catch (err: any) {
+      addNotification(err?.message || 'Failed to load pending respondents', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadNonRespondents();
+  }, [survey.id, includeStudents, programFilter, batchFilter]);
+
+  const allSelected = data.length > 0 && selectedIds.length === data.length;
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds([]);
+    else setSelectedIds(data.map((r) => r.userId));
+  };
+  const toggleOne = (uid: string) => {
+    setSelectedIds((prev) => (prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]));
+  };
+
+  const openRemindModal = (ids: string[] | null, allPending = false) => {
+    setRemindAllMode(allPending);
+    setRemindTargetIds(ids);
+    setTone('urgent');
+    setChannel('both');
+    setCustomTitle('');
+    setCustomMessage('');
+    setBypassCooldown(false);
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const blob = await adminApi.surveyExportNonRespondents(survey.id, {
+        search: search || undefined,
+        program: programFilter || undefined,
+        batch: batchFilter || undefined,
+        includeStudents: String(includeStudents),
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `survey-${survey.id}-non-respondents.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      addNotification('Failed to export CSV', 'error');
+    }
+  };
+
+  const handleSendReminder = async () => {
+    if (!remindAllMode && (!remindTargetIds || remindTargetIds.length === 0)) return;
+    setSending(true);
+    try {
+      const res = await adminApi.surveyRemind(survey.id, {
+        userIds: remindAllMode ? undefined : remindTargetIds || undefined,
+        sendToAllPending: remindAllMode,
+        channel,
+        tone,
+        customTitle: tone === 'custom' ? customTitle : undefined,
+        customMessage: tone === 'custom' ? customMessage : undefined,
+        bypassCooldown,
+        includeStudents,
+      });
+      addNotification(res.message || 'Reminder sent successfully', 'success');
+      if (res.skippedCooldownCount > 0) {
+        addNotification(`${res.skippedCooldownCount} skipped (already reminded within 24h).`, 'info');
+      }
+      setRemindTargetIds(null);
+      setRemindAllMode(false);
+      setSelectedIds([]);
+      await loadNonRespondents();
+    } catch (err: any) {
+      addNotification(err?.message || 'Failed to send reminder', 'error');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const previewTitle =
+    tone === 'custom'
+      ? customTitle || `Survey Reminder: ${survey.title}`
+      : tone === 'urgent'
+        ? `Urgent Compliance Notice: ${survey.title}`
+        : `Reminder: ${survey.title}`;
+
+  const previewMessage =
+    tone === 'custom'
+      ? customMessage || `Please complete "${survey.title}" in the CTU-Naga Alumni Tracker portal.`
+      : tone === 'urgent'
+        ? `Final reminder from CTU-Naga Alumni Affairs: Please complete "${survey.title}" immediately. Your response is required for official CHED Graduate Tracer compliance, Alumni Directory verification, and university clearance processing.`
+        : `Good day! We noticed you haven't completed "${survey.title}" yet. Please take a few minutes to submit your response in the CTU-Naga Alumni Tracker portal.`;
+
+  return (
+    <div className="space-y-3">
+      {/* KPI Summary Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+          <p className="text-[11px] text-gray-500">Target Alumni</p>
+          <p className="text-lg font-bold text-gray-900 tabular-nums">{summary.targetTotal}</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+          <p className="text-[11px] text-gray-500">Responded</p>
+          <p className="text-lg font-bold text-emerald-600 tabular-nums">{summary.respondedCount}</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+          <p className="text-[11px] text-gray-500">Not Yet Answered</p>
+          <p className="text-lg font-bold text-amber-600 tabular-nums">{summary.pendingCount}</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-3">
+          <p className="text-[11px] text-gray-500">Completion Rate</p>
+          <p className="text-lg font-bold text-gray-900 tabular-nums">{summary.completionRate}%</p>
+        </div>
+      </div>
+
+      {/* Filters & Bulk Actions */}
+      <div className="bg-white border border-gray-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && loadNonRespondents()}
+            placeholder="Search name, email, or ID..."
+            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 w-48"
+          />
+          <button
+            type="button"
+            onClick={loadNonRespondents}
+            className="px-2.5 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg"
+          >
+            Search
+          </button>
+          <input
+            type="text"
+            value={programFilter}
+            onChange={(e) => setProgramFilter(e.target.value)}
+            placeholder="Program (e.g. BSIT)"
+            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 w-36"
+          />
+          <input
+            type="text"
+            value={batchFilter}
+            onChange={(e) => setBatchFilter(e.target.value)}
+            placeholder="Batch year"
+            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400 w-24"
+          />
+          <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={includeStudents}
+              onChange={(e) => setIncludeStudents(e.target.checked)}
+              className="rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+            />
+            Include students
+          </label>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={data.length === 0}
+            className="px-2.5 py-1.5 text-xs font-medium bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 rounded-lg"
+          >
+            Export CSV
+          </button>
+          {selectedIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => openRemindModal(selectedIds, false)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+            >
+              <BellAlertIcon className="w-3.5 h-3.5" />
+              Remind Selected ({selectedIds.length})
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => openRemindModal(null, true)}
+            disabled={data.length === 0}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-40"
+          >
+            <BellAlertIcon className="w-3.5 h-3.5" />
+            Remind All Pending ({data.length})
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        {loading ? (
+          <div className="p-4">
+            <SkeletonTableRows rows={5} cols={6} />
+          </div>
+        ) : data.length === 0 ? (
+          <div className="p-8 text-center">
+            <CheckCircleIcon className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+            <p className="text-xs font-semibold text-gray-800">No pending respondents found</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">All targeted alumni under these filters have already answered.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-600 uppercase">
+                  <th className="py-2.5 px-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      className="rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                    />
+                  </th>
+                  <th className="py-2.5 px-3">Alumni</th>
+                  <th className="py-2.5 px-3">Program & Batch</th>
+                  <th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3">Last Reminded</th>
+                  <th className="py-2.5 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-xs">
+                {data.map((row) => (
+                  <tr key={row.userId} className="hover:bg-gray-50/70">
+                    <td className="py-2.5 px-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(row.userId)}
+                        onChange={() => toggleOne(row.userId)}
+                        className="rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                      />
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="font-medium text-gray-900">{row.fullName}</div>
+                      <div className="text-[11px] text-gray-500">
+                        {row.email}{row.idNumber ? ` · ID: ${row.idNumber}` : ''}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="text-gray-800">{row.program || '—'}</div>
+                      <div className="text-[11px] text-gray-500">
+                        {row.yearGraduated ? `Batch ${row.yearGraduated}` : 'No graduation year'}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                        row.isStudent ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        {row.isStudent ? 'Student' : 'Pending Alumni'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-[11px] text-gray-600">
+                      {row.lastRemindedAt
+                        ? new Date(row.lastRemindedAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
+                        : <span className="text-gray-400">Never reminded</span>}
+                    </td>
+                    <td className="py-2.5 px-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openRemindModal([row.userId], false)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium bg-orange-50 text-orange-700 hover:bg-orange-100 rounded-md"
+                      >
+                        <BellAlertIcon className="w-3.5 h-3.5" />
+                        Remind
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Send Reminder Modal */}
+      {(remindTargetIds !== null || remindAllMode) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-xl max-w-lg w-full overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50">
+              <div className="flex items-center gap-2">
+                <BellAlertIcon className="w-5 h-5 text-orange-600" />
+                <h3 className="text-sm font-bold text-gray-900">
+                  Send Survey Reminder ({remindAllMode ? `All ${data.length} Pending` : `${remindTargetIds?.length || 0} Selected`})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setRemindTargetIds(null); setRemindAllMode(false); }}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-gray-700 mb-1">Delivery Channel</label>
+                  <select
+                    value={channel}
+                    onChange={(e) => setChannel(e.target.value as any)}
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400"
+                  >
+                    <option value="both">In-App Notification + Email</option>
+                    <option value="in_app">In-App Notification Only</option>
+                    <option value="email">Email Only</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium text-gray-700 mb-1">Reminder Preset</label>
+                  <select
+                    value={tone}
+                    onChange={(e) => setTone(e.target.value as any)}
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400"
+                  >
+                    <option value="urgent">Urgent Compliance Notice</option>
+                    <option value="standard">Standard Friendly Reminder</option>
+                    <option value="custom">Custom Message</option>
+                  </select>
+                </div>
+              </div>
+
+              {tone === 'custom' && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1">Custom Subject / Title</label>
+                    <input
+                      type="text"
+                      value={customTitle}
+                      onChange={(e) => setCustomTitle(e.target.value)}
+                      placeholder={`Reminder: ${survey.title}`}
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1">Custom Message</label>
+                    <textarea
+                      rows={3}
+                      value={customMessage}
+                      onChange={(e) => setCustomMessage(e.target.value)}
+                      placeholder="Write your compliance or follow-up message here..."
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-orange-400"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className={`rounded-lg p-3 border ${tone === 'urgent' ? 'bg-red-50/70 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">Message Preview</p>
+                <p className="font-bold text-gray-900">{previewTitle}</p>
+                <p className="text-gray-700 mt-1 leading-relaxed">{previewMessage}</p>
+              </div>
+
+              <label className="inline-flex items-center gap-2 text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={bypassCooldown}
+                  onChange={(e) => setBypassCooldown(e.target.checked)}
+                  className="rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                />
+                <span>Bypass 24-hour anti-spam cooldown (force resend)</span>
+              </label>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => { setRemindTargetIds(null); setRemindAllMode(false); }}
+                  disabled={sending}
+                  className="px-3.5 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendReminder}
+                  disabled={sending}
+                  className="px-4 py-1.5 text-xs font-semibold bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50"
+                >
+                  {sending ? 'Sending...' : 'Send Reminder Now'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

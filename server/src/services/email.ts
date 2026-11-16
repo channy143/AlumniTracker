@@ -230,3 +230,94 @@ export async function notifyAllAlumniByEmail(payload: AlumniBroadcastEmailPayloa
     }
   }
 }
+
+export async function sendSurveyReminderEmail(
+  emails: string[],
+  payload: {
+    surveyTitle: string;
+    subject: string;
+    message: string;
+    isUrgent?: boolean;
+    portalLink?: string;
+  }
+): Promise<void> {
+  const validEmails = Array.from(
+    new Set(
+      (emails || [])
+        .map((e) => String(e || '').trim())
+        .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+    )
+  );
+  if (validEmails.length === 0) return;
+
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.log(`[DEV] Would send survey reminder email to ${validEmails.length} alumni: ${payload.subject}`);
+    return;
+  }
+
+  const clientUrl = (process.env.CLIENT_URL || '').trim().replace(/\/$/, '');
+  const ctaUrl = clientUrl ? `${clientUrl}${payload.portalLink || '/survey'}` : '';
+  const safeTitle = escapeHtml(payload.surveyTitle);
+  const safeSubject = escapeHtml(payload.subject);
+  const safeMessage = escapeHtml(payload.message).replace(/\n/g, '<br />');
+  const badge = payload.isUrgent ? 'Urgent Compliance Notice' : 'Tracer Survey Reminder';
+  const badgeColor = payload.isUrgent ? '#fca5a5' : '#e8a050';
+  const calloutBorder = payload.isUrgent ? '#dc2626' : '#f59e0b';
+  const calloutBg = payload.isUrgent ? '#fef2f2' : '#fffbeb';
+
+  const logoAttachment = getAlumiLogoAttachment();
+  const attachments = logoAttachment ? [logoAttachment] : [];
+
+  const html = `
+    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px 20px; background: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0;">
+      <div style="background: linear-gradient(135deg, #003366 0%, #002244 100%); margin: -24px -20px 24px; padding: 24px 20px; border-radius: 14px 14px 0 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+          <tr>
+            <td style="width: 58px; vertical-align: middle; padding-right: 14px;">
+              <img src="${logoAttachment ? 'cid:alumimascot' : getAlumiFallbackUrl()}" alt="Alumi — CTU-Naga Mascot" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px;" />
+            </td>
+            <td style="vertical-align: middle;">
+              <h1 style="color: #ffffff; font-size: 19px; margin: 0; font-weight: 700; line-height: 1.25;">CTU-Naga Alumni Tracker</h1>
+              <p style="color: ${badgeColor}; margin: 4px 0 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;">${badge}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div style="background: ${calloutBg}; border-left: 4px solid ${calloutBorder}; border-radius: 8px; padding: 14px 16px; margin: 0 0 18px;">
+        <div style="font-size: 12px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">${safeTitle}</div>
+        <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${safeSubject}</div>
+      </div>
+      <p style="color: #334155; font-size: 14px; line-height: 1.65; margin: 0 0 20px;">${safeMessage}</p>
+      ${ctaUrl ? `
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${escapeHtml(ctaUrl)}" style="display: inline-block; background: #f97316; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 10px;">
+            Complete Survey Now
+          </a>
+        </div>
+      ` : ''}
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0 14px;" />
+      <p style="color: #94a3b8; font-size: 11px; margin: 0; line-height: 1.4;">
+        Cebu Technological University &mdash; Naga Extension Campus<br />
+        City of Naga, Cebu, Philippines
+      </p>
+    </div>
+  `;
+
+  const BATCH_SIZE = 50;
+  for (let i = 0; i < validEmails.length; i += BATCH_SIZE) {
+    const bccBatch = validEmails.slice(i, i + BATCH_SIZE);
+    try {
+      await transporter.sendMail({
+        from: `"CTU-Naga Alumni Tracker" <${process.env.SMTP_USER}>`,
+        to: process.env.SMTP_USER,
+        bcc: bccBatch,
+        subject: `[CTU-Naga Alumni] ${payload.subject}`,
+        attachments,
+        html,
+      });
+    } catch (sendErr: any) {
+      console.error(`[Survey Reminder Email] Batch ${i / BATCH_SIZE + 1} failed:`, sendErr?.message || sendErr);
+    }
+  }
+}

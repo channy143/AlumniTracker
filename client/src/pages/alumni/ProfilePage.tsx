@@ -27,7 +27,7 @@ import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authStore';
 import { clearTrustedDeviceToken } from '@/utils/device';
 import { isPasswordStrong, checkPasswordCriteria } from '@/utils/validation';
-import { validateJobTitle } from '@/utils/validateJobTitle';
+import { validateJobTitle, validateCompanyName, CANONICAL_INDUSTRIES } from '@/utils/validateJobTitle';
 import { getHumanErrorMessage } from '@/utils/errorMapper';
 import CreatePostBox from '@/components/dashboard/CreatePostBox';
 import FeedPostCard, { PostItem } from '@/components/dashboard/FeedPostCard';
@@ -405,8 +405,9 @@ export default function ProfilePage() {
       const preSaveStatus = String(form.employment_status || 'Unemployed').toLowerCase();
       const preSaveNotEmployed = preSaveStatus === 'unemployed' || preSaveStatus.includes('seeking') || preSaveStatus === 'retired';
 
-      // Pre-save validation for job title and proof link (only when employed / self-employed)
+      // Pre-save validation for job title, company name, industry, and proof link (only when employed / self-employed)
       let validatedJobTitle: string | null = null;
+      let validatedCompanyName: string | null = null;
       if (!preSaveNotEmployed) {
         const jobTitleCheck = validateJobTitle(form.current_job_title);
         if (!jobTitleCheck.valid) {
@@ -415,6 +416,24 @@ export default function ProfilePage() {
           return;
         }
         validatedJobTitle = jobTitleCheck.cleaned;
+
+        const rawCompany =
+          !form.company_name?.trim() && preSaveStatus.includes('self')
+            ? 'Self-employed / Independent'
+            : form.company_name;
+        const companyCheck = validateCompanyName(rawCompany);
+        if (!companyCheck.valid) {
+          setError(companyCheck.error || 'Please enter a valid company or organization name.');
+          setSaving(false);
+          return;
+        }
+        validatedCompanyName = companyCheck.cleaned;
+
+        if (!form.industry || !CANONICAL_INDUSTRIES.includes(form.industry)) {
+          setError('Please select your Industry from the dropdown.');
+          setSaving(false);
+          return;
+        }
       }
 
       if (!preSaveNotEmployed && form.proof_url) {
@@ -441,7 +460,10 @@ export default function ProfilePage() {
       if (form.phone !== undefined) payload.phone = form.phone ? normalizePhPhone(form.phone) : null;
       if (form.gender !== undefined) payload.gender = form.gender || null;
       if (form.civil_status !== undefined) payload.civil_status = form.civil_status || null;
-      if (form.country !== undefined) payload.country = form.country || 'Philippines';
+      if (form.country !== undefined) {
+        const hasLoc = Boolean(form.city || form.province);
+        payload.country = hasLoc ? (form.country || 'Philippines') : (form.country && form.country !== 'Philippines' ? form.country : null);
+      }
       if (form.street !== undefined || form.barangay !== undefined) {
         payload.address = combinedAddress || null;
       } else if (form.address !== undefined) {
@@ -474,11 +496,18 @@ export default function ProfilePage() {
         else if (lower === 'retired') status = 'Retired';
 
         const isNotEmployed = status === 'Unemployed' || status === 'Seeking Opportunities' || status === 'Retired';
+        const prevActiveEmp = (profile?.employment || []).find((r: any) => r.is_current);
+        const wasSameRoleBeforeSave =
+          prevActiveEmp &&
+          validatedCompanyName &&
+          validatedJobTitle &&
+          String(prevActiveEmp.company_name || '').trim().toLowerCase() === validatedCompanyName.toLowerCase() &&
+          String(prevActiveEmp.position || '').trim().toLowerCase() === validatedJobTitle.toLowerCase();
 
         await profileApi.updateCareer({
           employment_status: status,
           current_job_title: isNotEmployed ? null : validatedJobTitle,
-          company_name: isNotEmployed ? null : (form.company_name || null),
+          company_name: isNotEmployed ? null : validatedCompanyName,
           industry: isNotEmployed ? null : (form.industry || null),
           salary_range: isNotEmployed ? null : (form.salary_range || null),
         });
@@ -487,24 +516,36 @@ export default function ProfilePage() {
         try {
           const records = await employmentApi.list();
           const current = records.find((r: any) => r.is_current);
-          if (!isNotEmployed) {
+          if (!isNotEmployed && validatedCompanyName && validatedJobTitle) {
             let effectiveProofType = form.proof_type || 'coe';
             if (effectiveProofType === 'other' && form.proof_type_other) {
               effectiveProofType = `other: ${form.proof_type_other.trim()}`;
             }
 
+            const prevStartStr = prevActiveEmp?.start_date ? String(prevActiveEmp.start_date).slice(0, 10) : '';
+            const resolvedStartDate = wasSameRoleBeforeSave
+              ? (form.start_date || prevStartStr || new Date().toISOString().slice(0, 10))
+              : (!form.start_date || form.start_date === prevStartStr
+                  ? new Date().toISOString().slice(0, 10)
+                  : form.start_date);
+
             const empPayload: any = {
-              company_name: form.company_name || (status === 'Self-employed' ? 'Self-employed / Business' : 'Organization'),
+              company_name: validatedCompanyName,
               position: validatedJobTitle,
-              company_industry: form.industry || null,
+              company_industry: form.industry,
               job_type: form.job_type || 'full-time',
-              start_date: form.start_date || (current?.start_date ? String(current.start_date).slice(0, 10) : new Date().toISOString().slice(0, 10)),
+              start_date: resolvedStartDate,
+              end_date: null,
               salary_range: form.salary_range || null,
               proof_type: effectiveProofType,
               proof_url: form.proof_url || null,
               is_current: true,
             };
-            if (current) {
+            const isSameRole =
+              current &&
+              String(current.company_name || '').trim().toLowerCase() === validatedCompanyName.toLowerCase() &&
+              String(current.position || '').trim().toLowerCase() === validatedJobTitle.toLowerCase();
+            if (isSameRole) {
               await employmentApi.update(current.id, empPayload);
             } else {
               await employmentApi.create(empPayload);
@@ -1203,13 +1244,27 @@ export default function ProfilePage() {
                         <label className="text-xs text-gray-600 font-medium mb-1 block">
                           Company / Organization
                         </label>
-                        <input
-                          value={isFormNotEmployed ? '' : (form.company_name || '')}
-                          onChange={(e) => setForm((prev: any) => ({ ...prev, company_name: e.target.value }))}
-                          disabled={isFormNotEmployed}
-                          placeholder={effectiveStatus === 'Self-employed' ? 'e.g. Business Name or Client (Optional)' : isFormNotEmployed ? 'N/A' : 'e.g. Google, Accenture, DepEd'}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                        />
+                        {(() => {
+                          const rawComp = isFormNotEmployed ? '' : (form.company_name || '');
+                          const compCheck = rawComp.trim() ? validateCompanyName(rawComp) : null;
+                          const showCompErr = !isFormNotEmployed && compCheck && !compCheck.valid;
+                          return (
+                            <>
+                              <input
+                                value={rawComp}
+                                onChange={(e) => setForm((prev: any) => ({ ...prev, company_name: e.target.value }))}
+                                disabled={isFormNotEmployed}
+                                placeholder={effectiveStatus === 'Self-employed' ? 'e.g. Business Name or Client (Optional)' : isFormNotEmployed ? 'N/A' : 'e.g. Google, Accenture, DepEd'}
+                                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-white disabled:bg-gray-100 disabled:text-gray-400 ${
+                                  showCompErr ? 'border-red-400 focus:border-red-500' : 'border-gray-300 focus:border-orange-400'
+                                }`}
+                              />
+                              {showCompErr && (
+                                <p className="mt-1 text-[11px] text-red-600">{compCheck?.error}</p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                       <div>
                         <label className="text-xs text-gray-600 font-medium mb-1 block">
@@ -1222,16 +1277,9 @@ export default function ProfilePage() {
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                         >
                           <option value="">{isFormNotEmployed ? 'N/A' : 'Select Industry'}</option>
-                          <option value="Information Technology">Information Technology</option>
-                          <option value="Education / Academia">Education / Academia</option>
-                          <option value="Industrial & Manufacturing">Industrial & Manufacturing</option>
-                          <option value="Engineering & Construction">Engineering & Construction</option>
-                          <option value="Business, Finance & BPO">Business, Finance & BPO</option>
-                          <option value="Hospitality & Tourism">Hospitality & Tourism</option>
-                          <option value="Government & Public Service">Government & Public Service</option>
-                          <option value="Healthcare & Life Sciences">Healthcare & Life Sciences</option>
-                          <option value="Creative Arts & Media">Creative Arts & Media</option>
-                          <option value="Other">Other</option>
+                          {CANONICAL_INDUSTRIES.map((ind) => (
+                            <option key={ind} value={ind}>{ind}</option>
+                          ))}
                         </select>
                       </div>
                       <div>
@@ -1893,7 +1941,11 @@ export default function ProfilePage() {
                 </div>
                 <p className="text-sm font-semibold text-gray-800 mt-0.5">{emp.position}</p>
                 <p className="text-xs text-gray-500">{emp.company_name}{emp.company_industry ? ` · ${emp.company_industry}` : ''}</p>
-                {emp.salary_range && <p className="text-[11px] text-gray-400">₱{emp.salary_range}</p>}
+                {emp.salary_range && (
+                  <p className="text-[11px] text-gray-400">
+                    {/^\d/.test(String(emp.salary_range).trim()) ? `₱${emp.salary_range}` : emp.salary_range}
+                  </p>
+                )}
                 {emp.start_date && (
                   <p className="text-[10px] text-gray-400 mt-0.5">
                     {formatExperienceFromDate(emp.start_date, emp.end_date)}

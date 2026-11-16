@@ -9,6 +9,7 @@ import { getCached, invalidateCachePrefixes } from '@/utils/apiCache';
 import { SkeletonSurveyForm } from '@/components/ui/Skeleton';
 import { formatProgramLongName } from '@/utils/formatProgram';
 import { generateYears } from '@/utils/helpers';
+import { validateJobTitle, validateCompanyName, CANONICAL_INDUSTRIES } from '@/utils/validateJobTitle';
 import {
   PsgcOption,
   fetchPhProvinces,
@@ -175,6 +176,7 @@ export default function AlumniOnboardingSurveyPage() {
   // Step 3: Academic Background
   const [academicInfo, setAcademicInfo] = useState({
     program: cachedProf?.program ? formatProgramLongName(cachedProf.program) : '',
+    major: cachedProf?.major || '',
     yearGraduated: cachedProf?.yearGraduated ? String(cachedProf.yearGraduated) : '',
     honors: cachedProf?.honors && cachedProf.honors !== 'None' ? cachedProf.honors : '',
     licensureStatus: 'Not Applicable',
@@ -190,7 +192,7 @@ export default function AlumniOnboardingSurveyPage() {
   });
 
   const [employmentInfo, setEmploymentInfo] = useState({
-    employmentStatus: 'Unemployed',
+    employmentStatus: '',
     currentJobTitle: cachedProf?.current_job_title || '',
     companyName: cachedProf?.company_name || '',
     industry: cachedProf?.industry || '',
@@ -337,9 +339,12 @@ export default function AlumniOnboardingSurveyPage() {
       if (isEvasiveInput(trimmedStudentId)) {
         return 'Please enter your actual Student or Alumni ID (evasive answers like "secret" are not accepted).';
       }
-      const studentIdAlnum = trimmedStudentId.replace(/[^a-zA-Z0-9]/g, '');
-      if (studentIdAlnum.length < 3 || !/\d/.test(studentIdAlnum)) {
-        return 'Please enter a valid Student or Alumni ID (must include digits, e.g. CTU-2021-0001).';
+      const cleanId = trimmedStudentId.replace(/\s+/g, '');
+      if (/^\d{8,}$/.test(cleanId)) {
+        return 'Student ID has too many digits. Standard CTU Student IDs are 7 digits (e.g. 1334567).';
+      }
+      if (!/^\d{7}$/.test(cleanId) && !/^(CTU-)?\d{4}-\d{3,6}$/i.test(cleanId)) {
+        return 'Please enter a valid 7-digit CTU Student ID (e.g. 1334567) or formatted ID (e.g. CTU-2021-0001).';
       }
       if (!personalInfo.phone.trim()) {
         return 'Please enter your contact / mobile number.';
@@ -406,17 +411,13 @@ export default function AlumniOnboardingSurveyPage() {
         if (!employmentInfo.jobType) {
           return 'Please select your Employment Type.';
         }
-        if (!employmentInfo.currentJobTitle.trim()) {
-          return 'Please enter your Current Job Title / Position.';
+        const titleCheck = validateJobTitle(employmentInfo.currentJobTitle);
+        if (!titleCheck.valid) {
+          return titleCheck.error || 'Please enter a valid Job Title / Position.';
         }
-        if (isEvasiveInput(employmentInfo.currentJobTitle)) {
-          return 'Please enter your actual Job Title (evasive answers like "secret" are not accepted).';
-        }
-        if (!employmentInfo.companyName.trim()) {
-          return 'Please enter your Company / Organization Name.';
-        }
-        if (isEvasiveInput(employmentInfo.companyName)) {
-          return 'Please enter your actual Company Name (evasive answers like "secret" are not accepted).';
+        const companyCheck = validateCompanyName(employmentInfo.companyName);
+        if (!companyCheck.valid) {
+          return companyCheck.error || 'Please enter a valid Company / Organization Name.';
         }
         if (!employmentInfo.industry) {
           return 'Please select your Industry / Field.';
@@ -1124,6 +1125,27 @@ export default function AlumniOnboardingSurveyPage() {
                       </select>
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1 truncate" title="Major or Specialization">
+                        Major / Specialization <span className="text-gray-400 font-normal text-[11px] ml-1">(If applicable)</span>
+                      </label>
+                      <select
+                        value={academicInfo.major}
+                        onChange={(e) => setAcademicInfo((a) => ({ ...a, major: e.target.value }))}
+                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                      >
+                        <option value="">None / Not Applicable</option>
+                        <option value="Information and Communications Technology (ICT)">Information and Communications Technology (ICT)</option>
+                        <option value="Home Economics (HE)">Home Economics (HE)</option>
+                        <option value="Industrial Arts (IA)">Industrial Arts (IA)</option>
+                        <option value="Agri-Fishery Arts (AFA)">Agri-Fishery Arts (AFA)</option>
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="English">English</option>
+                        <option value="Science">Science</option>
+                        <option value="Filipino">Filipino</option>
+                        <option value="Social Studies">Social Studies</option>
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Graduation Year <span className="text-red-500 font-bold ml-0.5">*</span>
                       </label>
@@ -1342,7 +1364,7 @@ export default function AlumniOnboardingSurveyPage() {
                           Current Employment Information
                         </label>
                         <p className="text-[11px] text-gray-500">
-                          Employment status is set to Unemployed by default for now. You can update your employment status and details anytime in Edit Profile.
+                          Select your current status. If you are still studying or not ready to report yet, choose the appropriate option below.
                         </p>
                       </div>
                     </div>
@@ -1353,22 +1375,21 @@ export default function AlumniOnboardingSurveyPage() {
                           Employment Status <span className="text-red-500 font-bold ml-0.5">*</span>
                         </label>
                         <select
-                          value="Unemployed"
-                          disabled
-                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none bg-gray-50 text-gray-600 cursor-not-allowed"
+                          value={employmentInfo.employmentStatus}
+                          onChange={(e) => setEmploymentInfo((emp) => ({ ...emp, employmentStatus: e.target.value }))}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
                         >
-                          <option value="Unemployed">Unemployed / Seeking First Job</option>
+                          <option value="">Select Employment Status</option>
                           <option value="Employed">Employed (Full-time / Part-time)</option>
                           <option value="Self-employed">Self-employed / Freelance / Entrepreneur</option>
+                          <option value="Unemployed">Unemployed</option>
                           <option value="Seeking Opportunities">Seeking Opportunities</option>
-                          <option value="Retired">Retired</option>
+                          <option value="Student">Student (Not Yet Graduated)</option>
+                          <option value="Not reported">Not reported / Prefer to update later</option>
                         </select>
-                        <p className="text-[11px] text-amber-700 mt-1">
-                          This will be updated in your Edit Profile page once you are ready to submit your employment details.
-                        </p>
                       </div>
 
-                      {employmentInfo.employmentStatus !== 'Unemployed' && (
+                      {(employmentInfo.employmentStatus === 'Employed' || employmentInfo.employmentStatus === 'Self-employed') && (
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Employment Type <span className="text-red-500 font-bold ml-0.5">*</span>
@@ -1437,16 +1458,9 @@ export default function AlumniOnboardingSurveyPage() {
                               className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
                             >
                               <option value="">Select Industry</option>
-                              <option value="Information Technology">Information Technology</option>
-                              <option value="Education / Academia">Education / Academia</option>
-                              <option value="Industrial & Manufacturing">Industrial & Manufacturing</option>
-                              <option value="Engineering & Construction">Engineering & Construction</option>
-                              <option value="Business, Finance & BPO">Business, Finance & BPO</option>
-                              <option value="Hospitality & Tourism">Hospitality & Tourism</option>
-                              <option value="Government & Public Service">Government & Public Service</option>
-                              <option value="Healthcare & Life Sciences">Healthcare & Life Sciences</option>
-                              <option value="Creative Arts & Media">Creative Arts & Media</option>
-                              <option value="Other">Other Industry</option>
+                              {CANONICAL_INDUSTRIES.map((ind) => (
+                                <option key={ind} value={ind}>{ind}</option>
+                              ))}
                             </select>
                           </div>
                           <div>

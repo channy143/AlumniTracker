@@ -111,7 +111,18 @@ const INVALID_JOB_TITLE_TERMS = new Set([
   'botbot',
   'ewan',
   'basta',
+  'organization',
+  'company',
+  'employer',
+  'imong mama',
+  'your mom',
+  'yo mama',
+  'ceo of being lazy-smart',
+  'lazy-smart',
+  'lazy smart',
 ]);
+
+const JUNK_PHRASE_PATTERN = /\b(imong\s*mama|your\s*mom|yo\s*mama|being\s+lazy|lazy[- ]?smart)\b/i;
 
 const KEYBOARD_MASH_PATTERN = /(asdf|qwer|zxcv|hjkl|uiop|fghj|dfgh|cvbn|tyui|ghjk)/i;
 
@@ -131,7 +142,7 @@ export function validateJobTitle(raw: unknown): {
   const lower = cleaned.toLowerCase();
   const alphaOnly = lower.replace(/[^a-z0-9]/g, '');
 
-  if (INVALID_JOB_TITLE_TERMS.has(lower) || INVALID_JOB_TITLE_TERMS.has(alphaOnly)) {
+  if (INVALID_JOB_TITLE_TERMS.has(lower) || INVALID_JOB_TITLE_TERMS.has(alphaOnly) || JUNK_PHRASE_PATTERN.test(cleaned)) {
     return {
       valid: false,
       cleaned,
@@ -192,6 +203,93 @@ export function validateJobTitle(raw: unknown): {
     };
   }
 
+  return { valid: true, cleaned };
+}
+
+export const CANONICAL_INDUSTRIES = [
+  'Information Technology',
+  'Education / Academia',
+  'Industrial & Manufacturing',
+  'Engineering & Construction',
+  'Business, Finance & BPO',
+  'Hospitality & Tourism',
+  'Government & Public Service',
+  'Healthcare & Life Sciences',
+  'Creative Arts & Media',
+  'Other',
+] as const;
+
+export const CANONICAL_SALARY_RANGES = [
+  'Below ₱20,000',
+  '₱20,000–₱40,000',
+  '₱40,000–₱60,000',
+  '₱60,000–₱80,000',
+  '₱80,000–₱100,000',
+  'Above ₱100,000',
+  'Prefer not to say',
+] as const;
+
+const INVALID_COMPANY_TERMS = new Set([
+  'organization',
+  'company',
+  'company name',
+  'employer',
+  'workplace',
+  'position',
+  'job',
+  'title',
+  'na',
+  'n/a',
+  'none',
+  'null',
+  'nil',
+  'nothing',
+  'secret',
+  'private',
+  'confidential',
+  'idk',
+  'tbd',
+  'tba',
+  'test',
+  'testing',
+  'sample',
+  'example',
+  'asdf',
+  'qwerty',
+  'unknown',
+  'other',
+  'wala',
+  'ambot',
+  'ewan',
+  'basta',
+  'imong mama',
+]);
+
+export function validateCompanyName(raw: unknown): {
+  valid: boolean;
+  cleaned: string;
+  error?: string;
+} {
+  const cleaned = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!cleaned) {
+    return { valid: false, cleaned: '', error: 'Please enter your company or organization name.' };
+  }
+  const lower = cleaned.toLowerCase();
+  const alphaOnly = lower.replace(/[^a-z0-9]/g, '');
+  if (INVALID_COMPANY_TERMS.has(lower) || INVALID_COMPANY_TERMS.has(alphaOnly) || JUNK_PHRASE_PATTERN.test(cleaned)) {
+    return {
+      valid: false,
+      cleaned,
+      error: `"${cleaned}" is not a valid company name. Please enter your actual employer or business name.`,
+    };
+  }
+  const letters = cleaned.match(/[a-zA-Z]/g) || [];
+  if (cleaned.length < 2 || letters.length < 2) {
+    return { valid: false, cleaned, error: 'Company name must contain at least 2 letters.' };
+  }
+  if (/^(.)\1+$/i.test(alphaOnly) || /(.)\1{3,}/i.test(alphaOnly) || KEYBOARD_MASH_PATTERN.test(alphaOnly)) {
+    return { valid: false, cleaned, error: 'Please enter a valid company or organization name.' };
+  }
   return { valid: true, cleaned };
 }
 
