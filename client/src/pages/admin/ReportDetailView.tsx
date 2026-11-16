@@ -11,7 +11,6 @@ import {
 } from 'recharts';
 import {
   ArrowLeftIcon,
-  ArrowPathIcon,
   ArrowDownTrayIcon,
   TableCellsIcon,
   PrinterIcon,
@@ -204,102 +203,93 @@ export default function ReportDetailView({
     } else {
       setSelectedGapKey(gapKey);
       setCompletenessFilter('incomplete');
-      // Smooth scroll to the table section
       document.getElementById('report-detail-table-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
   return (
     <div className="space-y-5 animate-in fade-in duration-150">
-      {/* Top Workspace Header */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <button
-              type="button"
-              onClick={onBack}
-              className="mt-0.5 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer shrink-0"
-            >
-              <ArrowLeftIcon className="w-3.5 h-3.5" />
-              Back to Reports
-            </button>
+      {/* Top Workspace Header — Hierarchy: Back button -> Title & Description -> Action Buttons */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+        {/* 1. Back Button */}
+        <div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
+          >
+            <ArrowLeftIcon className="w-3.5 h-3.5" />
+            Back to Reports
+          </button>
+        </div>
 
-            <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-              <Icon className="w-5 h-5" />
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold text-gray-900">{report.title}</h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                  {report.badge}
+        {/* 2. Card Title and Description */}
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 mt-0.5">
+            <Icon className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-gray-900">{report.title}</h2>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                {report.badge}
+              </span>
+              {activeFilterLabels.map((lbl) => (
+                <span key={lbl} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                  Filter: {lbl}
                 </span>
-                {activeFilterLabels.map((lbl) => (
-                  <span key={lbl} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                    Filter: {lbl}
-                  </span>
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 mt-1">{report.desc}</p>
-              {lastUpdated && (
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Live snapshot fetched {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              )}
+              ))}
             </div>
+            <p className="text-xs text-gray-600 mt-1 leading-relaxed">{report.desc}</p>
+            {lastUpdated && (
+              <p className="text-[11px] text-gray-400 mt-1">
+                Live snapshot fetched {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={loading}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-orange-500' : ''}`} />
-              Refresh
-            </button>
+        {/* 3. Export & Print Buttons */}
+        <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onExportCsv}
+            disabled={generating !== null || loading}
+            className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <ArrowDownTrayIcon className="w-3.5 h-3.5" />
+            CSV
+          </button>
 
-            <button
-              type="button"
-              onClick={onExportCsv}
-              disabled={generating !== null || loading}
-              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <ArrowDownTrayIcon className="w-3.5 h-3.5" />
-              CSV
-            </button>
+          <button
+            type="button"
+            onClick={() => onExportExcel(filteredAnalyzedRows.map((ar) => ar.row))}
+            disabled={generating !== null || loading || !analysis || analysis.rows.length === 0}
+            className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <TableCellsIcon className="w-3.5 h-3.5" />
+            Excel
+          </button>
 
-            <button
-              type="button"
-              onClick={() => onExportExcel(filteredAnalyzedRows.map((ar) => ar.row))}
-              disabled={generating !== null || loading || !analysis || analysis.rows.length === 0}
-              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <TableCellsIcon className="w-3.5 h-3.5" />
-              Excel
-            </button>
+          <button
+            type="button"
+            onClick={onExportJson}
+            disabled={generating !== null || loading}
+            className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl border border-gray-200 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            JSON
+          </button>
 
-            <button
-              type="button"
-              onClick={onExportJson}
-              disabled={generating !== null || loading}
-              className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl border border-gray-200 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              JSON
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onPrint(filteredAnalyzedRows.map((ar) => ar.row))}
-              disabled={loading || !analysis || analysis.rows.length === 0}
-              className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl border border-gray-200 transition-colors cursor-pointer disabled:opacity-50"
-              title="Print filtered or full report"
-            >
-              <PrinterIcon className="w-3.5 h-3.5" />
-              Print
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onPrint(filteredAnalyzedRows.map((ar) => ar.row))}
+            disabled={loading || !analysis || analysis.rows.length === 0}
+            className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl border border-gray-200 transition-colors cursor-pointer disabled:opacity-50"
+            title="Print filtered or full report"
+          >
+            <PrinterIcon className="w-3.5 h-3.5" />
+            Print
+          </button>
         </div>
 
         {/* Survey Cycle Picker inside Detail View when applicable */}
@@ -323,13 +313,13 @@ export default function ReportDetailView({
 
       {/* Loading / Error State */}
       {loading && !analysis && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-2xl p-4 h-24 animate-pulse">
-              <div className="h-3 w-28 bg-gray-200 rounded mb-3" />
-              <div className="h-7 w-20 bg-gray-200 rounded" />
-            </div>
-          ))}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_350px] xl:grid-cols-[minmax(0,1fr)_390px] gap-5 items-start">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 h-96 animate-pulse" />
+          <div className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-2xl p-4 h-28 animate-pulse" />
+            ))}
+          </div>
         </div>
       )}
 
@@ -346,250 +336,13 @@ export default function ReportDetailView({
         </div>
       )}
 
-      {/* Loaded Report Detail Workspace */}
+      {/* Main Two-Column Workspace: Left = Rows & Columns Table, Right = All Details Sidebar */}
       {analysis && (
-        <>
-          {/* 1. Tailored KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {analysis.kpis.map((kpi) => {
-              const style = KPI_TONE_CLASSES[kpi.tone];
-              return (
-                <div
-                  key={kpi.label}
-                  className={`bg-white border ${style.border} rounded-2xl p-4 shadow-2xs flex flex-col justify-between`}
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{kpi.label}</p>
-                  <p className={`text-2xl font-bold mt-1.5 ${style.value}`}>{kpi.value}</p>
-                  <span className={`inline-block self-start mt-2 text-[11px] font-medium px-2 py-0.5 rounded-md ${style.chip}`}>
-                    {kpi.subtext}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 2. Analytics & Field Coverage Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Domain Bar Chart */}
-            <div className="lg:col-span-7 bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
-              <div className="mb-3">
-                <h3 className="text-sm font-bold text-gray-900">{analysis.chartTitle}</h3>
-                <p className="text-xs text-gray-500">{analysis.chartSubtitle}</p>
-              </div>
-              {analysis.chartData.length === 0 ? (
-                <div className="h-60 flex items-center justify-center text-xs text-gray-400">
-                  No data available for visualization.
-                </div>
-              ) : (
-                <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analysis.chartData} margin={{ top: 8, right: 12, left: -12, bottom: 8 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 11, fill: '#475569' }}
-                        interval={0}
-                        angle={analysis.chartData.length > 5 ? -15 : 0}
-                        textAnchor={analysis.chartData.length > 5 ? 'end' : 'middle'}
-                        height={analysis.chartData.length > 5 ? 46 : 28}
-                      />
-                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: '12px',
-                          border: '1px solid #e2e8f0',
-                          fontSize: '12px',
-                          boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)',
-                        }}
-                      />
-                      {analysis.secondarySeriesName && <Legend wrapperStyle={{ fontSize: '11px' }} />}
-                      <Bar
-                        dataKey="primary"
-                        name={analysis.primarySeriesName}
-                        fill="#ea580c"
-                        radius={[6, 6, 0, 0]}
-                        maxBarSize={44}
-                      />
-                      {analysis.secondarySeriesName && (
-                        <Bar
-                          dataKey="secondary"
-                          name={analysis.secondarySeriesName}
-                          fill="#cbd5e1"
-                          radius={[6, 6, 0, 0]}
-                          maxBarSize={44}
-                        />
-                      )}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-
-            {/* Field Coverage Breakdown */}
-            <div className="lg:col-span-5 bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs flex flex-col">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900">Field Coverage Audit</h3>
-                  <p className="text-xs text-gray-500">Fill rate per report column across {analysis.rows.length} rows</p>
-                </div>
-                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-800">
-                  {analysis.completenessPct}% overall
-                </span>
-              </div>
-
-              {analysis.fieldCoverage.length === 0 ? (
-                <p className="text-xs text-gray-400 my-auto text-center py-8">No columns to audit.</p>
-              ) : (
-                <div className="space-y-2.5 overflow-y-auto pr-1 max-h-64">
-                  {analysis.fieldCoverage.map((fc) => {
-                    const barColor =
-                      fc.pct >= 85 ? 'bg-emerald-500' : fc.pct >= 50 ? 'bg-amber-500' : 'bg-rose-500';
-                    const textColor =
-                      fc.pct >= 85 ? 'text-emerald-700' : fc.pct >= 50 ? 'text-amber-700' : 'text-rose-700';
-                    return (
-                      <div key={fc.field}>
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-medium text-gray-700 truncate pr-2">{fc.field}</span>
-                          <span className={`font-semibold tabular-nums shrink-0 ${textColor}`}>
-                            {fc.pct}% <span className="text-[10px] font-normal text-gray-400">({fc.filled}/{fc.total})</span>
-                          </span>
-                        </div>
-                        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${fc.pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 3. Missing Data Audit & Action Plan */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Left: Missing & Pending Data */}
-            <div className="lg:col-span-7 bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                    <ExclamationTriangleIcon className="w-4 h-4 text-amber-500" />
-                    Missing &amp; Pending Data Audit
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Click any gap item below to filter the record table directly to affected records.
-                  </p>
-                </div>
-                {analysis.missingGroups.length > 0 && (
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">
-                    {analysis.missingGroups.length} issue type{analysis.missingGroups.length === 1 ? '' : 's'}
-                  </span>
-                )}
-              </div>
-
-              {analysis.missingGroups.length === 0 ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 flex items-center gap-3">
-                  <CheckCircleIcon className="w-6 h-6 text-emerald-600 shrink-0" />
-                  <div>
-                    <p className="text-xs font-bold text-emerald-900">All audited criteria are complete!</p>
-                    <p className="text-xs text-emerald-800/85 mt-0.5">
-                      No missing fields or pending submissions detected across {analysis.rows.length} live records.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {analysis.missingGroups.map((g) => {
-                    const sev = SEVERITY_STYLE[g.severity];
-                    const isSelected = selectedGapKey === g.key;
-                    return (
-                      <div
-                        key={g.key}
-                        className={`rounded-xl border p-3 transition-all ${
-                          isSelected ? 'ring-2 ring-orange-500 border-orange-400 bg-orange-50/40' : sev.card
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${sev.badge}`}>
-                              {sev.label}
-                            </span>
-                            <p className="text-xs font-bold text-gray-900">{g.label}</p>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleToggleGapFilter(g.key)}
-                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0 ${
-                              isSelected
-                                ? 'bg-orange-600 text-white'
-                                : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-                            }`}
-                          >
-                            <FunnelIcon className="w-3 h-3" />
-                            {isSelected ? 'Showing' : 'View'} {g.count} ({g.pct}%)
-                          </button>
-                        </div>
-
-                        <p className="text-[11px] text-gray-600 mt-1.5 leading-relaxed">
-                          <strong className="text-gray-800">User action:</strong> {g.userAction}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Right: Required Action Steps */}
-            <div className="lg:col-span-5 bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                  <ClipboardDocumentCheckIcon className="w-4 h-4 text-orange-600" />
-                  Required Actions (To Complete Data)
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Required steps for users and coordinators to close the gaps in this report.
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-orange-50/60 border border-orange-200/80 p-3 space-y-2">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-orange-900 flex items-center gap-1.5">
-                  <UserGroupIcon className="w-4 h-4 text-orange-600" />
-                  For Students / Alumni / Partners
-                </p>
-                {analysis.userSteps.length === 0 ? (
-                  <p className="text-xs text-gray-600">No outstanding user submissions needed right now.</p>
-                ) : (
-                  <ul className="space-y-1.5 text-xs text-gray-700 list-disc list-inside">
-                    {analysis.userSteps.map((step) => (
-                      <li key={step} className="leading-relaxed">{step}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                  <InformationCircleIcon className="w-4 h-4 text-slate-600" />
-                  For Admin / Coordinators
-                </p>
-                {analysis.adminSteps.length === 0 ? (
-                  <p className="text-xs text-gray-600">Dataset is clean and ready for official institutional export.</p>
-                ) : (
-                  <ul className="space-y-1.5 text-xs text-gray-700 list-disc list-inside">
-                    {analysis.adminSteps.map((step) => (
-                      <li key={step} className="leading-relaxed">{step}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Interactive Audit & Record Table */}
-          <div id="report-detail-table-section" className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-2xs">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_350px] xl:grid-cols-[minmax(0,1fr)_390px] gap-5 items-start">
+          {/* LEFT / MAIN CONTENT: Interactive Row & Column Data Table */}
+          <div id="report-detail-table-section" className="min-w-0 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-2xs">
             <div className="p-4 border-b border-gray-100 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
@@ -653,7 +406,7 @@ export default function ReportDetailView({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                  <div className="relative flex-1 sm:w-64">
+                  <div className="relative flex-1 sm:w-60">
                     <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />
                     <input
                       type="text"
@@ -798,7 +551,243 @@ export default function ReportDetailView({
               </div>
             </div>
           </div>
-        </>
+
+          {/* RIGHT SIDEBAR: KPIs, Analytics Chart, Field Coverage, Missing Data & Actions */}
+          <aside className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 lg:pb-2">
+            {/* 1. Compact 2x2 KPI Summary Cards */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {analysis.kpis.map((kpi) => {
+                const style = KPI_TONE_CLASSES[kpi.tone];
+                return (
+                  <div
+                    key={kpi.label}
+                    className={`bg-white border ${style.border} rounded-2xl p-3.5 shadow-2xs flex flex-col justify-between`}
+                  >
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 leading-snug">
+                      {kpi.label}
+                    </p>
+                    <p className={`text-lg font-bold mt-1 ${style.value}`}>{kpi.value}</p>
+                    <span className={`inline-block self-start mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md ${style.chip} leading-tight`}>
+                      {kpi.subtext}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 2. Missing & Pending Data Audit */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                    <ExclamationTriangleIcon className="w-4 h-4 text-amber-500 shrink-0" />
+                    Missing &amp; Pending Data
+                  </h3>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Click an item to filter matching rows on the left.
+                  </p>
+                </div>
+                {analysis.missingGroups.length > 0 && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">
+                    {analysis.missingGroups.length}
+                  </span>
+                )}
+              </div>
+
+              {analysis.missingGroups.length === 0 ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 flex items-center gap-2.5">
+                  <CheckCircleIcon className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-emerald-900">All audited criteria complete!</p>
+                    <p className="text-[11px] text-emerald-800/85 mt-0.5">
+                      No missing fields detected across {analysis.rows.length} live records.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {analysis.missingGroups.map((g) => {
+                    const sev = SEVERITY_STYLE[g.severity];
+                    const isSelected = selectedGapKey === g.key;
+                    return (
+                      <div
+                        key={g.key}
+                        className={`rounded-xl border p-2.5 transition-all ${
+                          isSelected ? 'ring-2 ring-orange-500 border-orange-400 bg-orange-50/40' : sev.card
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1 ${sev.badge}`}>
+                              {sev.label}
+                            </span>
+                            <p className="text-xs font-bold text-gray-900 leading-snug">{g.label}</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleToggleGapFilter(g.key)}
+                            className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                              isSelected
+                                ? 'bg-orange-600 text-white'
+                                : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            <FunnelIcon className="w-3 h-3" />
+                            {g.count} ({g.pct}%)
+                          </button>
+                        </div>
+
+                        <p className="text-[11px] text-gray-600 mt-1.5 leading-relaxed">
+                          <strong className="text-gray-800">User action:</strong> {g.userAction}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Analytics Chart */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="mb-2.5">
+                <h3 className="text-sm font-bold text-gray-900">{analysis.chartTitle}</h3>
+                <p className="text-[11px] text-gray-500 mt-0.5">{analysis.chartSubtitle}</p>
+              </div>
+              {analysis.chartData.length === 0 ? (
+                <div className="h-44 flex items-center justify-center text-xs text-gray-400">
+                  No data available for visualization.
+                </div>
+              ) : (
+                <div className="h-52 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analysis.chartData} margin={{ top: 8, right: 8, left: -18, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 10, fill: '#475569' }}
+                        interval={0}
+                        angle={analysis.chartData.length > 4 ? -20 : 0}
+                        textAnchor={analysis.chartData.length > 4 ? 'end' : 'middle'}
+                        height={analysis.chartData.length > 4 ? 46 : 26}
+                      />
+                      <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: '10px',
+                          border: '1px solid #e2e8f0',
+                          fontSize: '11px',
+                          boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)',
+                        }}
+                      />
+                      {analysis.secondarySeriesName && <Legend wrapperStyle={{ fontSize: '10px' }} />}
+                      <Bar
+                        dataKey="primary"
+                        name={analysis.primarySeriesName}
+                        fill="#ea580c"
+                        radius={[5, 5, 0, 0]}
+                        maxBarSize={36}
+                      />
+                      {analysis.secondarySeriesName && (
+                        <Bar
+                          dataKey="secondary"
+                          name={analysis.secondarySeriesName}
+                          fill="#cbd5e1"
+                          radius={[5, 5, 0, 0]}
+                          maxBarSize={36}
+                        />
+                      )}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Field Coverage Audit */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Field Coverage Audit</h3>
+                  <p className="text-[11px] text-gray-500">Fill rate across {analysis.rows.length} rows</p>
+                </div>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 shrink-0">
+                  {analysis.completenessPct}% overall
+                </span>
+              </div>
+
+              {analysis.fieldCoverage.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-6">No columns to audit.</p>
+              ) : (
+                <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                  {analysis.fieldCoverage.map((fc) => {
+                    const barColor =
+                      fc.pct >= 85 ? 'bg-emerald-500' : fc.pct >= 50 ? 'bg-amber-500' : 'bg-rose-500';
+                    const textColor =
+                      fc.pct >= 85 ? 'text-emerald-700' : fc.pct >= 50 ? 'text-amber-700' : 'text-rose-700';
+                    return (
+                      <div key={fc.field}>
+                        <div className="flex items-center justify-between text-[11px] mb-1">
+                          <span className="font-medium text-gray-700 truncate pr-2">{fc.field}</span>
+                          <span className={`font-semibold tabular-nums shrink-0 ${textColor}`}>
+                            {fc.pct}% <span className="text-[10px] font-normal text-gray-400">({fc.filled}/{fc.total})</span>
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${fc.pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 5. Required Actions */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs space-y-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                  <ClipboardDocumentCheckIcon className="w-4 h-4 text-orange-600 shrink-0" />
+                  Required Actions
+                </h3>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Steps needed to complete missing data.
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-orange-50/60 border border-orange-200/80 p-3 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-orange-900 flex items-center gap-1.5">
+                  <UserGroupIcon className="w-3.5 h-3.5 text-orange-600" />
+                  For Students / Alumni / Partners
+                </p>
+                {analysis.userSteps.length === 0 ? (
+                  <p className="text-[11px] text-gray-600">No outstanding user submissions needed right now.</p>
+                ) : (
+                  <ul className="space-y-1 text-[11px] text-gray-700 list-disc list-inside">
+                    {analysis.userSteps.map((step) => (
+                      <li key={step} className="leading-relaxed">{step}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <InformationCircleIcon className="w-3.5 h-3.5 text-slate-600" />
+                  For Admin / Coordinators
+                </p>
+                {analysis.adminSteps.length === 0 ? (
+                  <p className="text-[11px] text-gray-600">Dataset is complete and ready for export.</p>
+                ) : (
+                  <ul className="space-y-1 text-[11px] text-gray-700 list-disc list-inside">
+                    {analysis.adminSteps.map((step) => (
+                      <li key={step} className="leading-relaxed">{step}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
       )}
     </div>
   );
