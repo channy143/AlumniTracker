@@ -14,6 +14,15 @@ function isCurrentByEndDate(emp: any): boolean {
   return !end || end.toLowerCase() === 'present';
 }
 
+function isOjtRecord(emp: any): boolean {
+  if (!emp) return false;
+  return (
+    String(emp.record_category || '').toLowerCase() === 'ojt' ||
+    String(emp.job_type || '').toLowerCase() === 'internship' ||
+    String(emp.employment_status || '').toLowerCase() === 'ojt'
+  );
+}
+
 const REPORT_PLACEHOLDER_TERMS = new Set([
   'position',
   'current position',
@@ -419,8 +428,8 @@ router.get('/employment', async (req: AuthenticatedRequest, res, next) => {
     if (empErr) throw new AppError(empErr.message, 500);
     const currentYear = new Date().getFullYear();
 
-    // Filter out placeholder/junk rows
-    let employment = (employmentData || []).filter((e: any) => isReportValidEmployment(e));
+    // Filter out placeholder/junk rows and exclude student OJT/internship deployments from graduate job stats
+    let employment = (employmentData || []).filter((e: any) => !isOjtRecord(e) && isReportValidEmployment(e));
 
     // Also include any profile that is Employed / Self-employed with a valid position & company on their profile but missing from the employment table
     const { data: employedProfiles } = await supabase
@@ -1128,7 +1137,7 @@ router.get('/degree-alignment', async (req: AuthenticatedRequest, res, next) => 
     ];
 
     const validCurrentEmployment = (employment || []).filter(
-      (emp: any) => isCurrentByEndDate(emp) && isReportValidEmployment(emp)
+      (emp: any) => !isOjtRecord(emp) && isCurrentByEndDate(emp) && isReportValidEmployment(emp)
     );
     const empByProfile = groupBy(validCurrentEmployment, 'profile_id');
 
@@ -1755,6 +1764,173 @@ router.get('/system-master', async (req: AuthenticatedRequest, res, next) => {
     }
 
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// GET /api/admin/reports/ojt-clearance - 4th-Year OJT & Graduation Clearance Tracker
+// -----------------------------------------------------------------------------
+router.get('/ojt-clearance', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const format = String(req.query.format || 'json').toLowerCase();
+    const defaultBatch = String(new Date().getFullYear() + 1); // Current graduating 4th-year cohort (e.g. 2027)
+    const batchFilter = req.query.batch !== undefined ? String(req.query.batch).trim() : defaultBatch;
+    const programFilter = String(req.query.program || '').trim();
+    const statusFilter = String(req.query.status || 'all').trim().toLowerCase();
+
+    const [{ data: usersData }, { data: profilesData }, { data: eduData }, { data: empData }] = await Promise.all([
+      supabase.from('users').select('id, email, role, is_archived, is_active').eq('role', 'alumni'),
+      supabase.from('profiles').select('id, user_id, first_name, last_name, id_number, employment_status, current_job_title, company_name'),
+      supabase.from('education').select('profile_id, program, major, year_graduated'),
+      supabase.from('employment').select('*').order('start_date', { ascending: false }),
+    ]);
+
+    const profByUserId = new Map((profilesData || []).map((p: any) => [p.user_id, p]));
+    const eduByProfId = groupBy(eduData || [], 'profile_id');
+    const empByProfId = groupBy(empData || [], 'profile_id');
+
+    let records = (usersData || [])
+      .filter((u: any) => !u.is_archived && u.is_active !== false)
+      .map((u: any) => {
+        const prof = profByUserId.get(u.id);
+        const edus = prof ? eduByProfId[prof.id] || [] : [];
+        const primaryEdu = edus[0] || {};
+        const emps = prof ? empByProfId[prof.id] || [] : [];
+
+        const ojtRec = emps.find((e: any) => isOjtRecord(e) && isReportValidEmployment(e)) || null;
+        const workRec = emps.find(
+          (e: any) => !isOjtRecord(e) && isCurrentByEndDate(e) && isReportValidEmployment(e)
+        ) || null;
+
+        const isCleared = Boolean(ojtRec?.clearance_verified);
+        const clearanceStatus = !ojtRec
+          ? 'Pending OJT Update'
+          : isCleared
+            ? 'Cleared'
+            : 'Submitted (Ready to Clear)';
+
+        return {
+          userId: u.id,
+          employmentId: ojtRec?.id || null,
+          idNumber: prof?.id_number || '',
+          studentName: `${toTitleCaseName(prof?.first_name || '')} ${toTitleCaseName(prof?.last_name || '')}`.trim() || u.email,
+          email: u.email,
+          program: primaryEdu.program ? formatProgramLongName(primaryEdu.program) : '',
+          programRaw: primaryEdu.program || '',
+          batchYear: primaryEdu.year_graduated ? String(primaryEdu.year_graduated) : '',
+          ojtSite: ojtRec?.company_name || '',
+          ojtRole: ojtRec?.position || '',
+          ojtIndustry: ojtRec ? (normalizeIndustry(ojtRec.company_industry) || ojtRec.company_industry || '') : '',
+          ojtStartDate: ojtRec?.start_date || '',
+          proofUploaded: Boolean(ojtRec?.proof_url),
+          proofUrl: ojtRec?.proof_url || null,
+          concurrentWork: workRec ? `${workRec.position} at ${workRec.company_name}` : '',
+          clearanceVerified: isCleared,
+          clearanceStatus,
+          hasOjt: Boolean(ojtRec),
+        };
+      });
+
+    if (batchFilter && batchFilter.toLowerCase() !== 'all') {
+      records = records.filter((r) => r.batchYear === batchFilter);
+    }
+    if (programFilter) {
+      records = records.filter((r) => matchesProgramFilter(r.programRaw || r.program, programFilter));
+    }
+    if (statusFilter === 'updated') {
+      records = records.filter((r) => r.hasOjt);
+    } else if (statusFilter === 'pending') {
+      records = records.filter((r) => !r.hasOjt);
+    } else if (statusFilter === 'cleared') {
+      records = records.filter((r) => r.clearanceVerified);
+    }
+
+    const rows = records.map((r) => ({
+      'ID Number': r.idNumber,
+      'Student Name': r.studentName,
+      'Email': r.email,
+      'Degree Program': r.program,
+      'Batch Year': r.batchYear,
+      'OJT Site (School / Company)': r.ojtSite,
+      'Deployment Role': r.ojtRole,
+      'Industry / Sector': r.ojtIndustry,
+      'OJT Start Date': r.ojtStartDate,
+      'Proof Uploaded': r.hasOjt ? (r.proofUploaded ? 'Yes' : 'No') : '',
+      'Concurrent Work': r.concurrentWork,
+      'Clearance Status': r.clearanceStatus,
+    }));
+
+    await recordReportExport(req, {
+      reportName: '4th-Year OJT & Graduation Clearance Report',
+      reportType: 'ojt_clearance',
+      format,
+      recordCount: rows.length,
+      filters: { batch: batchFilter, program: programFilter, status: statusFilter },
+    });
+
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=ojt-clearance-batch-${batchFilter || 'all'}.csv`);
+      return res.send(buildCsv(rows));
+    }
+
+    res.json({
+      count: rows.length,
+      summary: {
+        totalStudents: records.length,
+        updatedCount: records.filter((r) => r.hasOjt).length,
+        clearedCount: records.filter((r) => r.clearanceVerified).length,
+        pendingCount: records.filter((r) => !r.hasOjt).length,
+      },
+      data: sortRowsAlphabetically(rows),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/ojt-clearance/:employmentId/verify', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const cleared = req.body?.cleared !== false;
+    const nowIso = new Date().toISOString();
+    let { error } = await supabase
+      .from('employment')
+      .update({
+        clearance_verified: cleared,
+        clearance_verified_at: cleared ? nowIso : null,
+        clearance_verified_by: cleared ? req.user?.userId || null : null,
+      })
+      .eq('id', req.params.employmentId);
+
+    if (error && error.code === '42703') {
+      ({ error } = await supabase
+        .from('employment')
+        .update({
+          is_verified: cleared,
+          verified_at: cleared ? nowIso : null,
+          verified_by: cleared ? req.user?.userId || null : null,
+          verification_status: cleared ? 'verified' : 'unverified',
+        })
+        .eq('id', req.params.employmentId));
+    }
+
+    if (error) throw new AppError(error.message, 500);
+
+    await logAudit(req, {
+      actorId: req.user?.userId,
+      actorName: req.user?.email,
+      actorRole: 'admin',
+      action: 'OJT_CLEARANCE_VERIFIED',
+      entity: 'employment',
+      entityId: req.params.employmentId,
+      details: { cleared },
+      severity: 'info',
+      status: 'success',
+    });
+
+    res.json({ message: cleared ? 'OJT clearance marked verified' : 'OJT clearance verification removed', cleared });
   } catch (err) {
     next(err);
   }

@@ -134,19 +134,28 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
     }
 
     const normalizedSalary = normalizeSalaryRange(req.body.salary_range);
+    const isOjt =
+      String(req.body.record_category || '').toLowerCase() === 'ojt' ||
+      String(req.body.job_type || '').toLowerCase() === 'internship';
+    const recordCategory = isOjt ? 'ojt' : 'employment';
 
     // Check for existing employment record with the same (company_name, position) for this alumnus
     const { data: existingRows } = await db
       .from('employment')
-      .select('id, company_name, position, start_date, end_date, is_current')
+      .select('id, company_name, position, job_type, employment_status, start_date, end_date, is_current')
       .eq('profile_id', profile.id);
+
+    const isRowOjt = (r: any) =>
+      String(r?.record_category || '').toLowerCase() === 'ojt' ||
+      String(r?.job_type || '').toLowerCase() === 'internship' ||
+      String(r?.employment_status || '').toLowerCase() === 'ojt';
 
     const normComp = companyCheck.cleaned.toLowerCase();
     const normPos = posCheck.cleaned.toLowerCase();
     const existingSameRole = (existingRows || []).find((r: any) => {
       const sameComp = String(r.company_name || '').trim().toLowerCase() === normComp;
       const samePos = String(r.position || '').trim().toLowerCase() === normPos;
-      return sameComp && samePos;
+      return sameComp && samePos && isRowOjt(r) === isOjt;
     });
 
     if (req.body.proof_url) {
@@ -156,10 +165,13 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       }
     }
 
-    // Auto-close any previously active (end_date IS NULL or is_current = true) position
+    // Auto-close previous active rows in the SAME category only (so working students keep both real work AND OJT active)
     if (isCurrent) {
       const activeRows = (existingRows || []).filter(
-        (r: any) => (r.is_current || !r.end_date) && (!existingSameRole || r.id !== existingSameRole.id)
+        (r: any) =>
+          (r.is_current || !r.end_date) &&
+          isRowOjt(r) === isOjt &&
+          (!existingSameRole || r.id !== existingSameRole.id)
       );
       for (const prev of activeRows) {
         const prevStart = prev.start_date ? String(prev.start_date).slice(0, 10) : '';
@@ -172,13 +184,14 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
     }
 
     const hasProof = Boolean(req.body.proof_url);
-    const payload = {
+    const basePayload: Record<string, any> = {
       ...req.body,
       company_name: companyCheck.cleaned,
       position: posCheck.cleaned,
       company_industry: normalizedIndustry,
       salary_range: normalizedSalary,
-      employment_status: req.body.employment_status || 'Employed',
+      employment_status: req.body.employment_status || (isOjt ? 'ojt' : 'Employed'),
+      job_type: isOjt ? 'internship' : (req.body.job_type || 'full-time'),
       start_date: existingSameRole?.start_date ? String(existingSameRole.start_date).slice(0, 10) : startDateStr,
       end_date: endDateStr,
       is_current: endDateStr === null,
@@ -186,24 +199,41 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       is_verified: false,
       verification_status: hasProof ? 'pending' : 'unverified',
     };
+    const payloadWithCat = { ...basePayload, record_category: recordCategory };
 
-    // If the alumnus already has a row for the same company + position, update it in place instead of creating a duplicate
+    // If the alumnus already has a row for the same company + position in this category, update it in place
     if (existingSameRole) {
-      const { data: updatedEmp, error: updErr } = await db
+      let { data: updatedEmp, error: updErr } = await db
         .from('employment')
-        .update(payload)
+        .update(payloadWithCat)
         .eq('id', existingSameRole.id)
         .select()
         .single();
+      if (updErr && updErr.code === '42703') {
+        ({ data: updatedEmp, error: updErr } = await db
+          .from('employment')
+          .update(basePayload)
+          .eq('id', existingSameRole.id)
+          .select()
+          .single());
+      }
       if (updErr) throw new AppError(updErr.message, 500);
       return res.status(200).json(updatedEmp);
     }
 
-    const { data: employment, error } = await db
+    let { data: employment, error } = await db
       .from('employment')
-      .insert(payload)
+      .insert(payloadWithCat)
       .select()
       .single();
+
+    if (error && error.code === '42703') {
+      ({ data: employment, error } = await db
+        .from('employment')
+        .insert(basePayload)
+        .select()
+        .single());
+    }
 
     if (error) throw new AppError(error.message, 500);
 
@@ -227,7 +257,7 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
     // Rule 2 – Authorized Access: Verify ownership before update
     const { data: existing, error: findError } = await db
       .from('employment')
-      .select('id, profile_id, proof_url, start_date, end_date, is_current')
+      .select('id, profile_id, proof_url, start_date, end_date, is_current, job_type, employment_status')
       .eq('id', req.params.id)
       .maybeSingle();
 
@@ -280,12 +310,24 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
 
     if (updatePayload.is_current === true) {
       const closeDate = effectiveStartDate || new Date().toISOString().slice(0, 10);
-      await db
+      const isThisOjt =
+        String(updatePayload.record_category || '').toLowerCase() === 'ojt' ||
+        String(updatePayload.job_type || existing.job_type || '').toLowerCase() === 'internship' ||
+        String(updatePayload.employment_status || existing.employment_status || '').toLowerCase() === 'ojt';
+      const { data: peerActive } = await db
         .from('employment')
-        .update({ is_current: false, end_date: closeDate })
+        .select('id, job_type, employment_status')
         .eq('profile_id', existing.profile_id)
         .eq('is_current', true)
         .neq('id', req.params.id);
+      for (const peer of peerActive || []) {
+        const peerIsOjt =
+          String(peer.job_type || '').toLowerCase() === 'internship' ||
+          String(peer.employment_status || '').toLowerCase() === 'ojt';
+        if (peerIsOjt === isThisOjt) {
+          await db.from('employment').update({ is_current: false, end_date: closeDate }).eq('id', peer.id);
+        }
+      }
     }
     if (updatePayload.proof_url) {
       const trimmed = String(updatePayload.proof_url).trim();

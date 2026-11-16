@@ -565,6 +565,17 @@ export default function ReportsPage() {
       defaultFilename: 'tracer-surveys-summary',
     },
     {
+      id: 'ojt-clearance',
+      title: '4th-Year OJT & Graduation Clearance Tracker',
+      badge: 'Clearance Requirement',
+      desc: 'Tracks 4th-year Educ (school) and IT/BIT (company) OJT deployments alongside any concurrent work for end-of-semester graduation clearance signing.',
+      icon: AcademicCapIcon,
+      accent: 'emerald',
+      fetchLiveJson: () => adminApi.reportOjtClearance({ format: 'json' }),
+      fetchCsv: () => adminApi.reportOjtClearance({ format: 'csv' }),
+      defaultFilename: 'ojt-graduation-clearance',
+    },
+    {
       id: 'survey-responses',
       title: 'Tracer Survey Response Datasets',
       badge: `${stats?.totalSurveyResponses || 0} Responses`,

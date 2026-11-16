@@ -279,17 +279,25 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
 
     if (updates.employment_status && profile) {
       const lowerStatus = updates.employment_status.toLowerCase();
+      const { data: openRows } = await supabase
+        .from('employment')
+        .select('id, company_name, position, job_type, employment_status, start_date, is_current, end_date')
+        .eq('profile_id', profile.id)
+        .or('is_current.eq.true,end_date.is.null');
+
+      const regularOpenRows = (openRows || []).filter(
+        (r: any) =>
+          String(r.job_type || '').toLowerCase() !== 'internship' &&
+          String(r.employment_status || '').toLowerCase() !== 'ojt'
+      );
+
       if (lowerStatus !== 'employed' && lowerStatus !== 'self-employed') {
         const today = new Date().toISOString().slice(0, 10);
-        await db.from('employment').update({ is_current: false, end_date: today }).eq('profile_id', profile.id).eq('is_current', true);
+        for (const r of regularOpenRows) {
+          await supabase.from('employment').update({ is_current: false, end_date: today }).eq('id', r.id);
+        }
       } else if (profile.current_job_title && profile.company_name) {
-        const { data: openRows } = await supabase
-          .from('employment')
-          .select('id, company_name, position, start_date, is_current, end_date')
-          .eq('profile_id', profile.id)
-          .or('is_current.eq.true,end_date.is.null');
-
-        const existingEmp = (openRows || [])[0] || null;
+        const existingEmp = regularOpenRows[0] || null;
         const normNewComp = String(profile.company_name).trim().toLowerCase();
         const normNewPos = String(profile.current_job_title).trim().toLowerCase();
         const isSameRole =
@@ -313,8 +321,8 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
         if (isSameRole) {
           await supabase.from('employment').update(empSyncPayload).eq('id', existingEmp.id);
         } else {
-          // Close all previous active positions instead of overwriting history
-          for (const prev of openRows || []) {
+          // Close previous active regular positions instead of overwriting history (preserve OJT rows)
+          for (const prev of regularOpenRows) {
             const prevStart = prev.start_date ? String(prev.start_date).slice(0, 10) : '';
             const closeDate = prevStart && today < prevStart ? prevStart : today;
             await supabase

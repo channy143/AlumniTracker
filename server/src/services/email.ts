@@ -138,21 +138,33 @@ export interface AlumniBroadcastEmailPayload {
  * Sends a Gmail notification (via BCC batches) to all registered alumni when
  * an admin publishes an announcement or creates an event.
  */
-export async function notifyAllAlumniByEmail(payload: AlumniBroadcastEmailPayload): Promise<void> {
-  const { data: alumniUsers, error } = await supabase
-    .from('users')
-    .select('email')
-    .eq('role', 'alumni');
+export async function notifyAllAlumniByEmail(
+  payload: AlumniBroadcastEmailPayload,
+  recipientEmailsOverride?: string[],
+): Promise<void> {
+  let rawEmails: string[] = [];
+  if (Array.isArray(recipientEmailsOverride)) {
+    rawEmails = recipientEmailsOverride;
+  } else {
+    const { data: alumniUsers, error } = await supabase
+      .from('users')
+      .select('email, is_archived, is_active')
+      .eq('role', 'alumni');
 
-  if (error) {
-    console.error('[Email Broadcast] Failed to fetch alumni emails:', error.message);
-    return;
+    if (error) {
+      console.error('[Email Broadcast] Failed to fetch alumni emails:', error.message);
+      return;
+    }
+
+    rawEmails = (alumniUsers || [])
+      .filter((u: any) => !u.is_archived && u.is_active !== false)
+      .map((u: any) => String(u.email || '').trim());
   }
 
   const emails = Array.from(
     new Set(
-      (alumniUsers || [])
-        .map((u: any) => String(u.email || '').trim())
+      rawEmails
+        .map((e: string) => String(e || '').trim())
         .filter((e: string) => e.includes('@'))
     )
   );

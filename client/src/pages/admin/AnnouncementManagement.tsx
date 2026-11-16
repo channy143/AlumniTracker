@@ -5,7 +5,23 @@ import { SkeletonAnnouncementCard } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/store/uiStore';
 import { MegaphoneIcon, XMarkIcon, PhotoIcon, TrashIcon } from '@heroicons/react/24/outline';
 
-const EMPTY_FORM = { title: '', content: '', image_url: '', document_url: '', is_pinned: false, send_to_all: true, linked_survey_id: '', status: 'published' };
+const EMPTY_FORM = {
+  title: '',
+  content: '',
+  image_url: '',
+  document_url: '',
+  is_pinned: false,
+  send_to_all: true,
+  send_by_batch: false,
+  send_by_course: false,
+  target_batches: [] as string[],
+  target_courses: [] as string[],
+  linked_survey_id: '',
+  status: 'published',
+};
+
+const TARGET_PROGRAM_OPTIONS = ['BEEd', 'BSED', 'BTLED', 'BSIT', 'BIT'];
+const TARGET_BATCH_OPTIONS = ['2027', '2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019'];
 
 export default function AnnouncementManagement() {
   const limit = 15;
@@ -88,6 +104,10 @@ export default function AnnouncementManagement() {
       document_url: item.document_url || '',
       is_pinned: !!item.is_pinned,
       send_to_all: item.send_to_all !== false,
+      send_by_batch: !!item.send_by_batch,
+      send_by_course: !!item.send_by_course,
+      target_batches: Array.isArray(item.target_batches) ? item.target_batches : [],
+      target_courses: Array.isArray(item.target_courses) ? item.target_courses : [],
       linked_survey_id: item.linked_survey_id || '',
       status: item.status || 'published',
     });
@@ -349,9 +369,114 @@ export default function AnnouncementManagement() {
                     </select>
                   </div>
                 </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold text-gray-800">Target Audience</span>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 text-xs cursor-pointer font-medium text-gray-800">
+                        <input
+                          type="radio"
+                          name="annAudience"
+                          checked={form.send_to_all !== false}
+                          onChange={() =>
+                            setForm((f: any) => ({
+                              ...f,
+                              send_to_all: true,
+                              send_by_batch: false,
+                              send_by_course: false,
+                            }))
+                          }
+                          className="text-orange-500 focus:ring-orange-500"
+                        />
+                        All Alumni & Graduating Students (Default)
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs cursor-pointer font-medium text-gray-700">
+                        <input
+                          type="radio"
+                          name="annAudience"
+                          checked={form.send_to_all === false}
+                          onChange={() => setForm((f: any) => ({ ...f, send_to_all: false }))}
+                          className="text-orange-500 focus:ring-orange-500"
+                        />
+                        Specific Batch / Program
+                      </label>
+                    </div>
+                  </div>
+
+                  {form.send_to_all !== false ? (
+                    <p className="text-[11px] text-gray-500">
+                      Sends in-app notifications and email to all registered legitimate alumni and current graduating students in the database.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <p className="text-[11px] font-medium text-gray-700 mb-1">Target Batch Years</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {TARGET_BATCH_OPTIONS.map((yr) => {
+                            const active = (form.target_batches || []).includes(yr);
+                            return (
+                              <button
+                                key={yr}
+                                type="button"
+                                onClick={() => {
+                                  const next = active
+                                    ? (form.target_batches || []).filter((b: string) => b !== yr)
+                                    : [...(form.target_batches || []), yr];
+                                  setForm((f: any) => ({
+                                    ...f,
+                                    target_batches: next,
+                                    send_by_batch: next.length > 0,
+                                  }));
+                                }}
+                                className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${
+                                  active
+                                    ? 'bg-orange-500 text-white border-orange-500'
+                                    : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
+                                }`}
+                              >
+                                {yr}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-gray-700 mb-1">Target Programs</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {TARGET_PROGRAM_OPTIONS.map((prog) => {
+                            const active = (form.target_courses || []).includes(prog);
+                            return (
+                              <button
+                                key={prog}
+                                type="button"
+                                onClick={() => {
+                                  const next = active
+                                    ? (form.target_courses || []).filter((c: string) => c !== prog)
+                                    : [...(form.target_courses || []), prog];
+                                  setForm((f: any) => ({
+                                    ...f,
+                                    target_courses: next,
+                                    send_by_course: next.length > 0,
+                                  }));
+                                }}
+                                className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${
+                                  active
+                                    ? 'bg-orange-500 text-white border-orange-500'
+                                    : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
+                                }`}
+                              >
+                                {prog}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex flex-wrap items-center gap-4 pt-1">
                   <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.is_pinned} onChange={(e) => setForm((f: any) => ({ ...f, is_pinned: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500 rounded" /> Pin Announcement</label>
-                  <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" checked={form.send_to_all} onChange={(e) => setForm((f: any) => ({ ...f, send_to_all: e.target.checked }))} className="w-3.5 h-3.5 text-orange-500 rounded" /> Send to All</label>
                 </div>
               </div>
 

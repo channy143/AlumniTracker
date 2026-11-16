@@ -2,8 +2,97 @@ import { Router } from 'express';
 import multer from 'multer';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
-import { createBroadcastNotification } from '../notifications';
+import { createBroadcastNotification, createNotification } from '../notifications';
 import { notifyAllAlumniByEmail } from '../../services/email';
+import { formatProgramLongName } from '../../utils/formatProgram';
+
+async function dispatchAnnouncementNotifications(ann: any) {
+  const sendToAll = ann.send_to_all !== false;
+  const targetBatches: string[] = Array.isArray(ann.target_batches)
+    ? ann.target_batches.map((b: any) => String(b).trim()).filter(Boolean)
+    : [];
+  const targetCourses: string[] = Array.isArray(ann.target_courses)
+    ? ann.target_courses.map((c: any) => String(c).trim()).filter(Boolean)
+    : [];
+
+  const title = `📢 ${ann.title || 'Announcement'}`;
+  const message = ann.content?.slice(0, 120)
+    ? `${ann.content.slice(0, 120)}...`
+    : 'A new announcement has been published.';
+  const link = `/announcements?id=${ann.id}`;
+
+  if (sendToAll || (targetBatches.length === 0 && targetCourses.length === 0)) {
+    await createBroadcastNotification({
+      role: 'alumni',
+      type: 'announcement',
+      title,
+      message,
+      link,
+    });
+    void notifyAllAlumniByEmail({
+      kind: 'announcement',
+      title: ann.title,
+      content: ann.content || '',
+    }).catch((err) => console.error('[Announcement Email Error]', err));
+    return;
+  }
+
+  // Targeted dispatch: resolve active alumni matching selected batches and/or courses
+  const [{ data: usersData }, { data: profilesData }, { data: eduData }] = await Promise.all([
+    supabase.from('users').select('id, email, is_archived, is_active').eq('role', 'alumni'),
+    supabase.from('profiles').select('id, user_id'),
+    supabase.from('education').select('profile_id, program, year_graduated'),
+  ]);
+
+  const profIdByUserId = new Map((profilesData || []).map((p: any) => [p.user_id, p.id]));
+  const eduByProfId = new Map<string, any[]>();
+  (eduData || []).forEach((ed: any) => {
+    if (!ed.profile_id) return;
+    if (!eduByProfId.has(ed.profile_id)) eduByProfId.set(ed.profile_id, []);
+    eduByProfId.get(ed.profile_id)!.push(ed);
+  });
+
+  const matchedUsers = (usersData || []).filter((u: any) => {
+    if (u.is_archived || u.is_active === false) return false;
+    const pid = profIdByUserId.get(u.id);
+    const edus = pid ? eduByProfId.get(pid) || [] : [];
+    return edus.some((ed: any) => {
+      const batchOk =
+        targetBatches.length === 0 || targetBatches.includes(String(ed.year_graduated || '').trim());
+      const progRaw = String(ed.program || '').trim().toLowerCase();
+      const progLong = ed.program ? formatProgramLongName(ed.program).toLowerCase() : '';
+      const courseOk =
+        targetCourses.length === 0 ||
+        targetCourses.some((tc) => {
+          const tcl = tc.toLowerCase();
+          return progRaw === tcl || progLong === formatProgramLongName(tc).toLowerCase() || progLong.includes(tcl);
+        });
+      return batchOk && courseOk;
+    });
+  });
+
+  if (matchedUsers.length === 0) return;
+
+  await Promise.all(
+    matchedUsers.map((u: any) =>
+      createNotification({
+        userId: u.id,
+        type: 'announcement',
+        title,
+        message,
+        link,
+      })
+    )
+  );
+  void notifyAllAlumniByEmail(
+    {
+      kind: 'announcement',
+      title: ann.title,
+      content: ann.content || '',
+    },
+    matchedUsers.map((u: any) => u.email)
+  ).catch((err) => console.error('[Announcement Targeted Email Error]', err));
+}
 
 const router = Router();
 const upload = multer({
@@ -101,18 +190,7 @@ router.post('/', async (req, res, next) => {
     if (error) throw new AppError(error.message, 500);
 
     if (data && data.status === 'published') {
-      await createBroadcastNotification({
-        role: 'alumni',
-        type: 'announcement',
-        title: `📢 ${data.title}`,
-        message: data.content?.slice(0, 120) ? `${data.content.slice(0, 120)}...` : 'A new announcement has been published.',
-        link: `/announcements?id=${data.id}`,
-      });
-      void notifyAllAlumniByEmail({
-        kind: 'announcement',
-        title: data.title,
-        content: data.content || '',
-      }).catch((err) => console.error('[Announcement Email Error]', err));
+      await dispatchAnnouncementNotifications(data);
     }
 
     res.status(201).json(data);
@@ -156,20 +234,10 @@ router.put('/:id', async (req, res, next) => {
     if (error) throw new AppError(error.message, 500);
 
     if (status === 'published' && existing?.status !== 'published') {
-      const finalTitle = title ?? existing?.title ?? 'Announcement';
-      const finalContent = content ?? existing?.content ?? '';
-      await createBroadcastNotification({
-        role: 'alumni',
-        type: 'announcement',
-        title: `📢 ${finalTitle}`,
-        message: finalContent?.slice(0, 120) ? `${finalContent.slice(0, 120)}...` : 'A new announcement has been published.',
-        link: `/announcements?id=${req.params.id}`,
-      });
-      void notifyAllAlumniByEmail({
-        kind: 'announcement',
-        title: finalTitle,
-        content: finalContent,
-      }).catch((err) => console.error('[Announcement Email Error]', err));
+      const { data: fullAnn } = await supabase.from('announcements').select('*').eq('id', req.params.id).maybeSingle();
+      if (fullAnn) {
+        await dispatchAnnouncementNotifications(fullAnn);
+      }
     }
 
     res.json({ message: 'Announcement updated' });
@@ -222,20 +290,14 @@ router.put('/:id/pin', async (req, res, next) => {
 
 router.put('/:id/publish', async (req, res, next) => {
   try {
-    const { data: ann } = await supabase.from('announcements').select('title, content').eq('id', req.params.id).maybeSingle();
+    const { data: ann } = await supabase.from('announcements').select('*').eq('id', req.params.id).maybeSingle();
     const { error } = await supabase.from('announcements').update({
       status: 'published', published_at: new Date().toISOString(),
     }).eq('id', req.params.id);
     if (error) throw new AppError(error.message, 500);
 
     if (ann) {
-      await createBroadcastNotification({
-        role: 'alumni',
-        type: 'announcement',
-        title: `📢 ${ann.title}`,
-        message: ann.content?.slice(0, 120) ? `${ann.content.slice(0, 120)}...` : 'A new announcement has been published.',
-        link: `/announcements?id=${req.params.id}`,
-      });
+      await dispatchAnnouncementNotifications(ann);
     }
 
     res.json({ message: 'Announcement published' });

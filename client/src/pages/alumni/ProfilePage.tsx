@@ -111,6 +111,23 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [form, setForm] = useState<any>({});
+  const [ojtForm, setOjtForm] = useState<{
+    active: boolean;
+    id: string;
+    site_name: string;
+    role_title: string;
+    industry: string;
+    start_date: string;
+    proof_url: string;
+  }>({
+    active: false,
+    id: '',
+    site_name: '',
+    role_title: '',
+    industry: '',
+    start_date: '',
+    proof_url: '',
+  });
   const fileRef = useRef<HTMLInputElement>(null);
   const resumeRef = useRef<HTMLInputElement>(null);
   const bioTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -294,7 +311,37 @@ export default function ProfilePage() {
       let currentStartDate = '';
       try {
         const records = await employmentApi.list();
-        const current = records.find((r: any) => r.is_current);
+        const isOjtRow = (r: any) =>
+          String(r?.record_category || '').toLowerCase() === 'ojt' ||
+          String(r?.job_type || '').toLowerCase() === 'internship' ||
+          String(r?.employment_status || '').toLowerCase() === 'ojt';
+
+        const currentOjt = records.find((r: any) => r.is_current && isOjtRow(r));
+        if (!editingRef.current) {
+          if (currentOjt) {
+            setOjtForm({
+              active: true,
+              id: currentOjt.id || '',
+              site_name: currentOjt.company_name || '',
+              role_title: currentOjt.position || '',
+              industry: currentOjt.company_industry || '',
+              start_date: currentOjt.start_date ? String(currentOjt.start_date).slice(0, 10) : '',
+              proof_url: currentOjt.proof_url || '',
+            });
+          } else {
+            setOjtForm({
+              active: false,
+              id: '',
+              site_name: '',
+              role_title: '',
+              industry: '',
+              start_date: '',
+              proof_url: '',
+            });
+          }
+        }
+
+        const current = records.find((r: any) => r.is_current && !isOjtRow(r));
         const isNotEmployed = data?.employment_status && ['unemployed', 'seeking opportunities', 'retired', 'student'].includes(String(data.employment_status).toLowerCase());
         if (current && !isNotEmployed) {
           currentJobType = current.job_type || '';
@@ -436,6 +483,26 @@ export default function ProfilePage() {
         }
       }
 
+      if (ojtForm.active) {
+        const ojtRoleCheck = validateJobTitle(ojtForm.role_title);
+        if (!ojtRoleCheck.valid) {
+          setError(`OJT Role: ${ojtRoleCheck.error || 'Please enter a valid OJT / Practice Teaching role (e.g. Practice Teacher, IT Intern).'}`);
+          setSaving(false);
+          return;
+        }
+        const ojtSiteCheck = validateCompanyName(ojtForm.site_name);
+        if (!ojtSiteCheck.valid) {
+          setError(`OJT Site: ${ojtSiteCheck.error || 'Please enter the School or Company where you are deployed.'}`);
+          setSaving(false);
+          return;
+        }
+        if (!ojtForm.industry || !CANONICAL_INDUSTRIES.includes(ojtForm.industry as any)) {
+          setError('Please select an Industry / Sector for your OJT deployment.');
+          setSaving(false);
+          return;
+        }
+      }
+
       if (!preSaveNotEmployed && form.proof_url) {
         const trimmed = String(form.proof_url).trim();
         if (trimmed && !trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
@@ -514,8 +581,12 @@ export default function ProfilePage() {
 
         // Sync employment record and proof of employment for accreditation (Q-Pro)
         try {
+          const isOjtRow = (r: any) =>
+            String(r?.record_category || '').toLowerCase() === 'ojt' ||
+            String(r?.job_type || '').toLowerCase() === 'internship' ||
+            String(r?.employment_status || '').toLowerCase() === 'ojt';
           const records = await employmentApi.list();
-          const current = records.find((r: any) => r.is_current);
+          const current = records.find((r: any) => r.is_current && !isOjtRow(r));
           if (!isNotEmployed && validatedCompanyName && validatedJobTitle) {
             let effectiveProofType = form.proof_type || 'coe';
             if (effectiveProofType === 'other' && form.proof_type_other) {
@@ -530,6 +601,7 @@ export default function ProfilePage() {
                   : form.start_date);
 
             const empPayload: any = {
+              record_category: 'employment',
               company_name: validatedCompanyName,
               position: validatedJobTitle,
               company_industry: form.industry,
@@ -554,6 +626,38 @@ export default function ProfilePage() {
         } catch (empErr) {
           console.warn('Employment record sync notice:', empErr);
         }
+      }
+
+      // Sync independent OJT / Practice Teaching deployment (works alongside real work)
+      try {
+        if (ojtForm.active) {
+          const ojtPayload: any = {
+            record_category: 'ojt',
+            company_name: validateCompanyName(ojtForm.site_name).cleaned,
+            position: validateJobTitle(ojtForm.role_title).cleaned,
+            company_industry: ojtForm.industry,
+            job_type: 'internship',
+            employment_status: 'ojt',
+            start_date: ojtForm.start_date || new Date().toISOString().slice(0, 10),
+            end_date: null,
+            salary_range: null,
+            proof_url: ojtForm.proof_url || null,
+            proof_type: 'endorsement',
+            is_current: true,
+          };
+          if (ojtForm.id) {
+            await employmentApi.update(ojtForm.id, ojtPayload);
+          } else {
+            await employmentApi.create(ojtPayload);
+          }
+        } else if (ojtForm.id) {
+          await employmentApi.update(ojtForm.id, {
+            is_current: false,
+            end_date: new Date().toISOString().slice(0, 10),
+          });
+        }
+      } catch (ojtErr) {
+        console.warn('OJT deployment sync notice:', ojtErr);
       }
 
       if (Array.isArray(editSkills) && editSkills.length > 0) {
@@ -1337,6 +1441,86 @@ export default function ProfilePage() {
                     })()}
                   </div>
 
+                  {/* OJT / Practice Teaching Deployment (For 4th-Year / Graduating Students) */}
+                  <div className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <label className="inline-flex items-center gap-2 text-xs font-bold text-indigo-950 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={ojtForm.active}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              const prog = String(profile?.education?.[0]?.program || '').toUpperCase();
+                              const isEduc = prog.includes('BEED') || prog.includes('BSED') || prog.includes('BTLED') || prog.includes('EDUCATION');
+                              setOjtForm((prev) => ({
+                                ...prev,
+                                active: checked,
+                                industry: prev.industry || (isEduc ? 'Education / Academia' : 'Information Technology'),
+                              }));
+                            }}
+                            className="h-4 w-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          Currently Deployed for OJT / Practice Teaching (Graduation Clearance Requirement)
+                        </label>
+                        <p className="text-[11px] text-indigo-800/80 mt-0.5 ml-6">
+                          For Education students, enter your assigned School. For BSIT / BIT students, enter your deployed Company. Working students can keep both their regular job above and their OJT here.
+                        </p>
+                      </div>
+                    </div>
+
+                    {ojtForm.active && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <label className="text-xs text-gray-700 font-medium mb-1 block">
+                            Deployed School / Company Name <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            value={ojtForm.site_name}
+                            onChange={(e) => setOjtForm((prev) => ({ ...prev, site_name: e.target.value }))}
+                            placeholder="e.g. Naga Central School or Accenture"
+                            className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-700 font-medium mb-1 block">
+                            OJT Role / Position <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            value={ojtForm.role_title}
+                            onChange={(e) => setOjtForm((prev) => ({ ...prev, role_title: e.target.value }))}
+                            placeholder="e.g. Practice Teacher, IT OJT Intern"
+                            className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-700 font-medium mb-1 block">
+                            Sector / Industry <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            value={ojtForm.industry}
+                            onChange={(e) => setOjtForm((prev) => ({ ...prev, industry: e.target.value }))}
+                            className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white"
+                          >
+                            <option value="">Select Industry / Sector</option>
+                            {CANONICAL_INDUSTRIES.map((ind) => (
+                              <option key={ind} value={ind}>{ind}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-700 font-medium mb-1 block">OJT Start Date</label>
+                          <input
+                            type="date"
+                            value={ojtForm.start_date}
+                            onChange={(e) => setOjtForm((prev) => ({ ...prev, start_date: e.target.value }))}
+                            className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Proof of Employment for Q-Pro Accreditation */}
                   <div data-tour="profile-proof-section" className="pt-4 border-t border-gray-100">
                     {/* Header with Title and Tooltip */}
@@ -1938,6 +2122,9 @@ export default function ProfilePage() {
                     {emp.is_current ? ' - Present' : emp.end_date ? ` - ${new Date(emp.end_date).getFullYear()}` : ''}
                   </p>
                   {emp.is_current && <span className="text-[10px] font-medium text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">Current</span>}
+                  {(emp.record_category === 'ojt' || String(emp.job_type || '').toLowerCase() === 'internship' || String(emp.employment_status || '').toLowerCase() === 'ojt') && (
+                    <span className="text-[10px] font-medium text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded">OJT Deployment</span>
+                  )}
                 </div>
                 <p className="text-sm font-semibold text-gray-800 mt-0.5">{emp.position}</p>
                 <p className="text-xs text-gray-500">{emp.company_name}{emp.company_industry ? ` · ${emp.company_industry}` : ''}</p>
