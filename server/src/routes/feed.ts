@@ -8,7 +8,8 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { addActivity } from '../services/activityStore';
 import { createPostSchema, updatePostSchema } from '../middleware/validationSchemas';
-import { createNotification, notifyAdmins } from './notifications';
+import { createNotification, notifyAdmins, notifyPostDeletedByAdmin } from './notifications';
+import { logAudit } from '../services/auditLogger';
 import {
   fetchAllMentionCandidateProfiles,
   getProfileIdByUserIdMap,
@@ -1273,9 +1274,10 @@ router.post('/:id/share', authenticate, async (req: AuthenticatedRequest, res, n
 router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const postId = req.params.id;
+    const reason = ((req.body && req.body.reason) || req.query.reason) as string | undefined;
     const { data: post, error: findError } = await supabase
       .from('feed_posts')
-      .select('id, user_id')
+      .select('id, user_id, title, content, author')
       .eq('id', postId)
       .single();
 
@@ -1283,6 +1285,40 @@ router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res, next)
 
     if (post.user_id !== req.user!.userId && req.user!.role !== 'admin') {
       throw new AppError('Unauthorized: You can only delete your own posts.', 403);
+    }
+
+    const isAdminDeletingOthersPost = req.user!.role === 'admin' && post.user_id && post.user_id !== req.user!.userId;
+    if (isAdminDeletingOthersPost) {
+      await notifyPostDeletedByAdmin({
+        postId,
+        postUserId: post.user_id,
+        postTitle: post.title,
+        postContent: post.content,
+        adminReason: reason,
+      });
+
+      await logAudit(req, {
+        action: 'ADMIN_DELETED_POST',
+        entity: 'feed_posts',
+        entityId: postId,
+        actorId: req.user?.userId,
+        actorName: req.user?.email || 'Administrator',
+        actorRole: 'admin',
+        details: {
+          postId: post.id,
+          author: post.author,
+          authorUserId: post.user_id,
+          contentSnippet: post.content?.slice(0, 150),
+          title: post.title || null,
+          moderationReason: reason?.trim() || 'Deleted by administrator from community feed',
+        },
+        severity: 'warning',
+      });
+
+      await supabase
+        .from('feed_post_reports')
+        .update({ status: 'resolved' })
+        .eq('post_id', postId);
     }
 
     const { error } = await supabase.from('feed_posts').delete().eq('id', postId);

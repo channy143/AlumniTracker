@@ -193,6 +193,67 @@ export async function createNotification(params: CreateNotificationParams) {
   }
 }
 
+/** Notify a post author why an admin removed their post, including any report reasons. */
+export async function notifyPostDeletedByAdmin(params: {
+  postId: string;
+  postUserId?: string | null;
+  postTitle?: string | null;
+  postContent?: string | null;
+  adminReason?: string | null;
+}) {
+  if (!params.postUserId) return;
+  try {
+    const { data: postReports } = await supabase
+      .from('feed_post_reports')
+      .select('reason, details')
+      .eq('post_id', params.postId);
+
+    const uniqueReasons = Array.from(
+      new Set(
+        (postReports || [])
+          .map((r: any) => String(r.reason || '').trim())
+          .filter(Boolean)
+      )
+    );
+    const uniqueDetails = Array.from(
+      new Set(
+        (postReports || [])
+          .map((r: any) => String(r.details || '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    const rawText = String(params.postTitle || params.postContent || '').replace(/\s+/g, ' ').trim();
+    const snippet = rawText
+      ? `"${rawText.slice(0, 60)}${rawText.length > 60 ? '...' : ''}"`
+      : 'your post';
+
+    const cleanedAdminReason = String(params.adminReason || '').trim();
+    const parts: string[] = [
+      `Your post (${snippet}) was removed by an administrator.`,
+      `Reason: ${cleanedAdminReason || 'Removed following administrative moderation review'}.`,
+    ];
+
+    if (uniqueReasons.length > 0) {
+      const detailsSnippet =
+        uniqueDetails.length > 0
+          ? ` (${uniqueDetails.slice(0, 2).join('; ').slice(0, 120)})`
+          : '';
+      parts.push(`Why it was reported: ${uniqueReasons.join(', ')}${detailsSnippet}.`);
+    }
+
+    await createNotification({
+      userId: params.postUserId,
+      type: 'system',
+      title: '⚠️ Your Community Post Was Removed',
+      message: parts.join(' '),
+      link: '/notifications',
+    });
+  } catch (err) {
+    console.error('Failed to notify user of removed post:', err);
+  }
+}
+
 export interface BroadcastNotificationParams {
   role?: string;
   type?: 'survey' | 'job' | 'application' | 'mentorship' | 'announcement' | 'event' | 'system';

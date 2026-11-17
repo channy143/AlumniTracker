@@ -2067,7 +2067,7 @@ export default function AdminActivity() {
 
               <div>
                 <label className="text-gray-700 font-semibold block mb-1">
-                  Reason for Deletion (Audit Trail Note):
+                  Reason for Deletion (Audit Trail &amp; Author Notification):
                 </label>
                 <textarea
                   value={deleteReason}

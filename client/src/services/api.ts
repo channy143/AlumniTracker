@@ -880,7 +880,8 @@ export const feedApi = {
   report: (id: string, reason: string, details?: string) =>
     api.post<{ message: string }>(`/feed/${id}/report`, { reason, details }),
   share: (id: string) => api.post<{ share_count: number }>(`/feed/${id}/share`, {}),
-  delete: (id: string) => api.delete<any>(`/feed/${id}`),
+  delete: (id: string, reason?: string) =>
+    api.delete<any>(`/feed/${id}${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`),
   uploadMedia: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);

@@ -25,10 +25,17 @@ import {
 } from '@heroicons/react/24/outline';
 import { SkeletonStatCard, SkeletonJobCard } from '@/components/ui/Skeleton';
 import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
+import {
+  getCurrencyOptions,
+  formatSalaryWithCurrency,
+  parseSalaryCurrencyAndRange,
+} from '@/utils/currencies';
+
+const CURRENCY_OPTIONS = getCurrencyOptions();
 
 const EMPTY_FORM = {
   employer_id: '', company_name: '', position: '', description: '', requirements: '', location: '', job_type: 'full-time',
-  salary_range: '', industry: '', experience_level: 'entry', required_skills: [] as string[],
+  salary_currency: 'PHP', salary_range: '', industry: '', experience_level: 'entry', required_skills: [] as string[],
   application_url: '', poster_url: '', vacancies_count: 1, contact_email: '', contact_phone: '',
   is_alumni_exclusive: false, is_remote: false, expires_at: '',
 };
@@ -153,6 +160,7 @@ export default function JobManagement() {
   };
 
   const openEdit = (job: any) => {
+    const parsedSalary = parseSalaryCurrencyAndRange(job.salary_range);
     setEditId(job.id);
     setForm({
       employer_id: job.employer_id || '',
@@ -162,7 +170,8 @@ export default function JobManagement() {
       requirements: Array.isArray(job.requirements) ? job.requirements.join('\n') : (job.requirements || ''),
       location: job.location || '',
       job_type: job.job_type || 'full-time',
-      salary_range: job.salary_range || '',
+      salary_currency: parsedSalary.currency,
+      salary_range: parsedSalary.range,
       industry: job.industry || '',
       experience_level: job.experience_level || 'entry',
       required_skills: Array.isArray(job.required_skills) ? [...job.required_skills] : [],
@@ -184,9 +193,11 @@ export default function JobManagement() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const { salary_currency, ...restForm } = form as any;
       const payload = {
-        ...form,
+        ...restForm,
         vacancies_count: form.vacancies_count ? Number(form.vacancies_count) : 1,
+        salary_range: formatSalaryWithCurrency(salary_currency, form.salary_range),
         poster_url: form.poster_url?.trim() || null,
         contact_email: form.contact_email?.trim() || null,
         contact_phone: form.contact_phone?.trim() || null,
@@ -794,7 +805,7 @@ export default function JobManagement() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-0.5">Job Type</label>
                   <select
@@ -820,13 +831,31 @@ export default function JobManagement() {
                     <option value="senior">Senior Level</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">Currency</label>
+                  <select
+                    value={form.salary_currency || 'PHP'}
+                    onChange={(e) => setForm((f: any) => ({ ...f, salary_currency: e.target.value }))}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white w-full outline-none focus:border-orange-400"
+                  >
+                    {CURRENCY_OPTIONS.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-0.5">Salary Range</label>
                   <input
                     type="text"
+                    maxLength={44}
                     value={form.salary_range}
                     onChange={(e) => setForm((f: any) => ({ ...f, salary_range: e.target.value }))}
-                    placeholder="e.g. 25,000 - 35,000"
+                    placeholder={form.salary_currency === 'PHP' || !form.salary_currency ? 'e.g. 25,000 - 35,000' : 'e.g. 2,000 - 3,500'}
                     className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white w-full outline-none focus:border-orange-400"
                   />
                 </div>

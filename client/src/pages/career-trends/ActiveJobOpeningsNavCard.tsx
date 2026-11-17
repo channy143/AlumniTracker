@@ -95,7 +95,7 @@ export default function ActiveJobOpeningsNavCard({
                   </div>
                   <p className="text-xs text-gray-600 font-medium truncate">{job.company_name}</p>
                   <p className="text-[11px] text-gray-400 mt-1 truncate">
-                    {[job.location, job.salary_range ? `₱${job.salary_range}` : null, job.job_type]
+                    {[job.location, job.salary_range ? (/^\d/.test(String(job.salary_range).trim()) ? `₱${job.salary_range}` : job.salary_range) : null, job.job_type]
                       .filter(Boolean)
                       .join(' • ')}
                   </p>

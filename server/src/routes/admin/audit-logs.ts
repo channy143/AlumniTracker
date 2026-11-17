@@ -4,6 +4,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
 import { logAudit } from '../../services/auditLogger';
 import { AuthenticatedRequest } from '../../types';
+import { notifyPostDeletedByAdmin } from '../notifications';
 
 const router = Router();
 
@@ -407,7 +408,16 @@ router.delete('/posts/:id', async (req: AuthenticatedRequest, res, next) => {
       throw new AppError('Post not found or already deleted', 404);
     }
 
-    // 2. Log audit entry before deletion
+    // 2. Notify post author with deletion reason and any report reasons BEFORE cascade delete removes reports
+    await notifyPostDeletedByAdmin({
+      postId: id,
+      postUserId: post.user_id,
+      postTitle: post.title,
+      postContent: post.content,
+      adminReason: reason,
+    });
+
+    // 3. Log audit entry before deletion
     await logAudit(req, {
       action: 'ADMIN_DELETED_POST',
       entity: 'feed_posts',
@@ -427,13 +437,13 @@ router.delete('/posts/:id', async (req: AuthenticatedRequest, res, next) => {
       severity: 'warning',
     });
 
-    // 3. Mark any associated reports as resolved
+    // 4. Mark any associated reports as resolved
     await supabase
       .from('feed_post_reports')
       .update({ status: 'resolved' })
       .eq('post_id', id);
 
-    // 4. Delete the post (cascades to comments/likes)
+    // 5. Delete the post (cascades to comments/likes)
     const { error: deleteError } = await supabase
       .from('feed_posts')
       .delete()

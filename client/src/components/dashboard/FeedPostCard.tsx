@@ -773,9 +773,19 @@ export default function FeedPostCard({
 
   // Delete Post
   const handleDeletePost = async () => {
-    if (!confirm('Are you sure you want to delete this post?')) return;
+    let reason: string | undefined;
+    if (currentUserRole === 'admin' && currentPost.user_id !== currentUserId) {
+      const input = window.prompt(
+        'Enter the reason for deleting this post (this will be sent to the author):',
+        ''
+      );
+      if (input === null) return;
+      reason = input.trim() || undefined;
+    } else if (!confirm('Are you sure you want to delete this post?')) {
+      return;
+    }
     try {
-      await feedApi.delete(currentPost.id);
+      await feedApi.delete(currentPost.id, reason);
       onPostDeleted?.(currentPost.id);
     } catch (err: any) {
       alert(err.message || 'Failed to delete post');
