@@ -19,6 +19,90 @@ import {
 
 const router = Router();
 
+/**
+ * Ensures an announcements-table item has a shadow row in feed_posts so
+ * feed_post_likes, feed_post_comments, and reactions work seamlessly for official posts.
+ */
+async function ensureFeedPostExists(postId: string): Promise<any | null> {
+  const { data: existingPost } = await supabase
+    .from('feed_posts')
+    .select('*')
+    .eq('id', postId)
+    .maybeSingle();
+
+  if (existingPost) return existingPost;
+
+  const { data: ann } = await supabase
+    .from('announcements')
+    .select('*')
+    .eq('id', postId)
+    .eq('status', 'published')
+    .maybeSingle();
+
+  if (!ann) return null;
+
+  const shadowPayload = {
+    id: ann.id,
+    type: 'announcement',
+    title: ann.title,
+    content: ann.content,
+    author: 'CTU-Naga Alumni Office',
+    author_avatar: 'C',
+    image_url: ann.image_url || null,
+    company: null,
+    job_url: null,
+    tag: ann.is_pinned ? 'Pinned Announcement' : 'Announcement',
+    tag_color: ann.is_pinned ? 'bg-orange-50 text-orange-700' : 'bg-blue-50 text-blue-700',
+    is_official: true,
+    user_id: null,
+    like_count: 0,
+    comment_count: 0,
+    share_count: 0,
+    audience: 'public',
+    media_type: 'photo',
+    comments_disabled: false,
+    reactions_summary: {},
+    linked_survey_id: ann.linked_survey_id || null,
+    created_at: ann.published_at || ann.created_at,
+    updated_at: ann.updated_at || ann.created_at,
+  };
+
+  const { data: inserted } = await supabase
+    .from('feed_posts')
+    .upsert(shadowPayload, { onConflict: 'id', ignoreDuplicates: true })
+    .select('*')
+    .maybeSingle();
+
+  if (inserted) return inserted;
+
+  const { data: refetched } = await supabase
+    .from('feed_posts')
+    .select('*')
+    .eq('id', postId)
+    .maybeSingle();
+
+  return refetched || shadowPayload;
+}
+
+function summarizeLikes(likes: Array<{ reaction_type?: string | null }>) {
+  const summary: Record<string, number> = {};
+  (likes || []).forEach((l) => {
+    const r = l.reaction_type || '👍';
+    summary[r] = (summary[r] || 0) + 1;
+  });
+  const totalCount = (likes || []).length;
+  const topReactions = Object.entries(summary)
+    .filter(([_, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([emoji]) => emoji);
+  return {
+    like_count: totalCount,
+    reactions_summary: summary,
+    top_reactions: topReactions.length > 0 ? topReactions : (totalCount > 0 ? ['👍'] : []),
+  };
+}
+
 const uploadMedia = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
@@ -111,9 +195,13 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       reactions_summary: {},
     }));
 
-    // Filter posts by audience
+    const publishedAnnouncementIds = new Set((announcements || []).map((a: any) => a.id));
+
+    // Filter posts by audience (and hide official announcement shadow rows if unpublished/deleted)
     const visiblePosts = (posts || []).filter((p: any) => {
-      if (p.is_official || p.type === 'announcement') return true;
+      if (p.is_official || p.type === 'announcement') {
+        return p.type === 'announcement' && p.is_official ? publishedAnnouncementIds.has(p.id) : true;
+      }
       const aud = p.audience || 'public';
       if (aud === 'public') return true;
       if (p.user_id === req.user!.userId || req.user!.role === 'admin') return true;
@@ -139,16 +227,24 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       merged.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
 
-    // Check which posts the current user has reacted to
-    const { data: userLikes } = await supabase
-      .from('feed_post_likes')
-      .select('post_id, reaction_type')
-      .eq('user_id', req.user!.userId);
-
+    // Compute authoritative live reaction counts, summaries, and current user's reactions directly from feed_post_likes
+    const mergedIds = merged.map((p: any) => p.id).filter(Boolean);
+    const likesByPostMap = new Map<string, Array<{ user_id: string; reaction_type: string | null }>>();
     const userReactionMap = new Map<string, string>();
-    (userLikes || []).forEach((l: any) => {
-      userReactionMap.set(l.post_id, l.reaction_type || '👍');
-    });
+    if (mergedIds.length > 0) {
+      const { data: allFeedLikes } = await supabase
+        .from('feed_post_likes')
+        .select('post_id, user_id, reaction_type')
+        .in('post_id', mergedIds);
+
+      (allFeedLikes || []).forEach((l: any) => {
+        if (!likesByPostMap.has(l.post_id)) likesByPostMap.set(l.post_id, []);
+        likesByPostMap.get(l.post_id)!.push(l);
+        if (l.user_id === req.user!.userId) {
+          userReactionMap.set(l.post_id, l.reaction_type || '👍');
+        }
+      });
+    }
 
     const authorProfileMap = await getProfileIdByUserIdMap(merged.map((p: any) => p.user_id).filter(Boolean));
     const hasAnyMention = merged.some((p: any) => typeof p.content === 'string' && p.content.includes('@'));
@@ -166,12 +262,14 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       }
 
       const myReaction = userReactionMap.get(p.id) || null;
-      const reactionsSummary = p.reactions_summary || (p.like_count > 0 ? { '👍': p.like_count } : {});
-      const topReactions = Object.entries(reactionsSummary)
-        .filter(([_, count]: any) => count > 0)
-        .sort((a: any, b: any) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([emoji]) => emoji);
+      const postLikesList = likesByPostMap.get(p.id);
+      const liveStats = postLikesList
+        ? summarizeLikes(postLikesList)
+        : {
+            like_count: 0,
+            reactions_summary: {},
+            top_reactions: [],
+          };
 
       const mentionedProfiles = hasAnyMention && typeof p.content === 'string' && p.content.includes('@')
         ? matchMentionsInText(p.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
@@ -179,6 +277,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
 
       return {
         ...p,
+        like_count: liveStats.like_count,
         author_profile_id: p.is_official || !p.user_id ? null : (authorProfileMap.get(p.user_id) || null),
         mentioned_profiles: mentionedProfiles,
         audience: p.audience || 'public',
@@ -190,8 +289,8 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
         comments_disabled: !!p.comments_disabled,
         liked: !!myReaction,
         user_reaction: myReaction,
-        reactions_summary: reactionsSummary,
-        top_reactions: topReactions.length > 0 ? topReactions : (p.like_count > 0 ? ['👍'] : []),
+        reactions_summary: liveStats.reactions_summary,
+        top_reactions: liveStats.top_reactions,
         linked_survey: linkedSurvey,
       };
     }));
@@ -364,21 +463,15 @@ router.get('/user/:userId', authenticate, async (req: AuthenticatedRequest, res,
 // GET /api/feed/:id - single post with comments and nested replies
 router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { data: post, error } = await supabase
-      .from('feed_posts')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
+    const post = await ensureFeedPostExists(req.params.id);
+    if (!post) throw new AppError('Post not found', 404);
 
-    if (error) throw new AppError('Post not found', 404);
-
-    // Check user reaction
-    const { data: like } = await supabase
+    // Fetch live likes for this post
+    const { data: allPostLikes } = await supabase
       .from('feed_post_likes')
-      .select('id, reaction_type')
-      .eq('post_id', req.params.id)
-      .eq('user_id', req.user!.userId)
-      .maybeSingle();
+      .select('id, user_id, reaction_type')
+      .eq('post_id', req.params.id);
+    const like = (allPostLikes || []).find((l: any) => l.user_id === req.user!.userId) || null;
 
     const { data: comments, error: commentsError } = await supabase
       .from('feed_post_comments')
@@ -475,12 +568,7 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       replies: replyMap.get(c.id) || [],
     }));
 
-    const reactionsSummary = post.reactions_summary || (post.like_count > 0 ? { '👍': post.like_count } : {});
-    const topReactions = Object.entries(reactionsSummary)
-      .filter(([_, count]: any) => count > 0)
-      .sort((a: any, b: any) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([emoji]) => emoji);
+    const liveStats = summarizeLikes(allPostLikes || []);
 
     const postMentions = hasAnyMention && typeof post.content === 'string' && post.content.includes('@')
       ? matchMentionsInText(post.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
@@ -488,6 +576,7 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
 
     res.json({
       ...post,
+      like_count: liveStats.like_count,
       author_profile_id: post.is_official || !post.user_id ? null : (authorProfileMap.get(post.user_id) || null),
       mentioned_profiles: postMentions,
       audience: post.audience || 'public',
@@ -499,8 +588,8 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       comments_disabled: !!post.comments_disabled,
       liked: !!like,
       user_reaction: like?.reaction_type || (like ? '👍' : null),
-      reactions_summary: reactionsSummary,
-      top_reactions: topReactions.length > 0 ? topReactions : (post.like_count > 0 ? ['👍'] : []),
+      reactions_summary: liveStats.reactions_summary,
+      top_reactions: liveStats.top_reactions,
       comments: finalComments,
     });
   } catch (err) { next(err); }
@@ -718,210 +807,121 @@ router.put('/:id', authenticate, validate(updatePostSchema), async (req: Authent
   } catch (err) { next(err); }
 });
 
-// POST /api/feed/:id/reaction - react to post with real emoji
-router.post('/:id/reaction', authenticate, async (req: AuthenticatedRequest, res, next) => {
-  try {
-    const postId = req.params.id;
-    const userId = req.user!.userId;
-    const reaction = req.body.reaction || '👍';
+async function applyPostReaction(postId: string, userId: string, reaction: string) {
+  const targetPost = await ensureFeedPostExists(postId);
+  if (!targetPost) {
+    throw new AppError('Post not found', 404);
+  }
 
-    const { data: existing } = await supabase
+  const { data: existing, error: lookupError } = await supabase
+    .from('feed_post_likes')
+    .select('id, reaction_type')
+    .eq('post_id', postId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (lookupError) throw new AppError(lookupError.message, 500);
+
+  let userReaction: string | null = null;
+  let liked = false;
+
+  if (existing && existing.reaction_type === reaction) {
+    const { error: delErr } = await supabase.from('feed_post_likes').delete().eq('id', existing.id);
+    if (delErr) throw new AppError(delErr.message, 500);
+    liked = false;
+    userReaction = null;
+  } else if (existing) {
+    const { error: updErr } = await supabase
       .from('feed_post_likes')
-      .select('id, reaction_type')
-      .eq('post_id', postId)
+      .update({ reaction_type: reaction })
+      .eq('id', existing.id);
+    if (updErr) throw new AppError(updErr.message, 500);
+    liked = true;
+    userReaction = reaction;
+  } else {
+    const { error: insErr } = await supabase
+      .from('feed_post_likes')
+      .insert({ post_id: postId, user_id: userId, reaction_type: reaction });
+    if (insErr) {
+      if (insErr.code === '23505') {
+        const { error: fallbackUpdErr } = await supabase
+          .from('feed_post_likes')
+          .update({ reaction_type: reaction })
+          .eq('post_id', postId)
+          .eq('user_id', userId);
+        if (fallbackUpdErr) throw new AppError(fallbackUpdErr.message, 500);
+      } else {
+        throw new AppError(insErr.message, 500);
+      }
+    }
+    liked = true;
+    userReaction = reaction;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const displayName = profile ? `${profile.first_name || ''} ${(profile.last_name || '').charAt(0)}.`.trim() : 'An alumnus';
+    addActivity(displayName, 'reacted to', 'a post').catch(() => {});
+  }
+
+  const { data: allLikes, error: countErr } = await supabase
+    .from('feed_post_likes')
+    .select('reaction_type')
+    .eq('post_id', postId);
+
+  if (countErr) throw new AppError(countErr.message, 500);
+
+  const liveStats = summarizeLikes(allLikes || []);
+
+  await supabase
+    .from('feed_posts')
+    .update({ like_count: liveStats.like_count, reactions_summary: liveStats.reactions_summary })
+    .eq('id', postId);
+
+  if (liked && targetPost.user_id && targetPost.user_id !== userId) {
+    const { data: senderProfile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
       .eq('user_id', userId)
       .maybeSingle();
 
-    let userReaction: string | null = null;
-    let liked = false;
+    const senderName = senderProfile
+      ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
+      : 'An alumnus';
 
-    if (existing && existing.reaction_type === reaction) {
-      // Toggle off
-      await supabase.from('feed_post_likes').delete().eq('id', existing.id);
-      liked = false;
-      userReaction = null;
-    } else if (existing) {
-      // Switch reaction
-      await supabase
-        .from('feed_post_likes')
-        .update({ reaction_type: reaction })
-        .eq('id', existing.id);
-      liked = true;
-      userReaction = reaction;
-    } else {
-      // Insert new reaction
-      await supabase
-        .from('feed_post_likes')
-        .insert({ post_id: postId, user_id: userId, reaction_type: reaction });
-      liked = true;
-      userReaction = reaction;
+    createNotification({
+      userId: targetPost.user_id,
+      type: 'post',
+      title: 'New Reaction on Your Post',
+      message: `${senderName} reacted ${userReaction || '👍'} to your post.`,
+      link: '/?post=' + postId,
+    }).catch(() => {});
+  }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('first_name, last_name')
-        .eq('user_id', userId)
-        .single();
-      const displayName = profile ? `${profile.first_name} ${profile.last_name[0]}.` : 'An alumnus';
-      addActivity(displayName, 'reacted to', 'a post').catch(() => {});
-    }
+  return {
+    liked,
+    user_reaction: userReaction,
+    like_count: liveStats.like_count,
+    reactions_summary: liveStats.reactions_summary,
+    top_reactions: liveStats.top_reactions,
+  };
+}
 
-    // Recompute total count and summary
-    const { data: allLikes } = await supabase
-      .from('feed_post_likes')
-      .select('reaction_type')
-      .eq('post_id', postId);
-
-    const summary: Record<string, number> = {};
-    (allLikes || []).forEach((l: any) => {
-      const r = l.reaction_type || '👍';
-      summary[r] = (summary[r] || 0) + 1;
-    });
-    const totalCount = (allLikes || []).length;
-
-    await supabase
-      .from('feed_posts')
-      .update({ like_count: totalCount, reactions_summary: summary })
-      .eq('id', postId);
-
-    if (liked) {
-      const { data: postData } = await supabase
-        .from('feed_posts')
-        .select('id, user_id, title, content')
-        .eq('id', postId)
-        .maybeSingle();
-
-      if (postData && postData.user_id && postData.user_id !== userId) {
-        const { data: senderProfile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        const senderName = senderProfile
-          ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
-          : 'An alumnus';
-
-        createNotification({
-          userId: postData.user_id,
-          type: 'post',
-          title: 'New Reaction on Your Post',
-          message: `${senderName} reacted ${userReaction || '👍'} to your post.`,
-          link: '/?post=' + postId,
-        }).catch(() => {});
-      }
-    }
-
-    const topReactions = Object.entries(summary)
-      .filter(([_, count]) => count > 0)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([emoji]) => emoji);
-
-    res.json({
-      liked,
-      user_reaction: userReaction,
-      like_count: totalCount,
-      reactions_summary: summary,
-      top_reactions: topReactions.length > 0 ? topReactions : (totalCount > 0 ? ['👍'] : []),
-    });
+// POST /api/feed/:id/reaction - react to post with real emoji
+router.post('/:id/reaction', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const result = await applyPostReaction(req.params.id, req.user!.userId, req.body?.reaction || '👍');
+    res.json(result);
   } catch (err) { next(err); }
 });
 
 // POST /api/feed/:id/like - backward compatibility alias
 router.post('/:id/like', authenticate, async (req: AuthenticatedRequest, res, next) => {
-  req.body.reaction = req.body.reaction || '👍';
-  const postId = req.params.id;
-  const userId = req.user!.userId;
-  const reaction = req.body.reaction;
-
   try {
-    const { data: existing } = await supabase
-      .from('feed_post_likes')
-      .select('id, reaction_type')
-      .eq('post_id', postId)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    let userReaction: string | null = null;
-    let liked = false;
-
-    if (existing && existing.reaction_type === reaction) {
-      await supabase.from('feed_post_likes').delete().eq('id', existing.id);
-      liked = false;
-      userReaction = null;
-    } else if (existing) {
-      await supabase
-        .from('feed_post_likes')
-        .update({ reaction_type: reaction })
-        .eq('id', existing.id);
-      liked = true;
-      userReaction = reaction;
-    } else {
-      await supabase
-        .from('feed_post_likes')
-        .insert({ post_id: postId, user_id: userId, reaction_type: reaction });
-      liked = true;
-      userReaction = reaction;
-    }
-
-    const { data: allLikes } = await supabase
-      .from('feed_post_likes')
-      .select('reaction_type')
-      .eq('post_id', postId);
-
-    const summary: Record<string, number> = {};
-    (allLikes || []).forEach((l: any) => {
-      const r = l.reaction_type || '👍';
-      summary[r] = (summary[r] || 0) + 1;
-    });
-    const totalCount = (allLikes || []).length;
-
-    await supabase
-      .from('feed_posts')
-      .update({ like_count: totalCount, reactions_summary: summary })
-      .eq('id', postId);
-
-    if (liked) {
-      const { data: postData } = await supabase
-        .from('feed_posts')
-        .select('id, user_id')
-        .eq('id', postId)
-        .maybeSingle();
-
-      if (postData && postData.user_id && postData.user_id !== userId) {
-        const { data: senderProfile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        const senderName = senderProfile
-          ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim()
-          : 'An alumnus';
-
-        createNotification({
-          userId: postData.user_id,
-          type: 'post',
-          title: 'New Reaction on Your Post',
-          message: `${senderName} reacted ${userReaction || '👍'} to your post.`,
-          link: '/?post=' + postId,
-        }).catch(() => {});
-      }
-    }
-
-    const topReactions = Object.entries(summary)
-      .filter(([_, count]) => count > 0)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([emoji]) => emoji);
-
-    res.json({
-      liked,
-      user_reaction: userReaction,
-      like_count: totalCount,
-      reactions_summary: summary,
-      top_reactions: topReactions.length > 0 ? topReactions : (totalCount > 0 ? ['👍'] : []),
-    });
+    const result = await applyPostReaction(req.params.id, req.user!.userId, req.body?.reaction || '👍');
+    res.json(result);
   } catch (err) { next(err); }
 });
 
@@ -931,14 +931,10 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
     const { content, parent_id, mentions } = req.body;
     if (!content || !content.trim()) throw new AppError('Comment content is required', 400);
 
-    // Check if comments disabled
-    const { data: post } = await supabase
-      .from('feed_posts')
-      .select('id, user_id, comments_disabled')
-      .eq('id', req.params.id)
-      .single();
+    const post = await ensureFeedPostExists(req.params.id);
+    if (!post) throw new AppError('Post not found', 404);
 
-    if (post?.comments_disabled) {
+    if (post.comments_disabled) {
       throw new AppError('Comments are turned off for this post.', 400);
     }
 
@@ -1254,13 +1250,10 @@ router.post('/:id/report', authenticate, async (req: AuthenticatedRequest, res, 
 router.post('/:id/share', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     const postId = req.params.id;
-    const { data: curr } = await supabase
-      .from('feed_posts')
-      .select('share_count')
-      .eq('id', postId)
-      .single();
+    const curr = await ensureFeedPostExists(postId);
+    if (!curr) throw new AppError('Post not found', 404);
 
-    const newCount = (curr?.share_count || 0) + 1;
+    const newCount = (curr.share_count || 0) + 1;
     await supabase
       .from('feed_posts')
       .update({ share_count: newCount })

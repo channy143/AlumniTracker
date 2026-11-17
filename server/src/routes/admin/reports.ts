@@ -625,6 +625,8 @@ function formatProofTypeLabel(type?: string | null): string {
   if (type.startsWith('other:')) return type.replace('other:', '').trim();
   const map: Record<string, string> = {
     coe: 'Certificate of Employment (COE)',
+    ojt_certificate: 'OJT Certificate of Completion',
+    coc: 'Certificate of Completion',
     welcome_email_payslip: 'Payslip / Welcome Email',
     affidavit: 'Sworn Affidavit',
     company_id: 'Company ID',

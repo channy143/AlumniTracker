@@ -865,7 +865,7 @@ export const feedApi = {
   like: (id: string) => api.post<{ liked: boolean; user_reaction?: string; like_count: number }>(`/feed/${id}/like`, {}),
   react: (id: string, reaction: string) =>
     api.post<{ liked: boolean; user_reaction: string | null; like_count: number; reactions_summary: any; top_reactions: string[] }>(`/feed/${id}/reaction`, { reaction }),
-  getReactions: (id: string) => api.get<any[]>(`/feed/${id}/reactions`),
+  getReactions: (id: string, options?: ApiGetOptions) => api.get<any[]>(`/feed/${id}/reactions`, options),
   addComment: (id: string, content: string, parent_id?: string | null, mentions?: Array<{ id: string; name: string }>) =>
     api.post<any>(`/feed/${id}/comments`, { content, parent_id, mentions }),
   reactComment: (commentId: string, reaction?: string) =>

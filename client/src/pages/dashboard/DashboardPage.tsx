@@ -178,7 +178,17 @@ function PostDetailView({
   const [submittingComment, setSubmittingComment] = useState(false);
   const submittingCommentRef = useRef(false);
   const [liked, setLiked] = useState(!!post.liked);
+  const [userReaction, setUserReaction] = useState<string | null>(post.user_reaction || (post.liked ? '👍' : null));
   const [likeCount, setLikeCount] = useState(post.like_count || 0);
+  const [reactionsSummary, setReactionsSummary] = useState<Record<string, number>>(post.reactions_summary || {});
+  const [topReactions, setTopReactions] = useState<string[]>(post.top_reactions || (post.like_count > 0 ? ['👍'] : []));
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const pickerTimeoutRef = useRef<any>(null);
+  const reactionInFlightRef = useRef(0);
+  const [showReactionsModal, setShowReactionsModal] = useState(false);
+  const [reactionsList, setReactionsList] = useState<any[]>([]);
+  const [loadingReactions, setLoadingReactions] = useState(false);
+  const [selectedReactionTab, setSelectedReactionTab] = useState<string>('all');
   const [showDetailImageLightbox, setShowDetailImageLightbox] = useState(false);
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [replyingToAuthorName, setReplyingToAuthorName] = useState<string | null>(null);
@@ -227,11 +237,22 @@ function PostDetailView({
         const fullPost = await feedApi.get(post.id, { force: true });
         if (isCancelled || !fullPost || commentMutationSeqRef.current !== seqBefore) return;
 
-        if (typeof fullPost.liked === 'boolean') {
-          setLiked(fullPost.liked);
-        }
-        if (typeof fullPost.like_count === 'number') {
-          setLikeCount(fullPost.like_count);
+        if (reactionInFlightRef.current === 0) {
+          if (typeof fullPost.liked === 'boolean') {
+            setLiked(fullPost.liked);
+          }
+          if (fullPost.user_reaction !== undefined) {
+            setUserReaction(fullPost.user_reaction || (fullPost.liked ? '👍' : null));
+          }
+          if (typeof fullPost.like_count === 'number') {
+            setLikeCount(fullPost.like_count);
+          }
+          if (fullPost.reactions_summary) {
+            setReactionsSummary(fullPost.reactions_summary);
+          }
+          if (Array.isArray(fullPost.top_reactions)) {
+            setTopReactions(fullPost.top_reactions);
+          }
         }
         if (fullPost.comments) {
           const cleaned = dedupeCommentTree(fullPost.comments);
@@ -299,25 +320,95 @@ function PostDetailView({
     };
   }, [post.id]);
 
-  const handleToggleLike = async () => {
-    const nextLiked = !liked;
-    const nextCount = nextLiked ? likeCount + 1 : Math.max(0, likeCount - 1);
+  const handleReact = async (emoji: string) => {
+    setShowReactionPicker(false);
+    const snapshot = { userReaction, liked, likeCount, reactionsSummary, topReactions };
+
+    const wasLikedSame = userReaction === emoji;
+    const nextReaction = wasLikedSame ? null : emoji;
+    const nextLiked = !wasLikedSame;
+    const nextCount = wasLikedSame
+      ? Math.max(0, likeCount - 1)
+      : !userReaction
+        ? likeCount + 1
+        : likeCount;
+
+    const nextSummary: Record<string, number> = { ...reactionsSummary };
+    if (userReaction && nextSummary[userReaction]) {
+      nextSummary[userReaction] = Math.max(0, nextSummary[userReaction] - 1);
+      if (nextSummary[userReaction] === 0) delete nextSummary[userReaction];
+    }
+    if (!wasLikedSame) {
+      nextSummary[emoji] = (nextSummary[emoji] || 0) + 1;
+    }
+    const nextTop = Object.entries(nextSummary)
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([e]) => e);
+
+    setUserReaction(nextReaction);
     setLiked(nextLiked);
     setLikeCount(nextCount);
-    onPostUpdated?.({ id: post.id, liked: nextLiked, like_count: nextCount });
+    setReactionsSummary(nextSummary);
+    setTopReactions(nextTop);
+    onPostUpdated?.({
+      id: post.id,
+      liked: nextLiked,
+      user_reaction: nextReaction,
+      like_count: nextCount,
+      reactions_summary: nextSummary,
+      top_reactions: nextTop,
+    });
+
+    reactionInFlightRef.current += 1;
     try {
-      const res = await feedApi.like(post.id);
-      if (res && typeof res.liked === 'boolean') {
+      const res = await feedApi.react(post.id, emoji);
+      if (res) {
         setLiked(res.liked);
-        if (typeof res.like_count === 'number') {
-          setLikeCount(res.like_count);
-          onPostUpdated?.({ id: post.id, liked: res.liked, like_count: res.like_count });
-        }
+        setUserReaction(res.user_reaction);
+        setLikeCount(res.like_count);
+        if (res.reactions_summary) setReactionsSummary(res.reactions_summary);
+        if (res.top_reactions) setTopReactions(res.top_reactions);
+        onPostUpdated?.({
+          id: post.id,
+          liked: res.liked,
+          user_reaction: res.user_reaction,
+          like_count: res.like_count,
+          reactions_summary: res.reactions_summary ?? nextSummary,
+          top_reactions: res.top_reactions ?? nextTop,
+        });
       }
     } catch {
-      setLiked(!nextLiked);
-      setLikeCount(likeCount);
-      onPostUpdated?.({ id: post.id, liked: !nextLiked, like_count: likeCount });
+      setUserReaction(snapshot.userReaction);
+      setLiked(snapshot.liked);
+      setLikeCount(snapshot.likeCount);
+      setReactionsSummary(snapshot.reactionsSummary);
+      setTopReactions(snapshot.topReactions);
+      onPostUpdated?.({
+        id: post.id,
+        liked: snapshot.liked,
+        user_reaction: snapshot.userReaction,
+        like_count: snapshot.likeCount,
+        reactions_summary: snapshot.reactionsSummary,
+        top_reactions: snapshot.topReactions,
+      });
+    } finally {
+      reactionInFlightRef.current = Math.max(0, reactionInFlightRef.current - 1);
+    }
+  };
+
+  const handleOpenReactionsModal = async () => {
+    setSelectedReactionTab('all');
+    setLoadingReactions(true);
+    setShowReactionsModal(true);
+    try {
+      const list = await feedApi.getReactions(post.id, { force: true });
+      setReactionsList(list || []);
+    } catch {
+      setReactionsList([]);
+    } finally {
+      setLoadingReactions(false);
     }
   };
 
@@ -489,6 +580,7 @@ function PostDetailView({
   }, []);
 
   const userInitial = currentProfile?.first_name?.[0] || currentUser?.first_name?.[0] || currentUser?.email?.[0]?.toUpperCase() || 'U';
+  const currentReactionObj = REAL_REACTIONS.find((r) => r.emoji === userReaction);
 
   return createPortal(
     <div
@@ -639,19 +731,55 @@ function PostDetailView({
         )}
 
         {/* Endorsement & Discussion bar */}
-        <div className="pt-2.5 pb-2 border-t border-gray-100 flex items-center justify-between">
+        <div className="pt-2.5 pb-2 border-t border-gray-100 flex items-center justify-between relative">
           <div className="flex items-center gap-4 text-gray-500">
-            <button
-              onClick={handleToggleLike}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors cursor-pointer text-xs font-semibold ${
-                liked ? 'text-blue-600 bg-blue-50' : 'hover:text-blue-600 hover:bg-gray-100 text-gray-600'
-              }`}
-              title={liked ? 'Endorsed' : 'Endorse'}
+            <div
+              className="relative"
+              onMouseEnter={() => {
+                if (pickerTimeoutRef.current) clearTimeout(pickerTimeoutRef.current);
+                setShowReactionPicker(true);
+              }}
+              onMouseLeave={() => {
+                pickerTimeoutRef.current = setTimeout(() => setShowReactionPicker(false), 300);
+              }}
             >
-              <span className="text-sm">👍</span>
-              <span>{liked ? 'Endorsed' : 'Endorse'}</span>
-              {likeCount > 0 && <span className="text-gray-500 font-medium">({likeCount})</span>}
-            </button>
+              <button
+                type="button"
+                onClick={() => handleReact(userReaction || '👍')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer select-none text-xs font-semibold active:scale-95 ${
+                  liked && currentReactionObj
+                    ? currentReactionObj.activeBg
+                    : 'hover:bg-gray-100 text-gray-600'
+                }`}
+                title={liked ? `Reacted ${userReaction}` : 'Endorse / React'}
+              >
+                <span className="text-sm">{userReaction || '👍'}</span>
+                <span>{userReaction ? currentReactionObj?.label || 'Endorsed' : 'Endorse'}</span>
+                {likeCount > 0 && <span className="opacity-75 font-medium">({likeCount})</span>}
+              </button>
+
+              {/* Floating Real Emojis Reaction Picker on Hover */}
+              {showReactionPicker && (
+                <div
+                  className="absolute -top-12 left-0 z-40 bg-white border border-gray-200/90 rounded-full px-2 py-1 shadow-2xl flex items-center gap-1 animate-in fade-in zoom-in-90 duration-150"
+                  onMouseEnter={() => {
+                    if (pickerTimeoutRef.current) clearTimeout(pickerTimeoutRef.current);
+                  }}
+                >
+                  {REAL_REACTIONS.map((r) => (
+                    <button
+                      key={r.emoji}
+                      type="button"
+                      onClick={() => handleReact(r.emoji)}
+                      className="text-xl p-1.5 rounded-full hover:scale-125 transition-transform duration-150 cursor-pointer active:scale-110"
+                      title={r.label}
+                    >
+                      {r.emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-1.5 px-2 py-1 text-gray-600 text-xs font-medium">
               <ChatBubbleOvalLeftIcon className="w-4 h-4 text-gray-400" />
               <span>{totalCommentCount} Comments</span>
@@ -659,18 +787,119 @@ function PostDetailView({
           </div>
 
           {likeCount > 0 && (
-            <div className="flex items-center -space-x-1 select-none">
-              {(post.top_reactions && post.top_reactions.length > 0 ? post.top_reactions : ['👍']).map((emoji: string, idx: number) => (
-                <span
-                  key={idx}
-                  className="w-5 h-5 rounded-full bg-white ring-1 ring-gray-200 flex items-center justify-center text-xs shadow-2xs"
-                >
-                  {emoji}
-                </span>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={handleOpenReactionsModal}
+              className="flex items-center gap-1.5 cursor-pointer hover:underline text-xs text-gray-600"
+              title="View who reacted"
+            >
+              <div className="flex items-center -space-x-1 select-none">
+                {(topReactions.length > 0 ? topReactions : ['👍']).map((emoji: string, idx: number) => (
+                  <span
+                    key={idx}
+                    className="w-5 h-5 rounded-full bg-white ring-1 ring-gray-200 flex items-center justify-center text-xs shadow-2xs"
+                  >
+                    {emoji}
+                  </span>
+                ))}
+              </div>
+              <span className="font-medium">{likeCount}</span>
+            </button>
           )}
         </div>
+
+        {/* People who reacted sub-modal inside Post Detail */}
+        {showReactionsModal && (
+          <div
+            className="fixed inset-0 z-[10010] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs"
+            onClick={() => setShowReactionsModal(false)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-100 max-h-[80vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <h4 className="text-sm font-bold text-gray-900">People who reacted</h4>
+                <button
+                  type="button"
+                  onClick={() => setShowReactionsModal(false)}
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded-full cursor-pointer"
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex items-center gap-1 px-3 py-2 border-b border-gray-100 overflow-x-auto text-xs">
+                <button
+                  type="button"
+                  onClick={() => setSelectedReactionTab('all')}
+                  className={`px-2.5 py-1 rounded-full font-semibold cursor-pointer ${
+                    selectedReactionTab === 'all' ? 'bg-orange-500 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  All ({reactionsList.length})
+                </button>
+                {Array.from(new Set(reactionsList.map((r) => r.reaction_type))).map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setSelectedReactionTab(emoji)}
+                    className={`px-2.5 py-1 rounded-full font-semibold flex items-center gap-1 cursor-pointer ${
+                      selectedReactionTab === emoji ? 'bg-orange-500 text-white' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>{emoji}</span>
+                    <span>{reactionsList.filter((r) => r.reaction_type === emoji).length}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="p-3 space-y-2 max-h-60 overflow-y-auto">
+                {loadingReactions ? (
+                  <p className="text-xs text-gray-400 text-center py-6">Loading reactions...</p>
+                ) : reactionsList.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-6">No reactions yet.</p>
+                ) : (
+                  reactionsList
+                    .filter((r) => selectedReactionTab === 'all' || r.reaction_type === selectedReactionTab)
+                    .map((item) => {
+                      const targetPid = item.profile_id || item.user_id || null;
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={(e) => {
+                            if (!targetPid) return;
+                            setShowReactionsModal(false);
+                            openAlumniProfile(e, targetPid);
+                          }}
+                          className={`flex items-center justify-between p-1.5 rounded-lg hover:bg-gray-50 ${
+                            targetPid ? 'cursor-pointer' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative">
+                              <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 font-bold flex items-center justify-center text-xs overflow-hidden shrink-0">
+                                {item.avatar ? (
+                                  <img src={item.avatar} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  (item.name || 'A').charAt(0)
+                                )}
+                              </div>
+                              <span className="absolute -bottom-1 -right-1 text-xs">{item.reaction_type}</span>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-gray-900 hover:text-orange-600 truncate">
+                                {item.name}
+                              </p>
+                              {item.headline && <p className="text-[10px] text-gray-400 truncate">{item.headline}</p>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Comments section */}

@@ -199,6 +199,7 @@ export default function FeedPostCard({
 
   // Mutation sequence counter to prevent stale polls/realtime from clobbering or duplicating mutations
   const commentMutationSeqRef = useRef(0);
+  const reactionInFlightRef = useRef(0);
 
   // Floating reaction picker for comments/replies
   const [activeCommentReactionPickerId, setActiveCommentReactionPickerId] = useState<string | null>(null);
@@ -243,16 +244,18 @@ export default function FeedPostCard({
   const isAuthor = Boolean(currentUserId && currentPost.user_id && currentUserId === currentPost.user_id);
   const canDelete = isAuthor || currentUserRole === 'admin';
 
-  // Sync props if changed
+  // Sync props if changed (skip reaction fields while a reaction mutation is in flight)
   useEffect(() => {
     setCurrentPost(post);
-    setLiked(!!post.liked);
-    setUserReaction(post.user_reaction || (post.liked ? '👍' : null));
-    setLikeCount(post.like_count || 0);
+    if (reactionInFlightRef.current === 0) {
+      setLiked(!!post.liked);
+      setUserReaction(post.user_reaction || (post.liked ? '👍' : null));
+      setLikeCount(post.like_count || 0);
+      setReactionsSummary(post.reactions_summary || {});
+      setTopReactions(post.top_reactions || (post.like_count > 0 ? ['👍'] : []));
+    }
     setShareCount(post.share_count || 0);
     setCommentCount(post.comment_count || 0);
-    setReactionsSummary(post.reactions_summary || {});
-    setTopReactions(post.top_reactions || (post.like_count > 0 ? ['👍'] : []));
     if (!showEditModal) {
       setEditContent(post.content);
       setEditAudience(post.audience || 'public');
@@ -332,7 +335,7 @@ export default function FeedPostCard({
   // Auto-refresh reactions breakdown if modal is open
   useEffect(() => {
     if (!showReactionsModal) return;
-    feedApi.getReactions(currentPost.id)
+    feedApi.getReactions(currentPost.id, { force: true })
       .then((list) => setReactionsList(list || []))
       .catch(() => {});
   }, [showReactionsModal, likeCount, currentPost.id]);
@@ -345,19 +348,44 @@ export default function FeedPostCard({
   // React to post with real emoji
   const handleReact = async (emoji: string) => {
     setShowReactionPicker(false);
+    const snapshot = {
+      userReaction,
+      liked,
+      likeCount,
+      reactionsSummary,
+      topReactions,
+    };
+
     const wasLikedSame = userReaction === emoji;
     const nextReaction = wasLikedSame ? null : emoji;
     const nextLiked = !wasLikedSame;
+    const nextCount = wasLikedSame
+      ? Math.max(0, likeCount - 1)
+      : !userReaction
+        ? likeCount + 1
+        : likeCount;
+
+    const nextSummary: Record<string, number> = { ...reactionsSummary };
+    if (userReaction && nextSummary[userReaction]) {
+      nextSummary[userReaction] = Math.max(0, nextSummary[userReaction] - 1);
+      if (nextSummary[userReaction] === 0) delete nextSummary[userReaction];
+    }
+    if (!wasLikedSame) {
+      nextSummary[emoji] = (nextSummary[emoji] || 0) + 1;
+    }
+    const nextTop = Object.entries(nextSummary)
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([e]) => e);
 
     setUserReaction(nextReaction);
     setLiked(nextLiked);
+    setLikeCount(nextCount);
+    setReactionsSummary(nextSummary);
+    setTopReactions(nextTop);
 
-    if (wasLikedSame) {
-      setLikeCount((prev) => Math.max(0, prev - 1));
-    } else {
-      if (!userReaction) {
-        setLikeCount((prev) => prev + 1);
-      }
+    if (!wasLikedSame) {
       // Dynamic bursting emoji particles
       const offsets = [-34, -18, -4, 12, 26, 40];
       const rotations = [-16, -9, 0, 8, 15, 22];
@@ -372,6 +400,7 @@ export default function FeedPostCard({
       setTimeout(() => setBursts([]), 1000);
     }
 
+    reactionInFlightRef.current += 1;
     try {
       const res = await feedApi.react(currentPost.id, emoji);
       if (res) {
@@ -380,18 +409,34 @@ export default function FeedPostCard({
         setLikeCount(res.like_count);
         if (res.reactions_summary) setReactionsSummary(res.reactions_summary);
         if (res.top_reactions) setTopReactions(res.top_reactions);
+        const syncedPost = {
+          ...currentPost,
+          liked: res.liked,
+          user_reaction: res.user_reaction,
+          like_count: res.like_count,
+          reactions_summary: res.reactions_summary ?? nextSummary,
+          top_reactions: res.top_reactions ?? nextTop,
+        };
+        setCurrentPost(syncedPost);
+        onPostUpdated?.(syncedPost);
       }
-    } catch {
-      // Revert on error
-      setUserReaction(userReaction);
-      setLiked(liked);
+    } catch (err: any) {
+      // Revert all reaction states on error
+      setUserReaction(snapshot.userReaction);
+      setLiked(snapshot.liked);
+      setLikeCount(snapshot.likeCount);
+      setReactionsSummary(snapshot.reactionsSummary);
+      setTopReactions(snapshot.topReactions);
+      showToast(err?.message || 'Failed to save reaction. Please try again.');
+    } finally {
+      reactionInFlightRef.current = Math.max(0, reactionInFlightRef.current - 1);
     }
   };
 
   // Open Reactions Modal
   const handleOpenReactionsModal = async () => {
     const cachedReactions = getCached<any[]>(`/feed/${currentPost.id}/reactions`);
-    if (cachedReactions !== undefined) {
+    if (cachedReactions !== undefined && (cachedReactions.length > 0 || likeCount === 0)) {
       setReactionsList(cachedReactions);
       setLoadingReactions(false);
     } else {
@@ -399,7 +444,7 @@ export default function FeedPostCard({
     }
     setShowReactionsModal(true);
     try {
-      const list = await feedApi.getReactions(currentPost.id);
+      const list = await feedApi.getReactions(currentPost.id, { force: true });
       setReactionsList(list || []);
     } catch {
       // fallback

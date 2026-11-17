@@ -468,7 +468,8 @@ router.get('/alumni-posts', async (req: AuthenticatedRequest, res, next) => {
 
     let query = supabase
       .from('feed_posts')
-      .select('*', { count: 'exact' });
+      .select('*', { count: 'exact' })
+      .or('is_official.is.null,is_official.eq.false');
 
     if (type && type !== 'all') {
       query = query.eq('type', type);

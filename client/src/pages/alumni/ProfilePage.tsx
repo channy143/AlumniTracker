@@ -153,6 +153,12 @@ export default function ProfilePage() {
   // Proof of employment & Accreditation dossier states
   const [proofSubmissionTab, setProofSubmissionTab] = useState<'upload' | 'link'>('upload');
   const [uploadingProof, setUploadingProof] = useState(false);
+
+  // OJT Certificate of Completion upload states
+  const ojtProofRef = useRef<HTMLInputElement>(null);
+  const [uploadingOjtProof, setUploadingOjtProof] = useState(false);
+  const [ojtProofError, setOjtProofError] = useState('');
+  const [ojtProofFileInfo, setOjtProofFileInfo] = useState<{ name?: string; size?: number; url?: string } | null>(null);
   const [isDraggingProof, setIsDraggingProof] = useState(false);
   const [showQProTooltip, setShowQProTooltip] = useState(false);
   const [proofUploadError, setProofUploadError] = useState('');
@@ -501,6 +507,14 @@ export default function ProfilePage() {
           setSaving(false);
           return;
         }
+        if (ojtForm.proof_url) {
+          const trimmedOjtProof = String(ojtForm.proof_url).trim();
+          if (trimmedOjtProof && !trimmedOjtProof.startsWith('http://') && !trimmedOjtProof.startsWith('https://')) {
+            setError('OJT Certificate of Completion link must be a valid URL starting with http:// or https://');
+            setSaving(false);
+            return;
+          }
+        }
       }
 
       if (!preSaveNotEmployed && form.proof_url) {
@@ -640,8 +654,8 @@ export default function ProfilePage() {
           start_date: ojtForm.start_date || new Date().toISOString().slice(0, 10),
           end_date: null,
           salary_range: null,
-          proof_url: ojtForm.proof_url || null,
-          proof_type: 'coe',
+          proof_url: ojtForm.proof_url?.trim() || null,
+          proof_type: 'ojt_certificate',
           is_current: true,
         };
         if (ojtForm.id) {
@@ -916,6 +930,41 @@ export default function ProfilePage() {
     setProofFileInfo(null);
     setProofUploadError('');
     if (proofFileRef.current) proofFileRef.current.value = '';
+  };
+
+  const handleUploadOjtCertificate = async (file: File) => {
+    setOjtProofError('');
+    if (file.size > 10 * 1024 * 1024) {
+      setOjtProofError('File exceeds 10MB limit. Please upload a smaller file (Max 10MB).');
+      return;
+    }
+    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+    const validExts = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
+    const validMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!validExts.includes(ext) && !validMimes.includes(file.type)) {
+      setOjtProofError('Unsupported file format. Please upload a PDF, JPG, PNG, or WEBP document.');
+      return;
+    }
+
+    try {
+      setUploadingOjtProof(true);
+      const res = await employmentApi.uploadProof(file);
+      setOjtForm((prev) => ({ ...prev, proof_url: res.url }));
+      setOjtProofFileInfo({ name: res.file_name || file.name, size: file.size, url: res.url });
+      useUIStore.getState().addNotification('Certificate of Completion uploaded. Click Save Changes to attach it to your OJT record.', 'success');
+    } catch (err: any) {
+      setOjtProofError(getHumanErrorMessage(err, 'Failed to upload certificate.'));
+    } finally {
+      setUploadingOjtProof(false);
+      if (ojtProofRef.current) ojtProofRef.current.value = '';
+    }
+  };
+
+  const handleRemoveOjtCertificate = () => {
+    setOjtForm((prev) => ({ ...prev, proof_url: '' }));
+    setOjtProofFileInfo(null);
+    setOjtProofError('');
+    if (ojtProofRef.current) ojtProofRef.current.value = '';
   };
 
   const handleAddCertification = async () => {
@@ -1515,6 +1564,92 @@ export default function ProfilePage() {
                             onChange={(e) => setOjtForm((prev) => ({ ...prev, start_date: e.target.value }))}
                             className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white"
                           />
+                        </div>
+
+                        {/* Certificate of Completion */}
+                        <div className="sm:col-span-2 pt-1 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label className="text-xs text-gray-700 font-medium">
+                              Certificate of Completion <span className="text-[11px] font-normal text-indigo-700/75">(Upload PDF/Image or paste viewable link)</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => ojtProofRef.current?.click()}
+                              disabled={uploadingOjtProof}
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100/60 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              {uploadingOjtProof ? (
+                                <>
+                                  <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+                                  Uploading...
+                                </>
+                              ) : (
+                                <>
+                                  <DocumentArrowUpIcon className="w-3.5 h-3.5" />
+                                  Upload Certificate
+                                </>
+                              )}
+                            </button>
+                            <input
+                              type="file"
+                              ref={ojtProofRef}
+                              accept=".pdf,.jpg,.jpeg,.png,.webp"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleUploadOjtCertificate(e.target.files[0]);
+                                }
+                              }}
+                              className="hidden"
+                            />
+                          </div>
+
+                          {ojtForm.proof_url && (ojtProofFileInfo || ojtForm.proof_url.includes('employment-proofs')) ? (
+                            <div className="flex items-center justify-between p-2.5 bg-white border border-emerald-200 rounded-lg">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <DocumentTextIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-gray-800 truncate">
+                                    {ojtProofFileInfo?.name || 'Uploaded Certificate of Completion'}
+                                  </p>
+                                  <p className="text-[11px] text-emerald-700">Ready to save with OJT record</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <a
+                                  href={ojtForm.proof_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-indigo-600 hover:underline font-medium inline-flex items-center gap-0.5 px-1.5 py-0.5"
+                                >
+                                  View
+                                  <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveOjtCertificate}
+                                  className="text-red-600 hover:bg-red-50 p-1 rounded cursor-pointer"
+                                  title="Remove certificate"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <input
+                              type="url"
+                              value={ojtForm.proof_url}
+                              onChange={(e) => setOjtForm((prev) => ({ ...prev, proof_url: e.target.value }))}
+                              placeholder="https://drive.google.com/... (or use Upload Certificate above)"
+                              className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 bg-white"
+                            />
+                          )}
+
+                          {ojtProofError && (
+                            <p className="text-xs text-red-600 font-medium flex items-center gap-1">
+                              <InformationCircleIcon className="w-3.5 h-3.5 shrink-0" />
+                              {ojtProofError}
+                            </p>
+                          )}
                         </div>
                       </div>
                     )}
@@ -2136,6 +2271,18 @@ export default function ProfilePage() {
                   <p className="text-[10px] text-gray-400 mt-0.5">
                     {formatExperienceFromDate(emp.start_date, emp.end_date)}
                   </p>
+                )}
+                {emp.proof_url && (emp.record_category === 'ojt' || String(emp.job_type || '').toLowerCase() === 'internship' || String(emp.employment_status || '').toLowerCase() === 'ojt') && (
+                  <a
+                    href={emp.proof_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline mt-1"
+                  >
+                    <DocumentTextIcon className="w-3.5 h-3.5" />
+                    Certificate of Completion
+                    <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+                  </a>
                 )}
               </div>
             </div>
