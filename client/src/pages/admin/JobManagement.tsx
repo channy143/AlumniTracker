@@ -27,7 +27,7 @@ import { SkeletonStatCard, SkeletonJobCard } from '@/components/ui/Skeleton';
 import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
 
 const EMPTY_FORM = {
-  employer_id: '', company_name: '', position: '', description: '', location: '', job_type: 'full-time',
+  employer_id: '', company_name: '', position: '', description: '', requirements: '', location: '', job_type: 'full-time',
   salary_range: '', industry: '', experience_level: 'entry', required_skills: [] as string[],
   application_url: '', poster_url: '', vacancies_count: 1, contact_email: '', contact_phone: '',
   is_alumni_exclusive: false, is_remote: false, expires_at: '',
@@ -159,6 +159,7 @@ export default function JobManagement() {
       company_name: job.company_name || '',
       position: job.position || '',
       description: job.description || '',
+      requirements: Array.isArray(job.requirements) ? job.requirements.join('\n') : (job.requirements || ''),
       location: job.location || '',
       job_type: job.job_type || 'full-time',
       salary_range: job.salary_range || '',
@@ -190,6 +191,12 @@ export default function JobManagement() {
         contact_email: form.contact_email?.trim() || null,
         contact_phone: form.contact_phone?.trim() || null,
         application_url: form.application_url?.trim() || null,
+        requirements: Array.isArray((form as any).requirements)
+          ? (form as any).requirements
+          : String((form as any).requirements || '')
+              .split(/\r?\n/)
+              .map((s) => s.trim())
+              .filter(Boolean),
         required_skills: form.required_skills,
         expires_at: form.expires_at ? new Date(form.expires_at + 'T23:59:59').toISOString() : undefined,
       };

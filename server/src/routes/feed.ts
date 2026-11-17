@@ -1180,25 +1180,72 @@ router.post('/:id/report', authenticate, async (req: AuthenticatedRequest, res, 
 
     if (!reason || !reason.trim()) throw new AppError('Report reason is required', 400);
 
-    const { error } = await supabase
-      .from('feed_post_reports')
-      .insert({
-        post_id: postId,
-        user_id: userId,
-        reason: reason.trim(),
-        details: details ? details.trim() : null,
+    const cleanReason = reason.trim();
+    const cleanDetails = details ? String(details).trim() : null;
+
+    // Verify whether this feed item is a community post or an official announcement
+    const { data: feedPost } = await supabase
+      .from('feed_posts')
+      .select('id, title')
+      .eq('id', postId)
+      .maybeSingle();
+
+    if (feedPost) {
+      const { error } = await supabase
+        .from('feed_post_reports')
+        .insert({
+          post_id: postId,
+          user_id: userId,
+          reason: cleanReason,
+          details: cleanDetails,
+        });
+
+      if (error) {
+        if (error.code === '23503') {
+          throw new AppError('This post is no longer available or has been deleted.', 404);
+        }
+        throw new AppError(error.message, 500);
+      }
+
+      notifyAdmins({
+        type: 'moderation',
+        title: '⚠️ Content Moderation: Post Reported',
+        message: `A community feed post was reported for "${cleanReason}". Details: "${(cleanDetails || 'None provided').slice(0, 100)}"`,
+        link: '/admin/activity',
       });
 
-    if (error) throw new AppError(error.message, 500);
+      return res.status(201).json({ message: 'Report submitted. Our moderation team will review this post.' });
+    }
 
-    notifyAdmins({
-      type: 'moderation',
-      title: '⚠️ Content Moderation: Post Reported',
-      message: `A community feed post was reported for "${reason.trim()}". Details: "${(details || 'None provided').slice(0, 100)}"`,
-      link: '/admin/activity',
-    });
+    const { data: announcement } = await supabase
+      .from('announcements')
+      .select('id, title')
+      .eq('id', postId)
+      .maybeSingle();
 
-    res.status(201).json({ message: 'Report submitted. Our moderation team will review this post.' });
+    if (announcement) {
+      const snippet = `Reported official announcement "${announcement.title || postId}" (ID: ${postId}) for "${cleanReason}". Details: ${cleanDetails || 'None provided'}`;
+      await supabase.from('security_incidents').insert({
+        reported_by: userId,
+        incident_type: 'other',
+        description: snippet,
+        severity: 'medium',
+        status: 'open',
+        ip_address: req.ip || 'unknown',
+        user_agent: (req.headers['user-agent'] as string) || null,
+      });
+
+      notifyAdmins({
+        type: 'moderation',
+        title: '⚠️ Content Moderation: Announcement Reported',
+        message: `Official announcement "${announcement.title || 'Announcement'}" was reported for "${cleanReason}". Details: "${(cleanDetails || 'None provided').slice(0, 100)}"`,
+        link: '/admin/activity',
+      });
+
+      return res.status(201).json({ message: 'Report submitted. Our moderation team will review this post.' });
+    }
+
+    throw new AppError('This post is no longer available or has been deleted.', 404);
   } catch (err) { next(err); }
 });
 

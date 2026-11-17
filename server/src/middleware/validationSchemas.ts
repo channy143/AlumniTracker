@@ -272,13 +272,27 @@ export const createEmployerSchema = z.object({
   contact_email: z.string().email('Invalid email').max(255).optional().nullable(),
 }).strict();
 
+const stringArrayField = (maxItemLen: number, splitOnComma = false) =>
+  z.preprocess((val) => {
+    if (val === undefined) return undefined;
+    if (val === null || val === '') return [];
+    if (Array.isArray(val)) {
+      return val.map((v) => String(v ?? '').trim()).filter(Boolean);
+    }
+    if (typeof val === 'string') {
+      const pattern = splitOnComma ? /[\r\n,]+/ : /\r?\n/;
+      return val.split(pattern).map((s) => s.trim()).filter(Boolean);
+    }
+    return val;
+  }, z.array(z.string().max(maxItemLen)).max(500)).optional();
+
 export const adminCreateJobSchema = z.object({
   company_id: z.string().max(64).optional().nullable(),
   employer_id: z.string().max(64).optional().nullable(),
   company_name: z.string().max(200).optional().nullable(),
   position: z.string().min(1, 'Position is required').max(200),
   description: z.string().min(1, 'Description is required').max(50000),
-  requirements: z.array(z.string().max(2000)).max(500).optional(),
+  requirements: stringArrayField(2000, false),
   location: z.string().min(1, 'Location is required').max(200),
   job_type: z.enum(['full-time', 'part-time', 'contract', 'freelance', 'internship']).optional(),
   salary_range: z.string().max(50).optional().nullable(),
@@ -290,7 +304,7 @@ export const adminCreateJobSchema = z.object({
   is_alumni_exclusive: z.boolean().optional(),
   expires_at: z.string().max(50).optional(),
   industry: z.string().max(100).optional().nullable(),
-  required_skills: z.array(z.string().max(100)).max(500).optional(),
+  required_skills: stringArrayField(100, true),
   experience_level: z.enum(['entry', 'junior', 'mid', 'senior', 'lead', 'executive']).optional(),
   is_remote: z.boolean().optional(),
 }).strict();
@@ -302,7 +316,7 @@ export const adminUpdateJobSchema = z.object({
   company_name: z.string().max(200).optional().nullable(),
   position: z.string().max(200).optional(),
   description: z.string().max(50000).optional(),
-  requirements: z.array(z.string().max(2000)).max(500).optional(),
+  requirements: stringArrayField(2000, false),
   location: z.string().max(200).optional(),
   job_type: z.enum(['full-time', 'part-time', 'contract', 'freelance', 'internship']).optional(),
   salary_range: z.string().max(50).optional().nullable(),
@@ -314,7 +328,7 @@ export const adminUpdateJobSchema = z.object({
   is_alumni_exclusive: z.boolean().optional(),
   expires_at: z.string().max(50).optional(),
   industry: z.string().max(100).optional().nullable(),
-  required_skills: z.array(z.string().max(100)).max(500).optional(),
+  required_skills: stringArrayField(100, true),
   experience_level: z.enum(['entry', 'junior', 'mid', 'senior', 'lead', 'executive']).optional(),
   is_remote: z.boolean().optional(),
 }).strict();
