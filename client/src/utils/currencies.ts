@@ -83,21 +83,34 @@ export function getCurrencyOptions(): CurrencyOption[] {
   return cachedOptions;
 }
 
+function stripLeadingCurrency(part: string): string {
+  return String(part || '')
+    .trim()
+    .replace(/^(?:PHP|USD|EUR|GBP|JPY|[A-Z]{3})\s+(?=[\d₱$€£¥₹₩฿₫])/i, '')
+    .replace(/^[₱$€£¥₹₩฿₫]\s*/, '')
+    .trim();
+}
+
 export function formatSalaryWithCurrency(currencyCode: string, rawRange: string): string | null {
   const code = (currencyCode || 'PHP').trim().toUpperCase();
   const trimmed = String(rawRange || '').trim();
   if (!trimmed) return null;
 
-  // Strip accidental leading currency code/symbol already typed by user
-  const cleaned = trimmed
-    .replace(/^(?:PHP|USD|EUR|GBP|JPY|[A-Z]{3})\s+/i, '')
-    .replace(/^[₱$€£¥₹₩฿₫]\s*/, '')
-    .trim();
+  const prefix = code === 'PHP' ? '₱' : `${code} `;
+  const rangeParts = trimmed.split(/\s*(?:-|–|—|\bto\b)\s*/i);
 
+  if (rangeParts.length === 2) {
+    const left = stripLeadingCurrency(rangeParts[0]);
+    const right = stripLeadingCurrency(rangeParts[1]);
+    if (left && right && /^\d/.test(left) && /^\d/.test(right)) {
+      return `${prefix}${left} - ${prefix}${right}`.slice(0, 50);
+    }
+  }
+
+  const cleaned = stripLeadingCurrency(trimmed);
   if (!cleaned) return null;
 
-  const formatted = code === 'PHP' ? `₱${cleaned}` : `${code} ${cleaned}`;
-  return formatted.slice(0, 50);
+  return `${prefix}${cleaned}`.slice(0, 50);
 }
 
 const SYMBOL_TO_CODE: Record<string, string> = {
@@ -108,13 +121,25 @@ const SYMBOL_TO_CODE: Record<string, string> = {
   '¥': 'JPY',
 };
 
+function stripBothBounds(raw: string): string {
+  const parts = raw.split(/\s*(?:-|–|—|\bto\b)\s*/i);
+  if (parts.length === 2) {
+    const left = stripLeadingCurrency(parts[0]);
+    const right = stripLeadingCurrency(parts[1]);
+    if (left && right && /^\d/.test(left) && /^\d/.test(right)) {
+      return `${left} - ${right}`;
+    }
+  }
+  return stripLeadingCurrency(raw);
+}
+
 export function parseSalaryCurrencyAndRange(raw?: string | null): { currency: string; range: string } {
   const str = String(raw || '').trim();
   if (!str) return { currency: 'PHP', range: '' };
 
   for (const [sym, code] of Object.entries(SYMBOL_TO_CODE)) {
     if (str.startsWith(sym)) {
-      return { currency: code, range: str.slice(sym.length).trim() };
+      return { currency: code, range: stripBothBounds(str) };
     }
   }
 
@@ -122,11 +147,11 @@ export function parseSalaryCurrencyAndRange(raw?: string | null): { currency: st
   if (codeMatch) {
     const knownCodes = new Set(getCurrencyOptions().map((c) => c.code));
     if (knownCodes.has(codeMatch[1])) {
-      return { currency: codeMatch[1], range: codeMatch[2].trim() };
+      return { currency: codeMatch[1], range: stripBothBounds(str) };
     }
   }
 
-  return { currency: 'PHP', range: str };
+  return { currency: 'PHP', range: stripBothBounds(str) };
 }
 
 export function formatJobSalaryDisplay(raw?: string | null): string | null {
