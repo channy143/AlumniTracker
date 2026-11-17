@@ -36,6 +36,7 @@ import CommunityPage from '@/pages/community/CommunityPage';
 
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AlumniManagement from '@/pages/admin/AlumniManagement';
+import OjtManagement from '@/pages/admin/OjtManagement';
 import CompanyManagement from '@/pages/admin/CompanyManagement';
 import JobManagement from '@/pages/admin/JobManagement';
 import GraduateTracerSurveys from '@/pages/admin/GraduateTracerSurveys';
@@ -182,6 +183,7 @@ export default function App() {
       >
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/alumni" element={<AlumniManagement />} />
+        <Route path="/admin/ojt" element={<OjtManagement />} />
         <Route path="/admin/companies" element={<CompanyManagement />} />
         <Route path="/admin/jobs" element={<JobManagement />} />
         <Route path="/admin/surveys" element={<GraduateTracerSurveys />} />

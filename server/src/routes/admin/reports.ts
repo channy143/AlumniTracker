@@ -1960,12 +1960,15 @@ router.get('/ojt-clearance', async (req: AuthenticatedRequest, res, next) => {
           (e: any) => !isOjtRecord(e) && isCurrentByEndDate(e) && isReportValidEmployment(e)
         ) || null;
 
-        const isCleared = Boolean(ojtRec?.clearance_verified);
+        const hasProof = Boolean(String(ojtRec?.proof_url || '').trim());
+        const isCleared = Boolean(ojtRec?.clearance_verified ?? ojtRec?.is_verified);
         const clearanceStatus = !ojtRec
           ? 'Pending OJT Update'
           : isCleared
             ? 'Cleared'
-            : 'Submitted (Ready to Clear)';
+            : hasProof
+              ? 'Ready to Clear'
+              : 'Awaiting Certificate';
 
         return {
           userId: u.id,
@@ -1989,6 +1992,13 @@ router.get('/ojt-clearance', async (req: AuthenticatedRequest, res, next) => {
         };
       });
 
+    const availableBatches = Array.from(
+      new Set(records.map((r) => r.batchYear).filter(Boolean))
+    ).sort((a, b) => Number(b) - Number(a));
+    const availablePrograms = Array.from(
+      new Set(records.map((r) => r.program).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b));
+
     if (explicitBatch) {
       if (explicitBatch.toLowerCase() !== 'all') {
         records = records.filter((r) => r.batchYear === explicitBatch);
@@ -2002,6 +2012,10 @@ router.get('/ojt-clearance', async (req: AuthenticatedRequest, res, next) => {
     }
     if (statusFilter === 'updated') {
       records = records.filter((r) => r.hasOjt);
+    } else if (statusFilter === 'ready') {
+      records = records.filter((r) => r.hasOjt && r.proofUploaded && !r.clearanceVerified);
+    } else if (statusFilter === 'awaiting_proof') {
+      records = records.filter((r) => r.hasOjt && !r.proofUploaded && !r.clearanceVerified);
     } else if (statusFilter === 'pending') {
       records = records.filter((r) => !r.hasOjt);
     } else if (statusFilter === 'cleared') {
@@ -2040,14 +2054,24 @@ router.get('/ojt-clearance', async (req: AuthenticatedRequest, res, next) => {
       return res.send(buildCsv(sortedRows));
     }
 
+    records.sort((a, b) => a.studentName.localeCompare(b.studentName));
+
     res.json({
       count: sortedRows.length,
       summary: {
         totalStudents: records.length,
         updatedCount: records.filter((r) => r.hasOjt).length,
         clearedCount: records.filter((r) => r.clearanceVerified).length,
+        readyToClearCount: records.filter((r) => r.hasOjt && r.proofUploaded && !r.clearanceVerified).length,
         pendingCount: records.filter((r) => !r.hasOjt).length,
+        proofCount: records.filter((r) => r.hasOjt && r.proofUploaded).length,
+        practiceTeachingCount: records.filter((r) =>
+          r.hasOjt && /practice\s*teach|student\s*teach/i.test(`${r.ojtRole} ${r.program}`)
+        ).length,
       },
+      availableBatches,
+      availablePrograms,
+      records,
       data: sortedRows,
     });
   } catch (err) {
@@ -2058,6 +2082,21 @@ router.get('/ojt-clearance', async (req: AuthenticatedRequest, res, next) => {
 router.put('/ojt-clearance/:employmentId/verify', async (req: AuthenticatedRequest, res, next) => {
   try {
     const cleared = req.body?.cleared !== false;
+
+    if (cleared) {
+      const { data: existingEmp, error: lookupError } = await supabase
+        .from('employment')
+        .select('id, proof_url')
+        .eq('id', req.params.employmentId)
+        .maybeSingle();
+
+      if (lookupError) throw new AppError(lookupError.message, 500);
+      if (!existingEmp) throw new AppError('OJT deployment record not found', 404);
+      if (!String(existingEmp.proof_url || '').trim()) {
+        throw new AppError('Certificate of completion / proof must be uploaded before marking this student cleared.', 400);
+      }
+    }
+
     const nowIso = new Date().toISOString();
     let { error } = await supabase
       .from('employment')

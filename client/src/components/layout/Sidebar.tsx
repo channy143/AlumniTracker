@@ -23,6 +23,7 @@ import {
   BriefcaseIcon,
   ShieldCheckIcon,
   GlobeAltIcon,
+  ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline';
 
 type NavItem = { name: string; href: string; icon: any; end?: boolean };
@@ -47,6 +48,7 @@ const resourcesNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { name: 'Dashboard', href: '/admin', icon: HomeIcon, end: true },
   { name: 'Alumni Management', href: '/admin/alumni', icon: UsersIcon },
+  { name: 'OJT & Clearance', href: '/admin/ojt', icon: ClipboardDocumentCheckIcon },
   { name: 'Partner Companies', href: '/admin/companies', icon: BuildingOffice2Icon },
   { name: 'Job Postings', href: '/admin/jobs', icon: BriefcaseIcon },
   { name: 'Graduate Tracer Surveys', href: '/admin/surveys', icon: DocumentTextIcon },

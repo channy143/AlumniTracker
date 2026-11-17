@@ -683,8 +683,10 @@ export const adminApi = {
     params.format === 'csv' ? api.blob(`/admin/reports/degree-alignment?${toQuery(params)}`) : api.get<any>(`/admin/reports/degree-alignment?${toQuery(params)}`),
   reportSurveys: (params: Record<string, any> = {}) =>
     params.format === 'csv' ? api.blob(`/admin/reports/surveys?${toQuery(params)}`) : api.get<any>(`/admin/reports/surveys?${toQuery(params)}`),
-  reportOjtClearance: (params: Record<string, any> = {}) =>
-    params.format === 'csv' ? api.blob(`/admin/reports/ojt-clearance?${toQuery(params)}`) : api.get<any>(`/admin/reports/ojt-clearance?${toQuery(params)}`),
+  reportOjtClearance: (params: Record<string, any> = {}, options?: ApiGetOptions) =>
+    params.format === 'csv'
+      ? api.blob(`/admin/reports/ojt-clearance?${toQuery(params)}`)
+      : api.get<any>(`/admin/reports/ojt-clearance?${toQuery(params)}`, options),
   verifyOjtClearance: (employmentId: string, cleared: boolean) =>
     api.put<{ message: string; cleared: boolean }>(`/admin/reports/ojt-clearance/${employmentId}/verify`, { cleared }),
   reportSurvey: (id: string, params: Record<string, any> = {}) =>
