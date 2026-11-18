@@ -405,7 +405,6 @@ router.get('/alumni', async (req: AuthenticatedRequest, res, next) => {
         'Last Name': toTitleCaseName(u.profile?.last_name || ''),
         'ID Number': u.profile?.id_number || '',
         'Degree Program': ed.program ? formatProgramLongName(ed.program) : '',
-        'Major': ed.major || '',
         'Graduation Year': ed.year_graduated || '',
         'Graduate Status': isStudent ? 'Student' : (ed.year_graduated ? 'Alumni' : 'Unverified'),
         'Employment Status': derivedEmploymentStatus,
