@@ -21,7 +21,7 @@ import {
   FaceSmileIcon,
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/outline';
-import { feedApi, connectionsApi, messagesApi, directoryApi } from '@/services/api';
+import { feedApi, communityApi, connectionsApi, messagesApi, directoryApi } from '@/services/api';
 import { decodeUnicode, setBackgroundInterval, dedupeCommentTree, countAllComments } from '@/utils/helpers';
 import { getCached } from '@/utils/apiCache';
 import { SkeletonCommentList, SkeletonReactionUserList, SkeletonRow } from '@/components/ui/Skeleton';
@@ -106,6 +106,11 @@ export interface PostItem {
   is_official?: boolean;
   linked_survey?: any;
   author_profile_id?: string | null;
+  is_forum_post?: boolean;
+  forum_group_id?: string | null;
+  forum_group_name?: string | null;
+  forum_tags?: string[];
+  forum_comments?: CommentItem[];
 }
 
 interface FeedPostCardProps {
@@ -240,6 +245,30 @@ export default function FeedPostCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showImageLightbox, setShowImageLightbox] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Pause video automatically when scrolled out of the viewport
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !currentPost.video_url || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if ((!entry.isIntersecting || entry.intersectionRatio < 0.25) && !el.paused) {
+            el.pause();
+          }
+        }
+      },
+      { threshold: [0, 0.25] }
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      if (!el.paused) el.pause();
+    };
+  }, [currentPost.video_url]);
 
   const isAuthor = Boolean(currentUserId && currentPost.user_id && currentUserId === currentPost.user_id);
   const canDelete = isAuthor || currentUserRole === 'admin';
@@ -278,6 +307,9 @@ export default function FeedPostCard({
     if (!commentsOpen) return;
 
     let isCancelled = false;
+    // Skip feed-only subscription when rendering an Alumni Forum post card
+    if (currentPost.is_forum_post) return;
+
     const refreshInlineComments = async () => {
       const seqBefore = commentMutationSeqRef.current;
       try {
@@ -402,6 +434,30 @@ export default function FeedPostCard({
 
     reactionInFlightRef.current += 1;
     try {
+      if (currentPost.is_forum_post) {
+        const res = await communityApi.likePost(currentPost.id);
+        const forumLiked = Boolean(res.liked);
+        const forumCount = typeof res.like_count === 'number' ? res.like_count : nextCount;
+        const forumReaction = forumLiked ? '👍' : null;
+        const forumSummary: Record<string, number> = forumCount > 0 ? { '👍': forumCount } : {};
+        setLiked(forumLiked);
+        setUserReaction(forumReaction);
+        setLikeCount(forumCount);
+        setReactionsSummary(forumSummary);
+        setTopReactions(forumCount > 0 ? ['👍'] : []);
+        const syncedPost = {
+          ...currentPost,
+          liked: forumLiked,
+          user_reaction: forumReaction,
+          like_count: forumCount,
+          reactions_summary: forumSummary,
+          top_reactions: forumCount > 0 ? ['👍'] : [],
+        };
+        setCurrentPost(syncedPost);
+        onPostUpdated?.(syncedPost);
+        return;
+      }
+
       const res = await feedApi.react(currentPost.id, emoji);
       if (res) {
         setLiked(res.liked);
@@ -457,6 +513,13 @@ export default function FeedPostCard({
   const handleToggleComments = async () => {
     if (!commentsOpen) {
       setCommentsOpen(true);
+      if (currentPost.is_forum_post) {
+        const forumList = currentPost.forum_comments || [];
+        setComments(dedupeCommentTree<CommentItem>(forumList));
+        setHasLoadedComments(true);
+        setLoadingComments(false);
+        return;
+      }
       const cachedPost = getCached<any>(`/feed/${currentPost.id}`);
       if (cachedPost?.comments) {
         setComments(dedupeCommentTree<CommentItem>(cachedPost.comments));
@@ -494,6 +557,27 @@ export default function FeedPostCard({
       const activeMentions = commentMentions.filter((m) =>
         commentText.toLowerCase().includes(`@${m.name.toLowerCase()}`)
       );
+      if (currentPost.is_forum_post) {
+        const res = await communityApi.addComment(currentPost.id, commentText.trim(), undefined, activeMentions);
+        commentMutationSeqRef.current += 1;
+        const created = {
+          id: res.comment?.id || String(Date.now()),
+          author: res.comment?.author_name || 'Me',
+          author_avatar: res.comment?.author_avatar || null,
+          author_profile_id: res.comment?.author_id || null,
+          content: res.comment?.content || commentText.trim(),
+          created_at: res.comment?.created_at || new Date().toISOString(),
+          like_count: 0,
+          liked: false,
+          replies: [],
+        };
+        setHasLoadedComments(true);
+        setComments((prev) => dedupeCommentTree([...prev, created]));
+        setCommentCount((prev) => (typeof res.comment_count === 'number' ? res.comment_count : prev + 1));
+        setCommentText('');
+        setCommentMentions([]);
+        return;
+      }
       const newComment = await feedApi.addComment(
         currentPost.id,
         commentText.trim(),
@@ -830,7 +914,11 @@ export default function FeedPostCard({
       return;
     }
     try {
-      await feedApi.delete(currentPost.id, reason);
+      if (currentPost.is_forum_post) {
+        await communityApi.deletePost(currentPost.id);
+      } else {
+        await feedApi.delete(currentPost.id, reason);
+      }
       onPostDeleted?.(currentPost.id);
     } catch (err: any) {
       alert(err.message || 'Failed to delete post');
@@ -994,8 +1082,8 @@ export default function FeedPostCard({
                   <span>Copy post link</span>
                 </button>
 
-                {/* Edit Post (for author) */}
-                {isAuthor && (
+                {/* Edit Post & Comment settings (feed posts only) */}
+                {isAuthor && !currentPost.is_forum_post && (
                   <button
                     onClick={() => {
                       setMenuOpen(false);
@@ -1008,8 +1096,22 @@ export default function FeedPostCard({
                   </button>
                 )}
 
-                {/* Turn on/off comments (for author) */}
-                {isAuthor && (
+                {/* Open in Alumni Forum (forum posts) */}
+                {currentPost.is_forum_post && (
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      navigate('/community');
+                    }}
+                    className="w-full text-left px-3.5 py-2 text-indigo-700 hover:bg-indigo-50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <ChatBubbleLeftRightIcon className="w-4 h-4 text-indigo-500" />
+                    <span>View in Alumni Forum</span>
+                  </button>
+                )}
+
+                {/* Turn on/off comments (for author on feed posts) */}
+                {isAuthor && !currentPost.is_forum_post && (
                   <button
                     onClick={handleToggleCommentsSetting}
                     className="w-full text-left px-3.5 py-2 text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 cursor-pointer"
@@ -1076,6 +1178,26 @@ export default function FeedPostCard({
           ]}
           className="text-sm text-gray-800 leading-relaxed mt-1.5 whitespace-pre-line break-words"
         />
+
+        {/* Forum Topic Tags & Shortcut */}
+        {currentPost.is_forum_post && (
+          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-1.5">
+              {(currentPost.forum_tags || []).map((t) => (
+                <span key={t} className="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                  #{t}
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/community')}
+              className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+            >
+              Open in Alumni Forum &rarr;
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Post Photo */}
@@ -1108,10 +1230,10 @@ export default function FeedPostCard({
         </div>
       )}
 
-      {/* Post Video */}
+      {/* Post Video (automatically pauses when scrolled out of the viewport) */}
       {currentPost.video_url && (
         <div className="mt-2 bg-black max-h-96 flex items-center justify-center overflow-hidden border-y border-gray-100">
-          <video src={currentPost.video_url} controls className="max-h-96 w-full" />
+          <video ref={videoRef} src={currentPost.video_url} controls playsInline className="max-h-96 w-full" />
         </div>
       )}
 

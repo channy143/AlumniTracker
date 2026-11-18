@@ -281,7 +281,7 @@ const MUTATION_INVALIDATION_RULES: Array<{ match: RegExp; prefixes: string[] }> 
   { match: /^\/employment/, prefixes: ['/employment', '/profile', '/directory', '/admin/alumni', '/admin/dashboard', '/career-trends', '/admin/analytics'] },
   { match: /^\/connections/, prefixes: ['/connections', '/directory', '/notifications', '/feed'] },
   { match: /^\/mentorship/, prefixes: ['/mentorship', '/notifications'] },
-  { match: /^\/community/, prefixes: ['/community'] },
+  { match: /^\/community/, prefixes: ['/community', '/feed'] },
   { match: /^\/jobs/, prefixes: ['/jobs', '/admin/jobs', '/admin/dashboard', '/employer'] },
   { match: /^\/surveys/, prefixes: ['/surveys', '/profile', '/admin/surveys', '/admin/dashboard', '/career-trends', '/admin/analytics'] },
   { match: /^\/events/, prefixes: ['/events', '/admin/events', '/admin/dashboard'] },

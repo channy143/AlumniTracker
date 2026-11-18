@@ -191,12 +191,12 @@ router.get('/industry-distribution', async (_req, res, next) => {
   try {
     const { data: employment } = await supabase
       .from('employment')
-      .select('company_industry, salary_range')
+      .select('company_industry, salary_range, record_category, job_type, employment_status, company_name, position')
       .eq('is_current', true)
       .not('company_industry', 'is', null);
 
     const distribution: Record<string, { count: number; salaries: number[] }> = {};
-    employment?.forEach((e: any) => {
+    employment?.filter(isValidRegularEmployment).forEach((e: any) => {
       if (!distribution[e.company_industry]) distribution[e.company_industry] = { count: 0, salaries: [] };
       distribution[e.company_industry].count++;
       if (e.salary_range) {
@@ -221,7 +221,7 @@ router.get('/top-employers', async (_req, res, next) => {
     const [{ data: employment }, { data: companies }, { data: employersTable }, { data: jobs }] = await Promise.all([
       supabase
         .from('employment')
-        .select('company_name, company_industry, salary_range')
+        .select('company_name, company_industry, salary_range, record_category, job_type, employment_status, position')
         .eq('is_current', true)
         .not('company_name', 'is', null),
       supabase.from('companies').select('name, industry'),
@@ -230,7 +230,7 @@ router.get('/top-employers', async (_req, res, next) => {
     ]);
 
     const employers: Record<string, { count: number; industry: string; salaries: number[] }> = {};
-    employment?.forEach((e: any) => {
+    employment?.filter(isValidRegularEmployment).forEach((e: any) => {
       const name = (e.company_name || '').trim();
       if (!name || name === 'Unknown') return;
       if (!employers[name]) employers[name] = { count: 0, industry: e.company_industry || '', salaries: [] };
@@ -270,7 +270,7 @@ router.get('/salary-distribution', async (req, res, next) => {
     const format = (req.query.format as string) || 'json';
     const { data: employment } = await supabase
       .from('employment')
-      .select('salary_range, company_industry')
+      .select('salary_range, company_industry, record_category, job_type, employment_status, company_name, position')
       .eq('is_current', true)
       .not('salary_range', 'is', null);
 
@@ -279,7 +279,7 @@ router.get('/salary-distribution', async (req, res, next) => {
       '50001-75000': 0, '75001-100000': 0, '100001+': 0,
     };
 
-    employment?.forEach((e: any) => {
+    employment?.filter(isValidRegularEmployment).forEach((e: any) => {
       const nums = e.salary_range.replace(/[^0-9\-]/g, '').split('-').map(Number).filter(Boolean);
       if (nums.length > 0) {
         const avg = nums.reduce((a: number, b: number) => a + b, 0) / nums.length;
@@ -314,11 +314,13 @@ router.get('/degree-alignment', async (req, res, next) => {
   try {
     const format = (req.query.format as string) || 'json';
     const { data: education } = await supabase.from('education').select('profile_id, program');
-    const { data: employment } = await supabase.from('employment').select('profile_id, company_industry, is_current');
+    const { data: employment } = await supabase
+      .from('employment')
+      .select('profile_id, company_industry, is_current, record_category, job_type, employment_status, company_name, position');
 
     const eduMap = new Map(education?.map((e) => [e.profile_id, e.program ? formatProgramLongName(e.program) : e.program]) || []);
     const empIndustries = new Map<string, string[]>();
-    employment?.forEach((e) => {
+    employment?.filter(isValidRegularEmployment).forEach((e) => {
       if (e.is_current && e.company_industry) {
         const existing = empIndustries.get(e.profile_id) || [];
         existing.push(e.company_industry);
@@ -378,10 +380,12 @@ router.get('/degree-alignment', async (req, res, next) => {
 router.get('/avg-time-employment', async (_req, res, next) => {
   try {
     const { data: education } = await supabase.from('education').select('profile_id, year_graduated');
-    const { data: employment } = await supabase.from('employment').select('profile_id, start_date, is_current');
+    const { data: employment } = await supabase
+      .from('employment')
+      .select('profile_id, start_date, is_current, record_category, job_type, employment_status, company_name, position');
 
     const firstJobs = new Map<string, string>();
-    employment?.forEach((e) => {
+    employment?.filter(isValidRegularEmployment).forEach((e) => {
       if (e.is_current && e.start_date && !firstJobs.has(e.profile_id)) {
         firstJobs.set(e.profile_id, e.start_date);
       }
@@ -494,12 +498,13 @@ router.get('/career-overview', async (_req, res, next) => {
 router.get('/career-progression', async (_req, res, next) => {
   try {
     const employment = await safeData(
-      supabase.from('employment').select('profile_id, position, company_name, start_date, is_current, employment_status')
+      supabase.from('employment').select('profile_id, position, company_name, start_date, is_current, employment_status, record_category, job_type')
         .order('start_date', { ascending: true })
     );
 
+    const regularEmployment = employment.filter(isValidRegularEmployment);
     const progressionMap = new Map<string, any[]>();
-    employment.forEach((e: any) => {
+    regularEmployment.forEach((e: any) => {
       if (!progressionMap.has(e.profile_id)) progressionMap.set(e.profile_id, []);
       progressionMap.get(e.profile_id)!.push(e);
     });

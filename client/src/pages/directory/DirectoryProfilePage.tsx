@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { formatJobSalaryDisplay } from '@/utils/currencies';
 import {
   ArrowLeftIcon,
   BriefcaseIcon,
@@ -585,7 +586,7 @@ export default function DirectoryProfilePage() {
                             </td>
                             {showSalaryColumn && (
                               <td className="py-2.5 pr-3 text-gray-500 font-medium">
-                                {emp.salary_range ? `₱${emp.salary_range}` : '—'}
+                                {formatJobSalaryDisplay(emp.salary_range) || '—'}
                               </td>
                             )}
                             <td className="py-2.5 pr-3 text-gray-500">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}</td>

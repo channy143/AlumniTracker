@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { formatProgramLongName } from '../../utils/formatProgram';
+import { isOjtEmploymentRow } from '../../utils/validateJobTitle';
 
 const router = Router();
 
@@ -103,7 +104,7 @@ router.get('/stats', async (req, res, next) => {
     ] = await Promise.all([
       safeData(supabase.from('users').select('id, email, created_at, is_verified').eq('role', 'alumni')),
       safeData(supabase.from('profiles').select('id, user_id, email, first_name, last_name, employment_status, current_job_title, company_name, industry, salary_range, city, province, country')),
-      safeData(supabase.from('employment').select('id, profile_id, employment_status, company_name, company_industry, salary_range, is_current, start_date')),
+      safeData(supabase.from('employment').select('id, profile_id, employment_status, record_category, job_type, company_name, company_industry, salary_range, is_current, start_date')),
       safeData(supabase.from('education').select('profile_id, program, year_graduated')),
       partnershipTracked
         ? safeData(supabase.from('companies').select('id, name, partnership_status, employer_type, created_at, agreement_start_date, agreement_end_date'))
@@ -118,8 +119,10 @@ router.get('/stats', async (req, res, next) => {
       eduByProfile.get(e.profile_id)!.push(e);
     });
 
+    const regularEmployment = (allEmployment || []).filter((e: any) => !isOjtEmploymentRow(e));
+
     const empByProfile = new Map<string, any[]>();
-    (allEmployment || []).forEach((e: any) => {
+    regularEmployment.forEach((e: any) => {
       if (!empByProfile.has(e.profile_id)) empByProfile.set(e.profile_id, []);
       empByProfile.get(e.profile_id)!.push(e);
     });
@@ -209,7 +212,7 @@ router.get('/stats', async (req, res, next) => {
       return Math.floor((parts[0] + parts[1]) / 2);
     };
 
-    const targetEmpRecords = (allEmployment || []).filter((e: any) =>
+    const targetEmpRecords = regularEmployment.filter((e: any) =>
       e.is_current && targetAlumniProfiles.some((p: any) => p.id === e.profile_id)
     );
     const salaries = targetEmpRecords
@@ -261,7 +264,7 @@ router.get('/stats', async (req, res, next) => {
     });
 
     const timeToEmployment: number[] = [];
-    (allEmployment || []).forEach((emp: any) => {
+    regularEmployment.forEach((emp: any) => {
       const edus = eduByProfile.get(emp.profile_id) || [];
       const edu = edus[0];
       if (edu && edu.year_graduated && emp.start_date) {
@@ -277,7 +280,7 @@ router.get('/stats', async (req, res, next) => {
     });
 
     if (timeToEmployment.length === 0 && isFiltered) {
-      (allEmployment || []).forEach((emp: any) => {
+      regularEmployment.forEach((emp: any) => {
         const edus = eduByProfile.get(emp.profile_id) || [];
         const edu = edus[0];
         if (edu && edu.year_graduated && emp.start_date) {
@@ -373,7 +376,7 @@ router.get('/charts', async (req, res, next) => {
     const selectedYear = isFiltered ? parseInt(rawYear!, 10) : undefined;
 
     const [employment, education, users, profiles, alumniSkills] = await Promise.all([
-      safeData(supabase.from('employment').select('id, company_name, company_industry, is_current, salary_range, profile_id, employment_status, job_type, start_date')),
+      safeData(supabase.from('employment').select('id, company_name, company_industry, record_category, is_current, salary_range, profile_id, employment_status, job_type, start_date')),
       safeData(supabase.from('education').select('program, year_graduated, profile_id')),
       safeData(supabase.from('users').select('id, created_at').eq('role', 'alumni')),
       safeData(supabase.from('profiles').select('id, user_id, first_name, last_name, employment_status, current_job_title, company_name, industry, salary_range, city, province, country')),
@@ -387,8 +390,10 @@ router.get('/charts', async (req, res, next) => {
       eduByProfile.get(e.profile_id)!.push(e);
     });
 
+    const regularEmp = (employment || []).filter((e: any) => !isOjtEmploymentRow(e));
+
     const empByProfile = new Map<string, any[]>();
-    (employment || []).forEach((e: any) => {
+    regularEmp.forEach((e: any) => {
       if (!empByProfile.has(e.profile_id)) empByProfile.set(e.profile_id, []);
       empByProfile.get(e.profile_id)!.push(e);
     });
@@ -477,7 +482,7 @@ router.get('/charts', async (req, res, next) => {
 
     // Salary distribution
     const salaryDistribution: Record<string, number> = {};
-    employment.forEach((e: any) => {
+    regularEmp.forEach((e: any) => {
       if (e.salary_range && targetProfileIds.has(e.profile_id)) {
         salaryDistribution[e.salary_range] = (salaryDistribution[e.salary_range] || 0) + 1;
       }

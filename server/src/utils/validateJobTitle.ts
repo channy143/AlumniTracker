@@ -358,6 +358,15 @@ export function toTitleCaseName(raw: unknown): string {
     .join(' ');
 }
 
+export function isOjtEmploymentRow(row: any): boolean {
+  if (!row) return false;
+  return (
+    String(row.record_category || '').trim().toLowerCase() === 'ojt' ||
+    String(row.job_type || '').trim().toLowerCase() === 'internship' ||
+    String(row.employment_status || '').trim().toLowerCase() === 'ojt'
+  );
+}
+
 export function validateStudentId(raw: unknown): {
   valid: boolean;
   cleaned: string;

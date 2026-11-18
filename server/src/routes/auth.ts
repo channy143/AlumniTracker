@@ -776,15 +776,52 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res, n
       .from('users')
       .update({ password_hash: hashedPassword })
       .eq('email', email)
-      .select('id')
-      .single();
+      .select('id, email, role, is_verified, is_active, is_archived, survey_completed')
+      .maybeSingle();
 
     if (error) throw new AppError(error.message, 500);
-    if (resetUser?.id) {
-      await invalidateUserSessions(resetUser.id);
+    if (!resetUser) throw new AppError('Account not found', 404);
+
+    // Revoke any pre-existing sessions and clear failed login lockouts before issuing the new session
+    await invalidateUserSessions(resetUser.id);
+    resetFailedAttempts(normalizedKey(email), clientIp(req));
+
+    if (resetUser.is_archived || resetUser.is_active === false) {
+      return res.json({ message: 'Password reset successfully', autoLoggedIn: false });
     }
 
-    res.json({ message: 'Password reset successfully' });
+    const nowIso = new Date().toISOString();
+    markUserActive(resetUser.id);
+    await supabase.from('users').update({ last_login: nowIso, last_active_at: nowIso }).eq('id', resetUser.id);
+    await supabase.from('profiles').update({ last_active_at: nowIso }).eq('user_id', resetUser.id);
+
+    const token = signAccessToken(resetUser.id, resetUser.email, resetUser.role);
+    const refreshToken = signRefreshToken(resetUser.id, resetUser.email, resetUser.role);
+    setAuthCookies(res, token, refreshToken, resetUser.role);
+
+    logAudit(req, {
+      action: 'AUTH_PASSWORD_RESET',
+      entity: 'user',
+      entityId: resetUser.id,
+      actorId: resetUser.id,
+      actorName: resetUser.email,
+      actorRole: resetUser.role,
+      severity: 'info',
+      status: 'success',
+      details: { email: resetUser.email, autoLoggedIn: true },
+    });
+
+    return res.json({
+      message: 'Password reset successfully',
+      autoLoggedIn: true,
+      user: {
+        id: resetUser.id,
+        email: resetUser.email,
+        role: resetUser.role,
+        is_verified: Boolean(resetUser.is_verified),
+        survey_completed: Boolean(resetUser.survey_completed),
+      },
+    });
   } catch (err) {
     next(err);
   }

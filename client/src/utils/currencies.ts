@@ -154,9 +154,36 @@ export function parseSalaryCurrencyAndRange(raw?: string | null): { currency: st
   return { currency: 'PHP', range: stripBothBounds(str) };
 }
 
+function formatBoundNumber(bound: string): string {
+  const cleaned = bound.trim();
+  if (/^\d+$/.test(cleaned)) {
+    return Number(cleaned).toLocaleString('en-US');
+  }
+  return cleaned;
+}
+
 export function formatJobSalaryDisplay(raw?: string | null): string | null {
   const str = String(raw || '').trim();
   if (!str) return null;
-  if (/^\d/.test(str)) return `₱${str}`;
+
+  // Preserve descriptive labels like "Below ₱20,000", "Above ₱100,000", "Competitive"
+  if (/^(below|under|above|over|prefer|competitive|undisclosed|n\/a)/i.test(str)) {
+    return str;
+  }
+
+  const parsed = parseSalaryCurrencyAndRange(str);
+  const rangeStr = parsed.range;
+  if (!rangeStr) return str;
+
+  const parts = rangeStr.split(/\s*(?:-|–|—|\bto\b)\s*/i);
+  if (parts.length === 2 && /^\d/.test(parts[0]) && /^\d/.test(parts[1])) {
+    const formattedRange = `${formatBoundNumber(parts[0])} - ${formatBoundNumber(parts[1])}`;
+    return formatSalaryWithCurrency(parsed.currency, formattedRange);
+  }
+
+  if (/^\d/.test(rangeStr)) {
+    return formatSalaryWithCurrency(parsed.currency, formatBoundNumber(rangeStr));
+  }
+
   return str;
 }

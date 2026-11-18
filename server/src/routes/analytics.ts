@@ -3,6 +3,7 @@ import { supabase } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
+import { isOjtEmploymentRow } from '../utils/validateJobTitle';
 
 const router = Router();
 
@@ -80,17 +81,20 @@ router.get('/overview', authenticate, async (_req: AuthenticatedRequest, res, ne
       .from('profiles')
       .select('*', { count: 'exact', head: true });
 
-    const { count: employed } = await supabase
-      .from('employment')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_current', true);
+    const [{ data: activeEmpRows }, { data: industries }] = await Promise.all([
+      supabase
+        .from('employment')
+        .select('employment_status, record_category, job_type')
+        .eq('is_current', true),
+      supabase
+        .from('employment')
+        .select('company_industry, employment_status, record_category, job_type'),
+    ]);
 
-    const { data: industries } = await supabase
-      .from('employment')
-      .select('company_industry');
+    const employed = (activeEmpRows || []).filter((e: any) => !isOjtEmploymentRow(e)).length;
 
     const industryCount: Record<string, number> = {};
-    industries?.forEach((e) => {
+    (industries || []).filter((e: any) => !isOjtEmploymentRow(e)).forEach((e) => {
       if (e.company_industry) {
         industryCount[e.company_industry] = (industryCount[e.company_industry] || 0) + 1;
       }
@@ -124,11 +128,12 @@ router.get('/batch/:year', authenticate, async (req, res, next) => {
     }
 
     const profileIds = graduates.map((g) => g.profile_id);
-    const { data: employment } = await supabase
+    const { data: rawEmployment } = await supabase
       .from('employment')
       .select('*')
       .in('profile_id', profileIds)
       .eq('is_current', true);
+    const employment = (rawEmployment || []).filter((e: any) => !isOjtEmploymentRow(e));
 
     const industryCount: Record<string, number> = {};
     employment?.forEach((e) => {
@@ -152,12 +157,13 @@ router.get('/batch/:year', authenticate, async (req, res, next) => {
 
 router.get('/industries', authenticate, async (_req, res, next) => {
   try {
-    const { data: employment, error } = await supabase
+    const { data: rawEmployment, error } = await supabase
       .from('employment')
-      .select('company_industry, salary_range')
+      .select('company_industry, salary_range, employment_status, record_category, job_type')
       .eq('is_current', true);
 
     if (error) throw new AppError(error.message, 500);
+    const employment = (rawEmployment || []).filter((e: any) => !isOjtEmploymentRow(e));
 
     const industryData: Record<string, { count: number; salaries: number[] }> = {};
     employment?.forEach((e) => {
@@ -182,9 +188,10 @@ router.get('/industries', authenticate, async (_req, res, next) => {
 
 router.get('/statistics', authenticate, async (_req, res, next) => {
   try {
-    const employment = await safeData(
-      supabase.from('employment').select('profile_id, company_industry, employment_status, salary_range, start_date, is_current, created_at')
+    const rawEmployment = await safeData(
+      supabase.from('employment').select('profile_id, company_industry, employment_status, record_category, job_type, salary_range, start_date, is_current, created_at')
     );
+    const employment = rawEmployment.filter((e: any) => !isOjtEmploymentRow(e));
     const education = await safeData(
       supabase.from('education').select('profile_id, program, year_graduated')
     );

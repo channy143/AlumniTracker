@@ -11,7 +11,7 @@ import { buildDpaCsv } from '../../utils/csvExport';
 import { requireAdminSudo } from '../../middleware/sudo';
 import { adminSensitiveLimiter } from '../../middleware/rateLimiter';
 import { invalidateUserSessions } from '../../services/sessionSecurityService';
-import { normalizeIndustry, normalizeSalaryRange, toTitleCaseName, toTitleCaseCompanyName } from '../../utils/validateJobTitle';
+import { normalizeIndustry, normalizeSalaryRange, toTitleCaseName, toTitleCaseCompanyName, isOjtEmploymentRow } from '../../utils/validateJobTitle';
 
 const router = Router();
 
@@ -74,11 +74,16 @@ router.get('/', async (req, res, next) => {
     });
 
     const empByProfile = new Map<string, any[]>();
+    const ojtByProfile = new Map<string, any[]>();
     (allEmployment || []).forEach((e: any) => {
-      if (e.profile_id) {
-        if (!empByProfile.has(e.profile_id)) empByProfile.set(e.profile_id, []);
-        empByProfile.get(e.profile_id)!.push(e);
+      if (!e.profile_id) return;
+      if (isOjtEmploymentRow(e)) {
+        if (!ojtByProfile.has(e.profile_id)) ojtByProfile.set(e.profile_id, []);
+        ojtByProfile.get(e.profile_id)!.push(e);
+        return;
       }
+      if (!empByProfile.has(e.profile_id)) empByProfile.set(e.profile_id, []);
+      empByProfile.get(e.profile_id)!.push(e);
     });
 
     // Populate distinct employers, provinces, and cities across all profiles & employment records
@@ -99,7 +104,7 @@ router.get('/', async (req, res, next) => {
       }
     });
     (allEmployment || []).forEach((e: any) => {
-      if (e.company_name?.trim()) distinctEmployerSet.add(e.company_name.trim());
+      if (!isOjtEmploymentRow(e) && e.company_name?.trim()) distinctEmployerSet.add(e.company_name.trim());
     });
 
     const employers = Array.from(distinctEmployerSet).sort();
@@ -115,6 +120,7 @@ router.get('/', async (req, res, next) => {
       const pid = p?.id;
       const edus = (pid ? eduByProfile.get(pid) : null) || eduByProfile.get(u.id) || [];
       const emps = (pid ? empByProfile.get(pid) : null) || empByProfile.get(u.id) || [];
+      const ojt = (pid ? ojtByProfile.get(pid) : null) || ojtByProfile.get(u.id) || [];
 
       const formattedEdus = edus.map((e: any) => ({
         ...e,
@@ -126,10 +132,12 @@ router.get('/', async (req, res, next) => {
             ...p,
             education: formattedEdus,
             employment: emps,
+            ojt,
           }
         : {
             education: formattedEdus,
             employment: emps,
+            ojt,
           };
 
       return {

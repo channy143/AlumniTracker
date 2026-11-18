@@ -5,6 +5,12 @@ import { SkeletonModalDetail } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/store/uiStore';
 import { generateYears } from '@/utils/helpers';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
+import { formatJobSalaryDisplay } from '@/utils/currencies';
+
+const isOjtEmploymentRow = (emp: any): boolean =>
+  String(emp?.record_category || '').toLowerCase() === 'ojt' ||
+  String(emp?.job_type || '').toLowerCase() === 'internship' ||
+  String(emp?.employment_status || '').toLowerCase() === 'ojt';
 import {
   UserIcon,
   UserPlusIcon,
@@ -653,7 +659,7 @@ export default function AlumniManagement() {
           <div data-tour="alumni-grid" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {data.map((user: any) => {
               const p = user.profile || {};
-              const emp = (p.employment || [])[0] || {};
+              const emp = (p.employment || []).find((e: any) => !isOjtEmploymentRow(e)) || {};
               const edu = (p.education || [])[0] || {};
               const initials = ((p.first_name?.[0] || '') + (p.last_name?.[0] || '')).toUpperCase();
   return (
@@ -1249,144 +1255,218 @@ export default function AlumniManagement() {
                     </div>
                   </div>
 
-                  {/* Career Summary */}
-                  <div className="mb-4">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Career Summary</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                      {[
-                        { label: 'Employment Status', value: detailData.profile?.employment_status, badge: detailData.profile?.employment_status },
-                        { label: 'Industry', value: detailData.profile?.industry },
-                        { label: 'Current Position', value: (detailData.employment || []).find((e: any) => e.is_current)?.position || detailData.profile?.current_job_title },
-                        { label: 'Company', value: (detailData.employment || []).find((e: any) => e.is_current)?.company_name || detailData.profile?.company_name },
-                        { label: 'Employment Type', value: (detailData.employment || []).find((e: any) => e.is_current)?.job_type },
-                        { label: 'Location', value: [detailData.profile?.city, detailData.profile?.province].filter(Boolean).join(', ') },
-                        { label: 'Time in Current Job', value: (() => {
-                          const cur = (detailData.employment || []).find((e: any) => e.is_current);
-                          return cur?.start_date ? formatExperienceFromDate(cur.start_date) : '';
-                        })() },
-                      ].map((item: any) => (
-                        item.value ? (
-                          <div key={item.label} className="flex justify-between py-1 border-b border-gray-50">
-                            <span className="text-gray-500">{item.label}</span>
-                            {item.badge ? (
-                              <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${statusBadge(item.badge)}`}>{normalizeStatus(item.badge)}</span>
-                            ) : (
-                              <span className="font-medium text-gray-800 text-right max-w-[60%] truncate">{item.value}</span>
-                            )}
-                          </div>
-                        ) : null
-                      ))}
-                    </div>
-                  </div>
+                  {/* Career Summary & Conditional History Sections (Employment vs OJT) */}
+                  {(() => {
+                    const allEmpRows = detailData.employment || [];
+                    const regularEmployment = allEmpRows.filter((e: any) => !isOjtEmploymentRow(e));
+                    const ojtEmployment = allEmpRows.filter((e: any) => isOjtEmploymentRow(e));
+                    const currentRegular = regularEmployment.find((e: any) => e.is_current) || null;
+                    const hasRegularEmployment = regularEmployment.length > 0;
+                    const hasOjt = ojtEmployment.length > 0;
 
-                  {/* Career Timeline */}
-                  {detailData.employment?.length > 0 && (
-                    <div className="mb-4">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Career Timeline</h3>
-                      <div className="space-y-2">
-                        {detailData.employment.map((emp: any, i: number) => (
-                          <div key={i} className="text-xs bg-gray-50 px-3 py-2">
-                            <div className="flex items-center gap-1.5">
-                              {emp.start_date && <span className="text-gray-400">{new Date(emp.start_date).getFullYear()}</span>}
-                              <span className="text-gray-300">·</span>
-                              <p className="font-medium text-gray-800">{emp.position || 'N/A'}</p>
-                              {emp.is_current && <span className="text-[10px] px-1 py-0.5 bg-emerald-100 text-emerald-700 font-medium">Current</span>}
+                    return (
+                      <>
+                        {/* Career Summary */}
+                        <div className="mb-4">
+                          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Career Summary</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                            {[
+                              { label: 'Employment Status', value: detailData.profile?.employment_status, badge: detailData.profile?.employment_status },
+                              { label: 'Industry', value: currentRegular?.company_industry || (hasRegularEmployment ? detailData.profile?.industry : '') },
+                              { label: 'Current Position', value: currentRegular?.position || (hasRegularEmployment ? detailData.profile?.current_job_title : '') },
+                              { label: 'Company', value: currentRegular?.company_name || (hasRegularEmployment ? detailData.profile?.company_name : '') },
+                              { label: 'Employment Type', value: currentRegular?.job_type || '' },
+                              { label: 'Location', value: [detailData.profile?.city, detailData.profile?.province].filter(Boolean).join(', ') },
+                              { label: 'Time in Current Job', value: currentRegular?.start_date ? formatExperienceFromDate(currentRegular.start_date) : '' },
+                            ].map((item: any) => (
+                              item.value ? (
+                                <div key={item.label} className="flex justify-between py-1 border-b border-gray-50">
+                                  <span className="text-gray-500">{item.label}</span>
+                                  {item.badge ? (
+                                    <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${statusBadge(item.badge)}`}>{normalizeStatus(item.badge)}</span>
+                                  ) : (
+                                    <span className="font-medium text-gray-800 text-right max-w-[60%] truncate">{item.value}</span>
+                                  )}
+                                </div>
+                              ) : null
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Career Timeline (regular employment only) */}
+                        {hasRegularEmployment && (
+                          <div className="mb-4">
+                            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Career Timeline</h3>
+                            <div className="space-y-2">
+                              {regularEmployment.map((emp: any, i: number) => (
+                                <div key={i} className="text-xs bg-gray-50 px-3 py-2">
+                                  <div className="flex items-center gap-1.5">
+                                    {emp.start_date && <span className="text-gray-400">{new Date(emp.start_date).getFullYear()}</span>}
+                                    <span className="text-gray-300">·</span>
+                                    <p className="font-medium text-gray-800">{emp.position || 'N/A'}</p>
+                                    {emp.is_current && <span className="text-[10px] px-1 py-0.5 bg-emerald-100 text-emerald-700 font-medium">Current</span>}
+                                  </div>
+                                  <p className="text-gray-500 mt-0.5">
+                                    {emp.company_name && `${emp.company_name}`}{emp.company_industry ? ` · ${emp.company_industry}` : ''}
+                                  </p>
+                                  {emp.start_date && (
+                                    <p className="text-gray-400 mt-0.5">
+                                      {new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+                                      {' — '}
+                                      {emp.is_current ? 'Present' : emp.end_date ? new Date(emp.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : ''}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                            <p className="text-gray-500 mt-0.5">
-                              {emp.company_name && `${emp.company_name}`}{emp.company_industry ? ` · ${emp.company_industry}` : ''}
-                            </p>
-                            {emp.start_date && (
-                              <p className="text-gray-400 mt-0.5">
-                                {new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
-                                {' — '}
-                                {emp.is_current ? 'Present' : emp.end_date ? new Date(emp.end_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : ''}
-                              </p>
-                            )}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                        )}
 
-                  {/* Employment History Table */}
-                  {detailData.employment?.length > 0 && (
-                    <div className="mb-4 overflow-x-auto">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Employment History &amp; Verification (Q-Pro)</h3>
-                      <table className="w-full text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-gray-50 text-gray-500 text-left">
-                            <th className="px-2 py-1.5 font-medium">Industry</th>
-                            <th className="px-2 py-1.5 font-medium">Company</th>
-                            <th className="px-2 py-1.5 font-medium">Position</th>
-                            <th className="px-2 py-1.5 font-medium">Type</th>
-                            <th className="px-2 py-1.5 font-medium">Salary</th>
-                            <th className="px-2 py-1.5 font-medium">Started</th>
-                            <th className="px-2 py-1.5 font-medium">Status</th>
-                            <th className="px-2 py-1.5 font-medium">Proof (COE/ID)</th>
-                            <th className="px-2 py-1.5 font-medium text-right">Accreditation</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {detailData.employment.map((emp: any, i: number) => {
-                            const isVer = emp.is_verified || emp.verification_status === 'verified';
-                            return (
-                              <tr key={i} className="border-b border-gray-100 hover:bg-gray-50/50">
-                                <td className="px-2 py-1.5 text-gray-700">{emp.company_industry || '---'}</td>
-                                <td className="px-2 py-1.5 text-gray-700">{emp.company_name || '---'}</td>
-                                <td className="px-2 py-1.5 text-gray-700 font-medium">{emp.position || '---'}</td>
-                                <td className="px-2 py-1.5 text-gray-700">{emp.job_type || '---'}</td>
-                                <td className="px-2 py-1.5 text-gray-700">{emp.salary_range ? `₱${emp.salary_range}` : '---'}</td>
-                                <td className="px-2 py-1.5 text-gray-700">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '---'}</td>
-                                <td className="px-2 py-1.5">{emp.is_current ? <span className="text-emerald-600 font-medium">Current</span> : <span className="text-gray-400">Past</span>}</td>
-                                <td className="px-2 py-1.5">
-                                  {emp.proof_url ? (
-                                    <a
-                                      href={emp.proof_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-orange-600 hover:underline font-semibold inline-flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded border border-orange-200"
-                                      title={emp.proof_type?.startsWith('other:') ? emp.proof_type : undefined}
-                                    >
-                                      <span>{formatProofLabel(emp.proof_type)}</span>
-                                      <span>↗</span>
-                                    </a>
-                                  ) : (
-                                    <span className="text-gray-400 italic">None</span>
-                                  )}
-                                </td>
-                                <td className="px-2 py-1.5 text-right">
-                                  {isVer ? (
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                      ✓ Verified
-                                    </span>
-                                  ) : emp.proof_url ? (
-                                    <div className="inline-flex items-center gap-1 justify-end">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleVerifyEmploymentProof(emp.id, 'verified')}
-                                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-semibold transition-colors cursor-pointer"
-                                      >
-                                        Verify
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleVerifyEmploymentProof(emp.id, 'rejected')}
-                                        className="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[10px] font-medium border border-red-200 transition-colors cursor-pointer"
-                                      >
-                                        Reject
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <span className="text-[10px] text-gray-400">Unverified</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                        {/* Employment History Table (shown when alumni has regular employment — alone or alongside OJT) */}
+                        {hasRegularEmployment && (
+                          <div className="mb-4 overflow-x-auto">
+                            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Employment History &amp; Verification (Q-Pro)</h3>
+                            <table className="w-full text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-gray-50 text-gray-500 text-left">
+                                  <th className="px-2 py-1.5 font-medium">Industry</th>
+                                  <th className="px-2 py-1.5 font-medium">Company</th>
+                                  <th className="px-2 py-1.5 font-medium">Position</th>
+                                  <th className="px-2 py-1.5 font-medium">Type</th>
+                                  <th className="px-2 py-1.5 font-medium">Salary</th>
+                                  <th className="px-2 py-1.5 font-medium">Started</th>
+                                  <th className="px-2 py-1.5 font-medium">Status</th>
+                                  <th className="px-2 py-1.5 font-medium">Proof (COE/ID)</th>
+                                  <th className="px-2 py-1.5 font-medium text-right">Accreditation</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {regularEmployment.map((emp: any, i: number) => {
+                                  const isVer = emp.is_verified || emp.verification_status === 'verified';
+                                  return (
+                                    <tr key={emp.id || i} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                      <td className="px-2 py-1.5 text-gray-700">{emp.company_industry || '---'}</td>
+                                      <td className="px-2 py-1.5 text-gray-700">{emp.company_name || '---'}</td>
+                                      <td className="px-2 py-1.5 text-gray-700 font-medium">{emp.position || '---'}</td>
+                                      <td className="px-2 py-1.5 text-gray-700">{emp.job_type || '---'}</td>
+                                      <td className="px-2 py-1.5 text-gray-700">{formatJobSalaryDisplay(emp.salary_range) || '---'}</td>
+                                      <td className="px-2 py-1.5 text-gray-700">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '---'}</td>
+                                      <td className="px-2 py-1.5">{emp.is_current ? <span className="text-emerald-600 font-medium">Current</span> : <span className="text-gray-400">Past</span>}</td>
+                                      <td className="px-2 py-1.5">
+                                        {emp.proof_url ? (
+                                          <a
+                                            href={emp.proof_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-orange-600 hover:underline font-semibold inline-flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded border border-orange-200"
+                                            title={emp.proof_type?.startsWith('other:') ? emp.proof_type : undefined}
+                                          >
+                                            <span>{formatProofLabel(emp.proof_type)}</span>
+                                            <span>↗</span>
+                                          </a>
+                                        ) : (
+                                          <span className="text-gray-400 italic">None</span>
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-1.5 text-right">
+                                        {isVer ? (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                            ✓ Verified
+                                          </span>
+                                        ) : emp.proof_url ? (
+                                          <div className="inline-flex items-center gap-1 justify-end">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVerifyEmploymentProof(emp.id, 'verified')}
+                                              className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-semibold transition-colors cursor-pointer"
+                                            >
+                                              Verify
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVerifyEmploymentProof(emp.id, 'rejected')}
+                                              className="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-[10px] font-medium border border-red-200 transition-colors cursor-pointer"
+                                            >
+                                              Reject
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <span className="text-[10px] text-gray-400">Unverified</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* OJT / Practice Teaching Section (shown when alumni has OJT — alone or alongside regular employment) */}
+                        {hasOjt && (
+                          <div className="mb-4 overflow-x-auto">
+                            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">OJT / Practice Teaching</h3>
+                            <table className="w-full text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-gray-50 text-gray-500 text-left">
+                                  <th className="px-2 py-1.5 font-medium">Industry / Sector</th>
+                                  <th className="px-2 py-1.5 font-medium">Site (School / Company)</th>
+                                  <th className="px-2 py-1.5 font-medium">Deployment Role</th>
+                                  <th className="px-2 py-1.5 font-medium">Started</th>
+                                  <th className="px-2 py-1.5 font-medium">Status</th>
+                                  <th className="px-2 py-1.5 font-medium">Certificate / Proof</th>
+                                  <th className="px-2 py-1.5 font-medium text-right">Clearance</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {ojtEmployment.map((ojt: any, i: number) => {
+                                  const isCleared = Boolean(ojt.clearance_verified ?? ojt.is_verified);
+                                  const hasProof = Boolean(String(ojt.proof_url || '').trim());
+                                  return (
+                                    <tr key={ojt.id || i} className="border-b border-gray-100 hover:bg-gray-50/50">
+                                      <td className="px-2 py-1.5 text-gray-700">{ojt.company_industry || '---'}</td>
+                                      <td className="px-2 py-1.5 text-gray-700">{ojt.company_name || '---'}</td>
+                                      <td className="px-2 py-1.5 text-gray-700 font-medium">{ojt.position || '---'}</td>
+                                      <td className="px-2 py-1.5 text-gray-700">{ojt.start_date ? new Date(ojt.start_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : '---'}</td>
+                                      <td className="px-2 py-1.5">{ojt.is_current ? <span className="text-blue-600 font-medium">Ongoing</span> : <span className="text-gray-400">Completed</span>}</td>
+                                      <td className="px-2 py-1.5">
+                                        {hasProof ? (
+                                          <a
+                                            href={ojt.proof_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-orange-600 hover:underline font-semibold inline-flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded border border-orange-200"
+                                          >
+                                            <span>View Certificate</span>
+                                            <span>↗</span>
+                                          </a>
+                                        ) : (
+                                          <span className="text-gray-400 italic">None</span>
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-1.5 text-right">
+                                        {isCleared ? (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                            ✓ Cleared
+                                          </span>
+                                        ) : hasProof ? (
+                                          <span className="inline-flex items-center text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                            Ready to Clear
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-gray-400">Awaiting Certificate</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {/* Education */}
                   {detailData.education?.length > 0 && (

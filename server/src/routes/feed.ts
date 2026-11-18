@@ -299,67 +299,230 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/feed/mine - get current user's posts
-router.get('/mine', authenticate, async (req: AuthenticatedRequest, res, next) => {
-  try {
-    const { data: posts, error } = await supabase
-      .from('feed_posts')
-      .select('*')
-      .eq('user_id', req.user!.userId)
-      .order('created_at', { ascending: false });
+function formatForumCommentsTree(rawComments: any[], viewerProfileId?: string | null) {
+  const flat = (Array.isArray(rawComments) ? rawComments : []).map((c: any) => {
+    const reactions: Record<string, string[]> =
+      c.reactions && typeof c.reactions === 'object' ? c.reactions : {};
+    let userReaction: string | null = null;
+    let totalLikes = 0;
+    const reactionsSummary: Record<string, number> = {};
 
-    if (error) throw new AppError(error.message, 500);
-
-    const { data: userLikes } = await supabase
-      .from('feed_post_likes')
-      .select('post_id, reaction_type')
-      .eq('user_id', req.user!.userId);
-
-    const userReactionMap = new Map<string, string>();
-    (userLikes || []).forEach((l: any) => {
-      userReactionMap.set(l.post_id, l.reaction_type || '👍');
+    Object.entries(reactions).forEach(([emoji, ids]) => {
+      const list = Array.isArray(ids) ? ids : [];
+      if (list.length > 0) {
+        reactionsSummary[emoji] = list.length;
+        totalLikes += list.length;
+        if (viewerProfileId && list.includes(viewerProfileId)) {
+          userReaction = emoji;
+        }
+      }
     });
 
-    const authorProfileMap = await getProfileIdByUserIdMap((posts || []).map((p: any) => p.user_id).filter(Boolean));
-    const hasAnyMention = (posts || []).some((p: any) => typeof p.content === 'string' && p.content.includes('@'));
-    const mentionCandidates = hasAnyMention ? await fetchAllMentionCandidateProfiles() : [];
+    const topReactions = Object.entries(reactionsSummary)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([emoji]) => emoji);
 
-    const formatted = (posts || []).map((p: any) => {
-      const myReaction = userReactionMap.get(p.id) || null;
-      const reactionsSummary = p.reactions_summary || (p.like_count > 0 ? { '👍': p.like_count } : {});
-      const topReactions = Object.entries(reactionsSummary)
-        .filter(([_, count]: any) => count > 0)
-        .sort((a: any, b: any) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([emoji]) => emoji);
+    return {
+      id: c.id,
+      author: c.author_name || 'CTU-Naga Alumnus',
+      author_avatar: c.author_avatar || null,
+      author_profile_id: c.author_id || null,
+      content: c.content || '',
+      created_at: c.created_at || new Date().toISOString(),
+      parent_id: c.parent_id || null,
+      like_count: totalLikes,
+      liked: Boolean(userReaction),
+      user_reaction: userReaction,
+      reactions_summary: reactionsSummary,
+      top_reactions: topReactions,
+      replies: [] as any[],
+    };
+  });
 
-      const mentionedProfiles = hasAnyMention && typeof p.content === 'string' && p.content.includes('@')
+  const roots: any[] = [];
+  const replyMap = new Map<string, any[]>();
+  flat.forEach((c) => {
+    if (c.parent_id) {
+      if (!replyMap.has(c.parent_id)) replyMap.set(c.parent_id, []);
+      replyMap.get(c.parent_id)!.push(c);
+    } else {
+      roots.push(c);
+    }
+  });
+  return roots.map((c) => ({ ...c, replies: replyMap.get(c.id) || [] }));
+}
+
+async function getUserProfilePosts(
+  targetUserId: string,
+  viewerUserId: string,
+  viewerRole: string
+): Promise<any[]> {
+  const isMe = targetUserId === viewerUserId;
+
+  const [{ data: targetProfile }, { data: viewerProfile }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, user_id, first_name, last_name, avatar_url')
+      .eq('user_id', targetUserId)
+      .maybeSingle(),
+    supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', viewerUserId)
+      .maybeSingle(),
+  ]);
+
+  let feedQuery = supabase
+    .from('feed_posts')
+    .select('*')
+    .eq('user_id', targetUserId)
+    .order('created_at', { ascending: false });
+
+  if (!isMe && viewerRole !== 'admin') {
+    let isFriend = false;
+    if (viewerProfile && targetProfile) {
+      const { data: conn } = await supabase
+        .from('connections')
+        .select('id')
+        .eq('status', 'accepted')
+        .or(`and(requester_id.eq.${viewerProfile.id},recipient_id.eq.${targetProfile.id}),and(requester_id.eq.${targetProfile.id},recipient_id.eq.${viewerProfile.id})`)
+        .maybeSingle();
+      if (conn) isFriend = true;
+    }
+
+    if (isFriend) {
+      feedQuery = feedQuery.in('audience', ['public', 'friends']);
+    } else {
+      feedQuery = feedQuery.eq('audience', 'public');
+    }
+  }
+
+  const forumPromise = targetProfile?.id
+    ? supabase
+        .from('forum_posts')
+        .select('*, group:community_groups(id, name, category)')
+        .eq('author_id', targetProfile.id)
+        .order('created_at', { ascending: false })
+    : Promise.resolve({ data: [] as any[], error: null });
+
+  const [{ data: feedPosts, error }, { data: forumPosts }, { data: userLikes }] = await Promise.all([
+    feedQuery,
+    forumPromise,
+    supabase.from('feed_post_likes').select('post_id, reaction_type').eq('user_id', viewerUserId),
+  ]);
+
+  if (error) throw new AppError(error.message, 500);
+
+  const userReactionMap = new Map<string, string>();
+  (userLikes || []).forEach((l: any) => {
+    userReactionMap.set(l.post_id, l.reaction_type || '👍');
+  });
+
+  const allPostsForMentions = [...(feedPosts || []), ...(forumPosts || [])];
+  const hasAnyMention = allPostsForMentions.some(
+    (p: any) => typeof p.content === 'string' && p.content.includes('@')
+  );
+  const mentionCandidates = hasAnyMention ? await fetchAllMentionCandidateProfiles() : [];
+
+  const authorProfileId = targetProfile?.id || null;
+  const authorName =
+    targetProfile
+      ? `${targetProfile.first_name || ''} ${targetProfile.last_name || ''}`.trim() || 'CTU-Naga Alumnus'
+      : 'CTU-Naga Alumnus';
+
+  const formattedFeed = (feedPosts || []).map((p: any) => {
+    const myReaction = userReactionMap.get(p.id) || null;
+    const reactionsSummary = p.reactions_summary || (p.like_count > 0 ? { '👍': p.like_count } : {});
+    const topReactions = Object.entries(reactionsSummary)
+      .filter(([, count]: any) => count > 0)
+      .sort((a: any, b: any) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([emoji]) => emoji);
+
+    const mentionedProfiles =
+      hasAnyMention && typeof p.content === 'string' && p.content.includes('@')
         ? matchMentionsInText(p.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
         : [];
 
-      return {
-        ...p,
-        author_profile_id: p.is_official || !p.user_id ? null : (authorProfileMap.get(p.user_id) || null),
-        mentioned_profiles: mentionedProfiles,
-        audience: p.audience || 'public',
-        feeling: p.feeling || null,
-        location: p.location || null,
-        tagged_friends: p.tagged_friends || [],
-        media_type: p.media_type || 'photo',
-        video_url: p.video_url || null,
-        comments_disabled: !!p.comments_disabled,
-        liked: !!myReaction,
-        user_reaction: myReaction,
-        reactions_summary: reactionsSummary,
-        top_reactions: topReactions.length > 0 ? topReactions : (p.like_count > 0 ? ['👍'] : []),
-      };
-    });
+    return {
+      ...p,
+      author_profile_id: p.is_official || !p.user_id ? null : authorProfileId,
+      mentioned_profiles: mentionedProfiles,
+      audience: p.audience || 'public',
+      feeling: p.feeling || null,
+      location: p.location || null,
+      tagged_friends: p.tagged_friends || [],
+      media_type: p.media_type || 'photo',
+      video_url: p.video_url || null,
+      comments_disabled: !!p.comments_disabled,
+      liked: !!myReaction,
+      user_reaction: myReaction,
+      reactions_summary: reactionsSummary,
+      top_reactions: topReactions.length > 0 ? topReactions : (p.like_count > 0 ? ['👍'] : []),
+    };
+  });
 
-    res.json(formatted);
+  const formattedForum = (forumPosts || []).map((fp: any) => {
+    const groupObj = Array.isArray(fp.group) ? fp.group[0] : fp.group;
+    const groupName = groupObj?.name || 'Alumni Forum';
+    const likedBy: string[] = Array.isArray(fp.liked_by) ? fp.liked_by : [];
+    const viewerLiked = Boolean(viewerProfile?.id && likedBy.includes(viewerProfile.id));
+    const totalLikes = typeof fp.like_count === 'number' ? fp.like_count : likedBy.length;
+    const rawComments: any[] = Array.isArray(fp.comments) ? fp.comments : [];
+    const mentionedProfiles =
+      hasAnyMention && typeof fp.content === 'string' && fp.content.includes('@')
+        ? matchMentionsInText(fp.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
+        : [];
+
+    return {
+      id: fp.id,
+      user_id: targetUserId,
+      type: 'forum',
+      is_forum_post: true,
+      forum_group_id: fp.group_id || null,
+      forum_group_name: groupName,
+      forum_tags: Array.isArray(fp.tags) ? fp.tags : [],
+      title: fp.title || null,
+      content: fp.content || '',
+      author: authorName,
+      author_avatar: targetProfile?.avatar_url || null,
+      author_profile_id: authorProfileId,
+      tag: `Forum · ${groupName}`,
+      tag_color: 'bg-indigo-50 text-indigo-700',
+      created_at: fp.created_at,
+      updated_at: fp.updated_at || fp.created_at,
+      like_count: totalLikes,
+      comment_count: rawComments.length,
+      share_count: 0,
+      audience: 'public',
+      media_type: 'photo',
+      video_url: null,
+      image_url: null,
+      comments_disabled: false,
+      liked: viewerLiked,
+      user_reaction: viewerLiked ? '👍' : null,
+      reactions_summary: totalLikes > 0 ? { '👍': totalLikes } : {},
+      top_reactions: totalLikes > 0 ? ['👍'] : [],
+      mentioned_profiles: mentionedProfiles,
+      forum_comments: formatForumCommentsTree(rawComments, viewerProfile?.id),
+    };
+  });
+
+  return [...formattedFeed, ...formattedForum].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
+// GET /api/feed/mine - get current user's posts (including Alumni Forum posts)
+router.get('/mine', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const posts = await getUserProfilePosts(req.user!.userId, req.user!.userId, req.user!.role);
+    res.json(posts);
   } catch (err) { next(err); }
 });
 
-// GET /api/feed/user/:userId - get posts by a specific user (with audience checks)
+// GET /api/feed/user/:userId - get posts by a specific user (including Alumni Forum posts, with audience checks)
 router.get('/user/:userId', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
     let targetUserId = req.params.userId;
@@ -378,85 +541,8 @@ router.get('/user/:userId', authenticate, async (req: AuthenticatedRequest, res,
       targetUserId = profileCheck.user_id;
     }
 
-    const isMe = targetUserId === req.user!.userId;
-
-    let query = supabase
-      .from('feed_posts')
-      .select('*')
-      .eq('user_id', targetUserId)
-      .order('created_at', { ascending: false });
-
-    if (!isMe && req.user!.role !== 'admin') {
-      const { data: myProfile } = await supabase.from('profiles').select('id').eq('user_id', req.user!.userId).maybeSingle();
-      const { data: targetProfile } = await supabase.from('profiles').select('id').eq('user_id', targetUserId).maybeSingle();
-
-      let isFriend = false;
-      if (myProfile && targetProfile) {
-        const { data: conn } = await supabase
-          .from('connections')
-          .select('id')
-          .eq('status', 'accepted')
-          .or(`and(requester_id.eq.${myProfile.id},recipient_id.eq.${targetProfile.id}),and(requester_id.eq.${targetProfile.id},recipient_id.eq.${myProfile.id})`)
-          .maybeSingle();
-        if (conn) isFriend = true;
-      }
-
-      if (isFriend) {
-        query = query.in('audience', ['public', 'friends']);
-      } else {
-        query = query.eq('audience', 'public');
-      }
-    }
-
-    const { data: posts, error } = await query;
-    if (error) throw new AppError(error.message, 500);
-
-    const { data: userLikes } = await supabase
-      .from('feed_post_likes')
-      .select('post_id, reaction_type')
-      .eq('user_id', req.user!.userId);
-
-    const userReactionMap = new Map<string, string>();
-    (userLikes || []).forEach((l: any) => {
-      userReactionMap.set(l.post_id, l.reaction_type || '👍');
-    });
-
-    const authorProfileMap = await getProfileIdByUserIdMap((posts || []).map((p: any) => p.user_id).filter(Boolean));
-    const hasAnyMention = (posts || []).some((p: any) => typeof p.content === 'string' && p.content.includes('@'));
-    const mentionCandidates = hasAnyMention ? await fetchAllMentionCandidateProfiles() : [];
-
-    const formatted = (posts || []).map((p: any) => {
-      const myReaction = userReactionMap.get(p.id) || null;
-      const reactionsSummary = p.reactions_summary || (p.like_count > 0 ? { '👍': p.like_count } : {});
-      const topReactions = Object.entries(reactionsSummary)
-        .filter(([_, count]: any) => count > 0)
-        .sort((a: any, b: any) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([emoji]) => emoji);
-
-      const mentionedProfiles = hasAnyMention && typeof p.content === 'string' && p.content.includes('@')
-        ? matchMentionsInText(p.content, mentionCandidates).map(({ id, name }) => ({ id, name }))
-        : [];
-
-      return {
-        ...p,
-        author_profile_id: p.is_official || !p.user_id ? null : (authorProfileMap.get(p.user_id) || null),
-        mentioned_profiles: mentionedProfiles,
-        audience: p.audience || 'public',
-        feeling: p.feeling || null,
-        location: p.location || null,
-        tagged_friends: p.tagged_friends || [],
-        media_type: p.media_type || 'photo',
-        video_url: p.video_url || null,
-        comments_disabled: !!p.comments_disabled,
-        liked: !!myReaction,
-        user_reaction: myReaction,
-        reactions_summary: reactionsSummary,
-        top_reactions: topReactions.length > 0 ? topReactions : (p.like_count > 0 ? ['👍'] : []),
-      };
-    });
-
-    res.json(formatted);
+    const posts = await getUserProfilePosts(targetUserId, req.user!.userId, req.user!.role);
+    res.json(posts);
   } catch (err) { next(err); }
 });
 

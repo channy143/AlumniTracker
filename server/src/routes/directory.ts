@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../types';
 import { sanitizeFilterInput } from '../utils/sanitizeFilterInput';
 import { formatProgramLongName } from '../utils/formatProgram';
+import { isOjtEmploymentRow } from '../utils/validateJobTitle';
 
 const router = Router();
 
@@ -198,13 +199,13 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
 
     if (profileIds.length > 0) {
       const [{ data: employment }, { data: education }] = await Promise.all([
-        db.from('employment').select('profile_id, company_name, position, employment_status, is_current')
+        db.from('employment').select('profile_id, company_name, position, employment_status, record_category, job_type, is_current')
           .in('profile_id', profileIds).eq('is_current', true),
         db.from('education').select('profile_id, program, year_graduated, honors')
           .in('profile_id', profileIds),
       ]);
 
-      (employment || []).forEach((e: any) => {
+      (employment || []).filter((e: any) => !isOjtEmploymentRow(e)).forEach((e: any) => {
         employmentMap.set(e.profile_id, e);
       });
       (education || []).forEach((e: any) => {

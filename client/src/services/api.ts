@@ -393,7 +393,11 @@ export const authApi = {
   forgotPassword: (email: string, turnstileToken?: string) =>
     api.post<{ message: string }>('/auth/forgot-password', { email, turnstileToken }),
   resetPassword: (email: string, otp: string, password: string) =>
-    api.post<{ message: string }>('/auth/reset-password', { email, otp, password }),
+    api.post<{
+      message: string;
+      autoLoggedIn?: boolean;
+      user?: { id: string; email: string; role: 'admin' | 'staff' | 'alumni'; is_verified?: boolean; survey_completed?: boolean };
+    }>('/auth/reset-password', { email, otp, password }),
   me: () => api.get<{ user: any }>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<{ message: string }>('/auth/change-password', { currentPassword, newPassword }),

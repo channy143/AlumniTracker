@@ -364,7 +364,7 @@ function JobCard({
         {/* Divider */}
         <hr className="border-gray-100 my-4" />
 
-        {/* Bottom Row: Salary, Location & Apply Now Button */}
+        {/* Bottom Row: Salary, Location & View Details Button */}
         <div className="flex items-center justify-between gap-3 pt-0.5">
           <div className="min-w-0">
             <p className="text-base font-bold text-gray-900 leading-tight truncate">
@@ -400,10 +400,10 @@ function JobCard({
             ) : (
               <button
                 type="button"
-                onClick={onApply}
+                onClick={onViewDetails}
                 className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-5 py-2.5 transition-all shadow-xs cursor-pointer active:scale-95"
               >
-                Apply now
+                View Details
               </button>
             )}
           </div>

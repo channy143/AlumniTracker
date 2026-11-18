@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { careerTrendsApi, jobsApi } from '@/services/api';
 import { formatExperience } from '@/utils/formatExperience';
 import { formatProgramLongName } from '@/utils/formatProgram';
+import { formatJobSalaryDisplay } from '@/utils/currencies';
 import { SkeletonChartPanel, SkeletonStatCard } from '@/components/ui/Skeleton';
 import { getCached } from '@/utils/apiCache';
 import { isJobMatch } from '@/utils/isJobMatch';
@@ -611,7 +612,7 @@ export default function CareerInsightsPage() {
                       </div>
                       <p className="text-xs text-gray-600 font-medium truncate">{job.company_name}</p>
                       <p className="text-[11px] text-gray-400 mt-1 truncate">
-                        {[job.location, job.salary_range ? (/^\d/.test(String(job.salary_range).trim()) ? `₱${job.salary_range}` : job.salary_range) : null, job.job_type].filter(Boolean).join(' • ')}
+                        {[job.location, formatJobSalaryDisplay(job.salary_range), job.job_type].filter(Boolean).join(' • ')}
                       </p>
                     </div>
 

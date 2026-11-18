@@ -3,7 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeftIcon, CheckIcon, KeyIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { authApi } from '@/services/api';
-import { isPasswordStrong, checkPasswordCriteria } from '@/utils/validation';
+import { useAuthStore } from '@/store/authStore';
+import { isPasswordStrong } from '@/utils/validation';
+import InlinePasswordStrength from '@/components/auth/InlinePasswordStrength';
 
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState<'email' | 'otp' | 'password'>('email');
@@ -19,6 +21,7 @@ export default function ForgotPasswordPage() {
   const [widgetRendered, setWidgetRendered] = useState(false);
   const captchaContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { setUser, setToken } = useAuthStore();
 
   useEffect(() => {
     if (step !== 'email') return;
@@ -96,8 +99,27 @@ export default function ForgotPasswordPage() {
 
     setLoading(true);
     try {
-      await authApi.resetPassword(email, otp, password);
-      navigate('/auth/login');
+      const res = await authApi.resetPassword(email, otp, password);
+      if (res.autoLoggedIn && res.user) {
+        setToken('httponly', false);
+        setUser({
+          id: res.user.id,
+          email: res.user.email,
+          role: res.user.role,
+          is_verified: Boolean(res.user.is_verified),
+          survey_completed: res.user.survey_completed,
+          created_at: '',
+        } as any);
+        if (res.user.role === 'admin') {
+          navigate('/admin');
+        } else if (res.user.survey_completed === false) {
+          navigate('/survey/onboarding');
+        } else {
+          navigate('/');
+        }
+      } else {
+        navigate('/auth/login');
+      }
     } catch (err: any) {
       setError(err.message || 'Reset failed');
     } finally {
@@ -236,6 +258,13 @@ export default function ForgotPasswordPage() {
                   </button>
                 </div>
               </div>
+              {password ? (
+                <InlinePasswordStrength password={password} />
+              ) : (
+                <p className="text-[11px] text-slate-400 -mt-1">
+                  Must be at least 8 characters and include uppercase, lowercase, a number, and a special character.
+                </p>
+              )}
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-ctu-charcoal mb-1.5">Confirm Password</label>
                 <div className="relative">
@@ -244,7 +273,11 @@ export default function ForgotPasswordPage() {
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="input-field text-base sm:text-sm h-11 sm:h-10 pr-12"
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 pr-12 ${
+                      confirmPassword && password !== confirmPassword
+                        ? 'border-red-500 focus:ring-red-500/20 focus:border-red-500'
+                        : ''
+                    }`}
                     placeholder="Re-enter new password"
                     required
                   />
@@ -259,6 +292,11 @@ export default function ForgotPasswordPage() {
                     {showConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                   </button>
                 </div>
+                {confirmPassword && (
+                  <p className={`mt-1 text-[11px] font-medium ${password === confirmPassword ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
+                  </p>
+                )}
               </div>
               <button
                 type="submit"
