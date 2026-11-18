@@ -4,6 +4,8 @@ import {
   UserGroupIcon,
   ClockIcon,
   FunnelIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { formatExperience } from '@/utils/formatExperience';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
@@ -46,8 +48,9 @@ const GRADIENTS = [
 ];
 
 function lookupEmployerIndustry(employerName: string, topCareers: any[]): string | null {
+  const target = employerName.trim().toLowerCase();
   for (const c of topCareers) {
-    if (c.topEmployers?.some((em: any) => em.name === employerName)) {
+    if (c.topEmployers?.some((em: any) => String(em.name || '').trim().toLowerCase() === target)) {
       const ind = c.topIndustries?.[0];
       if (ind?.name) return ind.name;
     }
@@ -56,7 +59,12 @@ function lookupEmployerIndustry(employerName: string, topCareers: any[]): string
 }
 
 function lookupEmployerCareer(employerName: string, topCareers: any[]): any | null {
-  return topCareers.find((c) => c.topEmployers?.some((em: any) => em.name === employerName)) || null;
+  const target = employerName.trim().toLowerCase();
+  return (
+    topCareers.find((c) =>
+      c.topEmployers?.some((em: any) => String(em.name || '').trim().toLowerCase() === target)
+    ) || null
+  );
 }
 
 function SummaryStats({ overview }: { overview: any }) {
@@ -119,6 +127,7 @@ export default function CareerLeaderboardNav({
 }) {
   const [segment, setSegment] = useState<Segment>('employers');
   const [workforceSubtab, setWorkforceSubtab] = useState<'industries' | 'status'>('industries');
+  const [searchTerm, setSearchTerm] = useState('');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -155,7 +164,7 @@ export default function CareerLeaderboardNav({
   // 1. Top Employers Card Data (Non-redundant details)
   const maxEmployerCount = Math.max(...employers.map((e) => e.alumniCount || 0), 1);
   const totalEmployed = data.overview?.totalEmployed || maxEmployerCount;
-  const employerCards: RankCard[] = employers.slice(0, 8).map((e, i) => {
+  const employerCards: RankCard[] = employers.map((e, i) => {
     const ind = e.industry || lookupEmployerIndustry(e.name, topCareers);
     const career = lookupEmployerCareer(e.name, topCareers);
     const pct = Math.round((e.alumniCount / maxEmployerCount) * 100);
@@ -186,7 +195,7 @@ export default function CareerLeaderboardNav({
 
   // 2. Top Job Positions Card Data (Non-redundant details)
   const maxCareerCount = Math.max(...topCareers.map((c) => c.alumniCount || 0), 1);
-  const careerCards: RankCard[] = topCareers.slice(0, 8).map((c, i) => {
+  const careerCards: RankCard[] = topCareers.map((c, i) => {
     const topEmp = c.topEmployers?.[0]?.name || null;
     const exp = c.averageExperienceYears != null ? formatExperience(c.averageExperienceYears) : null;
     const topInd = c.topIndustries?.[0]?.name || null;
@@ -219,7 +228,7 @@ export default function CareerLeaderboardNav({
   });
 
   // 3. Industries & Status Card Data
-  const industryCards: RankCard[] = industries.slice(0, 8).map((ind, i) => {
+  const industryCards: RankCard[] = industries.map((ind, i) => {
     const activeJobs = ind.activeJobsCount || 0;
     const hiredCount = ind.hiredViaJobsCount || 0;
     return {
@@ -279,6 +288,20 @@ export default function CareerLeaderboardNav({
   }, [selectedCard]);
 
   const activeSegmentMeta = SEGMENTS.find((s) => s.key === segment);
+  const normSearch = searchTerm.trim().toLowerCase();
+  const filterCards = (cards: RankCard[]) => {
+    if (!normSearch) return cards;
+    return cards.filter(
+      (c) =>
+        c.name.toLowerCase().includes(normSearch) ||
+        (c.industry || '').toLowerCase().includes(normSearch) ||
+        (c.topEmployer || '').toLowerCase().includes(normSearch)
+    );
+  };
+  const visibleEmployerCards = filterCards(employerCards);
+  const visibleCareerCards = filterCards(careerCards);
+  const visibleIndustryCards = filterCards(industryCards);
+  const visibleStatusCards = filterCards(statusCards);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden h-full flex flex-col shadow-xs">
@@ -312,21 +335,45 @@ export default function CareerLeaderboardNav({
         <span>Click item to filter</span>
       </div>
 
+      {/* Quick filter inside leaderboard */}
+      <div className="px-3 pb-1.5 shrink-0">
+        <div className="relative">
+          <MagnifyingGlassIcon className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={`Search ${activeSegmentMeta?.label.toLowerCase() || 'items'}...`}
+            className="w-full h-7 pl-7 pr-7 text-xs bg-gray-50 border border-gray-200 rounded-md outline-none focus:bg-white focus:border-orange-400 text-gray-700 placeholder:text-gray-400"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear filter"
+            >
+              <XMarkIcon className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Scrollable Cards Area - overflow-x-hidden strictly prevents horizontal scroll */}
-      <div className="px-3 pt-1 pb-2 flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden">
+      <div className="px-3 pt-1 pb-2 flex-1 min-h-0 max-h-[380px] lg:max-h-none flex flex-col overflow-y-auto overflow-x-hidden">
         {/* TAB 1: Top Employers */}
         {segment === 'employers' && (
-          <div className="flex-1 flex flex-col gap-1.5 w-full min-w-0">
-            {employerCards.length === 0 ? (
+          <div className="flex flex-col gap-1.5 w-full min-w-0">
+            {visibleEmployerCards.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6 my-auto">No employers found.</p>
             ) : (
-              employerCards.map((c, i) => {
+              visibleEmployerCards.map((c, i) => {
                 const isHovered = hoveredCard === `${c.kind}-${c.name}`;
                 const selected = isSelected(c);
                 return (
                   <div
                     key={`${c.kind}-${c.name}`}
-                    className="group flex flex-col overflow-hidden transition-all duration-200 w-full min-w-0"
+                    className="group shrink-0 flex flex-col overflow-hidden transition-all duration-200 w-full min-w-0"
                     onMouseEnter={() => handleMouseEnter(`${c.kind}-${c.name}`)}
                     onMouseLeave={handleMouseLeave}
                   >
@@ -408,17 +455,17 @@ export default function CareerLeaderboardNav({
 
         {/* TAB 2: Top Job Positions */}
         {segment === 'career' && (
-          <div className="flex-1 flex flex-col gap-1.5 w-full min-w-0">
-            {careerCards.length === 0 ? (
+          <div className="flex flex-col gap-1.5 w-full min-w-0">
+            {visibleCareerCards.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6 my-auto">No job positions found.</p>
             ) : (
-              careerCards.map((c, i) => {
+              visibleCareerCards.map((c, i) => {
                 const isHovered = hoveredCard === `${c.kind}-${c.name}`;
                 const selected = isSelected(c);
                 return (
                   <div
                     key={`${c.kind}-${c.name}`}
-                    className="group flex flex-col overflow-hidden transition-all duration-200 w-full min-w-0"
+                    className="group shrink-0 flex flex-col overflow-hidden transition-all duration-200 w-full min-w-0"
                     onMouseEnter={() => handleMouseEnter(`${c.kind}-${c.name}`)}
                     onMouseLeave={handleMouseLeave}
                   >
@@ -502,9 +549,9 @@ export default function CareerLeaderboardNav({
 
         {/* TAB 3: Industries & Status */}
         {segment === 'workforce' && (
-          <div className="flex-1 flex flex-col gap-1.5 w-full min-w-0">
+          <div className="flex flex-col gap-1.5 w-full min-w-0">
             {/* Sub-toggle between Industries and Status */}
-            <div className="flex items-center justify-between gap-1 mb-1 bg-gray-100 p-0.5 rounded-md text-[11px] font-medium">
+            <div className="flex items-center justify-between gap-1 mb-1 bg-gray-100 p-0.5 rounded-md text-[11px] font-medium shrink-0">
               <button
                 onClick={() => setWorkforceSubtab('industries')}
                 onMouseDown={(e) => e.preventDefault()}
@@ -515,7 +562,7 @@ export default function CareerLeaderboardNav({
                     : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
-                Industries ({industryCards.length})
+                Industries ({visibleIndustryCards.length})
               </button>
               <button
                 onClick={() => setWorkforceSubtab('status')}
@@ -527,22 +574,22 @@ export default function CareerLeaderboardNav({
                     : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
-                Status ({statusCards.length})
+                Status ({visibleStatusCards.length})
               </button>
             </div>
 
             {/* List rendered with gradient style + hoverable drawer */}
             {workforceSubtab === 'industries' &&
-              (industryCards.length === 0 ? (
+              (visibleIndustryCards.length === 0 ? (
                 <p className="text-xs text-gray-400 text-center py-6 my-auto">No industries found.</p>
               ) : (
-                industryCards.map((c, i) => {
+                visibleIndustryCards.map((c, i) => {
                   const isHovered = hoveredCard === `${c.kind}-${c.name}`;
                   const selected = isSelected(c);
                   return (
                     <div
                       key={`${c.kind}-${c.name}`}
-                      className="group flex flex-col overflow-hidden transition-all duration-200 w-full min-w-0"
+                      className="group shrink-0 flex flex-col overflow-hidden transition-all duration-200 w-full min-w-0"
                       onMouseEnter={() => handleMouseEnter(`${c.kind}-${c.name}`)}
                       onMouseLeave={handleMouseLeave}
                     >
@@ -616,16 +663,16 @@ export default function CareerLeaderboardNav({
               ))}
 
             {workforceSubtab === 'status' &&
-              (statusCards.length === 0 ? (
+              (visibleStatusCards.length === 0 ? (
                 <p className="text-xs text-gray-400 text-center py-6 my-auto">No status data found.</p>
               ) : (
-                statusCards.map((c, i) => {
+                visibleStatusCards.map((c, i) => {
                   const isHovered = hoveredCard === `${c.kind}-${c.name}`;
                   const selected = isSelected(c);
                   return (
                     <div
                       key={`${c.kind}-${c.name}`}
-                      className="group flex flex-col overflow-hidden transition-all duration-200 w-full min-w-0"
+                      className="group shrink-0 flex flex-col overflow-hidden transition-all duration-200 w-full min-w-0"
                       onMouseEnter={() => handleMouseEnter(`${c.kind}-${c.name}`)}
                       onMouseLeave={handleMouseLeave}
                     >

@@ -12,7 +12,18 @@ import FieldErrorAlert from '@/components/auth/FieldErrorAlert';
 type Step = 'verify' | 'form' | 'captcha' | 'otp';
 
 // Set to true to enforce alumni identity verification against registry before registration
-const REQUIRE_ALUMNI_VERIFICATION = false;
+const REQUIRE_ALUMNI_VERIFICATION = true;
+
+function normalizeRegisterProgram(raw?: string): string {
+  const val = String(raw || '').trim();
+  if (!val) return '';
+  if (/^beed/i.test(val) || /elementary education/i.test(val)) return 'BEEd';
+  if (/^bsed/i.test(val) || /secondary education/i.test(val) || /mathematics/i.test(val)) return 'BSEd-Math';
+  if (/^btled/i.test(val) || /technology and livelihood/i.test(val)) return 'BTLED';
+  if (/^bsit/i.test(val) || /information technology/i.test(val)) return 'BSIT';
+  if (/^bit/i.test(val) || /industrial technology/i.test(val)) return 'BIT';
+  return val;
+}
 
 export default function RegisterPage() {
   const [step, setStep] = useState<Step>(REQUIRE_ALUMNI_VERIFICATION ? 'verify' : 'form');
@@ -179,7 +190,7 @@ export default function RegisterPage() {
           graduationDate: idy.graduationDate || identity.graduationDate,
           batchYear: idy.batchYear || idy.yearGraduated || identity.batchYear,
           yearGraduated: idy.yearGraduated || idy.batchYear || identity.batchYear,
-          program: idy.program ? (/^btled/i.test(idy.program) ? 'BTLED' : idy.program) : prev.program,
+          program: idy.program ? normalizeRegisterProgram(idy.program) : prev.program,
         }));
         setIdentity((prev) => ({
           ...prev,

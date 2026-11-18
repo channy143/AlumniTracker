@@ -39,6 +39,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       else sessionStorage.removeItem('ctu_cache_uid');
     } catch {}
     set({ user, loading: false });
+    window.dispatchEvent(new Event('recently-viewed-changed'));
   },
   setToken: (_token?: string, _persist = true) => {
     clearAllCache();
@@ -61,6 +62,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         localStorage.setItem('ctu_auth_logout', String(Date.now()));
       } catch {}
       set({ user: null, token: null, loading: false });
+      window.dispatchEvent(new Event('recently-viewed-changed'));
     }
   },
   syncToken: () => false,

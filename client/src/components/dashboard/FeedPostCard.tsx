@@ -159,6 +159,11 @@ export default function FeedPostCard({
   const openAlumniProfile = (e: React.MouseEvent, targetId?: string | null) => {
     if (!targetId) return;
     e.stopPropagation();
+    const myProfileId = getCached<any>('/profile')?.id;
+    if ((myProfileId && targetId === myProfileId) || (currentUserId && targetId === currentUserId)) {
+      navigate('/profile');
+      return;
+    }
     navigate(`/directory/${targetId}`);
   };
   const [liked, setLiked] = useState(!!post.liked);

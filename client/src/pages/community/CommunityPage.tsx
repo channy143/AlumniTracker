@@ -97,6 +97,15 @@ export default function CommunityPage() {
   const [myProfileId, setMyProfileId] = useState<string | null>(() => getCached<any>('/profile')?.id || null);
   const [events, setEvents] = useState<any[]>(() => getCached<any[]>('/events') || []);
 
+  const navigateToProfile = (authorId?: string | null) => {
+    if (!authorId) return;
+    if (myProfileId && authorId === myProfileId) {
+      navigate('/profile');
+      return;
+    }
+    navigate(`/directory/${authorId}`);
+  };
+
   useEffect(() => {
     profileApi
       .get()
@@ -658,7 +667,7 @@ export default function CommunityPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div
-                          onClick={() => post.author_id && navigate(`/directory/${post.author_id}`)}
+                          onClick={() => navigateToProfile(post.author_id)}
                           className="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden cursor-pointer ring-1 ring-gray-200"
                         >
                           {post.author_avatar ? (
@@ -671,7 +680,7 @@ export default function CommunityPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <button
                               type="button"
-                              onClick={() => post.author_id && navigate(`/directory/${post.author_id}`)}
+                              onClick={() => navigateToProfile(post.author_id)}
                               className="text-xs sm:text-sm font-bold text-gray-900 hover:text-orange-600 truncate cursor-pointer"
                             >
                               {post.author_name || 'CTU-Naga Alumnus'}
@@ -797,13 +806,13 @@ export default function CommunityPage() {
                         </button>
                       </div>
 
-                      {!isMyPost && post.author_id && (
+                      {post.author_id && (
                         <button
                           type="button"
-                          onClick={() => navigate(`/directory/${post.author_id}`)}
+                          onClick={() => navigateToProfile(post.author_id)}
                           className="text-[11px] font-semibold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer"
                         >
-                          View Profile →
+                          {isMyPost ? 'View My Profile →' : 'View Profile →'}
                         </button>
                       )}
                     </div>
@@ -823,7 +832,7 @@ export default function CommunityPage() {
                                   <div className="bg-white border border-gray-200/80 rounded-xl p-2.5 shadow-2xs">
                                     <div className="flex items-start gap-2.5">
                                       <div
-                                        onClick={() => c.author_id && navigate(`/directory/${c.author_id}`)}
+                                        onClick={() => navigateToProfile(c.author_id)}
                                         className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center text-[10px] shrink-0 overflow-hidden cursor-pointer shadow-2xs"
                                       >
                                         {c.author_avatar && (c.author_avatar.startsWith('http') || c.author_avatar.startsWith('/') || c.author_avatar.startsWith('data:image/')) ? (
@@ -836,7 +845,7 @@ export default function CommunityPage() {
                                         <div className="flex items-center justify-between gap-2">
                                           <button
                                             type="button"
-                                            onClick={() => c.author_id && navigate(`/directory/${c.author_id}`)}
+                                            onClick={() => navigateToProfile(c.author_id)}
                                             className="text-xs font-bold text-gray-900 hover:text-orange-600 truncate cursor-pointer"
                                           >
                                             {c.author_name || 'Alumnus'}
@@ -969,7 +978,7 @@ export default function CommunityPage() {
                                         <div key={reply.id} className="bg-white border border-gray-200/80 rounded-xl p-2 shadow-2xs">
                                           <div className="flex items-start gap-2">
                                             <div
-                                              onClick={() => reply.author_id && navigate(`/directory/${reply.author_id}`)}
+                                              onClick={() => navigateToProfile(reply.author_id)}
                                               className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-bold flex items-center justify-center text-[9px] shrink-0 overflow-hidden cursor-pointer"
                                             >
                                               {reply.author_avatar && (reply.author_avatar.startsWith('http') || reply.author_avatar.startsWith('/') || reply.author_avatar.startsWith('data:image/')) ? (
@@ -982,7 +991,7 @@ export default function CommunityPage() {
                                               <div className="flex items-center justify-between gap-2">
                                                 <button
                                                   type="button"
-                                                  onClick={() => reply.author_id && navigate(`/directory/${reply.author_id}`)}
+                                                  onClick={() => navigateToProfile(reply.author_id)}
                                                   className={`font-bold text-gray-900 text-[11px] truncate text-left ${
                                                     reply.author_id ? 'hover:text-orange-600 hover:underline cursor-pointer' : ''
                                                   }`}

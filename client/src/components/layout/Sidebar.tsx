@@ -78,11 +78,11 @@ export default function Sidebar({
   const [recentProfiles, setRecentProfiles] = useState<any[]>([]);
 
   useEffect(() => {
-    setRecentProfiles(getRecentlyViewed());
-    const handler = () => setRecentProfiles(getRecentlyViewed());
+    setRecentProfiles(getRecentlyViewed(user?.id));
+    const handler = () => setRecentProfiles(getRecentlyViewed(user?.id));
     window.addEventListener('recently-viewed-changed', handler);
     return () => window.removeEventListener('recently-viewed-changed', handler);
-  }, [location.pathname]);
+  }, [location.pathname, user?.id]);
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
