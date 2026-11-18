@@ -602,7 +602,7 @@ router.post('/verify-alumni', validate(verifyAlumniSchema), async (req, res, nex
 
     // Check if using the primary name & graduation verification flow
     if (lastName && firstName) {
-      const { data: candidates, error } = await supabase
+      let { data: candidates, error } = await supabase
         .from('alumni_eligible')
         .select('id, student_id, first_name, last_name, middle_name, birth_date, graduation_date, program, year_graduated, user_id')
         .ilike('last_name', lastName.trim())
@@ -612,6 +612,18 @@ router.post('/verify-alumni', validate(verifyAlumniSchema), async (req, res, nex
         throw new AppError('Alumni registry is not configured', 500);
       }
       if (error) throw new AppError(error.message, 500);
+
+      // Fallback: check if the user accidentally inverted First Name and Last Name
+      if (!candidates || candidates.length === 0) {
+        const { data: swappedCandidates, error: swapErr } = await supabase
+          .from('alumni_eligible')
+          .select('id, student_id, first_name, last_name, middle_name, birth_date, graduation_date, program, year_graduated, user_id')
+          .ilike('last_name', firstName.trim())
+          .ilike('first_name', lastName.trim());
+        if (!swapErr && swappedCandidates && swappedCandidates.length > 0) {
+          candidates = swappedCandidates;
+        }
+      }
 
       if (!candidates || candidates.length === 0) {
         throw new AppError('We could not verify your alumni information. Please check your Last Name and First Name or contact the registrar.', 400);
@@ -638,12 +650,20 @@ router.post('/verify-alumni', validate(verifyAlumniSchema), async (req, res, nex
         // If record has graduation_date set, verify it matches the graduation day input
         if (c.graduation_date && inputGradDate && !isNaN(inputGradDate.getTime())) {
           const storedGrad = new Date(c.graduation_date);
-          const datesMatch =
+          const fullMatch =
             !isNaN(storedGrad.getTime()) &&
             storedGrad.getUTCFullYear() === inputGradDate.getUTCFullYear() &&
             storedGrad.getUTCMonth() === inputGradDate.getUTCMonth() &&
             storedGrad.getUTCDate() === inputGradDate.getUTCDate();
-          if (!datesMatch) return false;
+
+          // Also allow if month & day match and batch year matches (common when date picker defaults to current year)
+          const monthDayMatch =
+            !isNaN(storedGrad.getTime()) &&
+            storedGrad.getUTCMonth() === inputGradDate.getUTCMonth() &&
+            storedGrad.getUTCDate() === inputGradDate.getUTCDate() &&
+            (!targetBatch || c.year_graduated === targetBatch);
+
+          if (!fullMatch && !monthDayMatch) return false;
         }
 
         return true;

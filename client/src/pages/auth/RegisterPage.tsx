@@ -457,27 +457,8 @@ export default function RegisterPage() {
             </p>
 
             <form onSubmit={handleVerifyIdentity} className="space-y-3.5 sm:space-y-4">
-              {/* Last Name & First Name */}
+              {/* First Name & Last Name */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
-                <div>
-                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${identityErrors.lastName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
-                    Last Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={identity.lastName}
-                    onChange={(e) => {
-                      setIdentity((p) => ({ ...p, lastName: e.target.value }));
-                      if (verifyError || identityErrors.lastName) {
-                        setVerifyError(null);
-                        setIdentityErrors((p) => ({ ...p, lastName: false }));
-                      }
-                    }}
-                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${identityErrors.lastName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
-                    placeholder="e.g. Dela Cruz"
-                    required
-                  />
-                </div>
                 <div>
                   <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${identityErrors.firstName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
                     First Name <span className="text-red-500">*</span>
@@ -494,6 +475,25 @@ export default function RegisterPage() {
                     }}
                     className={`input-field text-base sm:text-sm h-11 sm:h-10 ${identityErrors.firstName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
                     placeholder="e.g. Juan"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={`block text-xs sm:text-sm font-medium mb-1.5 ${identityErrors.lastName ? 'text-red-600' : 'text-ctu-charcoal'}`}>
+                    Last Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={identity.lastName}
+                    onChange={(e) => {
+                      setIdentity((p) => ({ ...p, lastName: e.target.value }));
+                      if (verifyError || identityErrors.lastName) {
+                        setVerifyError(null);
+                        setIdentityErrors((p) => ({ ...p, lastName: false }));
+                      }
+                    }}
+                    className={`input-field text-base sm:text-sm h-11 sm:h-10 ${identityErrors.lastName ? 'border-red-600 focus:ring-red-500/20 focus:border-red-600' : ''}`}
+                    placeholder="e.g. Dela Cruz"
                     required
                   />
                 </div>
