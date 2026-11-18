@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import * as XLSX from 'xlsx';
+import { createStyledWorksheet } from '@/utils/excelExport';
 import {
   XMarkIcon,
   DocumentTextIcon,
@@ -358,21 +359,7 @@ export default function ApplicantScreeningModal({
           'Company Remarks': '',
         }));
 
-        const ws = XLSX.utils.json_to_sheet(rows);
-        ws['!cols'] = [
-          { wch: 24 },
-          { wch: 28 },
-          { wch: 14 },
-          { wch: 30 },
-          { wch: 14 },
-          { wch: 30 },
-          { wch: 25 },
-          { wch: 35 },
-          { wch: 35 },
-          { wch: 14 },
-          { wch: 40 },
-          { wch: 35 },
-        ];
+        const ws = createStyledWorksheet(rows);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Candidates');
         XLSX.writeFile(wb, `candidate_referral_${safeName}_${new Date().toISOString().slice(0, 10)}.xlsx`);

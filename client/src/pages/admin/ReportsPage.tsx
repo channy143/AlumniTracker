@@ -29,6 +29,7 @@ import {
 } from '@heroicons/react/24/outline';
 import ReportDetailView from './ReportDetailView';
 import { normalizeReportRows } from './reportAnalytics';
+import { exportAsExcel as exportStyledExcel, createStyledWorksheet } from '@/utils/excelExport';
 
 // Helper to trigger browser download of a Blob
 function downloadBlob(blob: Blob, filename: string) {
@@ -199,12 +200,9 @@ export default function ReportsPage() {
   // Export Handlers
   // ---------------------------------------------------------------------------
 
-  // Helper: Export as XLSX via SheetJS
+  // Helper: Export as XLSX via SheetJS with auto-fitted column spacing and comfortable row heights
   const exportAsExcel = (data: any[], filename: string, sheetName = 'Report') => {
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
-    XLSX.writeFile(wb, filename);
+    exportStyledExcel(data, filename, sheetName);
   };
 
   // Helper: Printable HTML / PDF Window
@@ -400,78 +398,78 @@ export default function ReportsPage() {
         { Parameter: 'Active OJT Deployments', Value: stats?.activeOjtCount ?? 0 },
         { Parameter: 'Registered Partner Companies', Value: stats?.totalCompanies || 0 },
       ];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(coverData), 'Institutional Overview');
+      XLSX.utils.book_append_sheet(wb, createStyledWorksheet(coverData), 'Institutional Overview');
 
       // Sheet 2: Alumni Registry
       const alumniRows = alumniRes.data || [];
       if (alumniRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(alumniRows), 'Alumni Registry');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(alumniRows), 'Alumni Registry');
       }
 
       // Sheet 3: Employment Records
       const empRows = empRes.data || [];
       if (empRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(empRows), 'Graduate Employment');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(empRows), 'Graduate Employment');
       }
 
       // Sheet 4: Proof of Employment & Verification
       const proofRows = proofsRes.data || [];
       if (proofRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(proofRows), 'Employment Proofs');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(proofRows), 'Employment Proofs');
       }
 
       // Sheet 4: Companies & Industry Partners
       const compRows = compRes.data || [];
       if (compRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(compRows), 'Partner Companies');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(compRows), 'Partner Companies');
       }
 
       // Sheet 5: Salary Analytics
       const salaryRows = salaryRes.data || [];
       if (salaryRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(salaryRows), 'Salary Brackets');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(salaryRows), 'Salary Brackets');
       }
 
       // Sheet 6: Employment by Program
       const courseRows = courseRes.data || [];
       if (courseRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(courseRows), 'Program Employment Rates');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(courseRows), 'Program Employment Rates');
       }
 
       // Sheet 7: Batch Trends
       const batchRows = batchRes.data || [];
       if (batchRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(batchRows), 'Batch Absorption Rates');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(batchRows), 'Batch Absorption Rates');
       }
 
       // Sheet 8: Degree Alignment
       const alignmentRows = alignmentRes.data || [];
       if (alignmentRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(alignmentRows), 'Degree Alignment');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(alignmentRows), 'Degree Alignment');
       }
 
       // Sheet 9: Career Progression
       const careerRows = careerRes.data || [];
       if (careerRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(careerRows), 'Career Progression');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(careerRows), 'Career Progression');
       }
 
       // Sheet 10: 4th-Year OJT & Graduation Clearance
       const ojtRows = ojtRes.data || [];
       if (ojtRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ojtRows), 'OJT Clearance');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(ojtRows), 'OJT Clearance');
       }
 
       // Sheet 11: Skills Inventory
       const skillsRows = skillsRes.data || [];
       if (skillsRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(skillsRows), 'Skills Inventory');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(skillsRows), 'Skills Inventory');
       }
 
       // Sheet 12: Tracer Surveys Summary
       const tracerRows = tracerRes.data || [];
       if (tracerRows.length > 0) {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tracerRows), 'Tracer Surveys');
+        XLSX.utils.book_append_sheet(wb, createStyledWorksheet(tracerRows), 'Tracer Surveys');
       }
 
       const fileName = `CTU_Master_Institutional_Analytics_${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -1109,7 +1107,8 @@ export default function ReportsPage() {
                             'xlsx',
                             async () => {
                               const res = await report.fetchLiveJson();
-                              const rows = res.data || (Array.isArray(res) ? res : []);
+                              const normalized = normalizeReportRows(report.id, res);
+                              const rows = normalized.length > 0 ? normalized : (res.data || (Array.isArray(res) ? res : []));
                               exportAsExcel(rows, `${report.defaultFilename}.xlsx`, report.title);
                             }
                           )

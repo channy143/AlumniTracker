@@ -3,6 +3,7 @@ import { adminApi } from '@/services/api';
 import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
 import { Link } from 'react-router-dom';
 import { SkeletonStatCard, SkeletonChartPanel } from '@/components/ui/Skeleton';
+import { exportSectionsToExcel } from '@/utils/excelExport';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line,
@@ -456,8 +457,7 @@ export default function EmployerInsights() {
   const handleExportExcel = () => {
     if (!data) return;
     const sections = buildReport();
-    const html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>table{border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px 8px;font-size:12px}</style></head><body>${sections.map((s) => `<h3>${s.title}</h3><table><thead><tr>${s.headers.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${s.rows.map((r: any) => `<tr>${s.headers.map((h) => `<td>${escapeHtml(r[h] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>`).join('')}</body></html>`;
-    download(`employer-insights-${new Date().toISOString().slice(0, 10)}.xls`, html, 'application/vnd.ms-excel;charset=utf-8');
+    exportSectionsToExcel(sections, `employer-insights-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const handleExportPDF = () => {
