@@ -682,11 +682,14 @@ router.get('/career-statistics', async (req, res, next) => {
 
     const parseSalary = (value?: string | null): number | null => {
       if (!value) return null;
-      const clean = String(value).replace(/[₱,,\s]/g, '');
-      const parts = clean.split('-').map((s) => parseFloat(s)).filter((n) => !isNaN(n));
+      const clean = String(value).replace(/[₱,\s]/g, '');
+      const parts = clean
+        .split(/[-–—]/)
+        .map((s) => parseFloat(s))
+        .filter((n) => !isNaN(n));
       if (parts.length === 0) return null;
-      if (parts.length === 1) return parts[0];
-      return (parts[0] + parts[1]) / 2;
+      if (parts.length === 1) return Math.round(parts[0]);
+      return Math.floor((parts[0] + parts[1]) / 2);
     };
 
     const salaryValues = currentEmployment.map((e: any) => parseSalary(e.salary_range)).filter((n): n is number => n !== null);

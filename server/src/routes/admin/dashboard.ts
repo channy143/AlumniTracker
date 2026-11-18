@@ -196,14 +196,17 @@ router.get('/stats', async (req, res, next) => {
     const employedPercentage = Math.round((totalEmployed / cohortTotal) * 100);
     const unemployedPercentage = Math.round((unemployedCount / cohortTotal) * 100);
 
-    // Salaries for current employment
+    // Salaries for current employment (whole-number midpoint, handles hyphen or en-dash ranges)
     const parseSalary = (value?: string | null): number | null => {
       if (!value) return null;
-      const clean = String(value).replace(/[₱,,\s]/g, '');
-      const parts = clean.split('-').map((s) => parseFloat(s)).filter((n) => !isNaN(n));
+      const clean = String(value).replace(/[₱,\s]/g, '');
+      const parts = clean
+        .split(/[-–—]/)
+        .map((s) => parseFloat(s))
+        .filter((n) => !isNaN(n));
       if (parts.length === 0) return null;
-      if (parts.length === 1) return parts[0];
-      return (parts[0] + parts[1]) / 2;
+      if (parts.length === 1) return Math.round(parts[0]);
+      return Math.floor((parts[0] + parts[1]) / 2);
     };
 
     const targetEmpRecords = (allEmployment || []).filter((e: any) =>

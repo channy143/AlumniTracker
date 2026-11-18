@@ -279,6 +279,37 @@ const INVALID_COMPANY_TERMS = new Set([
   'imong mama',
 ]);
 
+export function toTitleCaseCompanyName(raw: unknown): string {
+  const cleaned = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+
+  const toWordCase = (word: string): string =>
+    word.replace(/[A-Za-zÀ-ÖØ-öø-ÿ0-9']+/g, (segment) => {
+      if (/^(II|III|IV|V)$/i.test(segment)) return segment.toUpperCase();
+      return segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase();
+    });
+
+  const isAllUpper = /[A-ZÀ-ÖØ-Þ]/.test(cleaned) && cleaned === cleaned.toUpperCase();
+  const isAllLower = /[a-zà-öø-ÿ]/.test(cleaned) && cleaned === cleaned.toLowerCase();
+
+  if (isAllUpper || isAllLower) {
+    return cleaned.split(' ').map(toWordCase).join(' ');
+  }
+
+  return cleaned
+    .split(' ')
+    .map((word) =>
+      word.replace(/[A-Za-zÀ-ÖØ-öø-ÿ']+/g, (seg) => {
+        if (seg.length > 1 && seg === seg.toLowerCase()) {
+          if (/^(of|and|for|the|in|at|on|by|to|de|la)$/i.test(seg)) return seg;
+          return seg.charAt(0).toUpperCase() + seg.slice(1).toLowerCase();
+        }
+        return seg;
+      })
+    )
+    .join(' ');
+}
+
 export function validateCompanyName(raw: unknown): {
   valid: boolean;
   cleaned: string;
@@ -304,7 +335,7 @@ export function validateCompanyName(raw: unknown): {
   if (/^(.)\1+$/i.test(alphaOnly) || /(.)\1{3,}/i.test(alphaOnly) || KEYBOARD_MASH_PATTERN.test(alphaOnly)) {
     return { valid: false, cleaned, error: 'Please enter a valid company or organization name.' };
   }
-  return { valid: true, cleaned };
+  return { valid: true, cleaned: toTitleCaseCompanyName(cleaned) };
 }
 
 export function toTitleCaseName(raw: unknown): string {
@@ -314,9 +345,15 @@ export function toTitleCaseName(raw: unknown): string {
     .split(' ')
     .map((word) => {
       if (!word) return '';
-      // Preserve Roman numerals II, III, IV, Jr., Sr.
+      // Preserve Roman numerals II, III, IV, V
       if (/^(II|III|IV|V)$/i.test(word)) return word.toUpperCase();
-      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      if (/^(Jr\.?|Sr\.?)$/i.test(word)) {
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      }
+      return word
+        .split('-')
+        .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : ''))
+        .join('-');
     })
     .join(' ');
 }

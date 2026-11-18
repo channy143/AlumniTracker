@@ -15,6 +15,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AuthenticatedRequest, AuthPayload } from '../types';
 import { sendOtpEmail } from '../services/email';
 import { logAudit } from '../services/auditLogger';
+import { toTitleCaseName } from '../utils/validateJobTitle';
 import {
   createOtp,
   verifyOtp,
@@ -231,9 +232,9 @@ router.post('/register', validate(registerV2Schema), async (req, res, next) => {
 
     let profileInsertPayload: Record<string, any> = {
       user_id: user.id,
-      first_name: String(firstName || '').trim().split(/\s+/).map((w: string) => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : '').join(' '),
-      last_name: String(lastName || '').trim().split(/\s+/).map((w: string) => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : '').join(' '),
-      middle_name: middleName ? String(middleName).trim().split(/\s+/).map((w: string) => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : '').join(' ') : null,
+      first_name: toTitleCaseName(firstName),
+      last_name: toTitleCaseName(lastName),
+      middle_name: middleName ? toTitleCaseName(middleName) : null,
       email: String(email || '').trim().toLowerCase(),
       country: null,
       employment_status: null,

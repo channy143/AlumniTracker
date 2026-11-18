@@ -6,6 +6,7 @@ import { sanitizeFilterInput } from '../../utils/sanitizeFilterInput';
 import { logAudit } from '../../services/auditLogger';
 import { AuthenticatedRequest } from '../../types';
 import { notifyAdmins } from '../notifications';
+import { toTitleCaseCompanyName } from '../../utils/validateJobTitle';
 
 const router = Router();
 const upload = multer({
@@ -154,7 +155,7 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
     const resolvedPartnershipStatus = isPartner ? 'partner' : 'non-partner';
 
     const insertPayload: any = {
-      name: name.trim(),
+      name: toTitleCaseCompanyName(name),
       industry: industry || null,
       website: website || null,
       description: description || null,
@@ -232,7 +233,7 @@ router.post('/sync-employers', async (_req, res, next) => {
     const newRows = [...toInsertMap.entries()].map(([lower, industry]) => {
       const original = (employments || []).find((e: any) => String(e.company_name || '').trim().toLowerCase() === lower)?.company_name?.trim() || lower;
       return {
-        name: original,
+        name: toTitleCaseCompanyName(original),
         industry: industry || 'Other',
         employer_type: 'regular',
         partnership_status: 'non-partner',
@@ -281,7 +282,7 @@ router.put('/:id', async (req: AuthenticatedRequest, res, next) => {
     const { data: existing } = await supabase.from('companies').select('*').eq('id', req.params.id).single();
 
     const updatePayload: any = {};
-    if (name !== undefined) updatePayload.name = name.trim();
+    if (name !== undefined) updatePayload.name = toTitleCaseCompanyName(name);
     if (industry !== undefined) updatePayload.industry = industry;
     if (website !== undefined) updatePayload.website = website;
     if (description !== undefined) updatePayload.description = description;

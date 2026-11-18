@@ -84,9 +84,9 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
             .join(', ');
           const resolvedAddress = combinedAddr || (r.address ? String(r.address).trim() : '');
 
-          if (!profile.first_name && r.firstName) backfill.first_name = String(r.firstName).trim();
-          if (!profile.last_name && r.lastName) backfill.last_name = String(r.lastName).trim();
-          if (!profile.middle_name && r.middleName) backfill.middle_name = String(r.middleName).trim();
+          if (!profile.first_name && r.firstName) backfill.first_name = toTitleCaseName(r.firstName);
+          if (!profile.last_name && r.lastName) backfill.last_name = toTitleCaseName(r.lastName);
+          if (!profile.middle_name && r.middleName) backfill.middle_name = toTitleCaseName(r.middleName);
           if (!profile.phone && r.phone) backfill.phone = normalizePhPhone(r.phone);
           if (!profile.address && resolvedAddress) backfill.address = resolvedAddress;
           if (!profile.province && r.province) backfill.province = normalizeProvinceName(r.province);

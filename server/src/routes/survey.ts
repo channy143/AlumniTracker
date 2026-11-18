@@ -277,10 +277,10 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
     // Sync relevant profile information if provided
     const profileUpdates: Record<string, any> = {};
     if (responses?.firstName && !isEvasiveInput(responses.firstName)) {
-      profileUpdates.first_name = String(responses.firstName).trim();
+      profileUpdates.first_name = toTitleCaseName(responses.firstName);
     }
     if (responses?.lastName && !isEvasiveInput(responses.lastName)) {
-      profileUpdates.last_name = String(responses.lastName).trim();
+      profileUpdates.last_name = toTitleCaseName(responses.lastName);
     }
     const studentIdVal = responses?.studentId || responses?.id_number || responses?.idNumber;
     if (studentIdVal && !isEvasiveInput(studentIdVal)) {

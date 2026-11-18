@@ -11,7 +11,7 @@ import { buildDpaCsv } from '../../utils/csvExport';
 import { requireAdminSudo } from '../../middleware/sudo';
 import { adminSensitiveLimiter } from '../../middleware/rateLimiter';
 import { invalidateUserSessions } from '../../services/sessionSecurityService';
-import { normalizeIndustry, normalizeSalaryRange, toTitleCaseName } from '../../utils/validateJobTitle';
+import { normalizeIndustry, normalizeSalaryRange, toTitleCaseName, toTitleCaseCompanyName } from '../../utils/validateJobTitle';
 
 const router = Router();
 
@@ -573,7 +573,10 @@ router.post('/', async (req, res, next) => {
     if (userError) throw new AppError(userError.message, 500);
 
     let profileInsertPayload: Record<string, any> = {
-      user_id: user.id, first_name: firstName, last_name: lastName, email,
+      user_id: user.id,
+      first_name: toTitleCaseName(firstName),
+      last_name: toTitleCaseName(lastName),
+      email,
     };
     if (idNumber) {
       try {
@@ -639,6 +642,18 @@ router.put('/:id', async (req: AuthenticatedRequest, res, next) => {
         ...profile,
         updated_at: new Date().toISOString(),
       };
+      if (profilePayload.first_name !== undefined && profilePayload.first_name) {
+        profilePayload.first_name = toTitleCaseName(profilePayload.first_name);
+      }
+      if (profilePayload.last_name !== undefined && profilePayload.last_name) {
+        profilePayload.last_name = toTitleCaseName(profilePayload.last_name);
+      }
+      if (profilePayload.middle_name !== undefined) {
+        profilePayload.middle_name = profilePayload.middle_name ? toTitleCaseName(profilePayload.middle_name) : null;
+      }
+      if (profilePayload.company_name !== undefined && profilePayload.company_name) {
+        profilePayload.company_name = toTitleCaseCompanyName(profilePayload.company_name);
+      }
       if (profilePayload.id_number !== undefined && String(profilePayload.id_number).trim() === '') {
         profilePayload.id_number = null;
       }
@@ -677,7 +692,11 @@ router.put('/:id', async (req: AuthenticatedRequest, res, next) => {
       const careerFields: Record<string, any> = {};
       const allowed = ['employment_status', 'current_job_title', 'company_name', 'industry', 'salary_range'];
       for (const field of allowed) {
-        if (career[field] !== undefined) careerFields[field] = career[field];
+        if (career[field] !== undefined) {
+          careerFields[field] = field === 'company_name' && career[field]
+            ? toTitleCaseCompanyName(career[field])
+            : career[field];
+        }
       }
       if (Object.keys(careerFields).length > 0) {
         careerFields.last_updated_at = new Date().toISOString();

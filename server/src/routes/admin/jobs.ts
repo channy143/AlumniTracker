@@ -16,6 +16,7 @@ import {
 } from '../../middleware/validationSchemas';
 import { calculateMatchScore } from '../../utils/matchScoring';
 import { logAudit } from '../../services/auditLogger';
+import { toTitleCaseCompanyName } from '../../utils/validateJobTitle';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -97,7 +98,7 @@ router.post('/employers', validate(createEmployerSchema), async (req, res, next)
     const { data, error } = await supabase
       .from('employers')
       .insert({
-        company_name,
+        company_name: toTitleCaseCompanyName(company_name),
         industry: industry || null,
         contact_person: contact_person || null,
         contact_email: contact_email || null,
@@ -187,7 +188,7 @@ router.post('/', validate(adminCreateJobSchema), async (req, res, next) => {
       is_remote,
     } = req.body;
 
-    let resolvedCompanyName = (company_name || '').trim();
+    let resolvedCompanyName = toTitleCaseCompanyName(company_name);
     let resolvedEmployerId = employer_id || null;
     let resolvedCompanyId = company_id || null;
     let resolvedIndustry = industry || null;
