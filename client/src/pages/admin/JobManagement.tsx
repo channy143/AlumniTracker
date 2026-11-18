@@ -34,7 +34,7 @@ import {
 const CURRENCY_OPTIONS = getCurrencyOptions();
 
 const EMPTY_FORM = {
-  employer_id: '', company_name: '', position: '', description: '', requirements: '', location: '', job_type: 'full-time',
+  employer_id: '', company_id: '', company_name: '', position: '', description: '', requirements: '', location: '', job_type: 'full-time',
   salary_currency: 'PHP', salary_range: '', industry: '', experience_level: 'entry', required_skills: [] as string[],
   application_url: '', poster_url: '', vacancies_count: 1, contact_email: '', contact_phone: '',
   is_alumni_exclusive: false, is_remote: false, expires_at: '',
@@ -137,6 +137,7 @@ export default function JobManagement() {
       setForm((f: any) => ({
         ...f,
         employer_id: created.id,
+        company_id: created.company_id || '',
         company_name: created.company_name,
         industry: created.industry || f.industry,
       }));
@@ -156,14 +157,21 @@ export default function JobManagement() {
     setFormError('');
     setShowNewEmployer(false);
     setSkillInput('');
+    loadEmployers();
     setShowForm(true);
   };
 
   const openEdit = (job: any) => {
     const parsedSalary = parseSalaryCurrencyAndRange(job.salary_range);
+    const matchedEmployer = employers.find(
+      (emp) =>
+        (job.employer_id && (emp.id === job.employer_id || emp.employer_id === job.employer_id)) ||
+        (job.company_id && (emp.id === job.company_id || emp.company_id === job.company_id))
+    );
     setEditId(job.id);
     setForm({
-      employer_id: job.employer_id || '',
+      employer_id: matchedEmployer?.id || job.employer_id || job.company_id || '',
+      company_id: job.company_id || matchedEmployer?.company_id || '',
       company_name: job.company_name || '',
       position: job.position || '',
       description: job.description || '',
@@ -196,6 +204,8 @@ export default function JobManagement() {
       const { salary_currency, ...restForm } = form as any;
       const payload = {
         ...restForm,
+        employer_id: form.employer_id?.trim() || null,
+        company_id: form.company_id?.trim() || null,
         vacancies_count: form.vacancies_count ? Number(form.vacancies_count) : 1,
         salary_range: formatSalaryWithCurrency(salary_currency, form.salary_range),
         poster_url: form.poster_url?.trim() || null,
@@ -741,6 +751,7 @@ export default function JobManagement() {
                       setForm((f: any) => ({
                         ...f,
                         employer_id: e.target.value,
+                        company_id: emp?.company_id || '',
                         company_name: emp?.company_name || f.company_name,
                         industry: emp?.industry || f.industry,
                       }));

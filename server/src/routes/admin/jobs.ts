@@ -17,6 +17,7 @@ import {
 import { calculateMatchScore } from '../../utils/matchScoring';
 import { logAudit } from '../../services/auditLogger';
 import { toTitleCaseCompanyName } from '../../utils/validateJobTitle';
+import { ensureCompanyRecord, resolveJobCompanyAndEmployer } from '../../utils/syncEmployers';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -82,13 +83,56 @@ router.get('/', async (req, res, next) => {
 
 router.get('/employers', async (_req, res, next) => {
   try {
-    const { data, error } = await supabase
-      .from('employers')
-      .select('*')
-      .order('company_name', { ascending: true });
-    if (error && (error.code === '42P01' || error.code === 'PGRST205')) return res.json([]);
-    if (error) throw new AppError(error.message, 500);
-    res.json(data || []);
+    const [employersRes, companiesRes] = await Promise.all([
+      supabase.from('employers').select('*').order('company_name', { ascending: true }),
+      supabase.from('companies').select('id, name, industry, contact_email, is_active').order('name', { ascending: true }),
+    ]);
+
+    const employersMissing = employersRes.error && (employersRes.error.code === '42P01' || employersRes.error.code === 'PGRST205');
+    if (employersRes.error && !employersMissing) throw new AppError(employersRes.error.message, 500);
+
+    const companiesMissing = companiesRes.error && (companiesRes.error.code === '42P01' || companiesRes.error.code === 'PGRST205');
+    if (companiesRes.error && !companiesMissing) throw new AppError(companiesRes.error.message, 500);
+
+    const mergedMap = new Map<string, any>();
+
+    for (const emp of employersMissing ? [] : (employersRes.data || [])) {
+      const key = String(emp.company_name || '').trim().toLowerCase();
+      if (!key) continue;
+      mergedMap.set(key, {
+        ...emp,
+        employer_id: emp.id,
+        company_id: null,
+      });
+    }
+
+    for (const comp of companiesMissing ? [] : (companiesRes.data || [])) {
+      if (comp.is_active === false) continue;
+      const key = String(comp.name || '').trim().toLowerCase();
+      if (!key) continue;
+      const existing = mergedMap.get(key);
+      if (existing) {
+        existing.company_id = comp.id;
+        if (!existing.industry && comp.industry) existing.industry = comp.industry;
+        if (!existing.contact_email && comp.contact_email) existing.contact_email = comp.contact_email;
+      } else {
+        mergedMap.set(key, {
+          id: comp.id,
+          employer_id: null,
+          company_id: comp.id,
+          company_name: comp.name,
+          industry: comp.industry || null,
+          contact_person: null,
+          contact_email: comp.contact_email || null,
+        });
+      }
+    }
+
+    const merged = Array.from(mergedMap.values()).sort((a, b) =>
+      String(a.company_name || '').localeCompare(String(b.company_name || ''), undefined, { sensitivity: 'base' })
+    );
+
+    res.json(merged);
   } catch (err) { next(err); }
 });
 
@@ -106,7 +150,18 @@ router.post('/employers', validate(createEmployerSchema), async (req, res, next)
       .select()
       .single();
     if (error) throw new AppError(error.message, 500);
-    res.status(201).json(data);
+
+    const company = await ensureCompanyRecord({
+      name: data.company_name,
+      industry: data.industry,
+      contactEmail: data.contact_email,
+    });
+
+    res.status(201).json({
+      ...data,
+      employer_id: data.id,
+      company_id: company?.id || null,
+    });
   } catch (err) { next(err); }
 });
 
@@ -188,33 +243,17 @@ router.post('/', validate(adminCreateJobSchema), async (req, res, next) => {
       is_remote,
     } = req.body;
 
-    let resolvedCompanyName = toTitleCaseCompanyName(company_name);
-    let resolvedEmployerId = employer_id || null;
-    let resolvedCompanyId = company_id || null;
-    let resolvedIndustry = industry || null;
+    const resolved = await resolveJobCompanyAndEmployer({
+      employerId: employer_id,
+      companyId: company_id,
+      companyName: company_name,
+      industry,
+    });
 
-    if (resolvedEmployerId) {
-      const { data: emp } = await supabase
-        .from('employers')
-        .select('id, company_name, industry')
-        .eq('id', resolvedEmployerId)
-        .maybeSingle();
-      if (emp) {
-        resolvedCompanyName = emp.company_name;
-        if (!resolvedIndustry && emp.industry) resolvedIndustry = emp.industry;
-      }
-    } else if (resolvedCompanyId) {
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .select('id, name, is_verified, industry')
-        .eq('id', resolvedCompanyId)
-        .maybeSingle();
-      if (companyError) throw new AppError(companyError.message, 500);
-      if (company) {
-        resolvedCompanyName = company.name;
-        if (!resolvedIndustry && company.industry) resolvedIndustry = company.industry;
-      }
-    }
+    const resolvedCompanyName = resolved.companyName;
+    const resolvedEmployerId = resolved.employerId;
+    const resolvedCompanyId = resolved.companyId;
+    const resolvedIndustry = resolved.industry;
 
     if (!resolvedCompanyName) {
       throw new AppError('Employer / Company name is required', 400);
@@ -1242,6 +1281,8 @@ router.put('/:id', validate(adminUpdateJobSchema), async (req, res, next) => {
   try {
     const {
       company_id,
+      employer_id,
+      company_name,
       position,
       description,
       requirements,
@@ -1262,17 +1303,22 @@ router.put('/:id', validate(adminUpdateJobSchema), async (req, res, next) => {
     } = req.body;
 
     const payload: any = {};
-    if (company_id !== undefined) {
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .select('id, name, is_verified')
-        .eq('id', company_id)
-        .maybeSingle();
-      if (companyError) throw new AppError(companyError.message, 500);
-      if (!company) throw new AppError('Company not found', 404);
-      if (!company.is_verified) throw new AppError('Only verified companies can be used for job postings', 400);
-      payload.company_id = company.id;
-      payload.company_name = company.name;
+    if (employer_id !== undefined || company_id !== undefined || company_name !== undefined) {
+      const resolved = await resolveJobCompanyAndEmployer({
+        employerId: employer_id,
+        companyId: company_id,
+        companyName: company_name,
+        industry,
+      });
+      if (!resolved.companyName) {
+        throw new AppError('Employer / Company name is required', 400);
+      }
+      payload.employer_id = resolved.employerId;
+      payload.company_id = resolved.companyId;
+      payload.company_name = resolved.companyName;
+      if (industry === undefined && resolved.industry) {
+        payload.industry = resolved.industry;
+      }
     }
     if (position !== undefined) payload.position = position;
     if (description !== undefined) payload.description = sanitizeRichText(description);

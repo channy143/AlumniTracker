@@ -7,6 +7,7 @@ import { logAudit } from '../../services/auditLogger';
 import { AuthenticatedRequest } from '../../types';
 import { notifyAdmins } from '../notifications';
 import { toTitleCaseCompanyName } from '../../utils/validateJobTitle';
+import { ensureEmployerRecord } from '../../utils/syncEmployers';
 
 const router = Router();
 const upload = multer({
@@ -183,6 +184,12 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
 
     if (error && (error.code === '42P01' || error.code === 'PGRST205')) throw new AppError('Companies table not available. Run the SQL migration first.', 400);
     if (error) throw new AppError(error.message, 500);
+
+    await ensureEmployerRecord({
+      companyName: data.name,
+      industry: data.industry,
+      contactEmail: data.contact_email,
+    });
 
     await logAudit(req, {
       action: 'CREATE_COMPANY',
@@ -515,12 +522,34 @@ router.put('/:id/verify', async (req: AuthenticatedRequest, res, next) => {
 
 router.delete('/:id', async (req, res, next) => {
   try {
+    const { data: existingCompany } = await supabase
+      .from('companies')
+      .select('name')
+      .eq('id', req.params.id)
+      .maybeSingle();
+
     const { error } = await supabase.from('companies').delete().eq('id', req.params.id);
     if (error) {
       const { error: softErr } = await supabase.from('companies').update({ is_active: false }).eq('id', req.params.id);
       if (softErr) throw new AppError(softErr.message, 500);
       return res.json({ message: 'Company deactivated' });
     }
+
+    if (existingCompany?.name) {
+      try {
+        const targetNorm = String(existingCompany.name).trim().toLowerCase();
+        const { data: employers } = await supabase.from('employers').select('id, company_name');
+        const matchingIds = (employers || [])
+          .filter((e: any) => String(e.company_name || '').trim().toLowerCase() === targetNorm)
+          .map((e: any) => e.id);
+        if (matchingIds.length > 0) {
+          await supabase.from('employers').delete().in('id', matchingIds);
+        }
+      } catch {
+        // Ignore non-fatal sync cleanup
+      }
+    }
+
     res.json({ message: 'Company deleted' });
   } catch (err) {
     next(err);

@@ -341,6 +341,7 @@ router.get('/', authenticate, async (req, res, next) => {
     const employmentRate = totalAlumni > 0 ? Math.round((totalEmployed / totalAlumni) * 100) : 0;
 
     const careerMap = new Map<string, {
+      displayPosition: string;
       alumni: Set<string>;
       employers: Map<string, number>;
       industries: Map<string, number>;
@@ -354,10 +355,13 @@ router.get('/', authenticate, async (req, res, next) => {
     const careerLocations = new Map<string, Set<string>>();
     const careerBatches = new Map<string, Set<number>>();
 
-    mergedEmployment.forEach((e: any) => {
-      if (!e.position) return;
-      if (!careerMap.has(e.position)) {
-        careerMap.set(e.position, {
+    fullEmployment.forEach((e: any) => {
+      const rawPos = String(e.position || '').trim();
+      if (!rawPos) return;
+      const normKey = rawPos.toLowerCase();
+      if (!careerMap.has(normKey)) {
+        careerMap.set(normKey, {
+          displayPosition: rawPos,
           alumni: new Set(),
           employers: new Map(),
           industries: new Map(),
@@ -366,7 +370,10 @@ router.get('/', authenticate, async (req, res, next) => {
           experienceMonths: [],
         });
       }
-      const career = careerMap.get(e.position)!;
+      const career = careerMap.get(normKey)!;
+      if (career.displayPosition === career.displayPosition.toLowerCase() && rawPos !== rawPos.toLowerCase()) {
+        career.displayPosition = rawPos;
+      }
       career.alumni.add(e.profile_id);
       if (e.company_name && e.company_name !== 'Unknown') {
         career.employers.set(e.company_name, (career.employers.get(e.company_name) || 0) + 1);
@@ -400,37 +407,37 @@ router.get('/', authenticate, async (req, res, next) => {
 
       // Track filter data per career
       if (e.job_type) {
-        if (!careerJobTypes.has(e.position)) careerJobTypes.set(e.position, new Set());
-        careerJobTypes.get(e.position)!.add(e.job_type);
+        if (!careerJobTypes.has(normKey)) careerJobTypes.set(normKey, new Set());
+        careerJobTypes.get(normKey)!.add(e.job_type);
       }
       if (e.employment_status) {
         const normStatus = e.employment_status === 'employed' || e.employment_status === 'self-employed' ? e.employment_status : null;
         if (normStatus) {
-          if (!careerEmploymentStatuses.has(e.position)) careerEmploymentStatuses.set(e.position, new Set());
-          careerEmploymentStatuses.get(e.position)!.add(normStatus);
+          if (!careerEmploymentStatuses.has(normKey)) careerEmploymentStatuses.set(normKey, new Set());
+          careerEmploymentStatuses.get(normKey)!.add(normStatus);
         }
       }
       const p = profileMap.get(e.profile_id);
       if (p) {
         const loc = [p.city, p.province].filter(Boolean).join(', ');
         if (loc) {
-          if (!careerLocations.has(e.position)) careerLocations.set(e.position, new Set());
-          careerLocations.get(e.position)!.add(loc);
+          if (!careerLocations.has(normKey)) careerLocations.set(normKey, new Set());
+          careerLocations.get(normKey)!.add(loc);
         }
       }
       if (eduMap.has(e.profile_id)) {
         eduMap.get(e.profile_id)!.forEach((ed) => {
           if (ed.year) {
-            if (!careerBatches.has(e.position)) careerBatches.set(e.position, new Set());
-            careerBatches.get(e.position)!.add(ed.year);
+            if (!careerBatches.has(normKey)) careerBatches.set(normKey, new Set());
+            careerBatches.get(normKey)!.add(ed.year);
           }
         });
       }
     });
 
     const topCareers = Array.from(careerMap.entries())
-      .map(([position, data]) => {
-        const normPos = position.trim().toLowerCase();
+      .map(([normPos, data]) => {
+        const position = data.displayPosition;
         const matchingActiveJobs = activeJobs.filter((j: any) => {
           if (!j.position) return false;
           const jp = j.position.trim().toLowerCase();
@@ -462,16 +469,16 @@ router.get('/', authenticate, async (req, res, next) => {
         return {
           position,
           alumniCount,
-          currentInCareer: currentJobs.filter((j: any) => j.position === position).length,
+          currentInCareer: currentJobs.filter((j: any) => j.position && j.position.trim().toLowerCase() === normPos).length,
           topEmployers: sortedEmployers.map(([name, count]) => ({ name, count })),
           topIndustries: sortedIndustries.map(([name, count]) => ({ name, count })),
           mostCommonCourse: sortedCourses.length > 0 ? formatProgramLongName(sortedCourses[0][0]) : null,
           topSkills: sortedSkills.map(([name, count]) => ({ name, count })),
           averageExperienceYears: avgYears,
-          jobTypes: [...(careerJobTypes.get(position) || [])],
-          employmentStatuses: [...(careerEmploymentStatuses.get(position) || [])],
-          locations: [...(careerLocations.get(position) || [])],
-          batches: [...(careerBatches.get(position) || [])].sort((a, b) => b - a),
+          jobTypes: [...(careerJobTypes.get(normPos) || [])],
+          employmentStatuses: [...(careerEmploymentStatuses.get(normPos) || [])],
+          locations: [...(careerLocations.get(normPos) || [])],
+          batches: [...(careerBatches.get(normPos) || [])].sort((a, b) => b - a),
           activeJobsCount: matchingActiveJobs.length,
           activeJobPostings: matchingActiveJobs.slice(0, 5).map((j: any) => ({
             id: j.id,
@@ -485,7 +492,7 @@ router.get('/', authenticate, async (req, res, next) => {
           hiredViaJobsCount: hiredCount,
         };
       })
-      .sort((a, b) => b.alumniCount - a.alumniCount);
+      .sort((a, b) => b.alumniCount - a.alumniCount || (b.activeJobsCount || 0) - (a.activeJobsCount || 0) || a.position.localeCompare(b.position));
 
     const employerMap = new Map<string, Set<string>>();
     const employerIndustryMap = new Map<string, Map<string, number>>();
@@ -1002,9 +1009,9 @@ router.get('/', authenticate, async (req, res, next) => {
         totalActiveJobs: activeJobs.length,
         totalHiredThroughJobs: hiredApplications.length,
       },
-      topCareers: topCareers.slice(0, 20),
-      topEmployers: topEmployers.slice(0, 15),
-      topIndustries: topIndustries.slice(0, 15),
+      topCareers,
+      topEmployers,
+      topIndustries,
       industryDistribution,
       skillsDistribution: topSkills,
       batchDistribution,
