@@ -5249,7 +5249,10 @@ VALUES
   ('1366573', 'Rezel', NULL, 'Yusomn', 'BTLED', 2027, '2027-06-15', NULL),
   ('1378265', 'Ate Jhomlym', NULL, 'Zab', 'BTLED', 2027, '2027-06-15', NULL),
   ('1350458', 'Amma Marie', NULL, 'Zamora', 'BTLED', 2027, '2027-06-15', NULL),
-  ('1350455', 'Am Ma Marte', NULL, 'Zara', 'BTLED', 2027, '2027-06-15', NULL)
+  ('1350455', 'Am Ma Marte', NULL, 'Zara', 'BTLED', 2027, '2027-06-15', NULL),
+  ('1368101', 'Rhea Mae', 'G', 'Navarro', 'BSIT', 2025, '2025-06-15', NULL),
+  ('1368102', 'Joshua Karl', 'D', 'Villarmia', 'BEEd', 2025, '2025-06-15', NULL),
+  ('1368103', 'Mary Grace', 'C', 'Sarmiento', 'BSEd-Math', 2025, '2025-06-15', NULL)
 ON CONFLICT (student_id) DO UPDATE SET
   first_name = EXCLUDED.first_name,
   middle_name = COALESCE(EXCLUDED.middle_name, public.alumni_eligible.middle_name),
