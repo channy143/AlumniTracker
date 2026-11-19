@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
 import { formatProgramLongName } from '../utils/formatProgram';
+import { canonicalizeJobTitle } from '../utils/validateJobTitle';
 
 const EMPLOYED_STATUS_LABELS = new Set([
   'employed',
@@ -313,14 +314,14 @@ router.get('/', authenticate, async (req, res, next) => {
 
     const hiredEmploymentFallback: any[] = [];
     const existingEmploymentKeys = new Set(
-      mergedEmployment.map((e: any) => `${e.profile_id}__${(e.position || '').toLowerCase()}__${(e.company_name || '').toLowerCase()}`)
+      mergedEmployment.map((e: any) => `${e.profile_id}__${canonicalizeJobTitle(e.position || '').toLowerCase()}__${(e.company_name || '').toLowerCase()}`)
     );
 
     hiredApplications.forEach((app: any) => {
       const job = app.job;
       if (!job) return;
 
-      const normPos = (job.position || '').trim().toLowerCase();
+      const normPos = canonicalizeJobTitle(job.position || '').toLowerCase();
       const normEmp = (job.company_name || '').trim().toLowerCase();
       const normInd = (job.industry || '').trim().toLowerCase();
 
@@ -374,10 +375,11 @@ router.get('/', authenticate, async (req, res, next) => {
     fullEmployment.forEach((e: any) => {
       const rawPos = String(e.position || '').trim();
       if (!rawPos) return;
-      const normKey = rawPos.toLowerCase();
+      const canonicalPos = canonicalizeJobTitle(rawPos);
+      const normKey = canonicalPos.toLowerCase();
       if (!careerMap.has(normKey)) {
         careerMap.set(normKey, {
-          displayPosition: rawPos,
+          displayPosition: canonicalPos,
           alumni: new Set(),
           employers: new Map(),
           industries: new Map(),
@@ -387,8 +389,8 @@ router.get('/', authenticate, async (req, res, next) => {
         });
       }
       const career = careerMap.get(normKey)!;
-      if (career.displayPosition === career.displayPosition.toLowerCase() && rawPos !== rawPos.toLowerCase()) {
-        career.displayPosition = rawPos;
+      if (career.displayPosition === career.displayPosition.toLowerCase() && canonicalPos !== canonicalPos.toLowerCase()) {
+        career.displayPosition = canonicalPos;
       }
       career.alumni.add(e.profile_id);
       if (e.company_name && e.company_name !== 'Unknown') {
@@ -465,7 +467,7 @@ router.get('/', authenticate, async (req, res, next) => {
         const position = data.displayPosition;
         const matchingActiveJobs = activeJobs.filter((j: any) => {
           if (!j.position) return false;
-          const jp = j.position.trim().toLowerCase();
+          const jp = canonicalizeJobTitle(j.position).toLowerCase();
           return jp === normPos || jp.includes(normPos) || normPos.includes(jp);
         });
         const hiredCount = hiredCareerCount.get(normPos) || 0;
@@ -497,7 +499,7 @@ router.get('/', authenticate, async (req, res, next) => {
           position,
           alumniCount,
           averageSalary: avgSalary,
-          currentInCareer: currentJobs.filter((j: any) => j.position && j.position.trim().toLowerCase() === normPos).length,
+          currentInCareer: currentJobs.filter((j: any) => j.position && canonicalizeJobTitle(j.position).toLowerCase() === normPos).length,
           topEmployers: sortedEmployers.map(([name, count]) => ({ name, count })),
           topIndustries: sortedIndustries.map(([name, count]) => ({ name, count })),
           mostCommonCourse: sortedCourses.length > 0 ? formatProgramLongName(sortedCourses[0][0]) : null,
@@ -821,7 +823,8 @@ router.get('/', authenticate, async (req, res, next) => {
         cohort.employedCount++;
       }
 
-      const positionTitle = currentEmp?.position || p.current_job_title || survey?.position || (isEmployed ? 'Professional / Associate' : 'Seeking Opportunities');
+      const rawPositionTitle = currentEmp?.position || p.current_job_title || survey?.position || (isEmployed ? 'Professional / Associate' : 'Seeking Opportunities');
+      const positionTitle = canonicalizeJobTitle(rawPositionTitle);
       const company = currentEmp?.company_name || p.company_name || survey?.company_name || (isEmployed ? 'Partner Employer' : '—');
       
       const normComp = company.trim().toLowerCase();
@@ -969,7 +972,7 @@ router.get('/', authenticate, async (req, res, next) => {
     const topEmployersWithLocations = topEmployers.map((emp) => {
       const normName = emp.name.trim().toLowerCase();
       const addr = companyAddressMap.get(normName) || 'Cebu City / Naga City, Cebu';
-      const positions = currentJobs.filter((j: any) => (j.company_name || '').trim().toLowerCase() === normName).map((j: any) => j.position).filter(Boolean);
+      const positions = currentJobs.filter((j: any) => (j.company_name || '').trim().toLowerCase() === normName).map((j: any) => canonicalizeJobTitle(j.position)).filter(Boolean);
       const uniquePositions = [...new Set(positions)].slice(0, 3) as string[];
       return {
         companyName: emp.name,
@@ -1133,13 +1136,13 @@ router.get('/alumni', authenticate, async (req, res, next) => {
 
     // Merge hired applications
     const existingKeys = new Set(
-      mergedEmployment.map((e: any) => `${e.profile_id}__${(e.position || '').toLowerCase()}__${(e.company_name || '').toLowerCase()}`)
+      mergedEmployment.map((e: any) => `${e.profile_id}__${canonicalizeJobTitle(e.position || '').toLowerCase()}__${(e.company_name || '').toLowerCase()}`)
     );
     hiredApps.forEach((app: any) => {
       const job = app.job;
       const prof = userToProfileMap.get(app.user_id);
       if (prof && job) {
-        const normPos = (job.position || '').trim().toLowerCase();
+        const normPos = canonicalizeJobTitle(job.position || '').toLowerCase();
         const normComp = (job.company_name || '').trim().toLowerCase();
         const key = `${prof.id}__${normPos}__${normComp}`;
         if (!existingKeys.has(key)) {
@@ -1191,7 +1194,7 @@ router.get('/alumni', authenticate, async (req, res, next) => {
         default: {
           const pos = e.position || p?.current_job_title;
           if (!pos) return false;
-          return pos.trim().toLowerCase() === value.trim().toLowerCase();
+          return canonicalizeJobTitle(pos).toLowerCase() === canonicalizeJobTitle(value).toLowerCase();
         }
       }
     };
@@ -1251,7 +1254,9 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       } else if (type === 'industry') {
         return (job.industry || '').toLowerCase().includes(valNorm);
       } else if (type === 'position') {
-        return (job.position || '').toLowerCase().includes(valNorm);
+        const jobPos = canonicalizeJobTitle(job.position || '').toLowerCase();
+        const targetPos = canonicalizeJobTitle(value).toLowerCase();
+        return jobPos === targetPos || jobPos.includes(targetPos) || targetPos.includes(jobPos);
       }
       return false;
     });
@@ -1276,46 +1281,56 @@ router.get('/alumni', authenticate, async (req, res, next) => {
 router.get('/:position', authenticate, async (req, res, next) => {
   try {
     const position = decodeURIComponent(req.params.position);
+    const canonicalPos = canonicalizeJobTitle(position);
+    const targetCanon = canonicalPos.toLowerCase();
+
     const [employmentRes, allJobsRes, hiredAppsRes] = await Promise.all([
       supabase
         .from('employment')
         .select('*, profile:profiles!employment_profile_id_fkey(id, user_id, first_name, last_name, avatar_url, city, province, employment_status)')
-        .ilike('position', position),
+        .or(`position.ilike.%${position}%,position.ilike.%${canonicalPos}%`),
       supabase.from('job_postings').select('*'),
       supabase.from('job_applications').select('id, job_id, user_id, status, applied_at').in('status', ['hired', 'accepted']),
     ]);
 
     if (employmentRes.error) return res.json({ error: employmentRes.error.message });
 
-    const jobs = employmentRes.data || [];
+    const rawJobs = employmentRes.data || [];
+    const jobs = rawJobs.filter((j: any) => {
+      const p = canonicalizeJobTitle(j.position || '').toLowerCase();
+      return p === targetCanon || p.includes(targetCanon) || targetCanon.includes(p);
+    });
     const profileIds = [...new Set(jobs.map((j: any) => j.profile_id))];
 
     const { data: profileFallback } = await supabase
       .from('profiles')
       .select('id, user_id, first_name, last_name, company_name, industry, city, province, current_job_title, employment_status')
-      .ilike('current_job_title', position);
+      .or(`current_job_title.ilike.%${position}%,current_job_title.ilike.%${canonicalPos}%`);
 
     if (profileFallback) {
       for (const pf of profileFallback) {
-        if (!profileIds.includes(pf.id)) {
-          profileIds.push(pf.id);
-          jobs.push({
-            profile_id: pf.id,
-            company_name: pf.company_name,
-            position: pf.current_job_title,
-            company_industry: pf.industry,
-            is_current: true,
-            start_date: null,
-            end_date: null,
-            profile: {
-              first_name: pf.first_name,
-              last_name: pf.last_name,
-              avatar_url: null,
-              city: pf.city,
-              province: pf.province,
-              employment_status: pf.employment_status,
-            },
-          });
+        const pfCanon = canonicalizeJobTitle(pf.current_job_title || '').toLowerCase();
+        if (pfCanon === targetCanon || pfCanon.includes(targetCanon) || targetCanon.includes(pfCanon)) {
+          if (!profileIds.includes(pf.id)) {
+            profileIds.push(pf.id);
+            jobs.push({
+              profile_id: pf.id,
+              company_name: pf.company_name,
+              position: pf.current_job_title,
+              company_industry: pf.industry,
+              is_current: true,
+              start_date: null,
+              end_date: null,
+              profile: {
+                first_name: pf.first_name,
+                last_name: pf.last_name,
+                avatar_url: null,
+                city: pf.city,
+                province: pf.province,
+                employment_status: pf.employment_status,
+              },
+            });
+          }
         }
       }
     }
@@ -1325,13 +1340,13 @@ router.get('/:position', authenticate, async (req, res, next) => {
     const jobPostMap = new Map(allJobs.map((j: any) => [j.id, j]));
     const nowIso = new Date().toISOString();
     const activeJobs = allJobs.filter((j: any) => !j.expires_at || j.expires_at >= nowIso);
-    const posNorm = position.trim().toLowerCase();
+    const posNorm = targetCanon;
 
     // Check if any hired applications match this position
     const hiredAppsForPos = (hiredAppsRes.data || []).filter((a: any) => {
       const j = jobPostMap.get(a.job_id);
       if (!j || !j.position) return false;
-      const jp = j.position.trim().toLowerCase();
+      const jp = canonicalizeJobTitle(j.position).toLowerCase();
       return jp === posNorm || jp.includes(posNorm) || posNorm.includes(jp);
     });
 
@@ -1551,8 +1566,9 @@ router.get('/:position', authenticate, async (req, res, next) => {
     const relatedCareerCounts = new Map<string, number>();
     jobPositions.forEach((positions) => {
       positions.forEach((p) => {
-        if (p !== position) {
-          relatedCareerCounts.set(p, (relatedCareerCounts.get(p) || 0) + 1);
+        const canonP = canonicalizeJobTitle(p);
+        if (canonP.toLowerCase() !== targetCanon) {
+          relatedCareerCounts.set(canonP, (relatedCareerCounts.get(canonP) || 0) + 1);
         }
       });
     });

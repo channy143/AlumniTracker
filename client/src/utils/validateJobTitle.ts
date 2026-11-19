@@ -126,6 +126,77 @@ const JUNK_PHRASE_PATTERN = /\b(imong\s*mama|your\s*mom|yo\s*mama|being\s+lazy|l
 
 const KEYBOARD_MASH_PATTERN = /(asdf|qwer|zxcv|hjkl|uiop|fghj|dfgh|cvbn|tyui|ghjk)/i;
 
+/**
+ * Canonicalizes a job title by:
+ * 1. Trimming and normalizing whitespace
+ * 2. Proper title-casing words while preserving abbreviations (e.g. IT, OJT, STEM, QA, CAD, TLE, TVL, HR, CEO)
+ * 3. Singularizing the final noun if pluralized (e.g. "Mathematics Teachers" -> "Mathematics Teacher", "Software Engineers" -> "Software Engineer")
+ */
+export function canonicalizeJobTitle(raw: unknown): string {
+  const cleaned = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+
+  const words = cleaned.split(' ');
+  if (words.length === 0) return '';
+
+  const lastIndex = words.length - 1;
+  let lastWord = words[lastIndex];
+
+  // Common singular exceptions ending in 's' that should not be stripped
+  const preservedEndings = /\b(analytics|logistics|robotics|physics|mathematics|economics|statistics|graphics|optics|informatics|electronics|mechanics|business|class|pass|boss|waitress|actress|hostess|stewardess|sales|campus|status|apparatus|series|species|operations)\b/i;
+
+  if (!preservedEndings.test(lastWord)) {
+    // If ends in "ies" and length > 4 (e.g., "secretaries" -> "secretary")
+    if (/ies$/i.test(lastWord) && lastWord.length > 4) {
+      lastWord = lastWord.replace(/ies$/i, 'y');
+    }
+    // If ends in "ses" where base is "se" (e.g., "nurses" -> "nurse", "licenses" -> "license")
+    else if (/ses$/i.test(lastWord) && lastWord.length > 4) {
+      lastWord = lastWord.replace(/s$/i, '');
+    }
+    // If ends in "ches", "shes", "xes", "zes" (e.g., "coaches" -> "coach")
+    else if (/(ch|sh|x|z)es$/i.test(lastWord)) {
+      lastWord = lastWord.replace(/es$/i, '');
+    }
+    // General plural ending in "s" (not "ss" or "us" or "is")
+    // e.g. "teachers" -> "teacher", "engineers" -> "engineer", "developers" -> "developer"
+    else if (/s$/i.test(lastWord) && !/ss$/i.test(lastWord) && !/us$/i.test(lastWord) && !/is$/i.test(lastWord) && lastWord.length > 3) {
+      lastWord = lastWord.replace(/s$/i, '');
+    }
+  }
+
+  words[lastIndex] = lastWord;
+
+  // Title-case words while preserving known acronyms
+  const ACRONYMS = new Set(['IT', 'OJT', 'STEM', 'QA', 'CAD', 'TLE', 'TVL', 'HR', 'CEO', 'CTO', 'CFO', 'COO', 'VP', 'BPO', 'SEO', 'UI', 'UX', 'AI', 'ML']);
+
+  return words
+    .map((word, idx) => {
+      const upper = word.toUpperCase();
+      if (ACRONYMS.has(upper)) return upper;
+      if (word === '&' || word === '/') return word;
+      if (word.includes('/')) {
+        return word.split('/').map(part => {
+          const pUpper = part.toUpperCase();
+          if (ACRONYMS.has(pUpper)) return pUpper;
+          return part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : '';
+        }).join('/');
+      }
+      if (word.includes('-')) {
+        return word.split('-').map(part => {
+          const pUpper = part.toUpperCase();
+          if (ACRONYMS.has(pUpper)) return pUpper;
+          return part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : '';
+        }).join('-');
+      }
+      if (/^(and|of|in|at|for|the)$/i.test(word) && idx !== 0) {
+        return word.toLowerCase();
+      }
+      return word ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : '';
+    })
+    .join(' ');
+}
+
 export function validateJobTitle(raw: unknown): {
   valid: boolean;
   cleaned: string;
@@ -203,7 +274,7 @@ export function validateJobTitle(raw: unknown): {
     };
   }
 
-  return { valid: true, cleaned };
+  return { valid: true, cleaned: canonicalizeJobTitle(cleaned) };
 }
 
 export const CANONICAL_INDUSTRIES = [
