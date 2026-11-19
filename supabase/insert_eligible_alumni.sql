@@ -1,4 +1,4 @@
-﻿-- =========================================================================
+-- =========================================================================
 -- ALUMNI ELIGIBILITY REGISTRY INSERT QUERY
 -- Generated: 2026-10-27T18:13:48.546Z
 -- Source: D:\AlumniDatas (33 official graduate roster PDFs)
