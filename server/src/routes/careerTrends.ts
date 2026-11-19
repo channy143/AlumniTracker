@@ -135,33 +135,75 @@ export function normalizeTimeToFirstJob(val: string | number | null | undefined)
   return 'Over 2 Years';
 }
 
+const FEMALE_NAMES = new Set([
+  'laiza', 'gwen', 'kimberly', 'lovely', 'jamaica', 'sharlene', 'erica', 'angel', 'mae', 'may',
+  'allyza', 'mary', 'bie', 'edna', 'maria', 'ana', 'jenny', 'jessica', 'sarah', 'kristine',
+  'maricel', 'catherine', 'bea', 'camille', 'nicole', 'stephanie', 'rose', 'grace', 'diane',
+  'patricia', 'claire', 'rowena', 'janice', 'normie', 'hazel', 'joy', 'charlene', 'reyna',
+  'anne', 'ann', 'lyn', 'jane', 'christine', 'fatima', 'princess', 'althea', 'michelle',
+  'trisha', 'faith', 'hope', 'dawn', 'ashlie', 'ashley', 'melody', 'marivic', 'jenelyn',
+  'jhonalyn', 'marinel', 'kaye', 'missy', 'mayce', 'kisiah', 'caryl', 'trixie', 'zaibelle',
+  'clarise', 'ellen', 'aimee', 'aime', 'joan', 'jecel', 'jeian', 'lynrose', 'sheena',
+  'sheina', 'erika', 'almarie', 'ereca', 'kyciel', 'marienel', 'myrland', 'jennifer',
+  'jhiane', 'krizelda', 'diana', 'jamela', 'queen', 'queenie', 'cherry', 'apple', 'honey',
+  'ivy', 'daisy', 'april', 'june', 'julie', 'judy', 'judith', 'ruth', 'rachel', 'elvie',
+  'mariel', 'cathy', 'jasmine', 'clyne', 'genicar', 'cindy', 'ailen', 'shaine', 'maredel',
+  'rosejane', 'nikki', 'angelen', 'marchee', 'maricar', 'yushemae', 'stephany', 'lovellamae',
+  'wendy', 'lesliville', 'sundy', 'britney', 'divine', 'loraine', 'regine', 'marigold',
+  'jinefer', 'jenevy', 'janeth', 'pearl', 'ludemae', 'ericah', 'vanie', 'mizzy', 'charis',
+  'aileen', 'leslie', 'junah', 'juliet', 'ritzie'
+]);
+
+const MALE_NAMES = new Set([
+  'christian', 'hector', 'loui', 'louis', 'reymart', 'juan', 'mark', 'john', 'jhon', 'jose',
+  'michael', 'joshua', 'angelo', 'carl', 'paulo', 'james', 'ronald', 'bryan', 'kevin',
+  'jerome', 'alvin', 'david', 'ian', 'gerald', 'kenneth', 'ryan', 'alexander', 'anthony',
+  'jason', 'peter', 'justin', 'joseph', 'dave', 'leo', 'neil', 'raymond', 'richard',
+  'edward', 'daniel', 'dennis', 'eric', 'marvin', 'jr', 'sr', 'carlo', 'paolo', 'kyle',
+  'ralph', 'donald', 'vince', 'francis', 'rafael', 'jimwel', 'jay', 'ivan', 'jhonel',
+  'jovanie', 'khent', 'alvince', 'charz', 'fritz', 'gian', 'chadyl', 'jayfel', 'jurt',
+  'kristofferson', 'kent', 'clark', 'kurt', 'luke', 'george', 'charles', 'albert', 'robert',
+  'gilbert', 'elmer', 'denz', 'renz', 'dexter', 'lester', 'chester', 'noel', 'joel', 'ariel',
+  'gabriel', 'samuel', 'emmanuel', 'mickhelson', 'lawrence', 'gabe', 'edner', 'jesriel',
+  'joven', 'emjune', 'karl', 'jeanre', 'aki', 'jun', 'mil', 'jerel', 'aljon', 'justhin',
+  'owen', 'sean', 'darlwill', 'teodore', 'rodrigs', 'jetril', 'jomarie', 'jaime', 'elbert',
+  'marc', 'jerald', 'daryl', 'neimart', 'jongie', 'rinz', 'junjie', 'clyde', 'shoun',
+  'steven', 'rhamces'
+]);
+
 export function detectGender(firstName: string | null | undefined, explicitGender: string | null | undefined): 'Female' | 'Male' | 'Unspecified' {
   if (explicitGender) {
-    const g = explicitGender.trim().toLowerCase();
+    const g = String(explicitGender).trim().toLowerCase();
     if (g.startsWith('f') || g === 'female' || g === 'woman') return 'Female';
     if (g.startsWith('m') || g === 'male' || g === 'man') return 'Male';
+    if (g.includes('prefer not') || g === 'unspecified' || g === 'other') return 'Unspecified';
   }
   if (!firstName) return 'Unspecified';
-  const norm = firstName.trim().toLowerCase();
-  const femaleHints = [
-    'laiza', 'gwen', 'kimberly', 'lovely', 'jamaica', 'sharlene', 'erica', 'angel', 'mae',
-    'allyza', 'mary', 'bie', 'edna', 'maria', 'ana', 'jenny', 'jessica', 'sarah', 'kristine',
-    'maricel', 'catherine', 'bea', 'camille', 'nicole', 'stephanie', 'rose', 'grace', 'diane',
-    'patricia', 'claire', 'rowena', 'janice', 'normie', 'hazel', 'joy', 'charlene', 'reyna',
-    'anne', 'lyn', 'jane', 'christine', 'fatima', 'princess', 'althea', 'michelle'
-  ];
-  const maleHints = [
-    'christian', 'hector', 'loui', 'louis', 'reymart', 'juan', 'mark', 'john', 'jose',
-    'michael', 'joshua', 'angelo', 'carl', 'paulo', 'james', 'ronald', 'bryan', 'kevin',
-    'jerome', 'alvin', 'david', 'ian', 'gerald', 'kenneth', 'ryan', 'alexander', 'anthony',
-    'jason', 'peter', 'justin', 'joseph', 'dave', 'leo', 'neil', 'raymond', 'richard',
-    'edward', 'daniel', 'dennis', 'eric', 'marvin', 'jr', 'sr', 'carlo', 'paolo'
-  ];
+  const norm = String(firstName).trim().toLowerCase();
+  const words = norm.split(/[\s-]+/).filter(Boolean);
 
-  if (maleHints.some(h => norm === h || norm.startsWith(h + ' ') || norm.endsWith(' ' + h))) return 'Male';
-  if (femaleHints.some(h => norm === h || norm.startsWith(h + ' ') || norm.endsWith(' ' + h))) return 'Female';
-  if (norm.endsWith('a') || norm.includes('mae') || norm.includes('marie') || norm.includes('anne') || norm.includes('joy')) return 'Female';
-  if (norm.endsWith('o') || norm.includes(' jr') || norm.includes('jr.')) return 'Male';
+  // Check explicit full match or any component word in dictionaries
+  for (const w of words) {
+    if (FEMALE_NAMES.has(w)) return 'Female';
+    if (MALE_NAMES.has(w)) return 'Male';
+  }
+
+  // Suffix checks on individual words (e.g. Maria, Trisha, Carlo, Roberto)
+  for (const w of words) {
+    if (w.endsWith('lyn') || w.endsWith('line') || w.endsWith('ly') || w.endsWith('ette') || w.endsWith('elle') || w.endsWith('mae') || w.endsWith('marie')) return 'Female';
+    if (w.endsWith('son') || w.endsWith('ton') || w.endsWith('ford') || w === 'jr' || w === 'sr') return 'Male';
+  }
+
+  // First word ending in typical Philippine vowel
+  const first = words[0];
+  if (first && first.endsWith('a') && !['joshua', 'luca', 'elisha', 'ezra'].includes(first)) return 'Female';
+  if (first && first.endsWith('o')) return 'Male';
+
+  // Last word ending
+  const last = words[words.length - 1];
+  if (last && last.endsWith('a') && !['joshua', 'luca', 'elisha', 'ezra'].includes(last)) return 'Female';
+  if (last && last.endsWith('o')) return 'Male';
+
   return 'Unspecified';
 }
 
@@ -1622,7 +1664,8 @@ router.get('/:position', authenticate, async (req, res, next) => {
       const gradYear = edu.map((e: any) => e.year_graduated).filter(Boolean).sort().pop() || userEligible?.year_graduated || 2023;
 
       // Gender
-      const g = detectGender(p?.first_name || userEligible?.first_name, p?.gender);
+      const explicitGender = p?.gender || userSurvey?.gender;
+      const g = detectGender(p?.first_name || userEligible?.first_name, explicitGender);
       genderCounts[g] = (genderCounts[g] || 0) + 1;
 
       // Age
@@ -1811,8 +1854,10 @@ router.get('/:position', authenticate, async (req, res, next) => {
         genderDistribution,
         femaleCount: genderCounts.Female,
         maleCount: genderCounts.Male,
+        unspecifiedCount: genderCounts.Unspecified,
         femalePct,
         malePct,
+        unspecifiedPct,
         ageBrackets,
         averageAge,
         cohortDistribution,

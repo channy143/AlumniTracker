@@ -190,25 +190,40 @@ export default function CareerInsightsPage() {
 
                   {/* Female vs Male Population Ratio */}
                   <div className="space-y-1.5 bg-white p-2.5 rounded-lg border border-gray-100 shadow-2xs">
-                    <div className="flex items-center justify-between text-xs font-medium">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-xs font-medium">
                       <span className="text-pink-600 font-semibold flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-pink-500 inline-block" />
-                        Female: {data.demographics?.femaleCount ?? 0} ({data.demographics?.femalePct ?? 50}%)
+                        Female: {data.demographics?.femaleCount ?? 0} ({data.demographics?.femalePct ?? 0}%)
                       </span>
                       <span className="text-blue-600 font-semibold flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-                        Male: {data.demographics?.maleCount ?? 0} ({data.demographics?.malePct ?? 50}%)
+                        Male: {data.demographics?.maleCount ?? 0} ({data.demographics?.malePct ?? 0}%)
                       </span>
+                      {Boolean(data.demographics?.unspecifiedCount && data.demographics.unspecifiedCount > 0) && (
+                        <span className="text-gray-500 font-medium flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
+                          Undisclosed: {data.demographics.unspecifiedCount} ({data.demographics.unspecifiedPct ?? 0}%)
+                        </span>
+                      )}
                     </div>
                     <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden flex">
                       <div
                         className="h-full bg-pink-500 transition-all duration-500"
-                        style={{ width: `${data.demographics?.femalePct ?? 50}%` }}
+                        style={{ width: `${data.demographics?.femalePct ?? 0}%` }}
+                        title={`Female: ${data.demographics?.femaleCount ?? 0} (${data.demographics?.femalePct ?? 0}%)`}
                       />
                       <div
                         className="h-full bg-blue-500 transition-all duration-500"
-                        style={{ width: `${data.demographics?.malePct ?? 50}%` }}
+                        style={{ width: `${data.demographics?.malePct ?? 0}%` }}
+                        title={`Male: ${data.demographics?.maleCount ?? 0} (${data.demographics?.malePct ?? 0}%)`}
                       />
+                      {Boolean(data.demographics?.unspecifiedPct && data.demographics.unspecifiedPct > 0) && (
+                        <div
+                          className="h-full bg-gray-300 transition-all duration-500"
+                          style={{ width: `${data.demographics.unspecifiedPct}%` }}
+                          title={`Undisclosed: ${data.demographics?.unspecifiedCount ?? 0} (${data.demographics?.unspecifiedPct ?? 0}%)`}
+                        />
+                      )}
                     </div>
                   </div>
 
