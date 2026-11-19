@@ -21,7 +21,7 @@ import {
   FaceSmileIcon,
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/outline';
-import { feedApi, communityApi, connectionsApi, messagesApi, directoryApi } from '@/services/api';
+import { feedApi, communityApi, connectionsApi, messagesApi, profileApi } from '@/services/api';
 import { decodeUnicode, setBackgroundInterval, dedupeCommentTree, countAllComments } from '@/utils/helpers';
 import { getCached } from '@/utils/apiCache';
 import { SkeletonCommentList, SkeletonReactionUserList, SkeletonRow } from '@/components/ui/Skeleton';
@@ -859,32 +859,60 @@ export default function FeedPostCard({
     showToast('Post link copied to clipboard!');
   };
 
-  // Open "Send to others"
+  // Open "Send to others" (Direct Message)
   const handleOpenSendToOthers = async () => {
     setSendToOthersOpen(true);
-    if (alumniList.length === 0) {
-      setLoadingAlumni(true);
-      try {
-        const conns = await connectionsApi.list();
-        let list: any[] = [];
-        if (Array.isArray(conns) && conns.length > 0) {
-          list = conns
-            .map((c: any) => {
-              const partner = c.recipient_id === currentUserId ? c.requester : c.recipient;
-              return partner || c.recipient || c.requester;
-            })
-            .filter(Boolean);
-        }
-        if (list.length === 0) {
-          const dirRes: any = await directoryApi.search({ limit: 20 });
-          list = dirRes.data || [];
-        }
-        setAlumniList(list);
-      } catch {
-        // Fallback
-      } finally {
-        setLoadingAlumni(false);
+    setSearchRecipient('');
+    setLoadingAlumni(true);
+    try {
+      let myProfId = getCached<any>('/profile')?.id;
+      if (!myProfId) {
+        try {
+          const prof = await profileApi.get();
+          myProfId = prof?.id;
+        } catch {}
       }
+
+      const conns = await connectionsApi.list('accepted');
+      const uniqueMap = new Map<string, any>();
+
+      if (Array.isArray(conns)) {
+        conns.forEach((c: any) => {
+          // Strictly only include accepted friends / connections
+          if (c.status && c.status !== 'accepted') return;
+
+          // Determine the other partner (the friend)
+          const isMeRequester =
+            (myProfId && c.requester_id === myProfId) ||
+            (currentUserId && (c.requester_id === currentUserId || c.requester?.user_id === currentUserId));
+
+          const partner = isMeRequester ? c.recipient : c.requester;
+
+          if (partner && partner.id && !uniqueMap.has(partner.id)) {
+            // Guard against adding self
+            const isSelf =
+              partner.id === myProfId ||
+              partner.id === currentUserId ||
+              partner.user_id === currentUserId;
+
+            if (!isSelf) {
+              uniqueMap.set(partner.id, {
+                id: partner.id,
+                first_name: partner.first_name || '',
+                last_name: partner.last_name || '',
+                avatar_url: partner.avatar_url || null,
+                headline: partner.headline || null,
+              });
+            }
+          }
+        });
+      }
+
+      setAlumniList(Array.from(uniqueMap.values()));
+    } catch {
+      setAlumniList([]);
+    } finally {
+      setLoadingAlumni(false);
     }
   };
 
@@ -2274,7 +2302,7 @@ export default function FeedPostCard({
                     <p className="text-sm font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">
                       Send via Direct Message
                     </p>
-                    <p className="text-xs text-gray-500">Share privately with an alumnus via chat</p>
+                    <p className="text-xs text-gray-500">Share privately with friends or connections via chat</p>
                   </div>
                 </button>
 
@@ -2296,51 +2324,66 @@ export default function FeedPostCard({
                 </button>
               </div>
             ) : (
-              /* Subview: Send to others */
-              <div className="p-4">
+              /* Subview: Send via Direct Message to Connections */
+              <div className="p-4 flex flex-col">
                 <div className="flex items-center gap-2 mb-3">
                   <button
                     type="button"
-                    onClick={() => setSendToOthersOpen(false)}
+                    onClick={() => {
+                      setSendToOthersOpen(false);
+                      setSearchRecipient('');
+                    }}
                     className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer"
                   >
                     &larr; Back
                   </button>
-                  <span className="text-xs text-gray-400">|</span>
-                  <span className="text-xs font-medium text-gray-700">Select Alumnus to Message</span>
+                  <span className="text-xs text-gray-300">|</span>
+                  <span className="text-xs font-semibold text-gray-800">
+                    Send to Connections {alumniList.length > 0 ? `(${alumniList.length})` : ''}
+                  </span>
                 </div>
 
                 <input
                   type="text"
                   value={searchRecipient}
                   onChange={(e) => setSearchRecipient(e.target.value)}
-                  placeholder="Search alumni by name..."
-                  className="w-full px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg mb-3 outline-none focus:border-orange-500 transition-all"
+                  placeholder="Search your friends or connections..."
+                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg mb-3 outline-none focus:border-orange-500 transition-all"
                 />
 
-                <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
                   {loadingAlumni ? (
-                    <div className="space-y-1">
+                    <div className="space-y-2 py-2">
                       <SkeletonRow />
                       <SkeletonRow />
                       <SkeletonRow />
                     </div>
-                  ) : alumniList.filter((a) => {
-                      if (!searchRecipient.trim()) return true;
-                      const q = searchRecipient.toLowerCase();
-                      const name = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase();
-                      return name.includes(q);
-                    }).length === 0 ? (
-                    <p className="text-xs text-gray-400 text-center py-4">No alumni found.</p>
+                  ) : alumniList.length === 0 ? (
+                    <div className="text-center py-6 px-4">
+                      <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <PaperAirplaneIcon className="w-5 h-5" />
+                      </div>
+                      <p className="text-xs font-semibold text-gray-800">No friends or connections yet</p>
+                      <p className="text-[11px] text-gray-500 mt-1 max-w-xs mx-auto leading-relaxed">
+                        You can only share posts via direct message with alumni you are connected with. Connect with fellow alumni to start chatting!
+                      </p>
+                    </div>
                   ) : (
-                    alumniList
-                      .filter((a) => {
+                    (() => {
+                      const filtered = alumniList.filter((a) => {
                         if (!searchRecipient.trim()) return true;
                         const q = searchRecipient.toLowerCase();
                         const name = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase();
                         return name.includes(q);
-                      })
-                      .map((alumnus) => {
+                      });
+                      if (filtered.length === 0) {
+                        return (
+                          <p className="text-xs text-gray-400 text-center py-6">
+                            No connections found matching "{searchRecipient}".
+                          </p>
+                        );
+                      }
+                      return filtered.map((alumnus) => {
                         const isSent = sentMap[alumnus.id];
                         return (
                           <div
@@ -2348,11 +2391,11 @@ export default function FeedPostCard({
                             className="flex items-center justify-between p-2 rounded-xl hover:bg-gray-50 transition-colors"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-700 overflow-hidden shrink-0">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white font-bold flex items-center justify-center text-xs shrink-0 overflow-hidden">
                                 {alumnus.avatar_url ? (
                                   <img src={alumnus.avatar_url} alt="" className="w-full h-full object-cover" />
                                 ) : (
-                                  (alumnus.first_name?.[0] || '') + (alumnus.last_name?.[0] || '')
+                                  `${alumnus.first_name?.[0] || ''}${alumnus.last_name?.[0] || ''}`.toUpperCase() || '?'
                                 )}
                               </div>
                               <div className="min-w-0">
@@ -2379,7 +2422,8 @@ export default function FeedPostCard({
                             </button>
                           </div>
                         );
-                      })
+                      });
+                    })()
                   )}
                 </div>
               </div>

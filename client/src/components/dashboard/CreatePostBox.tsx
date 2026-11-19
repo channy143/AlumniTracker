@@ -212,7 +212,7 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
     }
     setLoadingFriends(true);
     try {
-      const conns = await connectionsApi.list();
+      const conns = await connectionsApi.list('accepted');
       const list = (conns || []).map((c: any) => {
         const partner = c.recipient_id === (currentProfile?.id || currentUser?.id) ? c.requester : c.recipient;
         return partner ? { id: partner.id, name: `${partner.first_name} ${partner.last_name}`, avatar: partner.avatar_url, headline: partner.headline } : null;
