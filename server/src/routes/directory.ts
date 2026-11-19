@@ -289,15 +289,18 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
 
     const isOwnerOrAdmin = profile.user_id === req.user!.userId || req.user!.role === 'admin';
 
-    // Rule 3 – Protection of Alumni Information: Redact sensitive salary information for peer views
-    // and respect the alumnus's privacy preference for employment history.
+    // Rule 3 – Protection of Alumni Information: Respect the alumnus's privacy preference
+    // for employment history and salary range visibility.
     let sanitizedEmployment: any[] = [];
     if (isOwnerOrAdmin || privacy.show_employment !== false) {
       sanitizedEmployment = (employment || []).map((emp: any) => {
         if (isOwnerOrAdmin) return emp;
-        // Sensitive financial/career compensation details must not be exposed to other alumni
-        const { salary_range: _omitted, ...safeEmp } = emp;
-        return safeEmp;
+        // Redact salary if alumnus has turned off show_salary in Directory Visibility Preferences
+        if (privacy.show_salary === false) {
+          const { salary_range: _omitted, ...safeEmp } = emp;
+          return safeEmp;
+        }
+        return emp;
       });
     }
 
@@ -354,9 +357,16 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
     if (isOwnerOrAdmin || privacy.show_address) {
       result.address = profile.address;
     }
-    if (isOwnerOrAdmin) {
-      result.privacy_settings = privacy;
+    if (isOwnerOrAdmin || privacy.show_salary !== false) {
+      result.salary_range = profile.salary_range;
     }
+    result.privacy_settings = {
+      show_email: Boolean(privacy.show_email),
+      show_phone: Boolean(privacy.show_phone),
+      show_address: Boolean(privacy.show_address),
+      show_employment: privacy.show_employment !== false,
+      show_salary: privacy.show_salary !== false,
+    };
 
     const { data: currentProfile } = await db
       .from('profiles')

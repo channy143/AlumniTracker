@@ -277,7 +277,7 @@ function notifyListeners(normEndpoint: string): void {
 
 const MUTATION_INVALIDATION_RULES: Array<{ match: RegExp; prefixes: string[] }> = [
   { match: /^\/feed/, prefixes: ['/feed', '/activities', '/admin/activity', '/admin/audit-logs'] },
-  { match: /^\/profile/, prefixes: ['/profile', '/employment', '/directory', '/feed', '/admin/alumni', '/admin/dashboard'] },
+  { match: /^\/profile/, prefixes: ['/profile', '/employment', '/directory', '/feed', '/admin/alumni', '/admin/dashboard', '/career-trends', '/admin/analytics'] },
   { match: /^\/employment/, prefixes: ['/employment', '/profile', '/directory', '/admin/alumni', '/admin/dashboard', '/career-trends', '/admin/analytics'] },
   { match: /^\/connections/, prefixes: ['/connections', '/directory', '/notifications', '/feed'] },
   { match: /^\/mentorship/, prefixes: ['/mentorship', '/notifications'] },

@@ -374,6 +374,7 @@ export default function ProfilePage() {
           show_phone: false,
           show_address: false,
           show_employment: true,
+          show_salary: true,
         };
         const parsedPrivacy = (typeof data.privacy_settings === 'string'
           ? JSON.parse(data.privacy_settings)
@@ -2181,7 +2182,7 @@ export default function ProfilePage() {
                       <div className="flex items-center justify-between gap-3 pt-3">
                         <div className="min-w-0 pr-1">
                           <p className="text-xs font-semibold text-gray-800">Show Employment History</p>
-                          <p className="text-[11px] text-gray-500 leading-tight">Display company and job titles (salary is always redacted)</p>
+                          <p className="text-[11px] text-gray-500 leading-tight">Display your company name and job titles in the alumni directory</p>
                         </div>
                         <button
                           type="button"
@@ -2196,6 +2197,28 @@ export default function ProfilePage() {
                             }`}
                         >
                           <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_employment !== false ? 'translate-x-5' : 'translate-x-0'
+                            }`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-3 pt-3">
+                        <div className="min-w-0 pr-1">
+                          <p className="text-xs font-semibold text-gray-800">Show Salary Range</p>
+                          <p className="text-[11px] text-gray-500 leading-tight">Display your monthly salary bracket in Career Trends and when alumni view your profile</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setForm((prev: any) => ({
+                            ...prev,
+                            privacy_settings: {
+                              ...(prev.privacy_settings || {}),
+                              show_salary: prev.privacy_settings?.show_salary === false ? true : false,
+                            },
+                          }))}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${form.privacy_settings?.show_salary !== false ? 'bg-orange-600' : 'bg-gray-200'
+                            }`}
+                        >
+                          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${form.privacy_settings?.show_salary !== false ? 'translate-x-5' : 'translate-x-0'
                             }`} />
                         </button>
                       </div>
@@ -2529,6 +2552,7 @@ export default function ProfilePage() {
       show_phone: false,
       show_address: false,
       show_employment: true,
+      show_salary: true,
     };
     const currentPrivacy = (typeof profile?.privacy_settings === 'string'
       ? JSON.parse(profile.privacy_settings)
@@ -2617,7 +2641,7 @@ export default function ProfilePage() {
               { label: 'Contact Information', desc: 'Email address, phone number & residential address.' },
               { label: 'Educational Background', desc: 'Degree program, graduation year, campus & honors.' },
               { label: 'Employment Information', desc: 'Current job, employer, work status & industry.' },
-              { label: 'Career History', desc: 'Past employment timeline (salary data strictly redacted).' },
+              { label: 'Career History', desc: 'Past employment timeline & salary visibility preferences.' },
               { label: 'Survey & Tracer Responses', desc: 'Graduate tracer responses & curriculum feedback.' },
             ].map((item, i) => (
               <div key={i} className="p-3 bg-gray-50/60 rounded-xl border border-gray-100 flex flex-col justify-between">
@@ -2634,7 +2658,7 @@ export default function ProfilePage() {
             <SectionLine label="Directory Visibility Preferences" />
           </div>
           <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-            Choose what other registered alumni can view on your public directory profile. Note that sensitive details (salary range and student ID) are always strictly protected and never displayed to other alumni.
+            Choose what other registered alumni can view on your public directory profile and in Career Trends. Sensitive identifiers like student ID are always strictly protected.
           </p>
 
           <div className="space-y-3.5 divide-y divide-gray-100">
@@ -2689,7 +2713,7 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between pt-3">
               <div>
                 <p className="text-xs font-semibold text-gray-800">Show Employment History</p>
-                <p className="text-[11px] text-gray-500">Display your company and job titles (compensation and salary are always redacted)</p>
+                <p className="text-[11px] text-gray-500">Display your company and job titles</p>
               </div>
               <button
                 type="button"
@@ -2698,6 +2722,22 @@ export default function ProfilePage() {
                   }`}
               >
                 <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${privacyForm.show_employment !== false ? 'translate-x-4' : 'translate-x-0'
+                  }`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between pt-3">
+              <div>
+                <p className="text-xs font-semibold text-gray-800">Show Salary Range</p>
+                <p className="text-[11px] text-gray-500">Display your monthly salary bracket in Career Trends and when alumni view your profile</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => updatePrivacyKey('show_salary', privacyForm.show_salary === false ? true : false)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${privacyForm.show_salary !== false ? 'bg-orange-600' : 'bg-gray-200'
+                  }`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${privacyForm.show_salary !== false ? 'translate-x-4' : 'translate-x-0'
                   }`} />
               </button>
             </div>

@@ -85,7 +85,7 @@ export function normalizeSalaryBracket(val: string | number | null | undefined):
   if (/10k.*20k|1000[0-9].*20000|10000.*20000/i.test(str)) return '₱10k–₱20k';
   if (/20k.*30k|2000[0-9].*30000|20000.*30000/i.test(str)) return '₱20k–₱30k';
   if (/30k.*50k|3000[0-9].*50000|30000.*50000/i.test(str)) return '₱30k–₱50k';
-  if (/above|over|>.*50|50k\+|5000[1-9]/i.test(str)) return 'Above ₱50k';
+  if (/above|over|>|50k|60k|80k|100k|5000[0-9]|6000[0-9]|8000[0-9]|10000[0-9]|\+/i.test(str)) return 'Above ₱50k';
 
   const nums = str.match(/\d+/g)?.map(Number);
   if (!nums || nums.length === 0) return 'Undisclosed';
@@ -96,6 +96,21 @@ export function normalizeSalaryBracket(val: string | number | null | undefined):
   if (numVal <= 30000) return '₱20k–₱30k';
   if (numVal <= 50000) return '₱30k–₱50k';
   return 'Above ₱50k';
+}
+
+export function parseSalaryToNumeric(raw: string | number | null | undefined): number {
+  if (!raw) return 0;
+  const str = String(raw).replace(/,/g, '').trim().toLowerCase();
+  if (str.includes('confidential') || str.includes('undisclosed')) return 0;
+  if (str.includes('100000') || str.includes('100k')) return 110000;
+  if (str.includes('80000+') || str.includes('80k+') || str.includes('80k above') || str.includes('80000 and above')) return 90000;
+  if (str.includes('60000') || str.includes('60k')) return 70000;
+  if (str.includes('40000') || str.includes('40k')) return 50000;
+  if (str.includes('20000') || str.includes('20k')) return 30000;
+  const nums = str.match(/\d+/g)?.map(Number);
+  if (!nums || nums.length === 0) return 0;
+  const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+  return avg < 100 ? avg * 1000 : avg;
 }
 
 export function normalizeTimeToFirstJob(val: string | number | null | undefined): string {
@@ -197,7 +212,7 @@ router.get('/', authenticate, async (req, res, next) => {
       supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, record_category, start_date, end_date, is_current, salary_range, job_type').order('start_date', { ascending: false }),
       supabase.from('education').select('profile_id, program, year_graduated, major'),
       supabase.from('skills').select('profile_id, name, category, proficiency_level'),
-      supabase.from('profiles').select('id, user_id, first_name, last_name, gender, birth_date, current_job_title, company_name, industry, employment_status, city, province, address, id_number'),
+      supabase.from('profiles').select('id, user_id, first_name, last_name, gender, birth_date, current_job_title, company_name, industry, employment_status, city, province, address, id_number, salary_range, privacy_settings'),
       supabase.from('users').select('id, created_at, is_archived, is_active').eq('role', 'alumni'),
       supabase.from('job_postings').select('id, position, company_name, industry, location, is_remote, salary_range, job_type, expires_at'),
       supabase.from('job_applications').select('id, job_id, user_id, status, applied_at').in('status', ['hired', 'accepted']),
@@ -281,7 +296,7 @@ router.get('/', authenticate, async (req, res, next) => {
       is_current: true,
       start_date: null,
       end_date: null,
-      salary_range: null,
+      salary_range: p.salary_range || null,
       job_type: null,
     }));
 
@@ -354,6 +369,7 @@ router.get('/', authenticate, async (req, res, next) => {
     const careerEmploymentStatuses = new Map<string, Set<string>>();
     const careerLocations = new Map<string, Set<string>>();
     const careerBatches = new Map<string, Set<number>>();
+    const careerSalaries = new Map<string, number[]>();
 
     fullEmployment.forEach((e: any) => {
       const rawPos = String(e.position || '').trim();
@@ -424,6 +440,15 @@ router.get('/', authenticate, async (req, res, next) => {
           if (!careerLocations.has(normKey)) careerLocations.set(normKey, new Set());
           careerLocations.get(normKey)!.add(loc);
         }
+
+        const pPrivacy = (typeof p.privacy_settings === 'string' ? JSON.parse(p.privacy_settings) : p.privacy_settings) || {};
+        if (pPrivacy.show_salary !== false) {
+          const sNum = parseSalaryToNumeric(e.salary_range || p.salary_range);
+          if (sNum > 0) {
+            if (!careerSalaries.has(normKey)) careerSalaries.set(normKey, []);
+            careerSalaries.get(normKey)!.push(sNum);
+          }
+        }
       }
       if (eduMap.has(e.profile_id)) {
         eduMap.get(e.profile_id)!.forEach((ed) => {
@@ -465,10 +490,13 @@ router.get('/', authenticate, async (req, res, next) => {
           : 0;
         const avgYears = Math.round((avgMonths / 12) * 100) / 100;
         const alumniCount = data.alumni.size;
+        const sals = careerSalaries.get(normPos) || [];
+        const avgSalary = sals.length > 0 ? Math.round(sals.reduce((a, b) => a + b, 0) / sals.length) : 0;
 
         return {
           position,
           alumniCount,
+          averageSalary: avgSalary,
           currentInCareer: currentJobs.filter((j: any) => j.position && j.position.trim().toLowerCase() === normPos).length,
           topEmployers: sortedEmployers.map(([name, count]) => ({ name, count })),
           topIndustries: sortedIndustries.map(([name, count]) => ({ name, count })),
@@ -804,9 +832,11 @@ router.get('/', authenticate, async (req, res, next) => {
       }
 
       // 5. Salary Bracket
-      const rawSalary = currentEmp?.salary_range || survey?.salary_range;
-      const salaryBracket = normalizeSalaryBracket(rawSalary);
-      if (salaryBracket !== 'Undisclosed' && salaryBracketCounts[salaryBracket as keyof typeof salaryBracketCounts] !== undefined) {
+      const pPrivacy = (typeof p.privacy_settings === 'string' ? JSON.parse(p.privacy_settings) : p.privacy_settings) || {};
+      const isSalaryVisible = pPrivacy.show_salary !== false;
+      const rawSalary = isSalaryVisible ? (currentEmp?.salary_range || p.salary_range || survey?.salary_range) : null;
+      const salaryBracket = isSalaryVisible ? normalizeSalaryBracket(rawSalary) : 'Confidential';
+      if (isSalaryVisible && salaryBracket !== 'Undisclosed' && salaryBracketCounts[salaryBracket as keyof typeof salaryBracketCounts] !== undefined) {
         salaryBracketCounts[salaryBracket as keyof typeof salaryBracketCounts]++;
       }
 
@@ -854,7 +884,7 @@ router.get('/', authenticate, async (req, res, next) => {
         companyName: company,
         companyAddress: companyAddr,
         timeToFirstJob: timeBracket !== 'Undisclosed' ? timeBracket : (isEmployed ? '1–3 Months' : '—'),
-        salaryBracket: salaryBracket !== 'Undisclosed' ? salaryBracket : (isEmployed ? '₱20k–₱30k' : '—'),
+        salaryBracket: isSalaryVisible ? (salaryBracket !== 'Undisclosed' ? salaryBracket : (isEmployed ? '₱20k–₱30k' : '—')) : 'Confidential',
       });
     });
 
@@ -1040,7 +1070,7 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, record_category, start_date, end_date, is_current, salary_range, job_type'),
       supabase.from('education').select('profile_id, program, year_graduated, major'),
       supabase.from('skills').select('profile_id, name, category, proficiency_level'),
-      supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, current_job_title, company_name, industry, employment_status, city, province, address, gender'),
+      supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, current_job_title, company_name, industry, employment_status, city, province, address, gender, salary_range, privacy_settings'),
       supabase.from('job_postings').select('id, position, company_name, industry, location, is_remote, salary_range, job_type, expires_at'),
       supabase.from('job_applications').select('id, job_id, user_id, status, applied_at').in('status', ['hired', 'accepted']),
       supabase.from('companies').select('id, name, industry, address, city, province, country'),
@@ -1092,7 +1122,7 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       is_current: true,
       start_date: null,
       end_date: null,
-      salary_range: null,
+      salary_range: p.salary_range || null,
       job_type: null,
     }));
     const employedIds = new Set(employment.filter((e: any) => e.is_current).map((e: any) => e.profile_id));
@@ -1180,7 +1210,10 @@ router.get('/alumni', authenticate, async (req, res, next) => {
       const compName = j.company_name || p.company_name;
       const compNorm = compName ? compName.trim().toLowerCase() : '';
       const companyAddress = companyAddressMap.get(compNorm) || (p.city ? `${p.city}, ${p.province || 'Cebu'}` : 'Cebu, Philippines');
-      const salaryBracket = normalizeSalaryBracket(j.salary_range);
+      const pPrivacy = (typeof p?.privacy_settings === 'string' ? JSON.parse(p.privacy_settings) : p?.privacy_settings) || {};
+      const isSalaryVisible = pPrivacy.show_salary !== false;
+      const rawSalary = isSalaryVisible ? (j.salary_range || p?.salary_range || null) : null;
+      const salaryBracket = isSalaryVisible ? normalizeSalaryBracket(rawSalary) : 'Confidential';
       const gender = detectGender(p.first_name, p.gender);
 
       alumni.push({
@@ -1191,8 +1224,8 @@ router.get('/alumni', authenticate, async (req, res, next) => {
         company: compName,
         companyAddress,
         industry: j.company_industry || p.industry,
-        salary: j.salary_range || null,
-        salaryBracket: salaryBracket !== 'Undisclosed' ? salaryBracket : null,
+        salary: isSalaryVisible ? rawSalary : null,
+        salaryBracket: isSalaryVisible ? (salaryBracket !== 'Undisclosed' ? salaryBracket : null) : 'Confidential',
         jobType: j.job_type || null,
         employmentStatus: (j.employment_status || p.employment_status) || 'Employed',
         location: [p.city, p.province].filter(Boolean).join(', ') || null,
@@ -1349,7 +1382,7 @@ router.get('/:position', authenticate, async (req, res, next) => {
       supabase.from('companies').select('id, name, industry, address, city, province, country'),
       supabase.from('survey_responses').select('id, survey_id, user_id, responses, submitted_at'),
       supabase.from('alumni_eligible').select('id, student_id, first_name, last_name, program, year_graduated, graduation_date, birth_date, user_id'),
-      supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, gender, birth_date, address, city, province, employment_status, current_job_title, company_name, industry').in('id', profileIds),
+      supabase.from('profiles').select('id, user_id, first_name, last_name, avatar_url, gender, birth_date, address, city, province, employment_status, current_job_title, company_name, industry, salary_range, privacy_settings').in('id', profileIds),
     ]);
 
     const education = educationRes.data || [];
@@ -1617,13 +1650,17 @@ router.get('/:position', authenticate, async (req, res, next) => {
       }
 
       // Salary bracket
-      const profJob = jobs.find((j: any) => j.profile_id === pid);
-      const rawSalary = profJob?.salary_range || userSurvey?.salary_range || userSurvey?.monthly_salary;
-      let sBracket = normalizeSalaryBracket(rawSalary);
-      if (sBracket === 'Undisclosed') {
-        sBracket = '₱20k–₱30k';
+      const pPrivacy = (typeof p?.privacy_settings === 'string' ? JSON.parse(p.privacy_settings) : p?.privacy_settings) || {};
+      const isSalaryVisible = pPrivacy.show_salary !== false;
+      if (isSalaryVisible) {
+        const profJob = jobs.find((j: any) => j.profile_id === pid);
+        const rawSalary = profJob?.salary_range || p?.salary_range || userSurvey?.salary_range || userSurvey?.monthly_salary;
+        let sBracket = normalizeSalaryBracket(rawSalary);
+        if (sBracket === 'Undisclosed') {
+          sBracket = '₱20k–₱30k';
+        }
+        salaryBracketCounts[sBracket] = (salaryBracketCounts[sBracket] || 0) + 1;
       }
-      salaryBracketCounts[sBracket] = (salaryBracketCounts[sBracket] || 0) + 1;
     });
 
     const totalPop = profileIds.length || 1;
@@ -1710,8 +1747,11 @@ router.get('/:position', authenticate, async (req, res, next) => {
         const empStatus = j.profile?.employment_status || (j.is_current ? 'Employed' : 'Previously Employed');
         const compNorm = (j.company_name || '').trim().toLowerCase();
         const compAddr = companyAddressMap.get(compNorm) || (j.profile?.city ? `${j.profile.city}, ${j.profile.province || 'Cebu'}` : 'Cebu City / Naga City, Cebu');
-        const salaryBracket = normalizeSalaryBracket(j.salary_range);
         const detP = detailedProfMap.get(j.profile_id);
+        const pPrivacy = (typeof detP?.privacy_settings === 'string' ? JSON.parse(detP.privacy_settings) : detP?.privacy_settings) || {};
+        const isSalaryVisible = pPrivacy.show_salary !== false;
+        const rawSal = isSalaryVisible ? (j.salary_range || detP?.salary_range || null) : null;
+        const salaryBracket = isSalaryVisible ? normalizeSalaryBracket(rawSal) : 'Confidential';
         const gender = detectGender(j.profile?.first_name, detP?.gender);
         return {
           id: j.profile_id,
@@ -1723,7 +1763,7 @@ router.get('/:position', authenticate, async (req, res, next) => {
           program: prog ? formatProgramLongName(prog) : null,
           batch: gradYear,
           employmentStatus: empStatus,
-          salaryBracket: salaryBracket !== 'Undisclosed' ? salaryBracket : '₱20k–₱30k',
+          salaryBracket: isSalaryVisible ? (salaryBracket !== 'Undisclosed' ? salaryBracket : '₱20k–₱30k') : 'Confidential',
           timeToFirstJob: '1–3 Months',
           gender,
           avatar_url: j.profile?.avatar_url || null,

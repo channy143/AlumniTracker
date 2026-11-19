@@ -283,9 +283,13 @@ export default function CareerCardInsightsPanel({
                             )}
 
                             {(a.salary || a.salaryBracket) && (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/80">
-                                <CurrencyDollarIcon className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                                <span>{(a.salary ? formatJobSalaryDisplay(a.salary) : null) || a.salaryBracket}</span>
+                              <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
+                                a.salaryBracket === 'Confidential'
+                                  ? 'text-gray-500 bg-gray-50 border-gray-200 italic'
+                                  : 'text-emerald-700 bg-emerald-50 border-emerald-100/80'
+                              }`}>
+                                <CurrencyDollarIcon className={`w-3.5 h-3.5 shrink-0 ${a.salaryBracket === 'Confidential' ? 'text-gray-400' : 'text-emerald-600'}`} />
+                                <span>{a.salaryBracket === 'Confidential' ? 'Confidential' : ((a.salary ? formatJobSalaryDisplay(a.salary) : null) || a.salaryBracket)}</span>
                               </span>
                             )}
                           </div>

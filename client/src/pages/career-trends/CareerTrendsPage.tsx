@@ -44,6 +44,7 @@ interface CareerTrend {
   mostCommonCourse: string | null;
   topSkills: { name: string; count: number }[];
   averageExperienceYears: number;
+  averageSalary?: number;
   jobTypes?: string[];
   employmentStatuses?: string[];
   locations?: string[];
@@ -393,6 +394,9 @@ export default function CareerTrendsPage() {
     if (selectedLocation) list = list.filter((c) => c.locations?.some((loc) => matchQuery(loc, selectedLocation)));
 
     switch (sortBy) {
+      case 'highest-salary':
+        list.sort((a, b) => (b.averageSalary || 0) - (a.averageSalary || 0));
+        break;
       case 'most-experienced':
         list.sort((a, b) => b.averageExperienceYears - a.averageExperienceYears);
         break;

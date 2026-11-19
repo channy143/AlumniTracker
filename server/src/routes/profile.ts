@@ -8,7 +8,7 @@ import { AuthenticatedRequest } from '../types';
 import { addActivity } from '../services/activityStore';
 import { validateResumeContent } from '../utils/validateResume';
 import { normalizeCityName, normalizeProvinceName, normalizePhPhone } from '../utils/formatLocation';
-import { validateJobTitle, validateCompanyName, normalizeIndustry, toTitleCaseName, validateStudentId } from '../utils/validateJobTitle';
+import { validateJobTitle, validateCompanyName, normalizeIndustry, normalizeSalaryRange, toTitleCaseName, validateStudentId } from '../utils/validateJobTitle';
 import { notifyAdmins } from './notifications';
 import {
   updateProfileSchema,
@@ -266,6 +266,10 @@ router.put('/career', authenticate, validate(updateCareerSchema), async (req: Au
       const check = validateJobTitle(updates.current_job_title);
       if (!check.valid) throw new AppError(check.error || 'Please enter a valid job title.', 400);
       updates.current_job_title = check.cleaned;
+    }
+
+    if (updates.salary_range !== undefined) {
+      updates.salary_range = normalizeSalaryRange(updates.salary_range) || (updates.salary_range ? String(updates.salary_range).trim() : null);
     }
 
     const { data: profile, error } = await db

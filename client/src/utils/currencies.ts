@@ -166,8 +166,8 @@ export function formatJobSalaryDisplay(raw?: string | null): string | null {
   const str = String(raw || '').trim();
   if (!str) return null;
 
-  // Preserve descriptive labels like "Below ₱20,000", "Above ₱100,000", "Competitive"
-  if (/^(below|under|above|over|prefer|competitive|undisclosed|n\/a)/i.test(str)) {
+  // Preserve descriptive labels like "Below ₱20,000", "Above ₱100,000", "Competitive", "Confidential"
+  if (/^(below|under|above|over|prefer|competitive|undisclosed|confidential|n\/a)/i.test(str)) {
     return str;
   }
 

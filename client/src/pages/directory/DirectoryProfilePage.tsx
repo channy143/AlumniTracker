@@ -559,7 +559,8 @@ export default function DirectoryProfilePage() {
               <SectionTitle icon={BuildingOfficeIcon} title="Employment History" />
               <div className="overflow-x-auto mt-2 flex-1">
                 {(() => {
-                  const showSalaryColumn = profile.employment.some((e: any) => Boolean(e.salary_range));
+                  const isOwnProfile = Boolean(currentUser?.id && (currentUser.id === profile?.user_id || currentUser.id === profile?.id));
+                  const showSalaryColumn = (isOwnProfile || profile.privacy_settings?.show_salary !== false) && profile.employment.some((e: any) => Boolean(e.salary_range));
                   return (
                     <table className="w-full text-xs">
                       <thead>

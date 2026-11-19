@@ -224,6 +224,8 @@ export const CANONICAL_SALARY_RANGES = [
   '₱20,000–₱40,000',
   '₱40,000–₱60,000',
   '₱60,000–₱80,000',
+  '₱80,000+',
+  '₱80,000 and above',
   '₱80,000–₱100,000',
   'Above ₱100,000',
   'Prefer not to say',

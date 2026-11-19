@@ -729,8 +729,14 @@ export default function QProAnalyticsView({
                         {item.timeToFirstJob}
                       </span>
                     </td>
-                    <td className="py-2 px-3 font-bold text-amber-700">
-                      {item.salaryBracket}
+                    <td className="py-2 px-3">
+                      {item.salaryBracket === 'Confidential' ? (
+                        <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500 italic">
+                          Confidential
+                        </span>
+                      ) : (
+                        <span className="font-bold text-amber-700">{item.salaryBracket}</span>
+                      )}
                     </td>
                     <td className="py-2 px-3 text-center">
                       <span

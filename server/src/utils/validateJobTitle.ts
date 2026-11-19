@@ -206,6 +206,8 @@ export const CANONICAL_SALARY_RANGES = [
   '₱20,000–₱40,000',
   '₱40,000–₱60,000',
   '₱60,000–₱80,000',
+  '₱80,000+',
+  '₱80,000 and above',
   '₱80,000–₱100,000',
   'Above ₱100,000',
   'Prefer not to say',
@@ -228,16 +230,25 @@ export function normalizeSalaryRange(raw: unknown): string | null {
   if (lower === '40000-60000' || lower === '40001-60000') return '₱40,000–₱60,000';
   if (lower === '60000-80000' || lower === '60001-80000') return '₱60,000–₱80,000';
   if (lower === '80000-100000' || lower === '80001-100000') return '₱80,000–₱100,000';
+  if (
+    lower === '80000+' ||
+    lower === '₱80,000+' ||
+    lower.includes('80k') ||
+    (lower.includes('80000') && (lower.includes('+') || lower.includes('above') || lower.includes('over') || lower.includes('>')))
+  ) {
+    return '₱80,000+';
+  }
 
-  const numericOnly = cleaned.replace(/[₱,\s]/g, '');
+  const numericOnly = cleaned.replace(/[₱,\s+]/g, '');
   if (/^\d+(\.\d+)?$/.test(numericOnly)) {
     const num = Number(numericOnly);
-    if (num <= 0 || num >= 150000) return null; // Reject suspicious test outliers like 150000
+    if (num <= 0 || num >= 1000000) return null;
     if (num < 20000) return 'Below ₱20,000';
     if (num <= 40000) return '₱20,000–₱40,000';
     if (num <= 60000) return '₱40,000–₱60,000';
-    if (num <= 80000) return '₱60,000–₱80,000';
-    if (num <= 100000) return '₱80,000–₱100,000';
+    if (num <= 80000 && !cleaned.includes('+') && !lower.includes('above')) return '₱60,000–₱80,000';
+    if (num <= 100000 && !cleaned.includes('+') && !lower.includes('above')) return '₱80,000–₱100,000';
+    if (cleaned.includes('+') || lower.includes('above') || num >= 80000) return '₱80,000+';
     return 'Above ₱100,000';
   }
   return null;
