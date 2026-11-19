@@ -711,26 +711,8 @@ export default function CommunityPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {!isMyPost && post.author_id && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleChatWithAuthor(
-                                post.author_id,
-                                post.author_name,
-                                post.author_avatar,
-                                post.author_headline
-                              )
-                            }
-                            className="h-7 px-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer"
-                            title={`Chat with ${post.author_name}`}
-                          >
-                            <ChatBubbleLeftRightIcon className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Chat</span>
-                          </button>
-                        )}
-                        {isMyPost && (
+                      {isMyPost && (
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             type="button"
                             onClick={() => handleDeletePost(post.id)}
@@ -739,8 +721,8 @@ export default function CommunityPage() {
                           >
                             <TrashIcon className="w-4 h-4" />
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Tags */}
