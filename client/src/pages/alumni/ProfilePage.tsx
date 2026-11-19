@@ -2272,17 +2272,36 @@ export default function ProfilePage() {
                     {formatExperienceFromDate(emp.start_date, emp.end_date)}
                   </p>
                 )}
-                {emp.proof_url && (emp.record_category === 'ojt' || String(emp.job_type || '').toLowerCase() === 'internship' || String(emp.employment_status || '').toLowerCase() === 'ojt') && (
-                  <a
-                    href={emp.proof_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-700 hover:underline mt-1"
-                  >
-                    <DocumentTextIcon className="w-3.5 h-3.5" />
-                    Certificate of Completion
-                    <ArrowTopRightOnSquareIcon className="w-3 h-3" />
-                  </a>
+                {emp.proof_url && (
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <a
+                      href={emp.proof_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center gap-1 text-[11px] font-medium hover:underline ${
+                        emp.record_category === 'ojt' || String(emp.job_type || '').toLowerCase() === 'internship' || String(emp.employment_status || '').toLowerCase() === 'ojt'
+                          ? 'text-indigo-600 hover:text-indigo-700'
+                          : 'text-orange-600 hover:text-orange-700'
+                      }`}
+                    >
+                      <DocumentTextIcon className="w-3.5 h-3.5" />
+                      <span>{emp.record_category === 'ojt' ? 'Certificate of Completion' : formatProofType(emp.proof_type)}</span>
+                      <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+                    </a>
+                    {emp.is_verified || emp.verification_status === 'verified' ? (
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        ✓ Verified
+                      </span>
+                    ) : emp.verification_status === 'rejected' ? (
+                      <span className="text-[10px] font-semibold text-red-700 bg-red-50 px-1.5 py-0.5 rounded border border-red-200" title={emp.verification_notes ? `Reason: ${emp.verification_notes}` : 'Rejected'}>
+                        ✕ Rejected
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        Pending Verification
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -3076,39 +3095,51 @@ export default function ProfilePage() {
                       <div>
                         <span className="text-[11px] text-gray-500 block font-medium">Accreditation Dossier (Q-Pro)</span>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <CheckBadgeIcon className={`w-4 h-4 ${currentEmp?.is_verified || currentEmp?.verification_status === 'verified' ? 'text-emerald-600' : currentEmp?.verification_status === 'pending' ? 'text-amber-500' : 'text-gray-400'}`} />
-                          <span className="text-xs font-semibold text-gray-800">
+                          <CheckBadgeIcon className={`w-4 h-4 ${currentEmp?.is_verified || currentEmp?.verification_status === 'verified' ? 'text-emerald-600' : currentEmp?.verification_status === 'pending' ? 'text-amber-500' : currentEmp?.verification_status === 'rejected' ? 'text-red-500' : 'text-gray-400'}`} />
+                          <span className={`text-xs font-semibold ${currentEmp?.verification_status === 'rejected' ? 'text-red-700' : 'text-gray-800'}`}>
                             {currentEmp?.is_verified || currentEmp?.verification_status === 'verified'
                               ? 'Verified Employment'
                               : currentEmp?.verification_status === 'pending'
                                 ? 'Pending Admin Verification'
                                 : currentEmp?.verification_status === 'rejected'
-                                  ? 'Resubmission Requested'
+                                  ? 'Rejected — Resubmission Required'
                                   : 'Unverified Record'}
                           </span>
                         </div>
+                        {currentEmp?.verification_status === 'rejected' && currentEmp?.verification_notes && (
+                          <p className="text-[11px] text-red-600 mt-1 bg-red-50 p-1.5 rounded border border-red-200">
+                            <span className="font-semibold">Reason:</span> {currentEmp.verification_notes}
+                          </p>
+                        )}
                       </div>
-                      {currentEmp?.proof_url ? (
-                        <a
-                          href={currentEmp.proof_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-1 text-xs font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg border border-orange-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                        >
-                          <DocumentTextIcon className="w-3.5 h-3.5" />
-                          <span>View {formatProofType(currentEmp.proof_type)}</span>
-                          <ArrowTopRightOnSquareIcon className="w-3 h-3" />
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => { setEditing(true); setEditSection('personal'); }}
-                          className="px-2.5 py-1 text-xs font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
-                        >
-                          <DocumentArrowUpIcon className="w-3.5 h-3.5" />
-                          <span>+ Submit Proof</span>
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {currentEmp?.proof_url && (
+                          <a
+                            href={currentEmp.proof_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1 text-xs font-medium bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg border border-orange-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <DocumentTextIcon className="w-3.5 h-3.5" />
+                            <span>View {formatProofType(currentEmp.proof_type)}</span>
+                            <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+                          </a>
+                        )}
+                        {(!currentEmp?.proof_url || currentEmp?.verification_status === 'rejected') && (
+                          <button
+                            type="button"
+                            onClick={() => { setEditing(true); setEditSection('personal'); }}
+                            className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors cursor-pointer inline-flex items-center gap-1 ${
+                              currentEmp?.verification_status === 'rejected'
+                                ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
+                                : 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200'
+                            }`}
+                          >
+                            <DocumentArrowUpIcon className="w-3.5 h-3.5" />
+                            <span>{currentEmp?.verification_status === 'rejected' ? 'Re-upload Proof' : '+ Submit Proof'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

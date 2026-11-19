@@ -329,8 +329,14 @@ export default function AlumniManagement() {
   };
 
   const handleVerifyEmploymentProof = async (empId: string, status: 'verified' | 'rejected') => {
+    let notes: string | undefined = undefined;
+    if (status === 'rejected') {
+      const input = window.prompt('Please enter the reason for rejecting this Certificate of Employment (optional):');
+      if (input === null) return;
+      notes = input.trim() || undefined;
+    }
     try {
-      await adminApi.verifyEmploymentProof(empId, { status });
+      await adminApi.verifyEmploymentProof(empId, { status, notes });
       addNotification(`Employment record marked as ${status} for accreditation`, 'success');
       if (detailData?.id) {
         const fresh = await adminApi.alumniGet(detailData.id);
@@ -1343,6 +1349,7 @@ export default function AlumniManagement() {
                               <tbody>
                                 {regularEmployment.map((emp: any, i: number) => {
                                   const isVer = emp.is_verified || emp.verification_status === 'verified';
+                                  const isRej = emp.verification_status === 'rejected';
                                   return (
                                     <tr key={emp.id || i} className="border-b border-gray-100 hover:bg-gray-50/50">
                                       <td className="px-2 py-1.5 text-gray-700">{emp.company_industry || '---'}</td>
@@ -1354,25 +1361,59 @@ export default function AlumniManagement() {
                                       <td className="px-2 py-1.5">{emp.is_current ? <span className="text-emerald-600 font-medium">Current</span> : <span className="text-gray-400">Past</span>}</td>
                                       <td className="px-2 py-1.5">
                                         {emp.proof_url ? (
-                                          <a
-                                            href={emp.proof_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-orange-600 hover:underline font-semibold inline-flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded border border-orange-200"
-                                            title={emp.proof_type?.startsWith('other:') ? emp.proof_type : undefined}
-                                          >
-                                            <span>{formatProofLabel(emp.proof_type)}</span>
-                                            <span>↗</span>
-                                          </a>
+                                          <div>
+                                            <a
+                                              href={emp.proof_url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-orange-600 hover:underline font-semibold inline-flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded border border-orange-200"
+                                              title={emp.proof_type?.startsWith('other:') ? emp.proof_type : undefined}
+                                            >
+                                              <span>{formatProofLabel(emp.proof_type)}</span>
+                                              <span>↗</span>
+                                            </a>
+                                            {isRej && emp.verification_notes && (
+                                              <p className="text-[10px] text-red-600 mt-0.5 font-normal line-clamp-2 max-w-[180px]" title={emp.verification_notes}>
+                                                Reason: {emp.verification_notes}
+                                              </p>
+                                            )}
+                                          </div>
                                         ) : (
                                           <span className="text-gray-400 italic">None</span>
                                         )}
                                       </td>
                                       <td className="px-2 py-1.5 text-right">
                                         {isVer ? (
-                                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                            ✓ Verified
-                                          </span>
+                                          <div className="inline-flex items-center gap-1.5 justify-end">
+                                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                              ✓ Verified
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVerifyEmploymentProof(emp.id, 'rejected')}
+                                              className="px-1.5 py-0.5 text-red-600 hover:bg-red-50 rounded text-[10px] font-medium border border-transparent hover:border-red-200 transition-colors cursor-pointer"
+                                              title="Reject this employment proof"
+                                            >
+                                              Reject
+                                            </button>
+                                          </div>
+                                        ) : isRej ? (
+                                          <div className="inline-flex items-center gap-1.5 justify-end">
+                                            <span
+                                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-200"
+                                              title={emp.verification_notes ? `Reason: ${emp.verification_notes}` : 'Certificate rejected'}
+                                            >
+                                              ✕ Rejected
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVerifyEmploymentProof(emp.id, 'verified')}
+                                              className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-semibold transition-colors cursor-pointer shadow-xs"
+                                              title="Approve / Re-verify this employment proof"
+                                            >
+                                              Verify
+                                            </button>
+                                          </div>
                                         ) : emp.proof_url ? (
                                           <div className="inline-flex items-center gap-1 justify-end">
                                             <button

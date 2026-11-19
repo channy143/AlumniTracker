@@ -42,6 +42,7 @@ const ADMIN_NOTIF_TYPES: Record<string, { id: string; label: string; icon: any }
 };
 
 const ALUMNI_NOTIF_TYPES: Record<string, { id: string; label: string; icon: any }> = {
+  employment: { id: 'employment', label: 'Employment & COE', icon: ArrowTrendingUpIcon },
   survey: { id: 'survey', label: 'Surveys', icon: DocumentTextIcon },
   job: { id: 'job', label: 'Job Opportunities', icon: BriefcaseIcon },
   application: { id: 'application', label: 'Applications', icon: BriefcaseIcon },
@@ -66,12 +67,13 @@ function getNotifConfig(type?: string, isAdmin?: boolean) {
       };
     case 'employment':
     case 'career':
+    case 'coe':
       return {
         icon: ArrowTrendingUpIcon,
         color: 'text-teal-600',
         bg: 'bg-teal-50',
-        badge: 'Career Update',
-        actionLabel: isAdmin ? 'View Alumni Career' : 'View Career',
+        badge: 'Employment & COE',
+        actionLabel: isAdmin ? 'View Alumni Career' : 'View Profile',
       };
     case 'security':
     case 'incident':

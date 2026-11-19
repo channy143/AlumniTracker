@@ -12,6 +12,8 @@ import { requireAdminSudo } from '../../middleware/sudo';
 import { adminSensitiveLimiter } from '../../middleware/rateLimiter';
 import { invalidateUserSessions } from '../../services/sessionSecurityService';
 import { normalizeIndustry, normalizeSalaryRange, toTitleCaseName, toTitleCaseCompanyName, isOjtEmploymentRow } from '../../utils/validateJobTitle';
+import { createNotification } from '../notifications';
+import { sendEmploymentVerificationEmail } from '../../services/email';
 
 const router = Router();
 
@@ -1137,6 +1139,57 @@ router.put('/employment/:employmentId/verify', async (req: AuthenticatedRequest,
       status: 'success',
       details: { verification_status: status, notes },
     });
+
+    // Notify alumni in-app and via email about COE review decision
+    if (data?.profile_id) {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, user_id, first_name, last_name')
+          .eq('id', data.profile_id)
+          .maybeSingle();
+
+        if (profile?.user_id) {
+          const alumniName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Alumnus';
+          const roleInfo = [data.position, data.company_name].filter(Boolean).join(' at ');
+
+          const notifTitle = isVerified
+            ? 'Certificate of Employment (COE) Verified'
+            : 'Certificate of Employment (COE) Rejected';
+          const notifMessage = isVerified
+            ? `Your Certificate of Employment (COE) for ${roleInfo || 'your employment record'} has been verified by the university administration.`
+            : `Your Certificate of Employment (COE) for ${roleInfo || 'your employment record'} was not approved.${notes ? ` Reason: ${notes}` : ' Please upload a clear copy of your employment proof.'}`;
+
+          await createNotification({
+            userId: profile.user_id,
+            type: 'employment',
+            title: notifTitle,
+            message: notifMessage,
+            link: '/profile',
+          });
+
+          const { data: userRec } = await supabase
+            .from('users')
+            .select('email')
+            .eq('id', profile.user_id)
+            .maybeSingle();
+
+          if (userRec?.email) {
+            sendEmploymentVerificationEmail(userRec.email, {
+              alumniName,
+              companyName: data.company_name,
+              position: data.position,
+              status: isVerified ? 'verified' : 'rejected',
+              notes: notes || undefined,
+            }).catch((emailErr) => {
+              console.error('Failed to send employment verification email:', emailErr);
+            });
+          }
+        }
+      } catch (notifyErr) {
+        console.error('Failed to notify alumni on employment verification change:', notifyErr);
+      }
+    }
 
     res.json({ message: `Employment record marked as ${status}`, data });
   } catch (err) {

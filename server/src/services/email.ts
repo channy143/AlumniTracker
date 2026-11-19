@@ -333,3 +333,100 @@ export async function sendSurveyReminderEmail(
     }
   }
 }
+
+export async function sendEmploymentVerificationEmail(
+  to: string,
+  payload: {
+    alumniName: string;
+    companyName?: string;
+    position?: string;
+    status: 'verified' | 'rejected';
+    notes?: string;
+  }
+): Promise<void> {
+  const cleanTo = String(to || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanTo)) return;
+
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.log(`[DEV] Employment verification email to ${cleanTo}: ${payload.status}`);
+    return;
+  }
+
+  const clientUrl = (process.env.CLIENT_URL || '').trim().replace(/\/$/, '');
+  const profileUrl = clientUrl ? `${clientUrl}/profile` : '';
+  const isVerified = payload.status === 'verified';
+  const jobInfo = [payload.position, payload.companyName].filter(Boolean).join(' at ');
+
+  const subject = isVerified
+    ? 'Certificate of Employment (COE) Verified — CTU-Naga Alumni Tracker'
+    : 'Certificate of Employment (COE) Update Required — CTU-Naga Alumni Tracker';
+
+  const badge = isVerified ? 'Document Verified' : 'Document Rejected / Action Required';
+  const badgeColor = isVerified ? '#10b981' : '#ef4444';
+  const calloutBorder = isVerified ? '#059669' : '#dc2626';
+  const calloutBg = isVerified ? '#ecfdf5' : '#fef2f2';
+
+  const logoAttachment = getAlumiLogoAttachment();
+  const attachments = logoAttachment ? [logoAttachment] : [];
+
+  const html = `
+    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px 20px; background: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0;">
+      <div style="background: linear-gradient(135deg, #003366 0%, #002244 100%); margin: -24px -20px 24px; padding: 24px 20px; border-radius: 14px 14px 0 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+          <tr>
+            <td style="width: 58px; vertical-align: middle; padding-right: 14px;">
+              <img src="${logoAttachment ? 'cid:alumimascot' : getAlumiFallbackUrl()}" alt="Alumi — CTU-Naga Mascot" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px;" />
+            </td>
+            <td style="vertical-align: middle;">
+              <h1 style="color: #ffffff; font-size: 19px; margin: 0; font-weight: 700; line-height: 1.25;">CTU-Naga Alumni Tracker</h1>
+              <p style="color: ${badgeColor}; margin: 4px 0 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;">${badge}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div style="background: ${calloutBg}; border-left: 4px solid ${calloutBorder}; border-radius: 8px; padding: 14px 16px; margin: 0 0 18px;">
+        <div style="font-size: 15px; font-weight: 700; color: #0f172a;">
+          ${isVerified ? 'Your Certificate of Employment has been approved' : 'Certificate of Employment was not approved'}
+        </div>
+        ${jobInfo ? `<div style="font-size: 13px; color: #475569; margin-top: 4px;">Role: <strong>${escapeHtml(jobInfo)}</strong></div>` : ''}
+      </div>
+      <p style="color: #334155; font-size: 14px; line-height: 1.65; margin: 0 0 16px;">Hello ${escapeHtml(payload.alumniName || 'Alumnus')},</p>
+      <p style="color: #334155; font-size: 14px; line-height: 1.65; margin: 0 0 16px;">
+        ${isVerified
+          ? 'Your Certificate of Employment (COE) has been reviewed and successfully verified by the university administration for accreditation (Q-Pro).'
+          : `Your Certificate of Employment (COE) could not be verified by the university administration.${payload.notes ? ` <strong>Reason:</strong> ${escapeHtml(payload.notes)}` : ''}`
+        }
+      </p>
+      ${!isVerified ? `
+        <p style="color: #334155; font-size: 14px; line-height: 1.65; margin: 0 0 20px;">
+          Please sign in to your account and upload a clear, legible copy of your Certificate of Employment (COE), Company ID, or appointment document under your Profile.
+        </p>
+      ` : ''}
+      ${profileUrl ? `
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${escapeHtml(profileUrl)}" style="display: inline-block; background: #f97316; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 10px;">
+            ${isVerified ? 'View Profile' : 'Update Employment Proof'}
+          </a>
+        </div>
+      ` : ''}
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0 14px;" />
+      <p style="color: #94a3b8; font-size: 11px; margin: 0; line-height: 1.4;">
+        Cebu Technological University &mdash; Naga Extension Campus<br />
+        City of Naga, Cebu, Philippines
+      </p>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"CTU-Naga Alumni Tracker" <${process.env.SMTP_USER}>`,
+      to: cleanTo,
+      subject,
+      attachments,
+      html,
+    });
+  } catch (err: any) {
+    console.error(`[Email Verification] Failed to send email to ${cleanTo}:`, err?.message || err);
+  }
+}

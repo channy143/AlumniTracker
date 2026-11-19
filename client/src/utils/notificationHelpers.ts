@@ -84,6 +84,9 @@ export function resolveNotificationLink(notif: any, userRole?: string): string {
     }
   } else {
     switch (type) {
+      case 'employment':
+      case 'coe':
+        return '/profile';
       case 'post':
         return '/';
       case 'survey':
@@ -133,6 +136,9 @@ export function resolveNotificationLink(notif: any, userRole?: string): string {
   }
   if (title.includes('survey')) {
     return '/tracer-survey';
+  }
+  if (title.includes('employment') || title.includes('coe') || title.includes('certificate')) {
+    return '/profile';
   }
   if (title.includes('announcement')) {
     return '/announcements';
@@ -186,6 +192,9 @@ export function getNotificationActionLabel(type?: string, userRole?: string): st
   }
 
   switch (t) {
+    case 'employment':
+    case 'coe':
+      return 'View Profile →';
     case 'post':
       return 'View Post →';
     case 'survey':
