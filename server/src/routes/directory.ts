@@ -54,6 +54,7 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
     const company = (req.query.company as string) || '';
     const location = (req.query.location as string) || '';
     const sort = (req.query.sort as string) || 'name';
+    const licensureFilter = ((req.query.licensure as string) || '').trim().toLowerCase();
     const hasPrcLicense = req.query.has_prc_license === 'true';
     const hasPostgraduate = req.query.has_postgraduate === 'true';
 
@@ -109,19 +110,58 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
       employmentFilterIds = [...new Set((data || []).map((e: any) => e.profile_id))];
     }
 
-    // Pre-filter by accreditation credentials (PRC license / Postgraduate)
+    // Pre-filter by accreditation credentials (PRC license / LET / Postgraduate)
     let accreditationFilterIds: string[] | null = null;
-    if (hasPrcLicense || hasPostgraduate) {
-      const matchLists: string[][] = [];
-      if (hasPrcLicense) {
-        const { data: licData } = await db.from('alumni_licensures').select('profile_id').eq('status', 'passed');
-        matchLists.push((licData || []).map((l: any) => l.profile_id));
+    let excludeLicensureIds: string[] = [];
+    const effectiveLicensure = licensureFilter || (hasPrcLicense ? 'prc' : hasPostgraduate ? 'postgrad' : '');
+    const needPostgrad = hasPostgraduate || effectiveLicensure === 'postgrad' || effectiveLicensure === 'postgraduate';
+
+    if (effectiveLicensure || needPostgrad) {
+      let licIds: string[] | null = null;
+      if (effectiveLicensure === 'none' || effectiveLicensure === 'unlicensed') {
+        const { data: licData } = await db.from('alumni_licensures').select('profile_id');
+        excludeLicensureIds = [...new Set((licData || []).map((l: any) => l.profile_id).filter(Boolean))];
+      } else if (effectiveLicensure && effectiveLicensure !== 'postgrad' && effectiveLicensure !== 'postgraduate') {
+        const { data: licData } = await db.from('alumni_licensures').select('profile_id, exam_title, status').eq('status', 'passed');
+        const rows = licData || [];
+        if (effectiveLicensure === 'let') {
+          licIds = rows
+            .filter((l: any) => {
+              const t = (l.exam_title || '').toLowerCase();
+              return t.includes('let') || t.includes('teacher') || t.includes('licensure examination for teacher');
+            })
+            .map((l: any) => l.profile_id);
+        } else if (effectiveLicensure === 'cpa') {
+          licIds = rows
+            .filter((l: any) => {
+              const t = (l.exam_title || '').toLowerCase();
+              return t.includes('cpa') || t.includes('accountant');
+            })
+            .map((l: any) => l.profile_id);
+        } else if (effectiveLicensure === 'prc' || effectiveLicensure === 'prc_any' || effectiveLicensure === 'licensed' || effectiveLicensure === 'passed') {
+          licIds = rows.map((l: any) => l.profile_id);
+        } else {
+          licIds = rows
+            .filter((l: any) => (l.exam_title || '').toLowerCase().includes(effectiveLicensure))
+            .map((l: any) => l.profile_id);
+        }
+        licIds = [...new Set(licIds.filter(Boolean))];
       }
-      if (hasPostgraduate) {
+
+      let pgIds: string[] | null = null;
+      if (needPostgrad) {
         const { data: pgData } = await db.from('alumni_postgraduate').select('profile_id');
-        matchLists.push((pgData || []).map((p: any) => p.profile_id));
+        pgIds = [...new Set((pgData || []).map((p: any) => p.profile_id).filter(Boolean))];
       }
-      accreditationFilterIds = [...new Set(matchLists.flat())];
+
+      if (licIds !== null && pgIds !== null) {
+        const pgSet = new Set(pgIds);
+        accreditationFilterIds = licIds.filter((id) => pgSet.has(id));
+      } else if (licIds !== null) {
+        accreditationFilterIds = licIds;
+      } else if (pgIds !== null) {
+        accreditationFilterIds = pgIds;
+      }
     }
 
     let profileQuery = db
@@ -186,8 +226,14 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
     if (employmentFilterIds) {
       profileQuery = profileQuery.in('id', employmentFilterIds);
     }
-    if (accreditationFilterIds) {
-      profileQuery = profileQuery.in('id', accreditationFilterIds);
+    if (accreditationFilterIds !== null) {
+      profileQuery = profileQuery.in(
+        'id',
+        accreditationFilterIds.length > 0 ? accreditationFilterIds : ['00000000-0000-0000-0000-000000000000']
+      );
+    }
+    if (excludeLicensureIds.length > 0) {
+      profileQuery = profileQuery.not('id', 'in', `(${excludeLicensureIds.join(',')})`);
     }
 
     // Sort

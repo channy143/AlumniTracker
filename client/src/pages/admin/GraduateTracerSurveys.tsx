@@ -2005,7 +2005,7 @@ function SurveyNonRespondents({ survey }: { survey: any }) {
 
       {/* Send Reminder Modal */}
       {(remindTargetIds !== null || remindAllMode) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-xl border border-gray-200 shadow-xl max-w-lg w-full overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50">
               <div className="flex items-center gap-2">

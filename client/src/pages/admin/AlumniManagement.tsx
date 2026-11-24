@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { adminApi } from '@/services/api';
 import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
 import { SkeletonModalDetail } from '@/components/ui/Skeleton';
@@ -40,7 +41,8 @@ export default function AlumniManagement() {
   const [provinces, setProvinces] = useState<string[]>(initialAlumniRes?.provinces ?? []);
   const [locationCities, setLocationCities] = useState<Array<{ city: string; province: string }>>(initialAlumniRes?.locationCities ?? []);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  const search = searchParams.get('q') || '';
   const [filters, setFilters] = useState({ course: '', year: '', employment_status: '', employer: '', province: '', city: '', archived: 'false', licensure: '' });
   const [selected, setSelected] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
@@ -145,6 +147,11 @@ export default function AlumniManagement() {
     } catch (err: any) { if (!cached) setError(err.message || 'Failed to load alumni'); }
     finally { setLoading(false); }
   }, [page, search, filters]);
+
+  useEffect(() => {
+    setPage(1);
+    setEligPage(1);
+  }, [search]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -582,7 +589,7 @@ export default function AlumniManagement() {
         </div>
       </div>
 
-      <div data-tour="alumni-tabs" className="flex gap-1 mb-3 flex-wrap">
+      <div data-tour="alumni-tabs" className="flex items-center gap-1.5 mb-3 flex-wrap">
         {user?.role !== 'registrar' && (
           <button onClick={() => { setTab('registered'); setPage(1); }} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'registered' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
             Registered
@@ -596,11 +603,21 @@ export default function AlumniManagement() {
             Deleted / Trash
           </button>
         )}
+        {tab === 'registered' && (
+          <select
+            value={filters.archived}
+            onChange={(e) => { setFilters((f) => ({ ...f, archived: e.target.value })); setPage(1); }}
+            className="text-xs border border-gray-200 rounded-full px-3 py-1 bg-white text-gray-600 outline-none focus:border-orange-400"
+            title="Filter by account status"
+          >
+            <option value="">All</option>
+            <option value="false">Active</option>
+            <option value="true">Archived</option>
+          </select>
+        )}
       </div>
 
       <div data-tour="alumni-search-filter" className="flex flex-wrap gap-2 mb-3">
-        <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); setEligPage(1); }}
-          placeholder={tab === 'eligible' ? "Search eligible by name or student ID..." : "Search by name, email, or ID..."} className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-orange-400 w-full sm:w-56" />
         <select value={filters.course} onChange={(e) => { setFilters((f) => ({ ...f, course: e.target.value })); setPage(1); setEligPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="">All Courses</option>
@@ -668,13 +685,8 @@ export default function AlumniManagement() {
           <option value="let">LET Passers Only (Teachers)</option>
           <option value="prc">All PRC Board Passers</option>
           <option value="cpa">CPA Passers</option>
+          <option value="postgrad">Postgraduate (MS/Ph.D.)</option>
           <option value="none">Non-Licensed</option>
-        </select>
-        <select value={filters.archived} onChange={(e) => { setFilters((f) => ({ ...f, archived: e.target.value })); setPage(1); }}
-          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
-          <option value="">All</option>
-          <option value="false">Active</option>
-          <option value="true">Archived</option>
         </select>
           </>
         )}

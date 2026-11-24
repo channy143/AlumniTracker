@@ -413,6 +413,33 @@ export const authApi = {
     api.post<{ success: boolean; message: string }>('/auth/logout', { allDevices }),
   sudoVerify: (password: string) =>
     api.post<{ ok: boolean }>('/auth/sudo-verify', { password }),
+  getRoleAppointment: () =>
+    api.get<{
+      pendingOffer: {
+        offeredRole: string;
+        offeredRoleLabel: string;
+        offeredBy: string;
+        created_at: string;
+      } | null;
+      acceptedRole: string | null;
+      acceptedRoleLabel: string | null;
+      hasPin: boolean;
+    }>('/auth/role-appointment', { skipCache: true }),
+  respondRoleAppointment: (action: 'accept' | 'decline') =>
+    api.post<{
+      ok: boolean;
+      status: 'accepted' | 'declined';
+      role: string;
+      roleLabel?: string;
+      hasPin?: boolean;
+    }>('/auth/role-appointment/respond', { action }),
+  verifyAdminPin: (pin: string) =>
+    api.post<{
+      ok: boolean;
+      firstTimeSetup: boolean;
+      role: string;
+      roleLabel: string;
+    }>('/auth/role-appointment/verify-pin', { pin }),
   reportIncident: (data: { incidentType: string; description: string; severity?: string }) =>
     api.post<{ success: boolean; message: string; incidentId: string }>('/auth/report-incident', data),
   reportDeletedAccount: (description: string) =>
@@ -731,6 +758,11 @@ export const adminApi = {
 
   userList: (params: Record<string, any> = {}) => api.get<any>(`/admin/users?${toQuery(params)}`),
   userCreate: (data: any) => api.post<any>('/admin/users', data),
+  userUploadPhoto: (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    return api.upload<{ url: string }>(`/admin/users/${id}/photo`, formData);
+  },
   userDisable: (id: string) => api.put<any>(`/admin/users/${id}/disable`, {}),
   userEnable: (id: string) => api.put<any>(`/admin/users/${id}/enable`, {}),
   userSetRole: (id: string, role: string) => api.put<any>(`/admin/users/${id}/role`, { role }),
@@ -745,6 +777,18 @@ export const adminApi = {
 
   settingsGet: () => api.get<any>('/admin/settings'),
   settingsUpdate: (data: any) => api.put<any>('/admin/settings', data),
+  directivesList: () => api.get<{ directives: any[]; role_permissions: any }>('/admin/settings/directives', { skipCache: true }),
+  directiveCreate: (data: {
+    type: 'access_delegation' | 'document_request' | 'general_directive';
+    targetRole: 'admin' | 'alumni_officer' | 'registrar';
+    targetEmail?: string;
+    title?: string;
+    reason: string;
+    documentType?: string;
+    proposedPermissions?: Record<string, 'full' | 'view' | 'none'>;
+  }) => api.post<{ directive: any; notifiedUsers: number; emailSent: boolean; emailRecipients: string[] }>('/admin/settings/directives', data),
+  directiveRespond: (id: string, data: { action: 'accepted' | 'fulfilled' | 'declined'; responseNote?: string }) =>
+    api.post<{ directive: any }>(`/admin/settings/directives/${id}/respond`, data),
 
   auditLogs: (params: Record<string, any> = {}) => api.get<any>(`/admin/audit-logs?${toQuery(params)}`),
   auditLogStats: () => api.get<any>('/admin/audit-logs/stats'),
@@ -768,6 +812,42 @@ export const adminApi = {
   employerUpdatePartnership: (name: string, partnershipStatus: string) => api.put<any>(`/admin/employer-insights/employer/${encodeURIComponent(name)}/partnership`, { partnership_status: partnershipStatus }),
 
   curriculumStatistics: (params: Record<string, any> = {}) => api.get<any>(`/admin/curriculum-insights/statistics?${toQuery(params)}`),
+};
+
+export const documentRequestsApi = {
+  myList: () =>
+    api.get<{ requests: any[]; applicant: any }>('/document-requests/my', { skipCache: true }),
+  create: (data: {
+    documents: Array<{ type: string; copies: number }>;
+    purpose: string;
+    preferred_pickup_date?: string;
+    contact_number?: string;
+    student_id?: string;
+    program?: string;
+    year_graduated?: number | string | null;
+    notes?: string;
+  }) => api.post<{ request: any }>('/document-requests', data),
+  cancel: (id: string) => api.patch<{ request: any }>(`/document-requests/${id}/cancel`, {}),
+  adminList: (params: { status?: string; search?: string; documentType?: string } = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v) qs.set(k, v);
+    });
+    const qStr = qs.toString();
+    return api.get<{ requests: any[]; stats: any }>(
+      `/document-requests/admin${qStr ? `?${qStr}` : ''}`,
+      { skipCache: true }
+    );
+  },
+  adminUpdateStatus: (
+    id: string,
+    data: {
+      status: 'pending' | 'processing' | 'ready_for_pickup' | 'claimed' | 'rejected';
+      pickup_schedule?: string;
+      pickup_window?: string;
+      registrar_remarks?: string;
+    }
+  ) => api.patch<{ request: any }>(`/document-requests/${id}/status`, data),
 };
 
 export const connectionsApi = {
@@ -926,7 +1006,7 @@ export const announcementsApi = {
 };
 
 export const directoryApi = {
-  search: (params: { q?: string; page?: number; limit?: number; program?: string; batch?: string; employment_status?: string; industry?: string; company?: string; location?: string; sort?: string }) => {
+  search: (params: { q?: string; page?: number; limit?: number; program?: string; batch?: string; employment_status?: string; industry?: string; company?: string; location?: string; licensure?: string; has_prc_license?: string; has_postgraduate?: string; sort?: string }) => {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => { if (v) query.set(k, v.toString()); });
     return api.get<{ data: any[]; total: number; page: number; limit: number }>(`/directory/search?${query.toString()}`);

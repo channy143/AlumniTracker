@@ -127,8 +127,14 @@ export default function DirectoryPage() {
   const [programs, setPrograms] = useState<string[]>(searchParams.get('program')?.split(',').filter(Boolean) || []);
   const [batches, setBatches] = useState<string[]>(searchParams.get('batch')?.split(',').filter(Boolean) || []);
   const [employmentStatuses, setEmploymentStatuses] = useState<string[]>(searchParams.get('employment_status')?.split(',').filter(Boolean) || []);
-  const [filterPrc, setFilterPrc] = useState(searchParams.get('has_prc_license') === 'true');
-  const [filterPostgrad, setFilterPostgrad] = useState(searchParams.get('has_postgraduate') === 'true');
+  const [licensureFilter, setLicensureFilter] = useState(
+    searchParams.get('licensure') ||
+      (searchParams.get('has_prc_license') === 'true'
+        ? 'prc'
+        : searchParams.get('has_postgraduate') === 'true'
+        ? 'postgrad'
+        : '')
+  );
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'name');
 
   const buildSearchEndpoint = (targetPage = page) => {
@@ -139,8 +145,7 @@ export default function DirectoryPage() {
       program: programs.join(','),
       batch: batches.join(','),
       employment_status: employmentStatuses.join(','),
-      has_prc_license: filterPrc ? 'true' : undefined,
-      has_postgraduate: filterPostgrad ? 'true' : undefined,
+      licensure: licensureFilter || undefined,
       sort: sortBy,
     };
     const qs = new URLSearchParams();
@@ -255,8 +260,7 @@ export default function DirectoryPage() {
     if (programs.length) params.set('program', programs.join(','));
     if (batches.length) params.set('batch', batches.join(','));
     if (employmentStatuses.length) params.set('employment_status', employmentStatuses.join(','));
-    if (filterPrc) params.set('has_prc_license', 'true');
-    if (filterPostgrad) params.set('has_postgraduate', 'true');
+    if (licensureFilter) params.set('licensure', licensureFilter);
     if (sortBy !== 'name') params.set('sort', sortBy);
     setSearchParams(params, { replace: true });
 
@@ -276,6 +280,7 @@ export default function DirectoryPage() {
       program: programs.join(','),
       batch: batches.join(','),
       employment_status: employmentStatuses.join(','),
+      licensure: licensureFilter || undefined,
       sort: sortBy,
     })
       .then((res: any) => {
@@ -286,7 +291,7 @@ export default function DirectoryPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [query, page, programs, batches, employmentStatuses, filterPrc, filterPostgrad, sortBy]);
+  }, [query, page, programs, batches, employmentStatuses, licensureFilter, sortBy]);
 
   const handleView = (profile: any) => {
     if (!profile.is_admin) {
@@ -299,8 +304,7 @@ export default function DirectoryPage() {
     setPrograms([]);
     setBatches([]);
     setEmploymentStatuses([]);
-    setFilterPrc(false);
-    setFilterPostgrad(false);
+    setLicensureFilter('');
     setSortBy('name');
     setPage(1);
   };
@@ -315,7 +319,7 @@ export default function DirectoryPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const hasFilters = programs.length || batches.length || employmentStatuses.length || filterPrc || filterPostgrad || sortBy !== 'name';
+  const hasFilters = programs.length || batches.length || employmentStatuses.length || licensureFilter || sortBy !== 'name';
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -345,28 +349,23 @@ export default function DirectoryPage() {
         <FilterDropdown label="Program" options={programOptions} selected={programs} onChange={(vals) => { setPrograms(vals); setPage(1); }} />
         <FilterDropdown label="Batch" options={batchOptions} selected={batches} onChange={(vals) => { setBatches(vals); setPage(1); }} />
         <FilterDropdown label="Status" options={employmentStatusOptions} selected={employmentStatuses} onChange={(vals) => { setEmploymentStatuses(vals); setPage(1); }} />
-        <button
-          type="button"
-          onClick={() => { setFilterPrc(!filterPrc); setPage(1); }}
-          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer border ${
-            filterPrc
-              ? 'bg-emerald-600 text-white border-emerald-600'
-              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+        <select
+          value={licensureFilter}
+          onChange={(e) => { setLicensureFilter(e.target.value); setPage(1); }}
+          className={`text-xs border rounded-lg px-2 py-1.5 outline-none focus:border-orange-400 transition-colors ${
+            licensureFilter
+              ? 'bg-orange-50 border-orange-300 text-orange-700 font-medium'
+              : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
           }`}
+          title="Filter by PRC Board Examination / LET passer status"
         >
-          ✓ PRC Board Passer
-        </button>
-        <button
-          type="button"
-          onClick={() => { setFilterPostgrad(!filterPostgrad); setPage(1); }}
-          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer border ${
-            filterPostgrad
-              ? 'bg-purple-600 text-white border-purple-600'
-              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          🎓 Postgraduate (MS/Ph.D.)
-        </button>
+          <option value="">All Licensure Status</option>
+          <option value="let">LET Passers Only (Teachers)</option>
+          <option value="prc">All PRC Board Passers</option>
+          <option value="cpa">CPA Passers</option>
+          <option value="postgrad">Postgraduate (MS/Ph.D.)</option>
+          <option value="none">Non-Licensed</option>
+        </select>
         <span className="w-px h-5 bg-gray-200" />
         <select
           value={sortBy}

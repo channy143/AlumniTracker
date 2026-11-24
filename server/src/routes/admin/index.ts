@@ -42,8 +42,8 @@ router.use('/eligible-alumni', eligibleAlumniRouter);
 router.use('/alumni', alumniRouter);
 router.use('/reports', reportsRouter);
 
-// Alumni Affairs Operations (Admin, Alumni Officer, Staff)
-const authorizeOperations = authorize('admin', 'alumni_officer', 'staff');
+// Institutional Operations & Delegated Governance Access (Admin, Alumni Officer, Staff, Registrar)
+const authorizeOperations = authorize('admin', 'alumni_officer', 'staff', 'registrar');
 router.use('/dashboard', authorizeOperations, dashboardRouter);
 router.use('/companies', authorizeOperations, companiesRouter);
 router.use('/jobs', authorizeOperations, jobsRouter);
@@ -54,12 +54,13 @@ router.use('/analytics', authorizeOperations, analyticsRouter);
 router.use('/employer-insights', authorizeOperations, employerInsightsRouter);
 router.use('/curriculum-insights', authorizeOperations, curriculumInsightsRouter);
 
-// Sensitive System Management (Super Admin Only)
-const authorizeSuperAdmin = authorize('admin');
-router.use('/users', authorizeSuperAdmin, usersRouter);
-router.use('/settings', authorizeSuperAdmin, settingsRouter);
-router.use('/audit-logs', authorizeSuperAdmin, auditLogsRouter);
-router.use('/security-incidents', authorizeSuperAdmin, securityIncidentsRouter);
+// Shared institutional governance settings & inter-role directives (Admin, Alumni Officer, Staff, Registrar)
+router.use('/settings', settingsRouter);
+
+// Sensitive System Management (Accessible when delegated to institutional roles; mutating endpoints remain Sudo-protected)
+router.use('/users', authorizeOperations, usersRouter);
+router.use('/audit-logs', authorizeOperations, auditLogsRouter);
+router.use('/security-incidents', authorizeOperations, securityIncidentsRouter);
 
 router.get('/export', adminSensitiveLimiter, requireAdminSudo, async (req: AuthenticatedRequest, res, next) => {
   try {

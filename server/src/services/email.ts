@@ -430,3 +430,155 @@ export async function sendEmploymentVerificationEmail(
     console.error(`[Email Verification] Failed to send email to ${cleanTo}:`, err?.message || err);
   }
 }
+
+export interface GovernanceDirectiveEmailPayload {
+  toEmails: string[];
+  recipientRoleLabel: string;
+  senderName: string;
+  senderRoleLabel: string;
+  directiveType: 'access_delegation' | 'document_request' | 'general_directive';
+  title: string;
+  reason: string;
+  documentType?: string;
+  proposedPermissionsSummary?: string[];
+}
+
+export async function sendGovernanceDirectiveEmail(
+  payload: GovernanceDirectiveEmailPayload
+): Promise<{ sent: boolean; recipients: string[] }> {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const validEmails = [...new Set((payload.toEmails || []).map((e) => String(e || '').trim().toLowerCase()).filter((e) => emailRegex.test(e)))];
+  if (validEmails.length === 0) {
+    return { sent: false, recipients: [] };
+  }
+
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.log(`[DEV] Governance directive email (${payload.directiveType}) to [${validEmails.join(', ')}]: ${payload.title} — ${payload.reason}`);
+    return { sent: true, recipients: validEmails };
+  }
+
+  const logoAttachment = getAlumiLogoAttachment();
+  const attachments = logoAttachment ? [logoAttachment] : [];
+  const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').trim().replace(/\/$/, '');
+  const portalUrl = `${clientUrl}/admin`;
+
+  const isDelegation = payload.directiveType === 'access_delegation';
+  const isDocRequest = payload.directiveType === 'document_request';
+
+  const badgeText = isDelegation
+    ? 'Role Access Delegation · Action Required'
+    : isDocRequest
+    ? 'Official Institutional Document Request'
+    : 'Institutional Governance Directive';
+
+  const subject = isDelegation
+    ? `[CTU-Naga Governance] Role Access Adjustment Pending Your Acceptance — from ${payload.senderName}`
+    : isDocRequest
+    ? `[CTU-Naga Governance] Official Document Request: ${payload.documentType || payload.title}`
+    : `[CTU-Naga Governance] ${payload.title} — from ${payload.senderName}`;
+
+  const permsHtml =
+    isDelegation && payload.proposedPermissionsSummary && payload.proposedPermissionsSummary.length > 0
+      ? `
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin: 0 0 18px;">
+          <div style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+            Proposed Module Access Adjustments
+          </div>
+          <ul style="margin: 0; padding-left: 18px; color: #1e293b; font-size: 13px; line-height: 1.7;">
+            ${payload.proposedPermissionsSummary.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+          </ul>
+        </div>
+      `
+      : '';
+
+  const docHtml =
+    isDocRequest && payload.documentType
+      ? `
+        <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; padding: 12px 16px; margin: 0 0 18px;">
+          <div style="font-size: 11px; font-weight: 700; color: #047857; text-transform: uppercase; letter-spacing: 0.5px;">
+            Requested File / Official Record
+          </div>
+          <div style="font-size: 14px; font-weight: 700; color: #064e3b; margin-top: 3px;">
+            📄 ${escapeHtml(payload.documentType)}
+          </div>
+        </div>
+      `
+      : '';
+
+  const html = `
+    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px 20px; background: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0;">
+      <div style="background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%); margin: -24px -20px 24px; padding: 24px 20px; border-radius: 14px 14px 0 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+          <tr>
+            <td style="width: 58px; vertical-align: middle; padding-right: 14px;">
+              <img src="${logoAttachment ? 'cid:alumimascot' : getAlumiFallbackUrl()}" alt="Alumi — CTU-Naga Mascot" width="52" height="52" style="display: block; width: 52px; height: 52px; object-fit: contain; border-radius: 10px; background: #ffffff; padding: 3px;" />
+            </td>
+            <td style="vertical-align: middle;">
+              <h1 style="color: #ffffff; font-size: 19px; margin: 0; font-weight: 700; line-height: 1.25;">CTU-Naga Institutional Governance</h1>
+              <p style="color: #fde68a; margin: 4px 0 0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">${escapeHtml(badgeText)}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="color: #1e293b; font-size: 14px; line-height: 1.6; margin: 0 0 14px;">
+        Hello <strong>${escapeHtml(payload.recipientRoleLabel)}</strong>,
+      </p>
+
+      <p style="color: #334155; font-size: 14px; line-height: 1.65; margin: 0 0 16px;">
+        <strong>${escapeHtml(payload.senderName)}</strong> (${escapeHtml(payload.senderRoleLabel)}) has sent you an official governance ${
+          isDelegation ? 'role access adjustment' : isDocRequest ? 'document/file request' : 'communication'
+        } on the CTU-Naga Alumni Tracker portal:
+      </p>
+
+      <div style="background: #ffffff; border-left: 4px solid #f97316; border-radius: 8px; padding: 14px 16px; margin: 0 0 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <div style="font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">
+          ${escapeHtml(payload.title)}
+        </div>
+        <div style="font-size: 13px; color: #334155; line-height: 1.6; white-space: pre-line;">
+          "${escapeHtml(payload.reason)}"
+        </div>
+      </div>
+
+      ${docHtml}
+      ${permsHtml}
+
+      <p style="color: #475569; font-size: 13px; line-height: 1.6; margin: 0 0 20px;">
+        ${
+          isDelegation
+            ? 'Please log in to the CTU-Naga Alumni Tracker portal and open your Notification Bell (or Alumi Assistant popup) to <strong>review and accept these role access changes</strong> before they take effect.'
+            : isDocRequest
+            ? 'Please log in to the CTU-Naga Alumni Tracker portal to review this request, upload or prepare the requested file, and mark the request fulfilled.'
+            : 'Please log in to the CTU-Naga Alumni Tracker portal to view and acknowledge this directive.'
+        }
+      </p>
+
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${escapeHtml(portalUrl)}" style="display: inline-block; background: #ea580c; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 26px; border-radius: 10px;">
+          ${isDelegation ? 'Log In & Accept Role Access Changes' : isDocRequest ? 'Log In & Respond to Document Request' : 'Open CTU-Naga Governance Portal'}
+        </a>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0 14px;" />
+      <p style="color: #94a3b8; font-size: 11px; margin: 0; line-height: 1.4;">
+        Cebu Technological University &mdash; Naga Extension Campus<br />
+        City of Naga, Cebu, Philippines
+      </p>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"CTU-Naga Governance" <${process.env.SMTP_USER}>`,
+      to: validEmails.join(', '),
+      subject,
+      attachments,
+      html,
+    });
+    return { sent: true, recipients: validEmails };
+  } catch (err: any) {
+    console.error('[Governance Email] Failed to send directive email:', err?.message || err);
+    return { sent: false, recipients: validEmails };
+  }
+}

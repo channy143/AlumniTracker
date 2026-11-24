@@ -1287,7 +1287,7 @@ export default function ReportsPage() {
       {previewModal && createPortal(
         <div
           onClick={() => setPreviewModal(null)}
-          className="fixed inset-0 z-[160] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1399,7 +1399,7 @@ export default function ReportsPage() {
       {/* Pre-Export Confidentiality Acknowledgement Modal (Rule 5 & RA 10173) */}
       {/* --------------------------------------------------------------------- */}
       {pendingExport && createPortal(
-        <div className="fixed inset-0 z-[170] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-purple-200 animate-in zoom-in-95 duration-150">
             <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mb-3">
               <ScaleIcon className="w-6 h-6" />

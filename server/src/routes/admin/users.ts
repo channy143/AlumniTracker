@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 import { supabase } from '../../services/supabase';
 import { AppError } from '../../middleware/errorHandler';
 import { validate } from '../../middleware/validate';
@@ -10,6 +11,14 @@ import { requireAdminSudo } from '../../middleware/sudo';
 import { adminSensitiveLimiter } from '../../middleware/rateLimiter';
 import { invalidateUserSessions } from '../../services/sessionSecurityService';
 import {
+  loadRoleOverrides,
+  loadRoleAppointments,
+  createRoleAppointmentOffer,
+  updateUserRoleWithFallback,
+  insertUserWithRoleFallback,
+  INSTITUTIONAL_ROLE_LABELS,
+} from '../../services/roleOverrideService';
+import {
   adminCreateUserSchema,
   adminUpdateUserSchema,
   adminRoleSchema,
@@ -17,6 +26,7 @@ import {
 } from '../../middleware/validationSchemas';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.get('/', async (req, res, next) => {
   try {
@@ -27,18 +37,41 @@ router.get('/', async (req, res, next) => {
     const role = (req.query.role as string) || '';
     const status = (req.query.status as string) || '';
 
-    let query = supabase.from('users').select('id, email, role, is_verified, is_active, is_archived, last_login, created_at, updated_at', { count: 'exact' });
+    const [roleOverrides, roleAppointments, allRoleRowsRes] = await Promise.all([
+      loadRoleOverrides(),
+      loadRoleAppointments(),
+      supabase.from('users').select('id, email, role, is_active, last_login, created_at'),
+    ]);
+    const hasRoleOverrides = Object.keys(roleOverrides).length > 0;
 
-    if (role) query = query.eq('role', role);
-    if (search) query = query.or(`email.ilike.%${sanitizeFilterInput(search)}%`);
+    let query = supabase
+      .from('users')
+      .select('id, email, role, is_verified, is_active, is_archived, last_login, created_at, updated_at', { count: 'exact' })
+      .order('created_at', { ascending: false });
 
-    query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+    if (role && !hasRoleOverrides) query = query.eq('role', role);
+
+    const trimmedSearch = search.trim().toLowerCase();
+    if (!trimmedSearch && !role) {
+      query = query.range(offset, offset + limit - 1);
+    }
 
     const { data: usersData, count, error } = await query;
     if (error && (error.code === '42P01' || error.code === 'PGRST205')) return res.json({ data: [], total: 0, page, limit });
     if (error) throw new AppError(error.message, 500);
 
-    let result = usersData || [];
+    let result = (usersData || []).map((u: any) => ({
+      ...u,
+      role: roleOverrides[u.id] || u.role,
+      role_appointment: roleAppointments[u.id] || null,
+    }));
+    let totalCount = count || 0;
+
+    if (role) {
+      result = result.filter((u: any) => u.role === role);
+      totalCount = result.length;
+    }
+
     if (result.length > 0) {
       const userIds = result.map((u: any) => u.id);
       const { data: profiles } = await supabase
@@ -48,17 +81,65 @@ router.get('/', async (req, res, next) => {
       const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
       result = result.map((u: any) => ({ ...u, profile: profileMap.get(u.id) || null }));
 
-      if (search) {
-        const s = search.toLowerCase();
-        result = result.filter((u: any) =>
-          (u.email && u.email.toLowerCase().includes(s)) ||
-          (u.profile?.first_name && u.profile.first_name.toLowerCase().includes(s)) ||
-          (u.profile?.last_name && u.profile.last_name.toLowerCase().includes(s))
-        );
+      if (trimmedSearch) {
+        const tokens = trimmedSearch.split(/\s+/).filter(Boolean);
+        result = result.filter((u: any) => {
+          const email = (u.email || '').toLowerCase();
+          const first = (u.profile?.first_name || '').toLowerCase();
+          const last = (u.profile?.last_name || '').toLowerCase();
+          const full = `${first} ${last}`.trim();
+          const rev = `${last} ${first}`.trim();
+          const idNum = (u.profile?.id_number || '').toLowerCase();
+          return (
+            email.includes(trimmedSearch) ||
+            full.includes(trimmedSearch) ||
+            rev.includes(trimmedSearch) ||
+            idNum.includes(trimmedSearch) ||
+            (tokens.length > 1 && tokens.every((t) => full.includes(t) || email.includes(t)))
+          );
+        });
+        totalCount = result.length;
+      }
+
+      if (trimmedSearch || role) {
+        result = result.slice(offset, offset + limit);
       }
     }
 
-    res.json({ data: result, total: count || 0, page, limit });
+    // Compute governance role counts and institutional role holders across all pages
+    let governanceUsers: any[] = [];
+    const roleCounts: Record<string, number> = { admin: 0, alumni_officer: 0, registrar: 0, staff: 0, alumni: 0 };
+    try {
+      const allRoleRows = allRoleRowsRes.data || [];
+
+      const resolvedRows = (allRoleRows || []).map((r: any) => ({
+        ...r,
+        role: roleOverrides[r.id] || r.role || 'alumni',
+      }));
+
+      resolvedRows.forEach((r: any) => {
+        const key = r.role || 'alumni';
+        roleCounts[key] = (roleCounts[key] || 0) + 1;
+      });
+
+      const govRows = resolvedRows.filter((r: any) =>
+        ['admin', 'alumni_officer', 'staff', 'registrar'].includes(r.role)
+      );
+      if (govRows.length > 0) {
+        const govIds = govRows.map((g: any) => g.id);
+        const { data: govProfiles } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name, avatar_url')
+          .in('user_id', govIds);
+        const govProfMap = new Map((govProfiles || []).map((p: any) => [p.user_id, p]));
+        governanceUsers = govRows.map((g: any) => ({
+          ...g,
+          profile: govProfMap.get(g.id) || null,
+        }));
+      }
+    } catch {}
+
+    res.json({ data: result, total: totalCount, page, limit, governanceUsers, roleCounts });
   } catch (err) {
     next(err);
   }
@@ -72,13 +153,12 @@ router.post('/', validate(adminCreateUserSchema), async (req, res, next) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .insert({ email, password_hash: hashedPassword, role: userRole || 'staff', is_verified: true })
-      .select('id, email, role, is_verified, is_active, is_archived, last_login, created_at, updated_at')
-      .single();
-
-    if (userError) throw new AppError(userError.message, 500);
+    const user = await insertUserWithRoleFallback({
+      email,
+      password_hash: hashedPassword,
+      role: userRole || 'staff',
+      is_verified: true,
+    });
 
     await supabase.from('profiles').insert({
       user_id: user.id, first_name: firstName, last_name: lastName, email,
@@ -94,6 +174,47 @@ router.post('/', validate(adminCreateUserSchema), async (req, res, next) => {
     });
 
     res.status(201).json(user);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/photo', upload.single('photo'), async (req, res, next) => {
+  try {
+    if (!req.file) throw new AppError('No image file uploaded', 400);
+    if (!req.file.mimetype.startsWith('image/')) {
+      throw new AppError('Only image files are allowed', 400);
+    }
+
+    const parts = req.file.originalname.split('.');
+    const ext = parts.length > 1 ? parts.pop() : 'jpg';
+    const fileName = `avatars/${req.params.id}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('profiles')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      throw new AppError(`Storage upload failed: ${uploadError.message}`, 500);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('profiles')
+      .getPublicUrl(fileName);
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: urlData.publicUrl })
+      .eq('user_id', req.params.id);
+
+    if (updateError) {
+      throw new AppError(`Failed to save profile photo: ${updateError.message}`, 500);
+    }
+
+    res.json({ url: urlData.publicUrl });
   } catch (err) {
     next(err);
   }
@@ -212,10 +333,26 @@ router.put('/:id/role', adminSensitiveLimiter, requireAdminSudo, validate(adminR
       await ensureNotLastAdmin(req.params.id, 'demote');
     }
 
-    const { error } = await supabase.from('users').update({ role }).eq('id', req.params.id);
-    if (error) throw new AppError(error.message, 500);
+    if (role === 'alumni') {
+      await createRoleAppointmentOffer(req.params.id, 'alumni');
+      await invalidateUserSessions(req.params.id);
+    } else {
+      const offer = await createRoleAppointmentOffer(
+        req.params.id,
+        role,
+        'Sheila Marie C Lopez (Alumni Chair)'
+      );
+      const roleLabel = offer?.offeredRoleLabel || INSTITUTIONAL_ROLE_LABELS[role] || role;
 
-    await invalidateUserSessions(req.params.id);
+      await supabase.from('notifications').insert({
+        user_id: req.params.id,
+        type: 'system',
+        title: `🎖️ Institutional Role Appointment: ${roleLabel}`,
+        message: `Sheila Marie C Lopez (Alumni Chair) added the "${roleLabel}" role to your account! Click to review and accept your institutional role.`,
+        link: `/?role_offer=${encodeURIComponent(role)}`,
+        is_read: false,
+      });
+    }
 
     logAudit(req, {
       action: 'USER_ROLE_CHANGED',
@@ -223,10 +360,16 @@ router.put('/:id/role', adminSensitiveLimiter, requireAdminSudo, validate(adminR
       entityId: req.params.id,
       severity: 'critical',
       status: 'success',
-      details: { targetUserId: req.params.id, newRole: role },
+      details: { targetUserId: req.params.id, newRole: role, mode: role === 'alumni' ? 'revoked' : 'pending_acceptance' },
     });
 
-    res.json({ message: `Role updated to ${role}` });
+    res.json({
+      message:
+        role === 'alumni'
+          ? 'User role reset to Alumni Member'
+          : `Role appointment sent! The user will be notified by Alumi to accept the ${INSTITUTIONAL_ROLE_LABELS[role] || role} role upon login.`,
+      pendingAcceptance: role !== 'alumni',
+    });
   } catch (err) {
     next(err);
   }

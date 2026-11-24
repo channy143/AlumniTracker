@@ -52,15 +52,18 @@ router.get('/', async (req, res, next) => {
       { data: allEducation, error: eduError },
       { data: allEmployment, error: empError },
       licRes,
+      pgRes,
     ] = await Promise.all([
       query,
       supabase.from('profiles').select('*'),
       supabase.from('education').select('id, profile_id, program, major, year_graduated, campus'),
       supabase.from('employment').select('*').eq('is_current', true),
       supabase.from('alumni_licensures').select('*'),
+      supabase.from('alumni_postgraduate').select('*'),
     ]);
 
     const allLicensures = (licRes as any)?.error ? [] : ((licRes as any)?.data || []);
+    const allPostgraduates = (pgRes as any)?.error ? [] : ((pgRes as any)?.data || []);
 
     if (usersError && (usersError.code === '42P01' || usersError.code === '42703')) {
       return res.json({ data: [], total: 0, page, limit, employers: [], locations: [] });
@@ -105,6 +108,18 @@ router.get('/', async (req, res, next) => {
       }
     });
 
+    const pgByProfile = new Map<string, any[]>();
+    (allPostgraduates || []).forEach((pg: any) => {
+      if (pg.profile_id) {
+        if (!pgByProfile.has(pg.profile_id)) pgByProfile.set(pg.profile_id, []);
+        pgByProfile.get(pg.profile_id)!.push(pg);
+      }
+      if (pg.user_id && pg.user_id !== pg.profile_id) {
+        if (!pgByProfile.has(pg.user_id)) pgByProfile.set(pg.user_id, []);
+        pgByProfile.get(pg.user_id)!.push(pg);
+      }
+    });
+
     // Populate distinct employers, provinces, and cities across all profiles & employment records
     const distinctEmployerSet = new Set<string>();
     const distinctProvinceSet = new Set<string>();
@@ -142,6 +157,7 @@ router.get('/', async (req, res, next) => {
       const ojt = (pid ? ojtByProfile.get(pid) : null) || ojtByProfile.get(u.id) || [];
 
       const lics = (pid ? licByProfile.get(pid) : null) || licByProfile.get(u.id) || [];
+      const pgs = (pid ? pgByProfile.get(pid) : null) || pgByProfile.get(u.id) || [];
 
       const formattedEdus = edus.map((e: any) => ({
         ...e,
@@ -155,18 +171,21 @@ router.get('/', async (req, res, next) => {
             employment: emps,
             ojt,
             licensures: lics,
+            postgraduate: pgs,
           }
         : {
             education: formattedEdus,
             employment: emps,
             ojt,
             licensures: lics,
+            postgraduate: pgs,
           };
 
       return {
         ...u,
         profile: profileObj,
         licensures: lics,
+        postgraduate: pgs,
       };
     });
 
@@ -313,6 +332,10 @@ router.get('/', async (req, res, next) => {
             const title = (l.exam_title || '').toLowerCase();
             return title.includes('cpa') || title.includes('accountant');
           });
+        }
+        if (lf === 'postgrad' || lf === 'postgraduate') {
+          const pgs: any[] = u.postgraduate || u.profile?.postgraduate || [];
+          return pgs.length > 0;
         }
         if (lf === 'none' || lf === 'unlicensed') {
           return lics.length === 0;

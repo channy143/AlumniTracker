@@ -1093,10 +1093,10 @@ export default function ApplicantScreeningModal({
                 leaveFrom="opacity-100"
                 leaveTo="opacity-0"
               >
-                <div className="fixed inset-0 bg-black/65 backdrop-blur-xs z-[60]" />
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999]" />
               </TransitionChild>
 
-              <div className="fixed inset-0 overflow-hidden flex items-center justify-center p-4 z-[70]">
+              <div className="fixed inset-0 overflow-hidden flex items-center justify-center p-4 z-[10000]">
                 <TransitionChild
                   enter="ease-out duration-200"
                   enterFrom="opacity-0 scale-95"

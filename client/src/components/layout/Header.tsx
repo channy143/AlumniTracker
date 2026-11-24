@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 import { getInitials, playTing, setBackgroundInterval } from '@/utils/helpers';
 import { getCached } from '@/utils/apiCache';
 import { resolveNotificationLink, getNotificationActionLabel } from '@/utils/notificationHelpers';
-import { profileApi, notificationsApi } from '@/services/api';
+import { profileApi, notificationsApi, authApi } from '@/services/api';
 import {
   Bars3Icon,
   BellIcon,
@@ -31,9 +31,11 @@ import { ReportSuspiciousActivityModal } from '@/components/security/ReportSuspi
 import { useIdleTimer } from '@/hooks/useIdleTimer';
 import ChatDropdown from '@/components/chat/ChatDropdown';
 import { useChatStore } from '@/store/chatStore';
+import GovernanceDirectivesModal from '@/components/admin/GovernanceDirectivesModal';
 import '@/styles/blob.css';
 
 const SEARCH_PAGES = [
+  '/admin/alumni',
   '/admin/companies',
   '/admin/jobs',
   '/jobs',
@@ -45,6 +47,7 @@ const SEARCH_PAGES = [
 ];
 
 const SEARCH_PLACEHOLDERS: Record<string, string> = {
+  '/admin/alumni': 'Search alumni by name, email, or ID...',
   '/admin/companies': 'Search partner companies...',
   '/admin/jobs': 'Search job postings...',
   '/jobs': 'Search jobs by title, company, skill...',
@@ -84,6 +87,12 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     first_name: initialProfile?.first_name,
     last_name: initialProfile?.last_name,
   });
+  const [roleAppointment, setRoleAppointment] = useState<{
+    pendingOffer: any;
+    acceptedRole: string | null;
+    acceptedRoleLabel: string | null;
+    hasPin: boolean;
+  } | null>(null);
 
   const { isWarningActive, secondsRemaining, resetActivity } = useIdleTimer();
 
@@ -170,6 +179,16 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         setProfileName({ first_name: p?.first_name, last_name: p?.last_name });
       })
       .catch(() => { });
+
+    const loadAppointment = () => {
+      authApi
+        .getRoleAppointment()
+        .then((res) => setRoleAppointment(res))
+        .catch(() => {});
+    };
+    loadAppointment();
+    window.addEventListener('role-appointment-updated', loadAppointment);
+    return () => window.removeEventListener('role-appointment-updated', loadAppointment);
   }, [user]);
 
   useEffect(() => {
@@ -334,6 +353,17 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             {user?.role !== 'admin' && !location.pathname.startsWith('/admin') && (
               <ChatDropdown />
             )}
+            {(user?.role === 'admin' || user?.role === 'alumni_officer' || user?.role === 'staff' || user?.role === 'registrar') && (
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-governance-directives', { detail: { tab: 'inbox' } }))}
+                className="relative p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-purple-50/70 transition-all cursor-pointer shrink-0"
+                title="Institutional Role Directives & File Requests"
+                aria-label="Institutional Role Directives & File Requests"
+              >
+                <ChatBubbleLeftRightIcon className="w-5 h-5" />
+              </button>
+            )}
             <div className="relative" ref={notifDropdownRef}>
               <button
                 onClick={() => {
@@ -388,6 +418,22 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                                 setNotifications((prev) => prev.map((item) => (item.id === n.id ? { ...item, is_read: true } : item)));
                               }
                               setNotifDropdownOpen(false);
+                              if (
+                                String(n.link || '').includes('role_offer=') ||
+                                String(n.title || '').includes('Institutional Role Appointment')
+                              ) {
+                                window.dispatchEvent(new CustomEvent('open-role-appointment-offer'));
+                                return;
+                              }
+                              if (
+                                String(n.link || '').includes('directive=') ||
+                                String(n.title || '').includes('Role Access') ||
+                                String(n.title || '').includes('Document Request') ||
+                                String(n.title || '').includes('Governance')
+                              ) {
+                                window.dispatchEvent(new CustomEvent('open-governance-directives', { detail: { tab: 'inbox' } }));
+                                return;
+                              }
                               const groupMatch = targetLink?.match(/group=([^&]+)/);
                               if (groupMatch) {
                                 const groupId = groupMatch[1];
@@ -513,6 +559,43 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                       <span>Report Suspicious Activity</span>
                     </button>
                   )}
+                  {(roleAppointment?.acceptedRole ||
+                    ['alumni_officer', 'registrar', 'staff'].includes(user?.role || '')) && (
+                    <>
+                      <div className="border-t border-gray-100 my-1.5" />
+                      {location.pathname.startsWith('/admin') ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDropdownOpen(false);
+                            sessionStorage.setItem('ctu_active_portal_mode', 'alumni');
+                            navigate('/');
+                          }}
+                          className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-semibold text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100/80 transition-colors whitespace-nowrap text-left cursor-pointer"
+                        >
+                          <AcademicCapIcon className="w-4 h-4 text-indigo-600 shrink-0" />
+                          <span>Switch to Alumni Account</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDropdownOpen(false);
+                            window.dispatchEvent(new CustomEvent('open-admin-pin-modal'));
+                          }}
+                          className="flex items-center justify-between gap-2 w-full px-4 py-2.5 text-sm font-semibold text-purple-700 bg-purple-50/80 hover:bg-purple-100 transition-colors whitespace-nowrap text-left cursor-pointer"
+                        >
+                          <span className="flex items-center gap-3">
+                            <ShieldCheckIcon className="w-4 h-4 text-purple-600 shrink-0" />
+                            <span>Switch to Admin Dashboard</span>
+                          </span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-200/80 text-purple-900">
+                            PIN
+                          </span>
+                        </button>
+                      )}
+                    </>
+                  )}
                   <div className="border-t border-gray-100 my-1.5" />
                   <button
                     onClick={() => { setDropdownOpen(false); setLogoutAllDevices(false); setShowLogoutModal(true); }}
@@ -530,7 +613,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
       {/* Inactivity Timeout Warning Modal */}
       {isWarningActive && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[200] flex items-center justify-center p-3 animate-in fade-in duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[20010] flex items-center justify-center p-3 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center shadow-2xl border border-orange-200">
             <div className="w-12 h-12 mx-auto rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mb-3">
               <ShieldExclamationIcon className="w-7 h-7" />
@@ -564,7 +647,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       )}
 
       {showLogoutModal && (
-        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs z-[100] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setShowLogoutModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[15000] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150" onClick={() => setShowLogoutModal(false)}>
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center -mb-2">
               <BlobSpeech mood={blobMood} className="mb-0" />
@@ -625,6 +708,13 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
       {/* Report Suspicious Activity Modal */}
       <ReportSuspiciousActivityModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} />
+
+      {/* Alumi Proactive Notification Mascot & Inter-Role Governance Directives Modal */}
+      <GovernanceDirectivesModal
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onRefreshNotifications={fetchNotifications}
+      />
     </>
   );
 }

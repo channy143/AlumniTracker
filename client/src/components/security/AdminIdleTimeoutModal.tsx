@@ -16,7 +16,7 @@ export default function AdminIdleTimeoutModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[20010] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 bg-amber-50/70 flex items-center gap-3">
           <div className="p-2 rounded-lg bg-amber-100 text-amber-700">

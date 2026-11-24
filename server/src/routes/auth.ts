@@ -6,6 +6,13 @@ import { supabase } from '../services/supabase';
 import { authenticate, getJwtSecret } from '../middleware/auth';
 import { signAdminSudoCookie, clearAdminSudoCookie } from '../middleware/sudo';
 import {
+  resolveUserRole,
+  loadRoleAppointments,
+  respondToRoleAppointment,
+  saveUserAdminPin,
+  INSTITUTIONAL_ROLE_LABELS,
+} from '../services/roleOverrideService';
+import {
   getAdminSecurityPolicy,
   invalidateUserSessions,
   isTokenBeforeSessionCutoff,
@@ -378,6 +385,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
     }
 
     const record = user.data as any;
+    record.role = await resolveUserRole(record.id, record.role);
 
     // Successful password match -> clear failed counters.
     resetFailedAttempts(identifier, ip);
@@ -528,6 +536,7 @@ router.post('/mfa-verify', validate(mfaVerifySchema), async (req, res, next) => 
       .eq('email', email)
       .single();
     if (error || !user) throw new AppError('Invalid email or password.', 401);
+    user.role = await resolveUserRole(user.id, user.role);
 
     const nowIso = new Date().toISOString();
     markUserActive(user.id);
@@ -1053,6 +1062,7 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res, next) => 
       .single();
 
     if (error) throw new AppError('User not found', 404);
+    user.role = await resolveUserRole(user.id, user.role);
 
     let firstName = '';
     let lastName = '';
@@ -1148,9 +1158,10 @@ router.post('/refresh', async (req, res, next) => {
       });
     }
 
-    const nextAccess = signAccessToken(userRec.id, userRec.email, userRec.role);
-    const nextRefresh = signRefreshToken(userRec.id, userRec.email, userRec.role);
-    setAuthCookies(res, nextAccess, nextRefresh, userRec.role);
+    const nextRole = await resolveUserRole(userRec.id, userRec.role);
+    const nextAccess = signAccessToken(userRec.id, userRec.email, nextRole);
+    const nextRefresh = signRefreshToken(userRec.id, userRec.email, nextRole);
+    setAuthCookies(res, nextAccess, nextRefresh, nextRole);
 
     return res.json({ ok: true });
   } catch (err) {
@@ -1430,6 +1441,156 @@ router.post('/sudo-verify', authenticate, async (req: AuthenticatedRequest, res,
     });
 
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/role-appointment', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const userId = req.user!.userId;
+    const [appointments, effectiveRole] = await Promise.all([
+      loadRoleAppointments(),
+      resolveUserRole(userId, req.user!.role),
+    ]);
+    const rec = appointments[userId] || null;
+    const isAppointedStaffRole = ['alumni_officer', 'registrar', 'staff'].includes(effectiveRole);
+
+    res.json({
+      pendingOffer:
+        rec?.status === 'pending'
+          ? {
+              offeredRole: rec.offeredRole,
+              offeredRoleLabel: rec.offeredRoleLabel,
+              offeredBy: rec.offeredBy,
+              created_at: rec.created_at,
+            }
+          : null,
+      acceptedRole:
+        rec?.status === 'accepted'
+          ? rec.offeredRole
+          : isAppointedStaffRole
+          ? effectiveRole
+          : null,
+      acceptedRoleLabel:
+        rec?.status === 'accepted'
+          ? rec.offeredRoleLabel
+          : isAppointedStaffRole
+          ? INSTITUTIONAL_ROLE_LABELS[effectiveRole] || effectiveRole
+          : null,
+      hasPin: Boolean(rec?.pinHash),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/role-appointment/respond', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const userId = req.user!.userId;
+    const { action } = req.body || {};
+    if (action !== 'accept' && action !== 'decline') {
+      throw new AppError('Action must be accept or decline', 400);
+    }
+
+    const updated = await respondToRoleAppointment(userId, action);
+    if (!updated) {
+      throw new AppError('No pending role appointment found for your account', 404);
+    }
+
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const userName =
+      (prof ? `${prof.first_name || ''} ${prof.last_name || ''}`.trim() : '') || req.user!.email;
+
+    if (action === 'accept') {
+      const nextAccess = signAccessToken(userId, req.user!.email, updated.offeredRole);
+      const nextRefresh = signRefreshToken(userId, req.user!.email, updated.offeredRole);
+      setAuthCookies(res, nextAccess, nextRefresh, updated.offeredRole);
+
+      await notifyAdmins({
+        type: 'system',
+        title: `✅ Role Appointment Accepted: ${userName}`,
+        message: `${userName} accepted the ${updated.offeredRoleLabel} appointment.`,
+        link: '/admin/settings',
+      });
+
+      res.json({
+        ok: true,
+        status: 'accepted',
+        role: updated.offeredRole,
+        roleLabel: updated.offeredRoleLabel,
+        hasPin: Boolean(updated.pinHash),
+      });
+    } else {
+      await notifyAdmins({
+        type: 'system',
+        title: `ℹ️ Role Appointment Declined: ${userName}`,
+        message: `${userName} declined the ${updated.offeredRoleLabel} appointment.`,
+        link: '/admin/settings',
+      });
+
+      res.json({
+        ok: true,
+        status: 'declined',
+        role: 'alumni',
+      });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/role-appointment/verify-pin', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const userId = req.user!.userId;
+    const { pin } = req.body || {};
+    const cleanPin = String(pin || '').trim();
+    if (!/^\d{6}$/.test(cleanPin)) {
+      throw new AppError('Please enter a valid 6-digit numeric PIN.', 400);
+    }
+
+    const [appointments, effectiveRole] = await Promise.all([
+      loadRoleAppointments(),
+      resolveUserRole(userId, req.user!.role),
+    ]);
+    const rec = appointments[userId] || null;
+    const acceptedRole =
+      rec?.status === 'accepted'
+        ? rec.offeredRole
+        : ['alumni_officer', 'registrar', 'staff', 'admin'].includes(effectiveRole)
+        ? effectiveRole
+        : null;
+
+    if (!acceptedRole) {
+      throw new AppError('No active institutional role found on this account.', 403);
+    }
+
+    let firstTimeSetup = false;
+    if (!rec?.pinHash) {
+      firstTimeSetup = true;
+      const hashedPin = await bcrypt.hash(cleanPin, 10);
+      await saveUserAdminPin(userId, acceptedRole, hashedPin);
+    } else {
+      const valid = await bcrypt.compare(cleanPin, rec.pinHash);
+      if (!valid) {
+        throw new AppError('Incorrect 6-digit Admin PIN. Please try again.', 401);
+      }
+    }
+
+    const nextAccess = signAccessToken(userId, req.user!.email, acceptedRole);
+    const nextRefresh = signRefreshToken(userId, req.user!.email, acceptedRole);
+    setAuthCookies(res, nextAccess, nextRefresh, acceptedRole);
+
+    res.json({
+      ok: true,
+      firstTimeSetup,
+      role: acceptedRole,
+      roleLabel: INSTITUTIONAL_ROLE_LABELS[acceptedRole] || acceptedRole,
+    });
   } catch (err) {
     next(err);
   }

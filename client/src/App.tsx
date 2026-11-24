@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useHeartbeat } from '@/hooks/useHeartbeat';
 import { useAdminIdleTimeout } from '@/hooks/useAdminIdleTimeout';
+import { useRolePermissions } from '@/utils/rolePermissions';
 import MainLayout from '@/components/layout/MainLayout';
 import AuthLayout from '@/components/layout/AuthLayout';
 import ScrollToTop from '@/components/layout/ScrollToTop';
@@ -33,9 +34,11 @@ import EmployerDashboard from '@/pages/employer/EmployerDashboard';
 import NotificationsPage from '@/pages/notifications/NotificationsPage';
 import ConnectionsPage from '@/pages/connections/ConnectionsPage';
 import CommunityPage from '@/pages/community/CommunityPage';
+import AlumniDocumentRequestsPage from '@/pages/documents/AlumniDocumentRequestsPage';
 
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AlumniManagement from '@/pages/admin/AlumniManagement';
+import AdminDocumentRequests from '@/pages/admin/AdminDocumentRequests';
 import OjtManagement from '@/pages/admin/OjtManagement';
 import CompanyManagement from '@/pages/admin/CompanyManagement';
 import JobManagement from '@/pages/admin/JobManagement';
@@ -60,8 +63,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/auth/login" replace />;
-  if (['admin', 'staff', 'alumni_officer'].includes(user.role)) return <Navigate to="/admin" replace />;
-  if (user.role === 'registrar') return <Navigate to="/admin/alumni?tab=eligible" replace />;
+  if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  if (
+    ['staff', 'alumni_officer', 'registrar'].includes(user.role) &&
+    sessionStorage.getItem('ctu_active_portal_mode') === 'admin'
+  ) {
+    return <Navigate to={user.role === 'registrar' ? '/admin/alumni?tab=eligible' : '/admin'} replace />;
+  }
   if (user.role === 'alumni' && user.survey_completed === false) {
     return <Navigate to="/survey/onboarding" replace />;
   }
@@ -78,8 +86,7 @@ function OnboardingRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/auth/login" replace />;
-  if (['admin', 'staff', 'alumni_officer'].includes(user.role)) return <Navigate to="/admin" replace />;
-  if (user.role === 'registrar') return <Navigate to="/admin/alumni?tab=eligible" replace />;
+  if (user.role === 'admin') return <Navigate to="/admin" replace />;
   if (user.survey_completed) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
@@ -98,16 +105,22 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function SuperAdminRoute({ children }: { children: React.ReactNode }) {
+function ModuleAccessRoute({ href, children }: { href: string; children: React.ReactNode }) {
   const { user } = useAuthStore();
-  if (user?.role !== 'admin') return <Navigate to="/admin" replace />;
-  return <>{children}</>;
-}
-
-function RegistrarRestrictedRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
-  if (user?.role === 'registrar') {
-    return <Navigate to="/admin/alumni?tab=eligible" replace />;
+  const { getNavAccess, loadingPermissions } = useRolePermissions();
+  if (user?.role === 'admin') return <>{children}</>;
+  if (loadingPermissions) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-500" />
+      </div>
+    );
+  }
+  const access = getNavAccess(href);
+  if (access.locked) {
+    const fallback = user?.role === 'registrar' ? '/admin/alumni?tab=eligible' : '/admin';
+    if (fallback === href) return <Navigate to="/admin/alumni" replace />;
+    return <Navigate to={fallback} replace />;
   }
   return <>{children}</>;
 }
@@ -122,8 +135,13 @@ function IndexRoute() {
     );
   }
   if (!user) return <LandingPage />;
-  if (['admin', 'staff', 'alumni_officer'].includes(user.role)) return <Navigate to="/admin" replace />;
-  if (user.role === 'registrar') return <Navigate to="/admin/alumni?tab=eligible" replace />;
+  if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  if (
+    ['staff', 'alumni_officer', 'registrar'].includes(user.role) &&
+    sessionStorage.getItem('ctu_active_portal_mode') === 'admin'
+  ) {
+    return <Navigate to={user.role === 'registrar' ? '/admin/alumni?tab=eligible' : '/admin'} replace />;
+  }
   if (user.role === 'alumni' && user.survey_completed === false) {
     return <Navigate to="/survey/onboarding" replace />;
   }
@@ -173,6 +191,7 @@ export default function App() {
         <Route path="mentorship" element={<Navigate to="/connections" replace />} />
         <Route path="community" element={<CommunityPage />} />
         <Route path="forum" element={<Navigate to="/community" replace />} />
+        <Route path="document-requests" element={<AlumniDocumentRequestsPage />} />
 
       </Route>
 
@@ -198,23 +217,24 @@ export default function App() {
           </AdminRoute>
         }
       >
-        <Route path="/admin" element={<RegistrarRestrictedRoute><AdminDashboard /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/alumni" element={<AlumniManagement />} />
-        <Route path="/admin/ojt" element={<RegistrarRestrictedRoute><OjtManagement /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/companies" element={<RegistrarRestrictedRoute><CompanyManagement /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/jobs" element={<RegistrarRestrictedRoute><JobManagement /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/surveys" element={<RegistrarRestrictedRoute><GraduateTracerSurveys /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/announcements" element={<RegistrarRestrictedRoute><AnnouncementManagement /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/events" element={<RegistrarRestrictedRoute><AdminEvents /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/analytics" element={<RegistrarRestrictedRoute><CareerAnalytics /></RegistrarRestrictedRoute>} />
+        <Route path="/admin" element={<ModuleAccessRoute href="/admin"><AdminDashboard /></ModuleAccessRoute>} />
+        <Route path="/admin/alumni" element={<ModuleAccessRoute href="/admin/alumni"><AlumniManagement /></ModuleAccessRoute>} />
+        <Route path="/admin/document-requests" element={<ModuleAccessRoute href="/admin/document-requests"><AdminDocumentRequests /></ModuleAccessRoute>} />
+        <Route path="/admin/ojt" element={<ModuleAccessRoute href="/admin/ojt"><OjtManagement /></ModuleAccessRoute>} />
+        <Route path="/admin/companies" element={<ModuleAccessRoute href="/admin/companies"><CompanyManagement /></ModuleAccessRoute>} />
+        <Route path="/admin/jobs" element={<ModuleAccessRoute href="/admin/jobs"><JobManagement /></ModuleAccessRoute>} />
+        <Route path="/admin/surveys" element={<ModuleAccessRoute href="/admin/surveys"><GraduateTracerSurveys /></ModuleAccessRoute>} />
+        <Route path="/admin/announcements" element={<ModuleAccessRoute href="/admin/announcements"><AnnouncementManagement /></ModuleAccessRoute>} />
+        <Route path="/admin/events" element={<ModuleAccessRoute href="/admin/events"><AdminEvents /></ModuleAccessRoute>} />
+        <Route path="/admin/analytics" element={<ModuleAccessRoute href="/admin/analytics"><CareerAnalytics /></ModuleAccessRoute>} />
         <Route path="/admin/accreditation" element={<Navigate to="/admin/analytics?tab=qpro" replace />} />
-        <Route path="/admin/curriculum" element={<RegistrarRestrictedRoute><CurriculumInsights /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/employers" element={<RegistrarRestrictedRoute><EmployerInsights /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/employers/:name" element={<RegistrarRestrictedRoute><EmployerDetail /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/employer-dashboard" element={<RegistrarRestrictedRoute><EmployerDashboard /></RegistrarRestrictedRoute>} />
-        <Route path="/admin/reports" element={<ReportsPage />} />
-        <Route path="/admin/settings" element={<SuperAdminRoute><SystemSettings /></SuperAdminRoute>} />
-        <Route path="/admin/activity" element={<SuperAdminRoute><AdminActivity /></SuperAdminRoute>} />
+        <Route path="/admin/curriculum" element={<ModuleAccessRoute href="/admin/curriculum"><CurriculumInsights /></ModuleAccessRoute>} />
+        <Route path="/admin/employers" element={<ModuleAccessRoute href="/admin/employers"><EmployerInsights /></ModuleAccessRoute>} />
+        <Route path="/admin/employers/:name" element={<ModuleAccessRoute href="/admin/employers"><EmployerDetail /></ModuleAccessRoute>} />
+        <Route path="/admin/employer-dashboard" element={<ModuleAccessRoute href="/admin/employers"><EmployerDashboard /></ModuleAccessRoute>} />
+        <Route path="/admin/reports" element={<ModuleAccessRoute href="/admin/reports"><ReportsPage /></ModuleAccessRoute>} />
+        <Route path="/admin/settings" element={<ModuleAccessRoute href="/admin/settings"><SystemSettings /></ModuleAccessRoute>} />
+        <Route path="/admin/activity" element={<ModuleAccessRoute href="/admin/activity"><AdminActivity /></ModuleAccessRoute>} />
         <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>
