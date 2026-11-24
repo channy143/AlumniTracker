@@ -154,9 +154,11 @@ const PESO_CTU_SLIDES: PesoCtuSlide[] = [
     barTitle: 'CTU-NAGA VERIFIED ALUMNI DIRECTORY & OUTCOME ANALYTICS',
     description:
       'Explore the verified CTU-Naga Alumni Directory filtered by program, batch year, PRC LET/CPA licensure passers, and postgraduate studies while connecting with fellow alumni through mentorship and real-time chat.',
-    image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200&q=85',
+    image: '/image/0ecfea9a-1285-458e-84d1-5d40d410fc37.jpe',
   },
 ];
+
+const PESO_FB_PAGE_URL = 'https://www.facebook.com/profile.php?id=100085444406442';
 
 function getJobRelatedSlides(job: {
   id: string;
@@ -165,7 +167,17 @@ function getJobRelatedSlides(job: {
   location: string;
   industry?: string | null;
   poster_url?: string | null;
+  gallery_images?: string[];
 }): Array<{ image: string; title: string; subtitle: string; caption: string }> {
+  if (Array.isArray(job.gallery_images) && job.gallery_images.length > 0) {
+    return job.gallery_images.map((imgUrl, idx) => ({
+      image: imgUrl,
+      title: job.position,
+      subtitle: `${job.company_name} · ${job.location}`,
+      caption: `PESO - CITY OF NAGA, CEBU FACEBOOK HIRING ADVISORY (${idx + 1}/${job.gallery_images!.length})`,
+    }));
+  }
+
   const text = `${job.position || ''} ${job.company_name || ''} ${job.industry || ''}`.toLowerCase();
 
   let pool: Array<{ image: string; caption: string }> = [
@@ -574,6 +586,8 @@ export default function LandingPage() {
       created_at?: string | null;
       vacancies_count?: number | null;
       poster_url?: string | null;
+      gallery_images?: string[];
+      fb_url?: string | null;
       poster_avatar_url?: string | null;
     }>;
     featuredAlumni?: Array<{
@@ -585,9 +599,20 @@ export default function LandingPage() {
   } | null>(null);
 
   useEffect(() => {
-    publicApi.stats()
-      .then(setStats)
-      .catch(() => setStats(null));
+    const fetchLatestStats = () => {
+      publicApi
+        .stats()
+        .then(setStats)
+        .catch(() => {});
+    };
+    fetchLatestStats();
+    // Automatically poll every 60 seconds and on window focus so new PESO Facebook posts appear live
+    const pollTimer = setInterval(fetchLatestStats, 60 * 1000);
+    window.addEventListener('focus', fetchLatestStats);
+    return () => {
+      clearInterval(pollTimer);
+      window.removeEventListener('focus', fetchLatestStats);
+    };
   }, []);
 
   useEffect(() => {
@@ -704,6 +729,11 @@ export default function LandingPage() {
       {/* ═══ Navigation ═══ */}
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+      <motion.nav
+        initial={{ opacity: 0, y: -14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        className={`fixed top-0 left-0 right-0 z-50 transition-colors duration-500 ${
           mobileMenuOpen
             ? 'bg-transparent text-white'
             : showHeader
@@ -777,6 +807,7 @@ export default function LandingPage() {
           </div>
         </div>
       </nav>
+      </motion.nav>
 
       {/* ═══ Mobile Menu ═══ */}
       <AnimatePresence>
@@ -838,72 +869,94 @@ export default function LandingPage() {
           {(() => {
             const fallbackJobs = [
               {
-                id: 'sample-1',
-                position: 'Junior Software Developer (React & Node.js)',
-                company_name: 'PESO-Naga & Cebu IT Park Tech Partner',
+                id: 'peso-fb-yearend-jobfair-2026',
+                position: 'City of Naga Year-End Job Fair 2026 (Massive Hiring Event)',
+                company_name: 'PESO - City of Naga, Cebu · Official Upcoming Event',
                 description_preview:
-                  'Develop and maintain modern enterprise web applications for regional operations. Open to CTU-Naga BSIT graduates with strong foundations in TypeScript, React, REST APIs, and database management.',
+                  'Thousands of jobs. One massive event. End the year by taking one step closer to landing your dream job! Prepare your resumes, practice your pitch, and get ready to be hired on the spot — the City of Naga Year-End Job Fair is COMING SOON! #CityofNagaYearEndJobFair #PESOCityofNagCebu #TrabahoParaSaTanan',
                 requirements_preview:
-                  'BS in Information Technology (BSIT) graduate from CTU-Naga; portfolio or capstone project experience.',
-                industry: 'Information Technology',
-                required_skills: ['React', 'TypeScript', 'Node.js', 'SQL'],
-                location: 'City of Naga / Cebu IT Park (Hybrid)',
-                job_type: 'full-time',
+                  'Prepare multiple copies of your updated resume/biodata, valid government/alumni ID, and NSRP form. Stay tuned to PESO - City of Naga, Cebu for venue and participating employers.',
+                industry: 'Multi-Industry Mega Job Fair Event',
+                required_skills: ['Hired On-The-Spot', 'Local & Overseas Jobs', 'Fresh Graduates Welcome', 'PESO Naga Event'],
+                location: 'City of Naga, Cebu (Official PESO Event)',
+                job_type: 'Job Fair Event',
                 is_remote: false,
-                is_alumni_exclusive: true,
-                salary_range: '₱28,000 – ₱40,000 / mo',
-                experience_level: 'Entry level',
-                created_at: null,
-                vacancies_count: 3,
-                poster_url: null,
+                is_alumni_exclusive: false,
+                salary_range: 'Hired On-The-Spot',
+                experience_level: 'Open to All Graduates',
+                created_at: '2026-11-24T04:32:35Z',
+                vacancies_count: 1000,
+                fb_url: PESO_FB_PAGE_URL,
+                poster_url:
+                  'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/924087287_1116813584510111_3991031352338831839_n.jpg?stp=dst-jpg_s552x414_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=882B9-si25IQ7kNvwFyOL1E&_nc_oc=Adqb6x_c1rmlo0ciSJqMgS9c5cytIDnqvjCL5RyQdAA_lgCpr_0mLaVNuQzXLTgVTMFOCDbfEJxiFeiOnGJj7vly&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQSgh3KFmUMcYSCxpkeXGodCaSgJpdJD0L5wYn_sOeBw-w&oe=6B0BD2E7',
+                gallery_images: [
+                  'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/924087287_1116813584510111_3991031352338831839_n.jpg?stp=dst-jpg_s552x414_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=882B9-si25IQ7kNvwFyOL1E&_nc_oc=Adqb6x_c1rmlo0ciSJqMgS9c5cytIDnqvjCL5RyQdAA_lgCpr_0mLaVNuQzXLTgVTMFOCDbfEJxiFeiOnGJj7vly&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQSgh3KFmUMcYSCxpkeXGodCaSgJpdJD0L5wYn_sOeBw-w&oe=6B0BD2E7',
+                ],
                 poster_avatar_url: null,
               },
               {
-                id: 'sample-2',
-                position: 'Industrial Process & Quality Control Technician',
-                company_name: 'Naga Industrial Corridor Manufacturing Corp.',
+                id: 'peso-fb-minebeamitsumi-2026',
+                position: 'MinebeaMitsumi Career Opportunities (On-Site Hiring)',
+                company_name: 'MinebeaMitsumi · PESO - City of Naga, Cebu',
                 description_preview:
-                  'Coordinate plant production lines, preventive equipment maintenance, and ISO quality control checks in the City of Naga industrial zone. Priority placement via PESO-Naga and CTU-Naga Career Center.',
+                  'EYES HERE, JOB SEEKERS! MinebeaMitsumi is back with exciting career opportunities—open to all dedicated and qualified Nagahanons! Date: November 7 & 21, 2026 (Saturday, 9:00 A.M. - 4:00 P.M.) at VAL Hall, Ground Floor, City Hall Bldg., Naga, Cebu. Just bring your resume, wear smart casual attire, and seize the chance to get hired on-the-spot!',
                 requirements_preview:
-                  'Bachelor of Industrial Technology (BIT) graduate; familiarity with industrial safety and process instrumentation.',
-                industry: 'Industrial & Manufacturing',
-                required_skills: ['Process Control', 'Quality Assurance', 'Industrial Safety', 'CAD'],
-                location: 'City of Naga, Cebu',
-                job_type: 'full-time',
-                is_remote: false,
-                is_alumni_exclusive: true,
-                salary_range: '₱22,000 – ₱32,000 / mo',
-                experience_level: 'Mid level',
-                created_at: null,
-                vacancies_count: 5,
-                poster_url: null,
-                poster_avatar_url: null,
-              },
-              {
-                id: 'sample-3',
-                position: 'Licensed Secondary & Elementary Educator',
-                company_name: 'DepEd Naga Division & Partner Academies',
-                description_preview:
-                  'Full-time classroom instruction, curriculum alignment, and student mentorship across public and private partner schools in Southern Cebu. Coordinated through the CTU-Naga Alumni and PESO-Naga Educator Track.',
-                requirements_preview:
-                  'BEEd, BSEd-Math, or BTLED graduate from CTU-Naga; PRC LET Board Passer preferred.',
-                industry: 'Education & Academia',
-                required_skills: ['Curriculum Design', 'Classroom Management', 'PRC LET Licensed', 'Instruction'],
-                location: 'City of Naga & Cebu Province',
+                  'Walk-in with your updated resume in smart casual attire at VAL Hall, Ground Floor, City Hall Bldg., City of Naga, Cebu (9:00 A.M. – 4:00 P.M.).',
+                industry: 'Manufacturing, Engineering & Electronics',
+                required_skills: ['Engineering & Technical', 'Production & QA', 'Hired On-The-Spot', 'VAL Hall City of Naga'],
+                location: 'VAL Hall, Ground Floor, City Hall Bldg., Naga, Cebu',
                 job_type: 'full-time',
                 is_remote: false,
                 is_alumni_exclusive: false,
-                salary_range: '₱27,000 – ₱35,000 / mo',
-                experience_level: 'Entry level',
-                created_at: null,
-                vacancies_count: 4,
-                poster_url: null,
+                salary_range: 'Nov 7 & 21 · 9AM–4PM',
+                experience_level: 'Open to Graduates',
+                created_at: '2026-11-20T00:39:55Z',
+                vacancies_count: 150,
+                fb_url: PESO_FB_PAGE_URL,
+                poster_url:
+                  'https://scontent.fceb1-3.fna.fbcdn.net/v/t39.30808-6/890413888_1098406179684185_6024447272361947969_n.jpg?stp=dst-jpg_p526x296_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=Nuj2x7-DfcMQ7kNvwGSsan-&_nc_oc=Adr5G0ImkhUBgia_zG5kAI0TDMdJVRSWmqFBhFf4bndr96gPH6WXho4TX2wJyoyGCg01IWA1njDSCMWg-sMhoAXw&_nc_zt=23&_nc_ht=scontent.fceb1-3.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQQcSBLyymv_86DMs5qtRNzRJAjCKaGmdnCWcDMqBrtDsg&oe=6B0BC122',
+                gallery_images: [
+                  'https://scontent.fceb1-3.fna.fbcdn.net/v/t39.30808-6/890413888_1098406179684185_6024447272361947969_n.jpg?stp=dst-jpg_p526x296_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=Nuj2x7-DfcMQ7kNvwGSsan-&_nc_oc=Adr5G0ImkhUBgia_zG5kAI0TDMdJVRSWmqFBhFf4bndr96gPH6WXho4TX2wJyoyGCg01IWA1njDSCMWg-sMhoAXw&_nc_zt=23&_nc_ht=scontent.fceb1-3.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQQcSBLyymv_86DMs5qtRNzRJAjCKaGmdnCWcDMqBrtDsg&oe=6B0BC122',
+                  '/image/minebeamitsumi-peso-naga-2.jpg',
+                ],
+                poster_avatar_url: null,
+              },
+              {
+                id: 'peso-fb-ipi-2026',
+                position: 'International Pharmaceuticals Inc. (IPI) — Cebu Vacancies',
+                company_name: 'International Pharmaceuticals Inc. (IPI) · PESO Naga',
+                description_preview:
+                  'JOB HIRING ALERT! Still searching for the perfect job opportunity? International Pharmaceuticals Inc. (IPI) is opening its doors to passionate, talented, and dedicated individuals to become part of its growing team in Cebu! Explore the available vacancies and send your resume to hrdrecruit@ipi.ph to submit your application.',
+                requirements_preview:
+                  'Send your updated resume directly to hrdrecruit@ipi.ph or coordinate with PESO - City of Naga, Cebu.',
+                industry: 'Pharmaceutical, Corporate & Manufacturing',
+                required_skills: ['Corporate & Admin', 'Manufacturing & QA', 'Sales & Operations', 'hrdrecruit@ipi.ph'],
+                location: 'Cebu / City of Naga (Apply via hrdrecruit@ipi.ph)',
+                job_type: 'full-time',
+                is_remote: false,
+                is_alumni_exclusive: false,
+                salary_range: 'hrdrecruit@ipi.ph',
+                experience_level: 'Open to Graduates',
+                created_at: '2026-11-18T06:22:39Z',
+                vacancies_count: 15,
+                fb_url: PESO_FB_PAGE_URL,
+                poster_url:
+                  'https://scontent.fceb1-2.fna.fbcdn.net/v/t39.30808-6/905934058_1110806495110820_7932611558357572107_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=106&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=0kN24_CYDb0Q7kNvwEERC1c&_nc_oc=Adqkmi-EQpm5gIZgUkkCa3LBnvmeTsHcB6ImN93WBkp7llN3nUKQfB3meOiRdxbq5z95ZDoA7YG7lXexpfd0ga_t&_nc_zt=23&_nc_ht=scontent.fceb1-2.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQQZpzAoUy2smbYhQL0RRce6HxgZCX6wCG3Gv3Tu2Aw2vQ&oe=6B0BD4E6',
+                gallery_images: [
+                  'https://scontent.fceb1-2.fna.fbcdn.net/v/t39.30808-6/905934058_1110806495110820_7932611558357572107_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=106&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=0kN24_CYDb0Q7kNvwEERC1c&_nc_oc=Adqkmi-EQpm5gIZgUkkCa3LBnvmeTsHcB6ImN93WBkp7llN3nUKQfB3meOiRdxbq5z95ZDoA7YG7lXexpfd0ga_t&_nc_zt=23&_nc_ht=scontent.fceb1-2.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQQZpzAoUy2smbYhQL0RRce6HxgZCX6wCG3Gv3Tu2Aw2vQ&oe=6B0BD4E6',
+                  'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/904862774_1110806478444155_5575616319758607446_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=101&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=SvQLdFwdFEgQ7kNvwH5c4No&_nc_oc=AdpXa7goGkPYjH9iOap-abdLCj14ZN4TuCNh61KB-nbTY3-PF9camK6lwGrTXzvB2nriUqVtSbKMpo3XB5qDNGil&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQTabsOJqstfvLDiEuXh9fWGh5NKpH8g7rw9e6OPpyXNLg&oe=6B0BE695',
+                ],
                 poster_avatar_url: null,
               },
             ];
 
+            // Always prioritize PESO - City of Naga, Cebu Facebook jobs on the Hero section
             const allJobs =
-              stats?.featuredJobs && stats.featuredJobs.length > 0 ? stats.featuredJobs : fallbackJobs;
+              stats?.featuredJobs &&
+              stats.featuredJobs.length > 0 &&
+              String(stats.featuredJobs[0]?.id || '').startsWith('peso-fb-')
+                ? stats.featuredJobs
+                : fallbackJobs;
 
             const visibleJobs = allJobs.slice(0, 3);
 
@@ -945,6 +998,13 @@ export default function LandingPage() {
                   <div className="w-full lg:w-[57%] shrink-0 flex flex-col justify-between h-full gap-2.5">
                     {/* Huge Rectangular Picture Slideshow Box (Smooth In & Out Crossfade, NO round corners) */}
                     <div className="relative w-full h-[280px] sm:h-[320px] lg:h-auto lg:flex-1 lg:min-h-0 bg-[#111827] border border-white/20 overflow-hidden rounded-none select-none shadow-2xl">
+                    {/* 1. Huge Rectangular Picture Slideshow Box (First element of Jobs View to fade in) */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.65, delay: 0.65, ease: [0.22, 1, 0.36, 1] }}
+                      className="relative w-full h-[280px] sm:h-[320px] lg:h-auto lg:flex-1 lg:min-h-0 bg-[#111827] border border-white/20 overflow-hidden rounded-none select-none shadow-2xl"
+                    >
                       <AnimatePresence initial={false}>
                         <motion.img
                           key={`${selectedJob ? selectedJob.id : 'peso-ctu'}-${currentSlideIdx}`}
@@ -970,6 +1030,8 @@ export default function LandingPage() {
                           </span>
                         </div>
 
+                      {/* Top Bar inside Huge Square (Right-aligned Bulletin / Back button) */}
+                      <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-end gap-2 z-10">
                         {selectedJob ? (
                           <button
                             type="button"
@@ -1024,11 +1086,19 @@ export default function LandingPage() {
                         </div>
                       </div>
                     </div>
+                    </motion.div>
 
                     {/* ─── 2 Stacked Horizontal Description Bars Below the Huge Square (Fixed 112px height matching Right Bottom Bars) ─── */}
                     <div className="shrink-0 flex flex-col justify-between gap-2 lg:h-[112px]">
                       {/* Left Bar 1: Co-Branded Header / Job Specification Strip */}
                       <div className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2 rounded-none flex items-center justify-between gap-2 shrink-0">
+                      {/* 2. Left Bar 1: Co-Branded Header / Job Specification Strip */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.55, delay: 0.85, ease: [0.22, 1, 0.36, 1] }}
+                        className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2 rounded-none flex items-center justify-between gap-2 shrink-0"
+                      >
                         {selectedJob ? (
                           <>
                             <div className="flex items-center gap-2 text-xs min-w-0">
@@ -1055,9 +1125,17 @@ export default function LandingPage() {
                           </>
                         )}
                       </div>
+                      </motion.div>
 
                       {/* Left Bar 2: Role / Program Description Block */}
                       <div className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2.5 rounded-none flex-1 flex items-center">
+                      {/* 3. Left Bar 2: Role / Program Description Block */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.55, delay: 1.0, ease: [0.22, 1, 0.36, 1] }}
+                        className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2.5 rounded-none flex-1 flex items-center"
+                      >
                         {selectedJob ? (
                           <p className="text-[11px] sm:text-xs text-gray-700 leading-relaxed line-clamp-2">
                             <strong className="text-gray-900 uppercase">Role Overview: </strong>
@@ -1070,19 +1148,30 @@ export default function LandingPage() {
                           </p>
                         )}
                       </div>
+                      </motion.div>
                     </div>
                   </div>
 
                   {/* ─── CENTER VERTICAL DIVIDER LINE ─── */}
                   <div className="hidden lg:flex justify-center relative h-full shrink-0 px-0.5">
+                  {/* ─── 4. CENTER VERTICAL DIVIDER LINE ─── */}
+                  <motion.div
+                    initial={{ opacity: 0, scaleY: 0 }}
+                    animate={{ opacity: 1, scaleY: 1 }}
+                    transition={{ duration: 0.55, delay: 1.12, ease: [0.22, 1, 0.36, 1] }}
+                    className="hidden lg:flex justify-center relative h-full shrink-0 px-0.5 origin-top"
+                  >
                     <div className="w-px h-full bg-white/35" />
                   </div>
+                  </motion.div>
 
                   {/* ─── RIGHT SIDE: 3 Stacked Rectangular Job Cards + 2 Bottom Horizontal Bars ─── */}
                   <div className="flex-1 min-w-0 flex flex-col justify-between h-full gap-2.5">
                     {/* 3 Stacked Rectangular Job Cards with Seamless Image-to-White Fade Design */}
+                    {/* 5, 6, 7. 3 Stacked Rectangular Job Cards fading in one by one */}
                     <div className="flex-1 min-h-0 grid grid-rows-3 gap-2.5">
                       {visibleJobs.map((job) => {
+                      {visibleJobs.map((job, idx) => {
                         const isSelected = selectedJob && String(selectedJob.id) === String(job.id);
                         const jobSlides = getJobRelatedSlides(job);
                         const thumbUrl = jobSlides[0]?.image;
@@ -1094,13 +1183,22 @@ export default function LandingPage() {
 
                         return (
                           <button
+                          <motion.button
                             key={job.id}
                             type="button"
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{
+                              duration: 0.55,
+                              delay: 1.22 + idx * 0.15,
+                              ease: [0.22, 1, 0.36, 1],
+                            }}
                             onClick={() => {
                               setSelectedLandingJobId(String(job.id));
                               setJobSlideIndex(0);
                             }}
                             className={`relative w-full h-full text-left bg-white border transition-all rounded-none p-0 flex items-stretch overflow-hidden cursor-pointer group ${
+                            className={`relative w-full h-full text-left bg-white border transition-colors rounded-none p-0 flex items-stretch overflow-hidden cursor-pointer group ${
                               isSelected
                                 ? 'border-ctu-marigold ring-2 ring-ctu-marigold/40'
                                 : 'border-white/25 hover:border-white/60'
@@ -1148,37 +1246,42 @@ export default function LandingPage() {
                               </div>
                             </div>
                           </button>
+                          </motion.button>
                         );
                       })}
                     </div>
 
                     {/* ─── 2 Stacked Horizontal Bars Below the 3 Job Cards (Fixed 112px height matching Left Bottom Bars) ─── */}
                     <div className="shrink-0 flex flex-col justify-between gap-2 lg:h-[112px]">
-                      {/* Right Bottom Bar 1: Available Jobs Header & Overview Reset */}
+                      {/* Right Bottom Bar 1: PESO - City of Naga, Cebu Facebook Source Bar */}
                       <div className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2 rounded-none flex items-center justify-between gap-2 shrink-0">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-700 truncate">
-                          {selectedJob ? 'SELECT ANOTHER JOB OR RETURN TO OVERVIEW' : 'CLICK ANY JOB ABOVE TO PREVIEW DETAILS'}
-                        </span>
-                        {selectedJob ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedLandingJobId(null);
-                              setJobSlideIndex(0);
-                            }}
-                            className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[10px] font-extrabold uppercase border border-gray-300 rounded-none cursor-pointer shrink-0"
-                          >
-                            PESO &amp; CTU Overview
-                          </button>
-                        ) : (
-                          <span className="text-[10px] font-bold text-ctu-blue uppercase tracking-wider shrink-0">
-                            PESO-NAGA &amp; CTU
-                          </span>
-                        )}
+                      {/* 8. Right Bottom Bar 1: PESO - City of Naga, Cebu Facebook Source Bar */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.55, delay: 1.67, ease: [0.22, 1, 0.36, 1] }}
+                        className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2 rounded-none flex items-center justify-between gap-2 shrink-0"
+                      >
+                        <a
+                          href={PESO_FB_PAGE_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] font-extrabold uppercase tracking-wider text-ctu-blue hover:underline truncate"
+                        >
+                          SOURCE: PESO - CITY OF NAGA, CEBU (OFFICIAL FACEBOOK PAGE) ↗
+                        </a>
                       </div>
+                      </motion.div>
 
                       {/* Right Bottom Bar 2: Dark Navy "Explore More Jobs" Bar */}
                       <div className="bg-[#111c33]/95 backdrop-blur-md border border-white/20 px-3.5 py-2.5 rounded-none flex-1 flex items-center justify-between gap-3">
+                      {/* 9. Right Bottom Bar 2: Dark Navy "Explore More Jobs" Bar */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.55, delay: 1.82, ease: [0.22, 1, 0.36, 1] }}
+                        className="bg-[#111c33]/95 backdrop-blur-md border border-white/20 px-3.5 py-2.5 rounded-none flex-1 flex items-center justify-between gap-3"
+                      >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <BriefcaseIcon className="w-4 h-4 text-ctu-marigold shrink-0" />
                           <span className="text-[11px] text-gray-200 font-medium leading-snug line-clamp-2">
@@ -1195,6 +1298,7 @@ export default function LandingPage() {
                           <ArrowRightIcon className="w-3.5 h-3.5 stroke-[2.5]" />
                         </Link>
                       </div>
+                      </motion.div>
                     </div>
                   </div>
                 </div>
