@@ -177,7 +177,6 @@ function getJobRelatedSlides(job: {
       caption: `PESO - CITY OF NAGA, CEBU FACEBOOK HIRING ADVISORY (${idx + 1}/${job.gallery_images!.length})`,
     }));
   }
-
   const text = `${job.position || ''} ${job.company_name || ''} ${job.industry || ''}`.toLowerCase();
 
   let pool: Array<{ image: string; caption: string }> = [
@@ -727,8 +726,6 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen">
       {/* ═══ Navigation ═══ */}
-      <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
       <motion.nav
         initial={{ opacity: 0, y: -14 }}
         animate={{ opacity: 1, y: 0 }}
@@ -806,7 +803,6 @@ export default function LandingPage() {
             </button>
           </div>
         </div>
-      </nav>
       </motion.nav>
 
       {/* ═══ Mobile Menu ═══ */}
@@ -996,8 +992,6 @@ export default function LandingPage() {
                 <div className="flex flex-col lg:flex-row items-stretch gap-4 w-full lg:h-[525px]">
                   {/* ─── LEFT SIDE: Huge Picture Slideshow Box + 2 Stacked Horizontal Description Bars ─── */}
                   <div className="w-full lg:w-[57%] shrink-0 flex flex-col justify-between h-full gap-2.5">
-                    {/* Huge Rectangular Picture Slideshow Box (Smooth In & Out Crossfade, NO round corners) */}
-                    <div className="relative w-full h-[280px] sm:h-[320px] lg:h-auto lg:flex-1 lg:min-h-0 bg-[#111827] border border-white/20 overflow-hidden rounded-none select-none shadow-2xl">
                     {/* 1. Huge Rectangular Picture Slideshow Box (First element of Jobs View to fade in) */}
                     <motion.div
                       initial={{ opacity: 0, y: 18 }}
@@ -1020,15 +1014,6 @@ export default function LandingPage() {
 
                       {/* Dark Fade Coming Up from the Bottom */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/65 to-transparent pointer-events-none" />
-
-                      {/* Top Co-Branding Bar inside Huge Square */}
-                      <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between gap-2 z-10">
-                        <div className="flex items-center gap-2 bg-black/75 border border-white/20 px-2.5 py-1 rounded-none">
-                          <img src="/logo.png" alt="CTU-Naga" className="w-4 h-4 object-contain rounded-none" />
-                          <span className="text-[10px] font-extrabold tracking-[0.16em] text-white uppercase">
-                            PESO CITY OF NAGA &amp; CTU-NAGA
-                          </span>
-                        </div>
 
                       {/* Top Bar inside Huge Square (Right-aligned Bulletin / Back button) */}
                       <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-end gap-2 z-10">
@@ -1085,13 +1070,10 @@ export default function LandingPage() {
                           ))}
                         </div>
                       </div>
-                    </div>
                     </motion.div>
 
                     {/* ─── 2 Stacked Horizontal Description Bars Below the Huge Square (Fixed 112px height matching Right Bottom Bars) ─── */}
                     <div className="shrink-0 flex flex-col justify-between gap-2 lg:h-[112px]">
-                      {/* Left Bar 1: Co-Branded Header / Job Specification Strip */}
-                      <div className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2 rounded-none flex items-center justify-between gap-2 shrink-0">
                       {/* 2. Left Bar 1: Co-Branded Header / Job Specification Strip */}
                       <motion.div
                         initial={{ opacity: 0, y: 14 }}
@@ -1124,11 +1106,8 @@ export default function LandingPage() {
                             </span>
                           </>
                         )}
-                      </div>
                       </motion.div>
 
-                      {/* Left Bar 2: Role / Program Description Block */}
-                      <div className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2.5 rounded-none flex-1 flex items-center">
                       {/* 3. Left Bar 2: Role / Program Description Block */}
                       <motion.div
                         initial={{ opacity: 0, y: 14 }}
@@ -1147,13 +1126,10 @@ export default function LandingPage() {
                             {PESO_CTU_SLIDES[currentSlideIdx % PESO_CTU_SLIDES.length].description}
                           </p>
                         )}
-                      </div>
                       </motion.div>
                     </div>
                   </div>
 
-                  {/* ─── CENTER VERTICAL DIVIDER LINE ─── */}
-                  <div className="hidden lg:flex justify-center relative h-full shrink-0 px-0.5">
                   {/* ─── 4. CENTER VERTICAL DIVIDER LINE ─── */}
                   <motion.div
                     initial={{ opacity: 0, scaleY: 0 }}
@@ -1162,15 +1138,12 @@ export default function LandingPage() {
                     className="hidden lg:flex justify-center relative h-full shrink-0 px-0.5 origin-top"
                   >
                     <div className="w-px h-full bg-white/35" />
-                  </div>
                   </motion.div>
 
                   {/* ─── RIGHT SIDE: 3 Stacked Rectangular Job Cards + 2 Bottom Horizontal Bars ─── */}
                   <div className="flex-1 min-w-0 flex flex-col justify-between h-full gap-2.5">
-                    {/* 3 Stacked Rectangular Job Cards with Seamless Image-to-White Fade Design */}
                     {/* 5, 6, 7. 3 Stacked Rectangular Job Cards fading in one by one */}
                     <div className="flex-1 min-h-0 grid grid-rows-3 gap-2.5">
-                      {visibleJobs.map((job) => {
                       {visibleJobs.map((job, idx) => {
                         const isSelected = selectedJob && String(selectedJob.id) === String(job.id);
                         const jobSlides = getJobRelatedSlides(job);
@@ -1182,7 +1155,6 @@ export default function LandingPage() {
                             : 'Full-Time');
 
                         return (
-                          <button
                           <motion.button
                             key={job.id}
                             type="button"
@@ -1197,7 +1169,6 @@ export default function LandingPage() {
                               setSelectedLandingJobId(String(job.id));
                               setJobSlideIndex(0);
                             }}
-                            className={`relative w-full h-full text-left bg-white border transition-all rounded-none p-0 flex items-stretch overflow-hidden cursor-pointer group ${
                             className={`relative w-full h-full text-left bg-white border transition-colors rounded-none p-0 flex items-stretch overflow-hidden cursor-pointer group ${
                               isSelected
                                 ? 'border-ctu-marigold ring-2 ring-ctu-marigold/40'
@@ -1245,7 +1216,6 @@ export default function LandingPage() {
                                 </span>
                               </div>
                             </div>
-                          </button>
                           </motion.button>
                         );
                       })}
@@ -1253,8 +1223,6 @@ export default function LandingPage() {
 
                     {/* ─── 2 Stacked Horizontal Bars Below the 3 Job Cards (Fixed 112px height matching Left Bottom Bars) ─── */}
                     <div className="shrink-0 flex flex-col justify-between gap-2 lg:h-[112px]">
-                      {/* Right Bottom Bar 1: PESO - City of Naga, Cebu Facebook Source Bar */}
-                      <div className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2 rounded-none flex items-center justify-between gap-2 shrink-0">
                       {/* 8. Right Bottom Bar 1: PESO - City of Naga, Cebu Facebook Source Bar */}
                       <motion.div
                         initial={{ opacity: 0, y: 14 }}
@@ -1270,11 +1238,8 @@ export default function LandingPage() {
                         >
                           SOURCE: PESO - CITY OF NAGA, CEBU (OFFICIAL FACEBOOK PAGE) ↗
                         </a>
-                      </div>
                       </motion.div>
 
-                      {/* Right Bottom Bar 2: Dark Navy "Explore More Jobs" Bar */}
-                      <div className="bg-[#111c33]/95 backdrop-blur-md border border-white/20 px-3.5 py-2.5 rounded-none flex-1 flex items-center justify-between gap-3">
                       {/* 9. Right Bottom Bar 2: Dark Navy "Explore More Jobs" Bar */}
                       <motion.div
                         initial={{ opacity: 0, y: 14 }}
@@ -1297,7 +1262,6 @@ export default function LandingPage() {
                           <span>Explore More Jobs</span>
                           <ArrowRightIcon className="w-3.5 h-3.5 stroke-[2.5]" />
                         </Link>
-                      </div>
                       </motion.div>
                     </div>
                   </div>
