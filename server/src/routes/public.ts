@@ -18,7 +18,7 @@ router.get('/stats', async (_req, res, next) => {
       supabase.from('connections').select('id').eq('status', 'accepted'),
       supabase
         .from('job_postings')
-        .select('id, position, company_name, location, job_type, is_remote, is_alumni_exclusive, expires_at, salary_range, experience_level, created_at, vacancies_count, poster_url, posted_by')
+        .select('id, position, company_name, description, requirements, industry, required_skills, location, job_type, is_remote, is_alumni_exclusive, expires_at, salary_range, experience_level, created_at, vacancies_count, poster_url, posted_by')
         .order('created_at', { ascending: false }),
     ]);
 
@@ -103,10 +103,18 @@ router.get('/stats', async (_req, res, next) => {
       });
 
     const activeJobs = (jobsRes.data || []).filter((j: any) => !j.expires_at || new Date(j.expires_at).getTime() > now);
-    const featuredJobs = activeJobs.slice(0, 3).map((j: any) => ({
+    const featuredJobs = activeJobs.slice(0, 6).map((j: any) => ({
       id: j.id,
       position: j.position,
       company_name: j.company_name,
+      description_preview: j.description
+        ? String(j.description).trim().slice(0, 260) + (String(j.description).trim().length > 260 ? '...' : '')
+        : null,
+      requirements_preview: j.requirements
+        ? String(j.requirements).trim().slice(0, 180) + (String(j.requirements).trim().length > 180 ? '...' : '')
+        : null,
+      industry: j.industry || null,
+      required_skills: Array.isArray(j.required_skills) ? j.required_skills.slice(0, 5) : [],
       location: j.location,
       job_type: j.job_type,
       is_remote: Boolean(j.is_remote),

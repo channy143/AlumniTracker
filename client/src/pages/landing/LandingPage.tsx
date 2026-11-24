@@ -14,15 +14,10 @@ import {
   ArrowUpIcon,
   Bars3Icon,
   XMarkIcon,
-  ChevronDownIcon,
   SparklesIcon,
   AcademicCapIcon,
   GlobeAltIcon,
   ChatBubbleLeftRightIcon,
-  DocumentArrowUpIcon,
-  CheckBadgeIcon,
-  LockClosedIcon,
-  BookmarkIcon,
 } from '@heroicons/react/24/outline';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { useCountUp } from '@/hooks/useCountUp';
@@ -38,7 +33,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 const NAV_SECTIONS = [
   { id: 'numbers', label: 'Our Numbers' },
   { id: 'community', label: 'Community' },
-  { id: 'jobs', label: 'Job Offers' },
   { id: 'chat', label: 'Alumni Chat' },
   { id: 'connect', label: 'Connect' },
 ];
@@ -97,67 +91,6 @@ const ALUMNI_CHAT_CAPTIONS = [
   },
 ];
 
-const WAVY_LINE_PALETTES = [
-  { stroke: '#fb923c' },
-  { stroke: '#f59e0b' },
-  { stroke: '#38bdf8' },
-  { stroke: '#34d399' },
-  { stroke: '#a78bfa' },
-  { stroke: '#f472b6' },
-];
-
-function getJobWavyPalette(jobId: string | number) {
-  const str = String(jobId || '0');
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return WAVY_LINE_PALETTES[Math.abs(hash) % WAVY_LINE_PALETTES.length];
-}
-
-const WAVY_CONTOUR_LINES = Array.from({ length: 24 }, (_, i) => {
-  const baseY = -40 + i * 11;
-  const widthFactor = Math.pow(Math.sin((i / 24) * Math.PI * 2.8 + 0.35), 2);
-  const strokeWidth = Number((1.4 + 2.2 * widthFactor).toFixed(1));
-  const halfW = 145;
-  const amp = 22;
-  const tilt = 0.085;
-  let d = `M -60 ${Number((baseY - 60 * tilt).toFixed(1))}`;
-  for (let k = 0; k < 8; k++) {
-    const startX = -60 + k * halfW;
-    const endX = startX + halfW;
-    const peakY = baseY + (startX + halfW * 0.5) * tilt + (k % 2 === 0 ? -amp : amp);
-    const endY = baseY + endX * tilt;
-    const cp1x = Number((startX + halfW * 0.36).toFixed(1));
-    const cp2x = Number((startX + halfW * 0.64).toFixed(1));
-    d += ` C ${cp1x} ${Number(peakY.toFixed(1))}, ${cp2x} ${Number(peakY.toFixed(1))}, ${Number(endX.toFixed(1))} ${Number(endY.toFixed(1))}`;
-  }
-  return { id: i, d, strokeWidth };
-});
-
-function getCompanyInitials(name: string): string {
-  if (!name) return 'JB';
-  const clean = name.trim().replace(/[^a-zA-Z0-9\s]/g, '');
-  const words = clean.split(/\s+/).filter(Boolean);
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  return clean.slice(0, 2).toUpperCase() || 'JB';
-}
-
-function jobTimeAgo(dateStr?: string | null): string {
-  if (!dateStr) return 'Recently';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return 'just now';
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(diff / 86400000);
-  if (days === 1) return '1 day ago';
-  if (days < 30) return `${days} days ago`;
-  const months = Math.floor(days / 30);
-  return months === 1 ? '1 month ago' : `${months} months ago`;
-}
-
 const JOB_TYPE_LABELS: Record<string, string> = {
   'full-time': 'Full-Time',
   'part-time': 'Part-Time',
@@ -165,6 +98,155 @@ const JOB_TYPE_LABELS: Record<string, string> = {
   internship: 'Internship',
   freelance: 'Freelance',
 };
+
+interface PesoCtuSlide {
+  id: string;
+  badge: string;
+  tag: string;
+  title: string;
+  subtitle: string;
+  barTitle: string;
+  description: string;
+  image: string;
+}
+
+const PESO_CTU_SLIDES: PesoCtuSlide[] = [
+  {
+    id: 'peso-ctu-1',
+    badge: 'WELCOME TO CTU-NAGA ALUMNI CONNECT',
+    tag: 'CEBU TECHNOLOGICAL UNIVERSITY — NAGA EXTENSION CAMPUS',
+    title: 'Welcome to CTU-Naga Alumni Tracking & Career Portal',
+    subtitle: 'Bridging Education to Eternity · Official Graduate Community & Career Analytics Platform',
+    barTitle: 'CTU-NAGA ALUMNI TRACKING & CAREER ANALYTICS SYSTEM',
+    description:
+      'Welcome to the official CTU-Naga Extension Campus alumni platform — uniting graduates across BSIT, BIT, BEEd, BSEd-Math, and BTLED for CHED Graduate Tracer Studies, batch networking, and career advancement.',
+    image: '/image/ChatGPT Image May 27, 2026, 04_38_30 AM.png',
+  },
+  {
+    id: 'peso-ctu-2',
+    badge: 'REGISTRAR ONLINE DOCUMENT REQUEST',
+    tag: 'CTU-NAGA REGISTRAR OFFICE · ONLINE REQUISITION SYSTEM',
+    title: 'Online Registrar Document Request & Claiming System',
+    subtitle: 'Submit Requests Online for TOR, Diploma, Good Moral & PRC Board Certifications Before Visiting Campus',
+    barTitle: 'CTU-NAGA REGISTRAR ONLINE DOCUMENT REQUISITION PORTAL',
+    description:
+      'Registered alumni can submit document requests online through the portal first, track Registrar preparation in real time, and receive an official Claim Reference Code and Ready for Pick-Up notice before proceeding to the Registrar Office.',
+    image: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1200&q=85',
+  },
+  {
+    id: 'peso-ctu-3',
+    badge: 'PESO-NAGA & CTU-NAGA PARTNERSHIP',
+    tag: 'LGU CITY OF NAGA PESO & CTU-NAGA CAREER PLACEMENT',
+    title: 'PESO City of Naga & CTU-Naga Career Placement',
+    subtitle: 'Public Employment Service Office (City of Naga, Cebu) & CTU-Naga Graduate Employment Drives',
+    barTitle: 'LGU CITY OF NAGA PESO & CTU-NAGA EMPLOYMENT NETWORK',
+    description:
+      'In partnership with the Public Employment Service Office (PESO) of the City of Naga, Cebu, CTU-Naga connects graduates directly with local government job fairs, Naga industrial corridor employers, DepEd schools, and Metro Cebu companies.',
+    image:
+      'https://cityofnagacebu.gov.ph/wp-content/uploads/2025/09/540672727_1175663144605498_7106863393463117286_n-1024x683.jpg',
+  },
+  {
+    id: 'peso-ctu-4',
+    badge: 'ALUMNI DIRECTORY & CAREER OUTCOMES',
+    tag: 'VERIFIED ALUMNI NETWORK · PRC PASSERS · CHED & Q-PRO ANALYTICS',
+    title: 'Alumni Directory, PRC Board Passers & Career Analytics',
+    subtitle: 'Reconnect Across Batches, Celebrate LET & CPA Passers, and Track Institutional Outcomes',
+    barTitle: 'CTU-NAGA VERIFIED ALUMNI DIRECTORY & OUTCOME ANALYTICS',
+    description:
+      'Explore the verified CTU-Naga Alumni Directory filtered by program, batch year, PRC LET/CPA licensure passers, and postgraduate studies while connecting with fellow alumni through mentorship and real-time chat.',
+    image: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200&q=85',
+  },
+];
+
+function getJobRelatedSlides(job: {
+  id: string;
+  position: string;
+  company_name: string;
+  location: string;
+  industry?: string | null;
+  poster_url?: string | null;
+}): Array<{ image: string; title: string; subtitle: string; caption: string }> {
+  const text = `${job.position || ''} ${job.company_name || ''} ${job.industry || ''}`.toLowerCase();
+
+  let pool: Array<{ image: string; caption: string }> = [
+    {
+      image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&q=85',
+      caption: 'PESO-Naga and CTU Accredited Partner Employer Workplace',
+    },
+    {
+      image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&q=85',
+      caption: 'Collaborative Professional Team & Graduate Career Track',
+    },
+    {
+      image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&q=85',
+      caption: 'Regional Corporate & Industrial Partner Facility in Cebu',
+    },
+  ];
+
+  if (/software|developer|it|web|data|system|tech|programmer|network|cloud|react|node/i.test(text)) {
+    pool = [
+      {
+        image: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1200&q=85',
+        caption: 'Software Engineering & IT Systems Development Environment',
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?w=1200&q=85',
+        caption: 'BSIT Alumni Tech Team Collaboration & Agile Engineering',
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=85',
+        caption: 'Digital Infrastructure & Modern Enterprise Systems',
+      },
+    ];
+  } else if (/industrial|technician|engineer|manufacturing|plant|process|mechanical|electrical|bit|production/i.test(text)) {
+    pool = [
+      {
+        image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1200&q=85',
+        caption: 'City of Naga Industrial Corridor & Precision Engineering Operations',
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=1200&q=85',
+        caption: 'Industrial Process Control, Quality Assurance & Technical Systems',
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=1200&q=85',
+        caption: 'PESO-Naga Accredited Manufacturing & Engineering Facility',
+      },
+    ];
+  } else if (/teacher|educator|school|instructor|faculty|academic|deped|let|education|tutor/i.test(text)) {
+    pool = [
+      {
+        image: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1200&q=85',
+        caption: 'Classroom Instruction & Academic Leadership for CTU Educators',
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1200&q=85',
+        caption: 'Modern Curriculum Delivery & Student Mentorship Environment',
+      },
+      {
+        image: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=1200&q=85',
+        caption: 'Regional Academic Partner Institution & Faculty Development',
+      },
+    ];
+  }
+
+  if (job.poster_url) {
+    pool = [
+      {
+        image: job.poster_url,
+        caption: `Official Employer Job Poster — ${job.company_name}`,
+      },
+      ...pool.slice(0, 2),
+    ];
+  }
+
+  return pool.map((item, idx) => ({
+    image: item.image,
+    title: job.position,
+    subtitle: `${job.company_name} · ${job.location}`,
+    caption: `${item.caption} (${idx + 1}/${pool.length})`,
+  }));
+}
 
 interface BentoFeature {
   title: string; desc: string; icon: any;
@@ -462,6 +544,8 @@ export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('');
   const [careerHovered, setCareerHovered] = useState(false);
+  const [selectedLandingJobId, setSelectedLandingJobId] = useState<string | null>(null);
+  const [jobSlideIndex, setJobSlideIndex] = useState(0);
   const [stats, setStats] = useState<{
     totalAlumni: number;
     employmentRate: number;
@@ -477,6 +561,10 @@ export default function LandingPage() {
       id: string;
       position: string;
       company_name: string;
+      description_preview?: string | null;
+      requirements_preview?: string | null;
+      industry?: string | null;
+      required_skills?: string[];
       location: string;
       job_type: string;
       is_remote: boolean;
@@ -496,15 +584,33 @@ export default function LandingPage() {
     }>;
   } | null>(null);
 
-  const heroTaglineRef = useRef<HTMLDivElement>(null);
-  const heroHeadlineRef = useRef<HTMLHeadingElement>(null);
-  const heroDescRef = useRef<HTMLParagraphElement>(null);
-  const heroButtonsRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     publicApi.stats()
       .then(setStats)
       .catch(() => setStats(null));
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setJobSlideIndex((prev) => prev + 1);
+    }, 5200);
+    return () => clearInterval(timer);
+  }, [selectedLandingJobId]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const numbers = document.getElementById('numbers');
+      const hero = document.getElementById('hero');
+      if (!numbers || !hero) return;
+      const headerH = 64;
+      const heroVisible = hero.getBoundingClientRect().bottom > headerH;
+      const numbersReached = numbers.getBoundingClientRect().top <= headerH;
+      if (numbersReached) setShowHeader(true);
+      else if (heroVisible) setShowHeader(false);
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const statConfig = stats ? [
@@ -531,36 +637,6 @@ export default function LandingPage() {
       tag: cap.tag,
     };
   });
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const numbers = document.getElementById('numbers');
-      const hero = document.getElementById('hero');
-      if (!numbers || !hero) return;
-      const headerH = 64;
-      const heroVisible = hero.getBoundingClientRect().bottom > headerH;
-      const numbersReached = numbers.getBoundingClientRect().top <= headerH;
-      if (numbersReached) setShowHeader(true);
-      else if (heroVisible) setShowHeader(false);
-
-      const fadeDist = 200;
-      const fadeEl = (el: HTMLElement | null) => {
-        if (!el) return 1;
-        const rect = el.getBoundingClientRect();
-        const passed = headerH - rect.top;
-        if (passed <= 0) return 1;
-        return Math.max(0, 1 - passed / fadeDist);
-      };
-
-      if (heroTaglineRef.current) heroTaglineRef.current.style.opacity = String(fadeEl(heroTaglineRef.current));
-      if (heroHeadlineRef.current) heroHeadlineRef.current.style.opacity = String(fadeEl(heroHeadlineRef.current));
-      if (heroDescRef.current) heroDescRef.current.style.opacity = String(fadeEl(heroDescRef.current));
-      if (heroButtonsRef.current) heroButtonsRef.current.style.opacity = String(fadeEl(heroButtonsRef.current));
-    };
-    handleScroll();
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -617,10 +693,9 @@ export default function LandingPage() {
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  const { ref: heroRef, revealed: heroRevealed } = useScrollReveal(0.15);
+  const { ref: heroRef } = useScrollReveal(0.15);
   const { ref: statsRef, revealed: statsRevealed } = useScrollReveal(0.2);
   const { ref: communityRef, revealed: communityRevealed } = useScrollReveal(0.15);
-  const { ref: jobsRef, revealed: jobsRevealed } = useScrollReveal(0.15);
   const { ref: chatRef, revealed: chatRevealed } = useScrollReveal(0.15);
   const { ref: ctaRef, revealed: ctaRevealed } = useScrollReveal(0.2);
 
@@ -752,100 +827,381 @@ export default function LandingPage() {
       <section
         id="hero"
         ref={heroRef}
-        className="relative min-h-screen flex items-center overflow-hidden snap-start"
+        className="relative min-h-screen lg:h-screen lg:max-h-screen flex items-center overflow-hidden snap-start"
         style={{ backgroundImage: 'url("/image/ChatGPT Image May 27, 2026, 04_38_30 AM.png")', backgroundSize: 'cover', backgroundPosition: 'center' }}
       >
         <div className="absolute inset-0 gradient-mesh" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(232,160,80,0.08),transparent_60%)]" />
-
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 text-[12rem] sm:text-[22rem] md:text-[30rem] font-display font-bold text-white/[0.04] select-none pointer-events-none leading-none tracking-tighter">
-          ∞
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-20 sm:py-24 text-center relative z-10 w-full">
-          <div ref={heroTaglineRef} style={{ transition: 'opacity 0.15s ease-out' }}>
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-              className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md text-white/90 text-sm rounded-full mb-8 border border-white/10"
-            >
-              <SparklesIcon className="w-4 h-4 text-ctu-marigold" />
-              Bridging Education to Eternity
-            </motion.div>
-          </div>
-
-          <div ref={heroHeadlineRef} style={{ transition: 'opacity 0.15s ease-out' }}>
-            <motion.h1
-              initial={{ opacity: 0, y: 28 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.75, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-              className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold font-display leading-[0.95] tracking-tight"
-            >
-              <span className="text-white">Your Journey</span>
-              <br />
-              <span className="text-ctu-marigold">Never Ends Here</span>
-            </motion.h1>
-          </div>
-
-          <motion.div
-            initial={{ scaleX: 0, opacity: 0 }}
-            animate={{ scaleX: 1, opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="w-24 h-0.5 bg-gradient-to-r from-transparent via-ctu-marigold to-transparent mx-auto mt-8 origin-center"
-          />
-
-          <div ref={heroDescRef} style={{ transition: 'opacity 0.15s ease-out' }}>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.65, delay: 0.34, ease: [0.22, 1, 0.36, 1] }}
-              className="text-lg md:text-xl text-white/70 mt-8 max-w-2xl mx-auto leading-relaxed font-light"
-            >
-              CTU-Naga Alumni Network helps graduates advance their careers, connect with fellow alumni, and discover new opportunities.
-            </motion.p>
-          </div>
-
-          <div ref={heroButtonsRef} style={{ transition: 'opacity 0.15s ease-out' }}>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.65, delay: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="flex flex-wrap justify-center gap-4 mt-10"
-            >
-              <Link
-                to="/auth/register"
-                className="group text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl font-medium inline-flex items-center gap-2 transition-all text-white bg-ctu-marigold hover:bg-[#d4893a] hover:shadow-xl hover:shadow-ctu-marigold/20 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                Join the Community
-                <ArrowRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-              </Link>
-              <Link
-                to="/auth/login"
-                className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl font-medium transition-all text-white/80 border border-white/20 hover:bg-white/10 hover:text-white hover:border-white/40 backdrop-blur-sm"
-              >
-                Sign In
-              </Link>
-            </motion.div>
-          </div>
-        </div>
-
         <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/50 to-black/75 pointer-events-none" />
 
-        <motion.div
-          initial={false}
-          animate={heroRevealed ? { opacity: 1 } : { opacity: 0 }}
-          transition={{ delay: 0.3 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/30"
-        >
-          <span className="text-xs uppercase tracking-[0.3em] font-light">Scroll</span>
-          <motion.div
-            animate={{ y: [0, 6, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            <ChevronDownIcon className="w-4 h-4" />
-          </motion.div>
-        </motion.div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-20 pb-5 w-full h-full lg:h-screen flex items-center relative z-10">
+          {(() => {
+            const fallbackJobs = [
+              {
+                id: 'sample-1',
+                position: 'Junior Software Developer (React & Node.js)',
+                company_name: 'PESO-Naga & Cebu IT Park Tech Partner',
+                description_preview:
+                  'Develop and maintain modern enterprise web applications for regional operations. Open to CTU-Naga BSIT graduates with strong foundations in TypeScript, React, REST APIs, and database management.',
+                requirements_preview:
+                  'BS in Information Technology (BSIT) graduate from CTU-Naga; portfolio or capstone project experience.',
+                industry: 'Information Technology',
+                required_skills: ['React', 'TypeScript', 'Node.js', 'SQL'],
+                location: 'City of Naga / Cebu IT Park (Hybrid)',
+                job_type: 'full-time',
+                is_remote: false,
+                is_alumni_exclusive: true,
+                salary_range: '₱28,000 – ₱40,000 / mo',
+                experience_level: 'Entry level',
+                created_at: null,
+                vacancies_count: 3,
+                poster_url: null,
+                poster_avatar_url: null,
+              },
+              {
+                id: 'sample-2',
+                position: 'Industrial Process & Quality Control Technician',
+                company_name: 'Naga Industrial Corridor Manufacturing Corp.',
+                description_preview:
+                  'Coordinate plant production lines, preventive equipment maintenance, and ISO quality control checks in the City of Naga industrial zone. Priority placement via PESO-Naga and CTU-Naga Career Center.',
+                requirements_preview:
+                  'Bachelor of Industrial Technology (BIT) graduate; familiarity with industrial safety and process instrumentation.',
+                industry: 'Industrial & Manufacturing',
+                required_skills: ['Process Control', 'Quality Assurance', 'Industrial Safety', 'CAD'],
+                location: 'City of Naga, Cebu',
+                job_type: 'full-time',
+                is_remote: false,
+                is_alumni_exclusive: true,
+                salary_range: '₱22,000 – ₱32,000 / mo',
+                experience_level: 'Mid level',
+                created_at: null,
+                vacancies_count: 5,
+                poster_url: null,
+                poster_avatar_url: null,
+              },
+              {
+                id: 'sample-3',
+                position: 'Licensed Secondary & Elementary Educator',
+                company_name: 'DepEd Naga Division & Partner Academies',
+                description_preview:
+                  'Full-time classroom instruction, curriculum alignment, and student mentorship across public and private partner schools in Southern Cebu. Coordinated through the CTU-Naga Alumni and PESO-Naga Educator Track.',
+                requirements_preview:
+                  'BEEd, BSEd-Math, or BTLED graduate from CTU-Naga; PRC LET Board Passer preferred.',
+                industry: 'Education & Academia',
+                required_skills: ['Curriculum Design', 'Classroom Management', 'PRC LET Licensed', 'Instruction'],
+                location: 'City of Naga & Cebu Province',
+                job_type: 'full-time',
+                is_remote: false,
+                is_alumni_exclusive: false,
+                salary_range: '₱27,000 – ₱35,000 / mo',
+                experience_level: 'Entry level',
+                created_at: null,
+                vacancies_count: 4,
+                poster_url: null,
+                poster_avatar_url: null,
+              },
+            ];
+
+            const allJobs =
+              stats?.featuredJobs && stats.featuredJobs.length > 0 ? stats.featuredJobs : fallbackJobs;
+
+            const visibleJobs = allJobs.slice(0, 3);
+
+            const selectedJob = selectedLandingJobId
+              ? allJobs.find((j) => String(j.id) === String(selectedLandingJobId)) || null
+              : null;
+
+            const activeSlides = selectedJob
+              ? getJobRelatedSlides(selectedJob).map((s) => ({
+                  ...s,
+                  badge: 'SELECTED JOB PREVIEW',
+                }))
+              : PESO_CTU_SLIDES.map((s) => ({
+                  image: s.image,
+                  title: s.title,
+                  subtitle: s.subtitle,
+                  caption: s.tag,
+                  badge: s.badge,
+                  description: s.description,
+                }));
+
+            const currentSlideIdx = jobSlideIndex % activeSlides.length;
+            const currentSlide = activeSlides[currentSlideIdx];
+            const currentOverviewSlide = PESO_CTU_SLIDES[currentSlideIdx % PESO_CTU_SLIDES.length];
+            const overviewRightStat =
+              currentSlideIdx % PESO_CTU_SLIDES.length === 0
+                ? `${stats?.totalAlumni || 308} TRACKED ALUMNI · ${stats?.programsTracked || 5} PROGRAMS`
+                : currentSlideIdx % PESO_CTU_SLIDES.length === 1
+                ? 'TOR · DIPLOMA · GOOD MORAL · CAV'
+                : currentSlideIdx % PESO_CTU_SLIDES.length === 2
+                ? `${stats?.activeJobsCount || allJobs.length} ACTIVE JOB OPENINGS`
+                : `${stats?.employmentRate ?? 0}% EMPLOYMENT · ${stats?.mentorshipMatches ?? 0} CONNECTIONS`;
+
+            return (
+              <div className="w-full h-full flex flex-col justify-center -translate-y-[10px]">
+                {/* 2-Column Flex Layout Centered Over Hero Background (+30px height -> lg:h-[525px]) */}
+                <div className="flex flex-col lg:flex-row items-stretch gap-4 w-full lg:h-[525px]">
+                  {/* ─── LEFT SIDE: Huge Picture Slideshow Box + 2 Stacked Horizontal Description Bars ─── */}
+                  <div className="w-full lg:w-[57%] shrink-0 flex flex-col justify-between h-full gap-2.5">
+                    {/* Huge Rectangular Picture Slideshow Box (Smooth In & Out Crossfade, NO round corners) */}
+                    <div className="relative w-full h-[280px] sm:h-[320px] lg:h-auto lg:flex-1 lg:min-h-0 bg-[#111827] border border-white/20 overflow-hidden rounded-none select-none shadow-2xl">
+                      <AnimatePresence initial={false}>
+                        <motion.img
+                          key={`${selectedJob ? selectedJob.id : 'peso-ctu'}-${currentSlideIdx}`}
+                          src={currentSlide.image}
+                          alt={currentSlide.title}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.9, ease: 'easeInOut' }}
+                          className="absolute inset-0 w-full h-full object-cover rounded-none"
+                        />
+                      </AnimatePresence>
+
+                      {/* Dark Fade Coming Up from the Bottom */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/65 to-transparent pointer-events-none" />
+
+                      {/* Top Co-Branding Bar inside Huge Square */}
+                      <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between gap-2 z-10">
+                        <div className="flex items-center gap-2 bg-black/75 border border-white/20 px-2.5 py-1 rounded-none">
+                          <img src="/logo.png" alt="CTU-Naga" className="w-4 h-4 object-contain rounded-none" />
+                          <span className="text-[10px] font-extrabold tracking-[0.16em] text-white uppercase">
+                            PESO CITY OF NAGA &amp; CTU-NAGA
+                          </span>
+                        </div>
+
+                        {selectedJob ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedLandingJobId(null);
+                              setJobSlideIndex(0);
+                            }}
+                            className="bg-ctu-marigold hover:bg-amber-600 text-black text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 border border-white/30 rounded-none cursor-pointer transition-colors"
+                          >
+                            ← Back to PESO &amp; CTU Overview
+                          </button>
+                        ) : (
+                          <div className="bg-ctu-blue/90 border border-white/20 px-2.5 py-1 text-[10px] font-bold tracking-widest text-ctu-gold uppercase rounded-none">
+                            OFFICIAL CAREER BULLETIN
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Bottom-Left Title & Subtitle inside Dark Bottom Fade */}
+                      <div className="absolute bottom-0 left-0 right-0 p-4 z-10 flex flex-col justify-end">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-0.5 bg-ctu-marigold text-black text-[9px] font-extrabold uppercase tracking-wider rounded-none">
+                            {currentSlide.badge}
+                          </span>
+                          <span className="text-[10px] font-semibold text-gray-300 uppercase tracking-wider truncate">
+                            {currentSlide.caption}
+                          </span>
+                        </div>
+
+                        <h2 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-white tracking-tight leading-tight text-left">
+                          {currentSlide.title}
+                        </h2>
+                        <p className="text-xs text-gray-200 font-medium mt-0.5 text-left truncate">
+                          {currentSlide.subtitle}
+                        </p>
+
+                        {/* Sharp Rectangular Slide Indicators */}
+                        <div className="flex items-center gap-1.5 mt-2.5">
+                          {activeSlides.map((_, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setJobSlideIndex(idx)}
+                              className={`h-1 transition-all rounded-none cursor-pointer ${
+                                idx === currentSlideIdx
+                                  ? 'w-9 bg-ctu-marigold'
+                                  : 'w-4 bg-white/35 hover:bg-white/60'
+                              }`}
+                              aria-label={`Slide ${idx + 1}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ─── 2 Stacked Horizontal Description Bars Below the Huge Square (Fixed 112px height matching Right Bottom Bars) ─── */}
+                    <div className="shrink-0 flex flex-col justify-between gap-2 lg:h-[112px]">
+                      {/* Left Bar 1: Co-Branded Header / Job Specification Strip */}
+                      <div className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2 rounded-none flex items-center justify-between gap-2 shrink-0">
+                        {selectedJob ? (
+                          <>
+                            <div className="flex items-center gap-2 text-xs min-w-0">
+                              <span className="px-1.5 py-0.5 bg-ctu-blue text-white font-bold uppercase text-[9px] tracking-wider rounded-none shrink-0">
+                                {JOB_TYPE_LABELS[selectedJob.job_type] || selectedJob.job_type || 'Full-Time'}
+                              </span>
+                              <span className="font-bold text-gray-900 truncate">{selectedJob.company_name}</span>
+                              <span className="text-gray-400 shrink-0">|</span>
+                              <span className="text-gray-700 font-medium truncate">{selectedJob.location}</span>
+                            </div>
+                            <div className="text-[11px] font-extrabold text-ctu-blue uppercase tracking-wider shrink-0">
+                              {selectedJob.salary_range || 'Competitive'}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 text-[11px] font-extrabold text-ctu-charcoal uppercase tracking-wider truncate">
+                              <span className="w-2 h-2 bg-ctu-blue inline-block rounded-none shrink-0" />
+                              <span className="truncate">{currentOverviewSlide.barTitle}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-ctu-blue uppercase tracking-wider shrink-0">
+                              {overviewRightStat}
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Left Bar 2: Role / Program Description Block */}
+                      <div className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2.5 rounded-none flex-1 flex items-center">
+                        {selectedJob ? (
+                          <p className="text-[11px] sm:text-xs text-gray-700 leading-relaxed line-clamp-2">
+                            <strong className="text-gray-900 uppercase">Role Overview: </strong>
+                            {selectedJob.description_preview ||
+                              `${selectedJob.position} at ${selectedJob.company_name} (${selectedJob.location}). Career opportunity coordinated with PESO City of Naga and CTU-Naga Career Placement Office.`}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] sm:text-xs text-gray-700 leading-relaxed line-clamp-2">
+                            {PESO_CTU_SLIDES[currentSlideIdx % PESO_CTU_SLIDES.length].description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ─── CENTER VERTICAL DIVIDER LINE ─── */}
+                  <div className="hidden lg:flex justify-center relative h-full shrink-0 px-0.5">
+                    <div className="w-px h-full bg-white/35" />
+                  </div>
+
+                  {/* ─── RIGHT SIDE: 3 Stacked Rectangular Job Cards + 2 Bottom Horizontal Bars ─── */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-between h-full gap-2.5">
+                    {/* 3 Stacked Rectangular Job Cards with Seamless Image-to-White Fade Design */}
+                    <div className="flex-1 min-h-0 grid grid-rows-3 gap-2.5">
+                      {visibleJobs.map((job) => {
+                        const isSelected = selectedJob && String(selectedJob.id) === String(job.id);
+                        const jobSlides = getJobRelatedSlides(job);
+                        const thumbUrl = jobSlides[0]?.image;
+                        const jobTypeLabel =
+                          JOB_TYPE_LABELS[job.job_type] ||
+                          (job.job_type
+                            ? job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1)
+                            : 'Full-Time');
+
+                        return (
+                          <button
+                            key={job.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedLandingJobId(String(job.id));
+                              setJobSlideIndex(0);
+                            }}
+                            className={`relative w-full h-full text-left bg-white border transition-all rounded-none p-0 flex items-stretch overflow-hidden cursor-pointer group ${
+                              isSelected
+                                ? 'border-ctu-marigold ring-2 ring-ctu-marigold/40'
+                                : 'border-white/25 hover:border-white/60'
+                            }`}
+                          >
+                            {/* Left Active Accent Strip */}
+                            <div
+                              className={`relative z-20 w-1.5 shrink-0 rounded-none transition-colors ${
+                                isSelected ? 'bg-ctu-marigold' : 'bg-ctu-blue group-hover:bg-ctu-marigold'
+                              }`}
+                            />
+
+                            {/* Seamless Faded Background Image on the Left Blending into White on the Right */}
+                            <div className="absolute inset-y-0 left-1.5 w-[44%] sm:w-[46%] overflow-hidden pointer-events-none z-0">
+                              <img
+                                src={thumbUrl}
+                                alt={job.position}
+                                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 rounded-none"
+                              />
+                              {/* Smooth horizontal fade from image on the left into solid white on the right */}
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/55 via-60% to-white" />
+                              <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-r from-transparent via-white/90 to-white" />
+                            </div>
+
+                            {/* Job Card Details Sited Over the Faded White Area (Right-Aligned) */}
+                            <div className="relative z-10 flex-1 pl-[34%] sm:pl-[36%] pr-4 py-2.5 flex flex-col justify-between min-w-0 text-right">
+                              <div>
+                                <div className="text-[10px] font-extrabold uppercase tracking-wider text-ctu-blue truncate">
+                                  {job.company_name}
+                                </div>
+                                <h4 className="text-xs sm:text-sm font-extrabold text-gray-900 mt-0.5 line-clamp-1 group-hover:text-ctu-blue transition-colors">
+                                  {job.position}
+                                </h4>
+                                <p className="text-[11px] text-gray-500 truncate">
+                                  {job.location}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center justify-end gap-2.5 pt-1.5 border-t border-gray-200/80 text-[10px]">
+                                <span className="font-bold text-gray-600 uppercase">{jobTypeLabel}</span>
+                                <span className="text-gray-300">·</span>
+                                <span className="font-extrabold text-ctu-blue truncate">
+                                  {job.salary_range || 'Competitive'}
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* ─── 2 Stacked Horizontal Bars Below the 3 Job Cards (Fixed 112px height matching Left Bottom Bars) ─── */}
+                    <div className="shrink-0 flex flex-col justify-between gap-2 lg:h-[112px]">
+                      {/* Right Bottom Bar 1: Available Jobs Header & Overview Reset */}
+                      <div className="bg-white/95 backdrop-blur-md border border-white/20 px-3.5 py-2 rounded-none flex items-center justify-between gap-2 shrink-0">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-700 truncate">
+                          {selectedJob ? 'SELECT ANOTHER JOB OR RETURN TO OVERVIEW' : 'CLICK ANY JOB ABOVE TO PREVIEW DETAILS'}
+                        </span>
+                        {selectedJob ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedLandingJobId(null);
+                              setJobSlideIndex(0);
+                            }}
+                            className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[10px] font-extrabold uppercase border border-gray-300 rounded-none cursor-pointer shrink-0"
+                          >
+                            PESO &amp; CTU Overview
+                          </button>
+                        ) : (
+                          <span className="text-[10px] font-bold text-ctu-blue uppercase tracking-wider shrink-0">
+                            PESO-NAGA &amp; CTU
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Right Bottom Bar 2: Dark Navy "Explore More Jobs" Bar */}
+                      <div className="bg-[#111c33]/95 backdrop-blur-md border border-white/20 px-3.5 py-2.5 rounded-none flex-1 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <BriefcaseIcon className="w-4 h-4 text-ctu-marigold shrink-0" />
+                          <span className="text-[11px] text-gray-200 font-medium leading-snug line-clamp-2">
+                            {selectedJob
+                              ? `${selectedJob.position} — ${selectedJob.company_name}`
+                              : 'Official PESO City of Naga and Cebu Technological University Career Placement Network'}
+                          </span>
+                        </div>
+                        <Link
+                          to="/auth/register"
+                          className="shrink-0 bg-ctu-marigold hover:bg-amber-600 text-black text-[11px] font-extrabold uppercase tracking-wider px-3.5 py-2 rounded-none inline-flex items-center gap-1.5 transition-colors"
+                        >
+                          <span>Explore More Jobs</span>
+                          <ArrowRightIcon className="w-3.5 h-3.5 stroke-[2.5]" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       </section>
 
       {/* ═══ By the Numbers ═══ */}
@@ -1085,7 +1441,7 @@ export default function LandingPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => scrollTo('jobs')}
+                    onClick={scrollToTop}
                     className="text-xs font-semibold text-ctu-marigold hover:underline inline-flex items-center gap-1 shrink-0 pb-1"
                   >
                     View <ArrowRightIcon className="w-3.5 h-3.5" />
@@ -1150,253 +1506,6 @@ export default function LandingPage() {
             </div>
           </TiltedGridHero>
         </motion.div>
-      </section>
-
-      {/* ═══ Job Opportunities, Profile & Resume Support ═══ */}
-      <section
-        id="jobs"
-        ref={jobsRef}
-        className="min-h-screen flex items-center pt-24 pb-8 bg-gradient-to-b from-ctu-warm via-white to-ctu-warm relative overflow-hidden snap-start"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full relative z-10">
-          <motion.div
-            initial={false}
-            animate={jobsRevealed ? { opacity: 1, y: 0 } : { opacity: 0, y: 28 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {/* Top Hierarchy: Header + CTA */}
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-6">
-              <div className="max-w-3xl">
-                <span className="text-ctu-marigold text-xs uppercase tracking-[0.25em] font-semibold flex items-center gap-3 mb-2">
-                  <span className="w-8 h-px bg-ctu-marigold/60" />
-                  Job Offers &amp; Career Opportunities
-                </span>
-                <h2 className="text-3xl sm:text-4xl lg:text-[2.5rem] font-bold font-display text-ctu-charcoal leading-[1.1] tracking-tight">
-                  Opportunities Tailored for{' '}
-                  <span className="text-ctu-blue whitespace-nowrap">CTU-Naga Graduates</span>
-                </h2>
-                <p className="text-gray-500 mt-2 text-sm leading-relaxed">
-                  Verified openings from partner companies and fellow alumni—with direct applications, skill matching, and referral links.
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row lg:flex-col sm:items-center lg:items-end gap-2 shrink-0">
-                <Link
-                  to="/auth/register"
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-ctu-blue text-white text-sm font-medium hover:bg-blue-900 transition-colors shadow-sm"
-                >
-                  <span>Explore {stats?.activeJobsCount ? `${stats.activeJobsCount} ` : ''}Openings</span>
-                  <ArrowRightIcon className="w-4 h-4" />
-                </Link>
-                <span className="text-[11px] text-gray-500">
-                  Sign in or register to apply with your resume.
-                </span>
-              </div>
-            </div>
-
-            {/* 3-Column Job Cards using our JobsPage UI */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {(stats?.featuredJobs && stats.featuredJobs.length > 0
-                ? stats.featuredJobs
-                : [
-                    {
-                      id: 'sample-1',
-                      position: 'Junior Software Developer',
-                      company_name: 'Partner Tech Employer',
-                      location: 'Cebu City / Hybrid',
-                      job_type: 'full-time',
-                      is_remote: false,
-                      is_alumni_exclusive: true,
-                      salary_range: 'Competitive',
-                      experience_level: 'Entry level',
-                      created_at: null,
-                      vacancies_count: null,
-                      poster_url: null,
-                      poster_avatar_url: null,
-                    },
-                    {
-                      id: 'sample-2',
-                      position: 'Industrial Process Technician',
-                      company_name: 'Naga Manufacturing Partner',
-                      location: 'City of Naga, Cebu',
-                      job_type: 'full-time',
-                      is_remote: false,
-                      is_alumni_exclusive: true,
-                      salary_range: 'Competitive',
-                      experience_level: 'Mid level',
-                      created_at: null,
-                      vacancies_count: null,
-                      poster_url: null,
-                      poster_avatar_url: null,
-                    },
-                    {
-                      id: 'sample-3',
-                      position: 'Licensed Secondary Educator',
-                      company_name: 'Regional Academic Institutions',
-                      location: 'Cebu Province',
-                      job_type: 'full-time',
-                      is_remote: false,
-                      is_alumni_exclusive: false,
-                      salary_range: 'Competitive',
-                      experience_level: 'Entry level',
-                      created_at: null,
-                      vacancies_count: null,
-                      poster_url: null,
-                      poster_avatar_url: null,
-                    },
-                  ]
-              ).map((job) => {
-                const palette = getJobWavyPalette(job.id);
-                const initials = getCompanyInitials(job.company_name);
-                const jobTypeLabel =
-                  JOB_TYPE_LABELS[job.job_type] ||
-                  (job.job_type ? job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1) : 'Full-Time');
-
-                return (
-                  <div
-                    key={job.id}
-                    className="relative bg-white border border-gray-200 rounded-xl p-5 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden"
-                  >
-                    {/* Wavy Contour Lines Background */}
-                    <div className="absolute top-0 left-0 right-0 h-36 overflow-hidden pointer-events-none z-0">
-                      <svg viewBox="0 0 900 260" className="w-full h-full" preserveAspectRatio="xMidYMid slice" fill="none">
-                        {WAVY_CONTOUR_LINES.map((line) => (
-                          <path
-                            key={line.id}
-                            d={line.d}
-                            stroke={palette.stroke}
-                            strokeWidth={line.strokeWidth}
-                            strokeOpacity={0.65}
-                            strokeLinecap="round"
-                          />
-                        ))}
-                      </svg>
-                      <div className="absolute inset-0 bg-gradient-to-b from-transparent from-25% via-white/50 via-60% to-white" />
-                    </div>
-
-                    <div className="relative z-10">
-                      {/* Top Header: Company Avatar/Initials & Save Pill */}
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="w-12 h-12 rounded-full border border-gray-200/90 p-0.5 bg-white shadow-xs flex items-center justify-center shrink-0">
-                          {job.poster_avatar_url ? (
-                            <img src={job.poster_avatar_url} alt={job.company_name} className="w-full h-full rounded-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full rounded-full bg-orange-600 text-white flex items-center justify-center text-xs font-bold tracking-widest uppercase">
-                              {initials}
-                            </div>
-                          )}
-                        </div>
-                        <Link
-                          to="/auth/register"
-                          className="flex items-center gap-1.5 px-2.5 py-1 border bg-white/90 backdrop-blur-xs border-gray-200 text-gray-600 hover:text-orange-600 hover:border-orange-200 text-[11px] font-medium transition-colors"
-                        >
-                          <span>Save</span>
-                          <BookmarkIcon className="w-3.5 h-3.5 text-gray-500" />
-                        </Link>
-                      </div>
-
-                      {/* Company & Time */}
-                      <div className="mt-3.5 flex items-center gap-2 text-xs">
-                        <span className="font-bold text-gray-900 text-sm truncate">{job.company_name}</span>
-                        <span className="text-gray-400 font-normal shrink-0">{jobTimeAgo(job.created_at)}</span>
-                      </div>
-
-                      {/* Job Title */}
-                      <Link
-                        to="/auth/register"
-                        className="block text-lg font-bold text-gray-900 mt-1 mb-2.5 leading-snug line-clamp-1 hover:text-orange-600 transition-colors"
-                        title={job.position}
-                      >
-                        {job.position}
-                      </Link>
-
-                      {/* Badges Row */}
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-2.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-800">
-                          {jobTypeLabel}
-                        </span>
-                        {job.experience_level && (
-                          <span className="px-2.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-800 capitalize">
-                            {job.experience_level}
-                          </span>
-                        )}
-                        {job.is_remote && (
-                          <span className="px-2.5 py-0.5 text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                            Remote
-                          </span>
-                        )}
-                        {job.is_alumni_exclusive && (
-                          <span className="px-2.5 py-0.5 text-[11px] font-medium bg-orange-50 text-orange-700 border border-orange-200">
-                            Alumni Exclusive
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="relative z-10">
-                      <hr className="border-gray-100 my-3" />
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-900 leading-tight truncate">
-                            {job.salary_range || 'Competitive'}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5 truncate">
-                            {job.location}
-                          </p>
-                        </div>
-                        <Link
-                          to="/auth/register"
-                          className="shrink-0 bg-ctu-blue hover:bg-blue-900 text-white text-xs font-semibold px-3.5 py-2 rounded-lg inline-flex items-center gap-1 transition-colors"
-                        >
-                          <span>Apply Now</span>
-                          <ArrowRightIcon className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Bottom Compact Trust Pillars */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
-              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-3 shadow-xs">
-                <div className="w-9 h-9 rounded-lg bg-ctu-blue/10 text-ctu-blue flex items-center justify-center shrink-0">
-                  <DocumentArrowUpIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-ctu-charcoal">Profile Photo &amp; Resume Ready</h3>
-                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                    Upload your CV/resume and skills so partner employers can hire you faster.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-start gap-3 shadow-xs">
-                <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-                  <CheckBadgeIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-ctu-charcoal">Registrar-Verified Graduate Access</h3>
-                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                    Verified against CTU-Naga Registrar batch records using your name and birthdate.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-[#0f172a] text-white rounded-xl p-4 flex items-start gap-3 shadow-sm">
-                <div className="w-9 h-9 rounded-lg bg-ctu-marigold/20 text-ctu-marigold flex items-center justify-center shrink-0">
-                  <LockClosedIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Consent-First Contact Privacy</h3>
-                  <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">
-                    Approve connection requests before sharing contact links or direct messages.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
       </section>
 
       {/* ═══ Real-Time Alumni Chat (3D Marquee) ═══ */}
@@ -1574,7 +1683,7 @@ export default function LandingPage() {
             <div className="lg:col-span-3">
               <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-[0.2em]">Explore</h4>
               <ul className="mt-5 space-y-3 text-sm">
-                {['numbers', 'community', 'jobs', 'chat', 'connect'].map((id) => (
+                {['numbers', 'community', 'chat', 'connect'].map((id) => (
                   <li key={id}>
                     <button onClick={() => scrollTo(id)} className="text-gray-400 hover:text-white transition-colors">
                       {NAV_SECTIONS.find((s) => s.id === id)?.label}
