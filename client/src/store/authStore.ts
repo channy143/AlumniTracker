@@ -4,10 +4,10 @@ import { authApi } from '@/services/api';
 import { clearAllCache } from '@/utils/apiCache';
 
 interface AuthState {
-  user: (User & { role: 'admin' | 'staff' | 'alumni' }) | null;
+  user: User | null;
   token: string | null;
   loading: boolean;
-  setUser: (user: (User & { role: 'admin' | 'staff' | 'alumni' }) | null) => void;
+  setUser: (user: User | null) => void;
   setToken: (token?: string, persist?: boolean) => void;
   setLoading: (loading: boolean) => void;
   logout: (allDevices?: boolean) => Promise<void>;

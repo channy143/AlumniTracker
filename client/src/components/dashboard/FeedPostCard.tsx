@@ -20,6 +20,8 @@ import {
   ArrowUpTrayIcon,
   FaceSmileIcon,
   ArrowsPointingOutIcon,
+  SpeakerWaveIcon,
+  SpeakerXMarkIcon,
 } from '@heroicons/react/24/outline';
 import { feedApi, communityApi, connectionsApi, messagesApi, profileApi } from '@/services/api';
 import { decodeUnicode, setBackgroundInterval, dedupeCommentTree, countAllComments } from '@/utils/helpers';
@@ -251,6 +253,20 @@ export default function FeedPostCard({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showImageLightbox, setShowImageLightbox] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [videoMuted, setVideoMuted] = useState(false);
+
+  // Initialize and ensure audio volume is active whenever video mounts or URL changes
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !currentPost.video_url) return;
+    try {
+      el.muted = false;
+      if (el.volume === 0) el.volume = 1;
+      setVideoMuted(el.muted || el.volume === 0);
+    } catch {
+      // Browser autoplay restriction fallback
+    }
+  }, [currentPost.video_url]);
 
   // Pause video automatically when scrolled out of the viewport
   useEffect(() => {
@@ -1265,8 +1281,68 @@ export default function FeedPostCard({
 
       {/* Post Video (automatically pauses when scrolled out of the viewport) */}
       {currentPost.video_url && (
-        <div className="mt-2 bg-black max-h-96 flex items-center justify-center overflow-hidden border-y border-gray-100">
-          <video ref={videoRef} src={currentPost.video_url} controls playsInline className="max-h-96 w-full" />
+        <div className="relative mt-2 bg-black max-h-96 flex items-center justify-center overflow-hidden border-y border-gray-100 group">
+          <video
+            ref={videoRef}
+            src={currentPost.video_url}
+            controls
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              const v = e.currentTarget;
+              if (v.volume === 0) v.volume = 1;
+              setVideoMuted(v.muted || v.volume === 0);
+            }}
+            onVolumeChange={(e) => {
+              const v = e.currentTarget;
+              setVideoMuted(v.muted || v.volume === 0);
+            }}
+            onPlay={(e) => {
+              const v = e.currentTarget;
+              if (v.volume === 0) v.volume = 1;
+              setVideoMuted(v.muted || v.volume === 0);
+            }}
+            className="max-h-96 w-full"
+          />
+
+          {/* Quick Audio / Unmute Toggle Button */}
+          {videoMuted ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (videoRef.current) {
+                  videoRef.current.muted = false;
+                  videoRef.current.volume = 1;
+                  setVideoMuted(false);
+                  if (videoRef.current.paused) {
+                    videoRef.current.play().catch(() => {});
+                  }
+                }
+              }}
+              className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-3 py-1.5 bg-black/75 hover:bg-black/90 text-white text-xs font-semibold rounded-full shadow-lg backdrop-blur-xs transition-transform active:scale-95 cursor-pointer border border-white/20 animate-pulse hover:animate-none"
+              title="Click to unmute sound"
+            >
+              <SpeakerXMarkIcon className="w-4 h-4 text-amber-300" />
+              <span>Tap for sound</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (videoRef.current) {
+                  videoRef.current.muted = true;
+                  setVideoMuted(true);
+                }
+              }}
+              className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1 bg-black/60 hover:bg-black/80 text-white text-[11px] font-medium rounded-full shadow-md backdrop-blur-xs transition-opacity opacity-0 group-hover:opacity-100 cursor-pointer border border-white/20"
+              title="Mute sound"
+            >
+              <SpeakerWaveIcon className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Sound on</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -2107,7 +2183,16 @@ export default function FeedPostCard({
 
                 {editVideoUrl && editMediaType === 'video' && (
                   <div className="relative rounded-lg overflow-hidden max-h-40 bg-black border border-gray-800">
-                    <video src={editVideoUrl} controls className="max-h-40 w-full bg-black" />
+                    <video
+                      src={editVideoUrl}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      onLoadedMetadata={(e) => {
+                        if (e.currentTarget.volume === 0) e.currentTarget.volume = 1;
+                      }}
+                      className="max-h-40 w-full bg-black"
+                    />
                     {uploadingEditMedia && (
                       <div className="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center text-white text-xs">
                         Uploading video...

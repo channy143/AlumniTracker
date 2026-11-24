@@ -54,6 +54,8 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
     const company = (req.query.company as string) || '';
     const location = (req.query.location as string) || '';
     const sort = (req.query.sort as string) || 'name';
+    const hasPrcLicense = req.query.has_prc_license === 'true';
+    const hasPostgraduate = req.query.has_postgraduate === 'true';
 
     // Get admin user ids to exclude from directory
     const { data: adminUsers } = await supabase
@@ -105,6 +107,21 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
         .ilike('company_name', `%${sanitizeFilterInput(company)}%`);
       const { data } = await empQuery;
       employmentFilterIds = [...new Set((data || []).map((e: any) => e.profile_id))];
+    }
+
+    // Pre-filter by accreditation credentials (PRC license / Postgraduate)
+    let accreditationFilterIds: string[] | null = null;
+    if (hasPrcLicense || hasPostgraduate) {
+      const matchLists: string[][] = [];
+      if (hasPrcLicense) {
+        const { data: licData } = await db.from('alumni_licensures').select('profile_id').eq('status', 'passed');
+        matchLists.push((licData || []).map((l: any) => l.profile_id));
+      }
+      if (hasPostgraduate) {
+        const { data: pgData } = await db.from('alumni_postgraduate').select('profile_id');
+        matchLists.push((pgData || []).map((p: any) => p.profile_id));
+      }
+      accreditationFilterIds = [...new Set(matchLists.flat())];
     }
 
     let profileQuery = db
@@ -169,6 +186,9 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
     if (employmentFilterIds) {
       profileQuery = profileQuery.in('id', employmentFilterIds);
     }
+    if (accreditationFilterIds) {
+      profileQuery = profileQuery.in('id', accreditationFilterIds);
+    }
 
     // Sort
     if (sort === 'name') {
@@ -196,12 +216,18 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
     const profileIds = profiles.map((p: any) => p.id) || [];
     let employmentMap = new Map();
     let educationMap = new Map();
+    let licensuresMap = new Map();
+    let postgradMap = new Map();
 
     if (profileIds.length > 0) {
-      const [{ data: employment }, { data: education }] = await Promise.all([
+      const [{ data: employment }, { data: education }, { data: licensures }, { data: postgrads }] = await Promise.all([
         db.from('employment').select('profile_id, company_name, position, employment_status, record_category, job_type, is_current')
           .in('profile_id', profileIds).eq('is_current', true),
         db.from('education').select('profile_id, program, year_graduated, honors')
+          .in('profile_id', profileIds),
+        db.from('alumni_licensures').select('profile_id, exam_title, year_passed')
+          .in('profile_id', profileIds).eq('status', 'passed'),
+        db.from('alumni_postgraduate').select('profile_id, degree_level, program_title, status')
           .in('profile_id', profileIds),
       ]);
 
@@ -215,6 +241,16 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
             program: e.program ? formatProgramLongName(e.program) : e.program,
           });
         }
+      });
+      (licensures || []).forEach((l: any) => {
+        const list = licensuresMap.get(l.profile_id) || [];
+        list.push(l);
+        licensuresMap.set(l.profile_id, list);
+      });
+      (postgrads || []).forEach((pg: any) => {
+        const list = postgradMap.get(pg.profile_id) || [];
+        list.push(pg);
+        postgradMap.set(pg.profile_id, list);
       });
     }
 
@@ -234,6 +270,10 @@ router.get('/search', authenticate, async (req: AuthenticatedRequest, res, next)
       available_for_mentoring: p.available_for_mentoring ?? false,
       current_employment: employmentMap.get(p.id) || null,
       education: educationMap.get(p.id) || null,
+      licensures: licensuresMap.get(p.id) || [],
+      postgraduate: postgradMap.get(p.id) || [],
+      has_prc_license: (licensuresMap.get(p.id) || []).length > 0,
+      has_postgraduate: (postgradMap.get(p.id) || []).length > 0,
       is_admin: adminUserIds.includes(p.user_id),
       location: [p.city, p.province].filter(Boolean).join(', ') || null,
       industry: p.industry || null,
@@ -272,9 +312,11 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
 
     const resolvedProfileId = profile.id;
 
-    const [achievementsRes, feedbackRes] = await Promise.all([
+    const [achievementsRes, feedbackRes, licensuresRes, postgradRes] = await Promise.all([
       db.from('achievements').select('*').eq('profile_id', resolvedProfileId).order('date_achieved', { ascending: false }),
       db.from('career_feedback').select('*').eq('profile_id', resolvedProfileId).maybeSingle(),
+      db.from('alumni_licensures').select('*').eq('profile_id', resolvedProfileId).order('year_passed', { ascending: false }),
+      db.from('alumni_postgraduate').select('*').eq('profile_id', resolvedProfileId).order('start_year', { ascending: false }),
     ]);
 
     const privacy = (typeof profile.privacy_settings === 'string'
@@ -332,6 +374,8 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       employment: sanitizedEmployment,
       achievements: achievementsRes.data || [],
       career_feedback: feedbackRes.data || null,
+      licensures: licensuresRes.data || [],
+      postgraduate: postgradRes.data || [],
       resume_url: null,
     };
 

@@ -24,6 +24,7 @@ import {
   ShieldCheckIcon,
   GlobeAltIcon,
   ClipboardDocumentCheckIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 
 type NavItem = { name: string; href: string; icon: any; end?: boolean };
@@ -59,6 +60,13 @@ const adminNav: NavItem[] = [
   { name: 'Employer Insights', href: '/admin/employers', icon: BuildingOfficeIcon },
   { name: 'Reports & Exports', href: '/admin/reports', icon: DocumentChartBarIcon },
   { name: 'Audit & Activity Log', href: '/admin/activity', icon: ShieldCheckIcon },
+  { name: 'System Settings', href: '/admin/settings', icon: Cog6ToothIcon },
+];
+
+const registrarNav: NavItem[] = [
+  { name: 'Eligible Registry', href: '/admin/alumni?tab=eligible', icon: ClipboardDocumentCheckIcon },
+  { name: 'Alumni Records', href: '/admin/alumni', icon: UsersIcon },
+  { name: 'Reports & Exports', href: '/admin/reports', icon: DocumentChartBarIcon },
 ];
 
 export default function Sidebar({
@@ -97,7 +105,17 @@ export default function Sidebar({
     document.body.scrollTop = 0;
   };
 
-  const items = isAdminPath && user?.role === 'admin' ? adminNav : mainNav;
+  const isInstitutionalAdmin = ['admin', 'staff', 'alumni_officer', 'registrar'].includes(user?.role || '');
+  let items = mainNav;
+  if (isAdminPath && isInstitutionalAdmin) {
+    if (user?.role === 'registrar') {
+      items = registrarNav;
+    } else if (user?.role === 'admin') {
+      items = adminNav;
+    } else {
+      items = adminNav.filter((i) => i.href !== '/admin/activity' && i.href !== '/admin/settings');
+    }
+  }
 
   return (
     <>
@@ -135,7 +153,9 @@ export default function Sidebar({
             <nav data-tour={!isAdminPath ? 'sidebar-nav' : undefined} className="p-2 space-y-0.5">
               <div className={`px-3 py-1.5 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap ${collapsed ? 'max-h-0 opacity-0 py-0' : 'max-h-12 opacity-100 py-1.5'}`}>
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                  {isAdminPath ? 'Admin' : 'Navigation'}
+                  {isAdminPath
+                    ? (user?.role === 'registrar' ? 'Registrar Portal' : user?.role === 'alumni_officer' ? 'Alumni Affairs' : 'Institutional Admin')
+                    : 'Navigation'}
                 </p>
               </div>
               {items.map((item) => (

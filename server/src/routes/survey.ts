@@ -453,6 +453,57 @@ router.post('/onboarding', authenticate, async (req: AuthenticatedRequest, res, 
       }
     }
 
+    // Sync professional licensure (LET, CPA, REE, etc.) to public.alumni_licensures
+    if (responses?.licensureStatus === 'Passed' && responses?.licensureExamName && String(responses.licensureExamName).trim()) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', req.user!.userId)
+        .maybeSingle();
+
+      const profileId = profile?.id || req.user!.userId;
+      const cleanExamTitle = String(responses.licensureExamName).trim();
+      const currentYear = new Date().getFullYear();
+      let parsedYear = parseInt(String(responses.licensureYearPassed || responses.yearGraduated || currentYear), 10);
+      if (isNaN(parsedYear) || parsedYear < 1970 || parsedYear > currentYear + 1) {
+        parsedYear = currentYear;
+      }
+      const rawRating = responses.licensureRating ? parseFloat(String(responses.licensureRating)) : null;
+
+      try {
+        const { data: existingLic } = await supabase
+          .from('alumni_licensures')
+          .select('id')
+          .eq('profile_id', profileId)
+          .ilike('exam_title', cleanExamTitle)
+          .limit(1)
+          .maybeSingle();
+
+        const licPayload: Record<string, any> = {
+          profile_id: profileId,
+          user_id: req.user!.userId,
+          exam_title: cleanExamTitle,
+          year_passed: parsedYear,
+          status: 'passed',
+          updated_at: new Date().toISOString(),
+        };
+        if (rawRating !== null && !isNaN(rawRating) && rawRating >= 50 && rawRating <= 100) {
+          licPayload.rating = rawRating;
+        }
+        if (responses.licensureNumber && String(responses.licensureNumber).trim()) {
+          licPayload.license_number = String(responses.licensureNumber).trim();
+        }
+
+        if (existingLic) {
+          await supabase.from('alumni_licensures').update(licPayload).eq('id', existingLic.id);
+        } else {
+          await supabase.from('alumni_licensures').insert(licPayload);
+        }
+      } catch (licErr: any) {
+        console.error('[Survey Onboarding] Licensure sync failed:', licErr?.message);
+      }
+    }
+
     const alumniName = [responses?.firstName, responses?.lastName].filter(Boolean).join(' ') || req.user?.email?.split('@')[0] || 'Alumnus';
     notifyAdmins({
       type: 'survey',

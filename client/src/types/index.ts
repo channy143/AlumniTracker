@@ -20,8 +20,45 @@ export interface Profile {
   github_url?: string;
   portfolio_url?: string;
   privacy_settings: PrivacySettings;
+  education?: Education[];
+  employment?: Employment[];
+  skills?: Skill[];
+  certifications?: Certification[];
+  licensures?: AlumniLicensure[];
+  postgraduate?: AlumniPostgraduate[];
   created_at: string;
   updated_at: string;
+}
+
+export interface AlumniLicensure {
+  id: string;
+  profile_id: string;
+  user_id?: string;
+  exam_title: string;
+  license_number?: string;
+  exam_date?: string;
+  year_passed: number;
+  rating?: number;
+  status: 'passed' | 'pending_results';
+  verified_by_admin?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AlumniPostgraduate {
+  id: string;
+  profile_id: string;
+  user_id?: string;
+  degree_level: 'masteral' | 'doctoral' | 'post_graduate_diploma';
+  institution: string;
+  program_title: string;
+  major?: string;
+  start_year: number;
+  completion_year?: number;
+  status: 'enrolled' | 'candidate' | 'graduated';
+  thesis_title?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PrivacySettings {
@@ -222,7 +259,7 @@ export interface Analytics {
 export interface User {
   id: string;
   email: string;
-  role: 'admin' | 'staff' | 'alumni';
+  role: 'admin' | 'staff' | 'alumni' | 'alumni_officer' | 'registrar';
   is_verified: boolean;
   mfa_enabled?: boolean;
   created_at: string;

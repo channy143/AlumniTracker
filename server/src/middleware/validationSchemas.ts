@@ -186,6 +186,30 @@ export const addAchievementSchema = z.object({
   date_achieved: z.string().max(20).optional().nullable(),
 }).strict();
 
+export const addLicensureSchema = z.object({
+  exam_title: z.string().min(1, 'Exam title is required').max(250),
+  license_number: z.string().max(100).optional().nullable(),
+  exam_date: z.string().max(20).optional().nullable(),
+  year_passed: z.coerce.number().int().min(1950).max(2100),
+  rating: z.coerce.number().min(0).max(100).optional().nullable(),
+  status: z.enum(['passed', 'pending_results']).default('passed'),
+}).strict();
+
+export const updateLicensureSchema = addLicensureSchema.partial();
+
+export const addPostgraduateSchema = z.object({
+  degree_level: z.enum(['masteral', 'doctoral', 'post_graduate_diploma']),
+  institution: z.string().min(1, 'Institution is required').max(250),
+  program_title: z.string().min(1, 'Program title is required').max(250),
+  major: z.string().max(150).optional().nullable(),
+  start_year: z.coerce.number().int().min(1950).max(2100),
+  completion_year: z.coerce.number().int().min(1950).max(2100).optional().nullable(),
+  status: z.enum(['enrolled', 'candidate', 'graduated']).default('enrolled'),
+  thesis_title: z.string().max(1000).optional().nullable(),
+}).strict();
+
+export const updatePostgraduateSchema = addPostgraduateSchema.partial();
+
 // -----------------------------------------------------------------------------
 // Jobs
 // -----------------------------------------------------------------------------
@@ -356,7 +380,7 @@ export const adminCreateUserSchema = z.object({
   password: strongPasswordSchema,
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
-  role: z.enum(['admin', 'staff', 'alumni']).optional(),
+  role: z.enum(['admin', 'staff', 'alumni', 'alumni_officer', 'registrar']).optional(),
 }).strict();
 
 export const adminUpdateUserSchema = z.object({
@@ -366,7 +390,7 @@ export const adminUpdateUserSchema = z.object({
 }).strict();
 
 export const adminRoleSchema = z.object({
-  role: z.enum(['admin', 'staff', 'alumni']),
+  role: z.enum(['admin', 'staff', 'alumni', 'alumni_officer', 'registrar']),
 }).strict();
 
 export const adminResetPasswordSchema = z.object({
@@ -382,10 +406,23 @@ export const adminEligibleCreateSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),
   last_name: z.string().min(1, 'Last name is required').max(100),
   middle_name: z.string().max(100).optional().nullable(),
-  birth_date: z.string().max(20).optional().nullable(),
-  graduation_date: z.string().max(20).optional().nullable(),
+  birth_date: z.string().max(30).optional().nullable(),
+  graduation_date: z.string().max(30).optional().nullable(),
   program: z.string().max(200).optional().nullable(),
-  year_graduated: z.number().int().min(1900).max(2100).optional().nullable(),
+  year_graduated: z.union([z.number().int().min(1900).max(2100), z.string()]).optional().nullable(),
+}).strict();
+
+export const adminEligibleBulkSchema = z.object({
+  records: z.array(z.object({
+    student_id: z.string().max(50).optional().nullable(),
+    first_name: z.string().min(1, 'First name is required').max(100),
+    last_name: z.string().min(1, 'Last name is required').max(100),
+    middle_name: z.string().max(100).optional().nullable(),
+    birth_date: z.string().max(30).optional().nullable(),
+    graduation_date: z.string().max(30).optional().nullable(),
+    program: z.string().max(200).optional().nullable(),
+    year_graduated: z.union([z.number(), z.string()]).optional().nullable(),
+  })).min(1, 'At least one record is required').max(2000, 'Maximum 2,000 records per upload batch'),
 }).strict();
 
 // -----------------------------------------------------------------------------

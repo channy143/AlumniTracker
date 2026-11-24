@@ -693,7 +693,16 @@ export default function CreatePostBox({ onPostCreated, currentUser, currentProfi
                   {/* Video Preview Card */}
                   {videoUrl && mediaType === 'video' && (
                     <div className="relative rounded-xl overflow-hidden max-h-72 bg-black border border-gray-800">
-                      <video src={videoUrl} controls playsInline className="max-h-72 w-full rounded-xl bg-black" />
+                      <video
+                        src={videoUrl}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        onLoadedMetadata={(e) => {
+                          if (e.currentTarget.volume === 0) e.currentTarget.volume = 1;
+                        }}
+                        className="max-h-72 w-full rounded-xl bg-black"
+                      />
 
                       {/* Loading state overlay */}
                       {uploadingMedia && (

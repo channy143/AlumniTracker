@@ -266,7 +266,7 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
           companyName: companyCheck.cleaned,
           position: posCheck.cleaned,
           isActive: Boolean(updatedEmp?.is_current ?? isCurrent),
-        }).catch(() => {});
+        }).catch(() => { });
       }
       return res.status(200).json(updatedEmp);
     }
@@ -294,7 +294,7 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
         companyName: companyCheck.cleaned,
         position: posCheck.cleaned,
         isActive: Boolean(employment?.is_current ?? isCurrent),
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     res.status(201).json(employment);
@@ -456,7 +456,7 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
           companyName: nextComp || 'OJT Site',
           position: nextPos || 'OJT Intern',
           isActive: nextCurrent,
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
 

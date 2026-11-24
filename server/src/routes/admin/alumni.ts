@@ -32,6 +32,7 @@ router.get('/', async (req, res, next) => {
     const provinceFilter = (req.query.province as string) || '';
     const cityFilter = (req.query.city as string) || '';
     const archivedParam = req.query.archived as string;
+    const licensureFilter = (req.query.licensure as string) || '';
 
     let query = supabase
       .from('users')
@@ -50,12 +51,16 @@ router.get('/', async (req, res, next) => {
       { data: allProfiles, error: profError },
       { data: allEducation, error: eduError },
       { data: allEmployment, error: empError },
+      licRes,
     ] = await Promise.all([
       query,
       supabase.from('profiles').select('*'),
       supabase.from('education').select('id, profile_id, program, major, year_graduated, campus'),
       supabase.from('employment').select('*').eq('is_current', true),
+      supabase.from('alumni_licensures').select('*'),
     ]);
+
+    const allLicensures = (licRes as any)?.error ? [] : ((licRes as any)?.data || []);
 
     if (usersError && (usersError.code === '42P01' || usersError.code === '42703')) {
       return res.json({ data: [], total: 0, page, limit, employers: [], locations: [] });
@@ -86,6 +91,18 @@ router.get('/', async (req, res, next) => {
       }
       if (!empByProfile.has(e.profile_id)) empByProfile.set(e.profile_id, []);
       empByProfile.get(e.profile_id)!.push(e);
+    });
+
+    const licByProfile = new Map<string, any[]>();
+    (allLicensures || []).forEach((l: any) => {
+      if (l.profile_id) {
+        if (!licByProfile.has(l.profile_id)) licByProfile.set(l.profile_id, []);
+        licByProfile.get(l.profile_id)!.push(l);
+      }
+      if (l.user_id && l.user_id !== l.profile_id) {
+        if (!licByProfile.has(l.user_id)) licByProfile.set(l.user_id, []);
+        licByProfile.get(l.user_id)!.push(l);
+      }
     });
 
     // Populate distinct employers, provinces, and cities across all profiles & employment records
@@ -124,6 +141,8 @@ router.get('/', async (req, res, next) => {
       const emps = (pid ? empByProfile.get(pid) : null) || empByProfile.get(u.id) || [];
       const ojt = (pid ? ojtByProfile.get(pid) : null) || ojtByProfile.get(u.id) || [];
 
+      const lics = (pid ? licByProfile.get(pid) : null) || licByProfile.get(u.id) || [];
+
       const formattedEdus = edus.map((e: any) => ({
         ...e,
         program: e.program ? formatProgramLongName(e.program) : e.program,
@@ -135,16 +154,19 @@ router.get('/', async (req, res, next) => {
             education: formattedEdus,
             employment: emps,
             ojt,
+            licensures: lics,
           }
         : {
             education: formattedEdus,
             employment: emps,
             ojt,
+            licensures: lics,
           };
 
       return {
         ...u,
         profile: profileObj,
+        licensures: lics,
       };
     });
 
@@ -272,6 +294,33 @@ router.get('/', async (req, res, next) => {
       });
     }
 
+    // Licensure & LET filter (accreditation board passers)
+    if (licensureFilter.trim()) {
+      const lf = licensureFilter.trim().toLowerCase();
+      filtered = filtered.filter((u: any) => {
+        const lics: any[] = u.licensures || u.profile?.licensures || [];
+        if (lf === 'let') {
+          return lics.some((l: any) => {
+            const title = (l.exam_title || '').toLowerCase();
+            return title.includes('let') || title.includes('teacher') || title.includes('licensure examination for teacher');
+          });
+        }
+        if (lf === 'prc' || lf === 'prc_any' || lf === 'licensed' || lf === 'passed') {
+          return lics.some((l: any) => (l.status || 'passed').toLowerCase() === 'passed');
+        }
+        if (lf === 'cpa') {
+          return lics.some((l: any) => {
+            const title = (l.exam_title || '').toLowerCase();
+            return title.includes('cpa') || title.includes('accountant');
+          });
+        }
+        if (lf === 'none' || lf === 'unlicensed') {
+          return lics.length === 0;
+        }
+        return lics.some((l: any) => (l.exam_title || '').toLowerCase().includes(lf));
+      });
+    }
+
     const total = filtered.length;
     const paged = filtered.slice(offset, offset + limit);
 
@@ -310,13 +359,16 @@ router.get('/export', async (req, res, next) => {
 
     let education: any[] = [];
     let employment: any[] = [];
+    let licensures: any[] = [];
     if (profileIds.length > 0) {
-      const [edRes, empRes] = await Promise.all([
+      const [edRes, empRes, licRes] = await Promise.all([
         supabase.from('education').select('*').in('profile_id', profileIds),
         supabase.from('employment').select('*').in('profile_id', profileIds),
+        supabase.from('alumni_licensures').select('*').in('profile_id', profileIds),
       ]);
       education = edRes.data || [];
       employment = empRes.data || [];
+      licensures = (licRes as any)?.error ? [] : ((licRes as any)?.data || []);
     }
 
     const eduByProfile = new Map<string, any[]>();
@@ -331,6 +383,12 @@ router.get('/export', async (req, res, next) => {
       empByProfile.get(emp.profile_id)!.push(emp);
     });
 
+    const licByProfile = new Map<string, any[]>();
+    licensures.forEach((lic: any) => {
+      if (!licByProfile.has(lic.profile_id)) licByProfile.set(lic.profile_id, []);
+      licByProfile.get(lic.profile_id)!.push(lic);
+    });
+
     const users = activeUsers.map((u: any) => {
       const prof = profileMap.get(u.id) || null;
       return {
@@ -338,6 +396,7 @@ router.get('/export', async (req, res, next) => {
         profile: prof,
         education: prof ? eduByProfile.get(prof.id) || [] : [],
         employment: prof ? empByProfile.get(prof.id) || [] : [],
+        licensures: prof ? licByProfile.get(prof.id) || [] : [],
       };
     });
 
@@ -383,6 +442,13 @@ router.get('/export', async (req, res, next) => {
           }
         }
 
+        const lics: any[] = u.licensures || [];
+        const isLetPasser = lics.some((l: any) => {
+          const t = (l.exam_title || '').toLowerCase();
+          return t.includes('let') || t.includes('teacher');
+        });
+        const licSummary = lics.map((l: any) => `${l.exam_title}${l.year_passed ? ` (${l.year_passed})` : ''}`).join('; ');
+
         const isEmailValid = emailRegex.test(String(u.email || '').trim());
         return {
           'Email Address': u.email || '',
@@ -393,6 +459,8 @@ router.get('/export', async (req, res, next) => {
           'Graduation Year': ed.year_graduated || '',
           'Graduate Status': isStudent ? 'Student' : (ed.year_graduated ? 'Alumni' : 'Unverified'),
           'Employment Status': derivedStatus,
+          'PRC Licensures': licSummary || 'None',
+          'LET Passer': isLetPasser ? 'Yes' : (lics.length > 0 ? 'No' : 'None'),
           'Current Position': emp?.position || '',
           'Current Company': emp?.company_name || '',
           'Industry': emp ? (normalizeIndustry(emp.company_industry) || emp.company_industry || '') : '',
@@ -547,10 +615,12 @@ router.get('/:id', async (req, res, next) => {
 
     const profileId = profile?.id || req.params.id;
 
-    const [educationRes, employmentRes, skillsRes] = await Promise.all([
+    const [educationRes, employmentRes, skillsRes, licensuresRes, postgradRes] = await Promise.all([
       supabase.from('education').select('*').eq('profile_id', profileId),
       supabase.from('employment').select('*').eq('profile_id', profileId),
       supabase.from('skills').select('*').eq('profile_id', profileId),
+      supabase.from('alumni_licensures').select('*').or(`profile_id.eq.${profileId},user_id.eq.${req.params.id}`).order('year_passed', { ascending: false }),
+      supabase.from('alumni_postgraduate').select('*').or(`profile_id.eq.${profileId},user_id.eq.${req.params.id}`).order('start_year', { ascending: false }),
     ]);
 
     res.json({
@@ -559,6 +629,8 @@ router.get('/:id', async (req, res, next) => {
       education: educationRes.data || [],
       employment: employmentRes.data || [],
       skills: skillsRes.data || [],
+      licensures: (licensuresRes as any)?.error ? [] : ((licensuresRes as any)?.data || []),
+      postgraduate: (postgradRes as any)?.error ? [] : ((postgradRes as any)?.data || []),
     });
   } catch (err) {
     next(err);

@@ -3,9 +3,11 @@ import { adminApi } from '@/services/api';
 import { getCached, buildQueryEndpoint } from '@/utils/apiCache';
 import { SkeletonModalDetail } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/store/uiStore';
+import { useAuthStore } from '@/store/authStore';
 import { generateYears } from '@/utils/helpers';
 import { formatExperienceFromDate } from '@/utils/formatExperience';
 import { formatJobSalaryDisplay } from '@/utils/currencies';
+import BulkImportEligibleModal from '@/components/admin/BulkImportEligibleModal';
 
 const isOjtEmploymentRow = (emp: any): boolean =>
   String(emp?.record_category || '').toLowerCase() === 'ojt' ||
@@ -15,11 +17,14 @@ import {
   UserIcon,
   UserPlusIcon,
   CheckBadgeIcon,
+  CheckCircleIcon,
   XMarkIcon,
   KeyIcon,
   EyeIcon,
   EyeSlashIcon,
   PencilSquareIcon,
+  ArrowUpTrayIcon,
+  DocumentArrowDownIcon,
 } from '@heroicons/react/24/outline';
 
 export default function AlumniManagement() {
@@ -36,18 +41,21 @@ export default function AlumniManagement() {
   const [locationCities, setLocationCities] = useState<Array<{ city: string; province: string }>>(initialAlumniRes?.locationCities ?? []);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ course: '', year: '', employment_status: '', employer: '', province: '', city: '', archived: 'false' });
+  const [filters, setFilters] = useState({ course: '', year: '', employment_status: '', employer: '', province: '', city: '', archived: 'false', licensure: '' });
   const [selected, setSelected] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [detailData, setDetailData] = useState<any>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const { user } = useAuthStore();
   const [editingDetail, setEditingDetail] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [savingDetail, setSavingDetail] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '', idNumber: '', program: '', yearGraduated: '' });
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'registered' | 'eligible' | 'deleted'>('registered');
+  const initialTab = new URLSearchParams(window.location.search).get('tab') === 'eligible' || user?.role === 'registrar' ? 'eligible' : 'registered';
+  const [tab, setTab] = useState<'registered' | 'eligible' | 'deleted'>(initialTab);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [deletedAlumni, setDeletedAlumni] = useState<any[]>([]);
   const [loadingDeleted, setLoadingDeleted] = useState(false);
   const [deletedMigrationRequired, setDeletedMigrationRequired] = useState(false);
@@ -547,21 +555,47 @@ export default function AlumniManagement() {
         <div data-tour="alumni-top-actions" className="flex flex-wrap gap-2">
           {tab === 'registered' && <button onClick={handleExport} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Export CSV</button>}
           {tab === 'registered' && <button onClick={handleExportProofs} className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Export Employment Proofs</button>}
-          <button onClick={() => { setShowForm(true); setError(''); }} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Add Alumni</button>
+          {tab === 'eligible' && (
+            <>
+              <a
+                href="/api/admin/eligible-alumni/template"
+                download="ctu_naga_eligible_alumni_template.csv"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 shadow-2xs"
+              >
+                <DocumentArrowDownIcon className="w-4 h-4 text-gray-500" />
+                <span>CSV Template</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowBulkImport(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-orange-600 text-white rounded-lg hover:bg-orange-700 shadow-2xs cursor-pointer"
+              >
+                <ArrowUpTrayIcon className="w-4 h-4" />
+                <span>Bulk Import (CSV/Excel)</span>
+              </button>
+            </>
+          )}
+          {user?.role !== 'registrar' && (
+            <button onClick={() => { setShowForm(true); setError(''); }} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Add Alumni</button>
+          )}
           <button onClick={openEligibleForm} className="px-3 py-1.5 text-xs font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600">+ Eligible Alumni</button>
         </div>
       </div>
 
       <div data-tour="alumni-tabs" className="flex gap-1 mb-3 flex-wrap">
-        <button onClick={() => { setTab('registered'); setPage(1); }} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'registered' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
-          Registered
-        </button>
+        {user?.role !== 'registrar' && (
+          <button onClick={() => { setTab('registered'); setPage(1); }} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'registered' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
+            Registered
+          </button>
+        )}
         <button onClick={() => { setTab('eligible'); setEligPage(1); }} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'eligible' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
           Eligible / Unclaimed
         </button>
-        <button onClick={() => setTab('deleted')} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'deleted' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
-          Deleted / Trash
-        </button>
+        {user?.role !== 'registrar' && (
+          <button onClick={() => setTab('deleted')} className={`px-3 py-1 text-xs rounded-full font-medium ${tab === 'deleted' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
+            Deleted / Trash
+          </button>
+        )}
       </div>
 
       <div data-tour="alumni-search-filter" className="flex flex-wrap gap-2 mb-3">
@@ -621,6 +655,21 @@ export default function AlumniManagement() {
               <option key={city} value={city}>{city}</option>
             ))}
         </select>
+        <select
+          value={filters.licensure}
+          onChange={(e) => {
+            setFilters((f) => ({ ...f, licensure: e.target.value }));
+            setPage(1);
+          }}
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400 bg-white"
+          title="Filter by PRC Board Examination / LET passer status"
+        >
+          <option value="">All Licensure Status</option>
+          <option value="let">LET Passers Only (Teachers)</option>
+          <option value="prc">All PRC Board Passers</option>
+          <option value="cpa">CPA Passers</option>
+          <option value="none">Non-Licensed</option>
+        </select>
         <select value={filters.archived} onChange={(e) => { setFilters((f) => ({ ...f, archived: e.target.value })); setPage(1); }}
           className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400">
           <option value="">All</option>
@@ -667,6 +716,12 @@ export default function AlumniManagement() {
               const p = user.profile || {};
               const emp = (p.employment || []).find((e: any) => !isOjtEmploymentRow(e)) || {};
               const edu = (p.education || [])[0] || {};
+              const lics: any[] = user.licensures || p.licensures || [];
+              const letExam = lics.find((l: any) => {
+                const t = (l.exam_title || '').toLowerCase();
+                return t.includes('let') || t.includes('teacher');
+              });
+              const anyPrc = lics.find((l: any) => (l.status || 'passed').toLowerCase() === 'passed');
               const initials = ((p.first_name?.[0] || '') + (p.last_name?.[0] || '')).toUpperCase();
   return (
                 <div key={user.id} className="bg-white border border-gray-200 hover:shadow-md transition-shadow flex flex-col">
@@ -678,6 +733,27 @@ export default function AlumniManagement() {
                         <span className="text-2xl font-bold text-orange-400">{initials}</span>
                       )}
                     </div>
+                    {(letExam || anyPrc) && (
+                      <div className="absolute top-1.5 left-1.5">
+                        {letExam ? (
+                          <span
+                            className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-emerald-600 text-white shadow-xs flex items-center gap-0.5"
+                            title={`Passed: ${letExam.exam_title} (${letExam.year_passed})`}
+                          >
+                            <CheckCircleIcon className="w-2.5 h-2.5" />
+                            <span>LET Passer</span>
+                          </span>
+                        ) : (
+                          <span
+                            className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-blue-600 text-white shadow-xs flex items-center gap-0.5"
+                            title={`Passed: ${anyPrc.exam_title} (${anyPrc.year_passed})`}
+                          >
+                            <CheckCircleIcon className="w-2.5 h-2.5" />
+                            <span>PRC Licensed</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="absolute top-1.5 right-1.5">
                       <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${statusBadge(emp?.employment_status || p.employment_status)}`}>
                         {normalizeStatus(emp?.employment_status || p.employment_status) || 'Unemployed'}
@@ -690,6 +766,17 @@ export default function AlumniManagement() {
                       <p><span className="text-gray-400">ID:</span> {p.id_number || '---'}</p>
                       <p><span className="text-gray-400">Course:</span> {edu?.program ? courseShort(edu.program) : '---'}</p>
                       <p><span className="text-gray-400">Batch:</span> {edu?.year_graduated || '---'}</p>
+                      {letExam ? (
+                        <p className="truncate">
+                          <span className="text-gray-400">Licensure:</span>{' '}
+                          <span className="text-emerald-700 font-semibold">LET Passer ({letExam.year_passed})</span>
+                        </p>
+                      ) : anyPrc ? (
+                        <p className="truncate">
+                          <span className="text-gray-400">Licensure:</span>{' '}
+                          <span className="text-blue-700 font-semibold">{anyPrc.exam_title}</span>
+                        </p>
+                      ) : null}
                       <p><span className="text-gray-400">Employer:</span> {emp?.company_name || p.company_name || '---'}</p>
                       <p className="truncate"><span className="text-gray-400">Email:</span> {user.email}</p>
                     </div>
@@ -1527,6 +1614,73 @@ export default function AlumniManagement() {
                     </div>
                   )}
 
+                  {/* PRC Board Examinations & Licensures */}
+                  {detailData.licensures?.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          PRC Board Examinations &amp; Licensures
+                        </h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Accreditation Verified
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {detailData.licensures.map((lic: any, i: number) => {
+                          const isLet = (lic.exam_title || '').toLowerCase().includes('let') || (lic.exam_title || '').toLowerCase().includes('teacher');
+                          return (
+                            <div key={lic.id || i} className="text-xs bg-gray-50 border border-gray-100 rounded-lg p-2.5 space-y-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isLet ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>
+                                  {isLet ? 'LET Passer' : 'PRC Licensed'}
+                                </span>
+                                <span className="text-[10px] text-gray-500 font-medium">Passed: {lic.year_passed || '---'}</span>
+                              </div>
+                              <p className="font-semibold text-gray-900 leading-snug">{lic.exam_title}</p>
+                              <div className="flex items-center gap-3 text-[11px] text-gray-500 pt-0.5">
+                                {lic.rating && <span>Rating: <strong className="text-gray-800 font-medium">{lic.rating}%</strong></span>}
+                                {lic.license_number && <span>License #: <strong className="text-gray-800 font-medium">{lic.license_number}</strong></span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Postgraduate & Advanced Studies */}
+                  {detailData.postgraduate?.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Postgraduate &amp; Advanced Studies
+                        </h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                          Advanced Degree
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {detailData.postgraduate.map((pg: any, i: number) => (
+                          <div key={pg.id || i} className="text-xs bg-purple-50/50 border border-purple-100 rounded-lg p-2.5 space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 uppercase">
+                                {pg.degree_level === 'masteral' ? "Master's Degree" : pg.degree_level === 'doctoral' ? 'Doctorate / Ph.D.' : 'Postgrad Diploma'}
+                              </span>
+                              <span className="text-[10px] font-medium text-purple-700 capitalize">
+                                {pg.status === 'graduated' ? '✓ Conferred' : pg.status === 'candidate' ? 'Candidate' : 'Enrolled'}
+                              </span>
+                            </div>
+                            <p className="font-semibold text-gray-900">{pg.program_title}</p>
+                            <p className="text-[11px] text-gray-600">{pg.institution}</p>
+                            {pg.thesis_title && (
+                              <p className="text-[10px] text-gray-500 italic pt-0.5">Thesis: {pg.thesis_title}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Skills */}
                   {detailData.skills?.length > 0 && (
                     <div className="mb-4">
@@ -1862,6 +2016,14 @@ export default function AlumniManagement() {
           </div>
         </div>
       )}
+
+      <BulkImportEligibleModal
+        isOpen={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        onSuccess={() => {
+          loadEligible();
+        }}
+      />
     </div>
   );
 }

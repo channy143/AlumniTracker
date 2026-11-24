@@ -250,7 +250,9 @@ router.get('/', authenticate, async (req, res, next) => {
       companiesRes,
       employersTableRes,
       surveysRes,
-      eligibleRes
+      eligibleRes,
+      licensuresRes,
+      postgradRes
     ] = await Promise.all([
       supabase.from('employment').select('profile_id, company_name, position, company_industry, employment_status, record_category, start_date, end_date, is_current, salary_range, job_type').order('start_date', { ascending: false }),
       supabase.from('education').select('profile_id, program, year_graduated, major'),
@@ -263,7 +265,12 @@ router.get('/', authenticate, async (req, res, next) => {
       supabase.from('employers').select('id, company_name, industry'),
       supabase.from('survey_responses').select('id, survey_id, user_id, responses, submitted_at'),
       supabase.from('alumni_eligible').select('id, student_id, first_name, last_name, program, year_graduated, graduation_date, birth_date, user_id'),
+      supabase.from('alumni_licensures').select('*'),
+      supabase.from('alumni_postgraduate').select('*'),
     ]);
+
+    const licensures = licensuresRes.data || [];
+    const postgraduate = postgradRes.data || [];
 
     const employment = (employmentRes.data || []).filter(isValidRegularEmployment);
     const education = educationRes.data || [];
@@ -289,14 +296,14 @@ router.get('/', authenticate, async (req, res, next) => {
 
     const courseProfileIds = (course || batchQuery)
       ? new Set(
-          education
-            .filter((e: any) => {
-              const matchProg = !course || e.program === course || formatProgramLongName(e.program) === course;
-              const matchBatch = !batchQuery || e.year_graduated === batchQuery;
-              return matchProg && matchBatch;
-            })
-            .map((e: any) => e.profile_id)
-        )
+        education
+          .filter((e: any) => {
+            const matchProg = !course || e.program === course || formatProgramLongName(e.program) === course;
+            const matchBatch = !batchQuery || e.year_graduated === batchQuery;
+            return matchProg && matchBatch;
+          })
+          .map((e: any) => e.profile_id)
+      )
       : null;
 
     const educationFiltered = courseProfileIds
@@ -311,6 +318,12 @@ router.get('/', authenticate, async (req, res, next) => {
     const skillsFiltered = courseProfileIds
       ? skills.filter((s: any) => courseProfileIds.has(s.profile_id))
       : skills;
+    const licensuresFiltered = courseProfileIds
+      ? licensures.filter((l: any) => courseProfileIds.has(l.profile_id))
+      : licensures;
+    const postgradFiltered = courseProfileIds
+      ? postgraduate.filter((pg: any) => courseProfileIds.has(pg.profile_id))
+      : postgraduate;
 
     const totalAlumni = profilesFiltered.length;
 
@@ -868,7 +881,7 @@ router.get('/', authenticate, async (req, res, next) => {
       const rawPositionTitle = currentEmp?.position || p.current_job_title || survey?.position || (isEmployed ? 'Professional / Associate' : 'Seeking Opportunities');
       const positionTitle = canonicalizeJobTitle(rawPositionTitle);
       const company = currentEmp?.company_name || p.company_name || survey?.company_name || (isEmployed ? 'Partner Employer' : '—');
-      
+
       const normComp = company.trim().toLowerCase();
       let companyAddr = companyAddressMap.get(normComp);
       if (!companyAddr) {
@@ -1026,6 +1039,109 @@ router.get('/', authenticate, async (req, res, next) => {
       };
     });
 
+    // -------------------------------------------------------------------------
+    // Institutional Accreditation: PRC Board Licensures & Postgraduate Studies
+    // -------------------------------------------------------------------------
+    const passedLicensures = licensuresFiltered.filter((l: any) => l.status === 'passed');
+    const uniquePasserProfileIds = new Set(passedLicensures.map((l: any) => l.profile_id));
+    const totalPassers = uniquePasserProfileIds.size;
+    const prcPassingRate = totalAlumni > 0 ? Math.round((totalPassers / totalAlumni) * 1000) / 10 : 0;
+
+    const validRatings = passedLicensures
+      .map((l: any) => Number(l.rating))
+      .filter((r: number) => !isNaN(r) && r > 0);
+    const avgBoardRating = validRatings.length > 0
+      ? Math.round((validRatings.reduce((a: number, b: number) => a + b, 0) / validRatings.length) * 10) / 10
+      : null;
+
+    const examTitleCounts: Record<string, { count: number; ratings: number[] }> = {};
+    passedLicensures.forEach((l: any) => {
+      const title = (l.exam_title || 'Other Board Exam').trim();
+      if (!examTitleCounts[title]) examTitleCounts[title] = { count: 0, ratings: [] };
+      examTitleCounts[title].count += 1;
+      if (l.rating && !isNaN(Number(l.rating))) examTitleCounts[title].ratings.push(Number(l.rating));
+    });
+
+    const licensureExamDistribution = Object.entries(examTitleCounts).map(([title, item]) => ({
+      title,
+      count: item.count,
+      percentage: passedLicensures.length > 0 ? Math.round((item.count / passedLicensures.length) * 100) : 0,
+      avgRating: item.ratings.length > 0 ? Math.round((item.ratings.reduce((a, b) => a + b, 0) / item.ratings.length) * 10) / 10 : null,
+    })).sort((a, b) => b.count - a.count);
+
+    const yearPassingCounts: Record<number, number> = {};
+    passedLicensures.forEach((l: any) => {
+      const yr = Number(l.year_passed);
+      if (yr) yearPassingCounts[yr] = (yearPassingCounts[yr] || 0) + 1;
+    });
+    const licensureYearTrend = Object.entries(yearPassingCounts).map(([year, count]) => ({
+      year: Number(year),
+      count,
+    })).sort((a, b) => a.year - b.year);
+
+    // Postgraduate Studies (Master's & Doctorate)
+    const uniquePostgradProfileIds = new Set(postgradFiltered.map((pg: any) => pg.profile_id));
+    const totalPostgrad = uniquePostgradProfileIds.size;
+    const postgradPursuitRate = totalAlumni > 0 ? Math.round((totalPostgrad / totalAlumni) * 1000) / 10 : 0;
+
+    const levelCounts: Record<string, number> = { masteral: 0, doctoral: 0, post_graduate_diploma: 0 };
+    const postgradStatusCounts: Record<string, number> = { enrolled: 0, candidate: 0, graduated: 0 };
+    const instCounts: Record<string, number> = {};
+
+    postgradFiltered.forEach((pg: any) => {
+      if (pg.degree_level && levelCounts[pg.degree_level] !== undefined) levelCounts[pg.degree_level] += 1;
+      if (pg.status && postgradStatusCounts[pg.status] !== undefined) postgradStatusCounts[pg.status] += 1;
+      const inst = (pg.institution || 'Unspecified University').trim();
+      instCounts[inst] = (instCounts[inst] || 0) + 1;
+    });
+
+    const postgradDegreeDistribution = [
+      { level: 'Masteral Degree (MS/MA/MEd)', count: levelCounts.masteral, percentage: postgradFiltered.length > 0 ? Math.round((levelCounts.masteral / postgradFiltered.length) * 100) : 0 },
+      { level: 'Doctoral Degree (Ph.D./Ed.D./DIT)', count: levelCounts.doctoral, percentage: postgradFiltered.length > 0 ? Math.round((levelCounts.doctoral / postgradFiltered.length) * 100) : 0 },
+      { level: 'Post-Graduate Diploma (DPE/PGD)', count: levelCounts.post_graduate_diploma, percentage: postgradFiltered.length > 0 ? Math.round((levelCounts.post_graduate_diploma / postgradFiltered.length) * 100) : 0 },
+    ];
+
+    const postgradStatusDistribution = [
+      { status: 'Currently Enrolled', count: postgradStatusCounts.enrolled, key: 'enrolled' },
+      { status: 'Candidate (CAR Completed)', count: postgradStatusCounts.candidate, key: 'candidate' },
+      { status: 'Graduated / Conferred', count: postgradStatusCounts.graduated, key: 'graduated' },
+    ];
+
+    const topPostgradInstitutions = Object.entries(instCounts).map(([institution, count]) => ({
+      institution,
+      count,
+    })).sort((a, b) => b.count - a.count).slice(0, 5);
+
+    // Combined Accreditation Alumni Roster for SUC Leveling & CHED Audits
+    const accreditationRoster = profilesFiltered.filter((p: any) => {
+      return uniquePasserProfileIds.has(p.id) || uniquePostgradProfileIds.has(p.id);
+    }).map((p: any) => {
+      const pLic = passedLicensures.filter((l: any) => l.profile_id === p.id);
+      const pPg = postgradFiltered.filter((pg: any) => pg.profile_id === p.id);
+      const edu = (eduMap.get(p.id) || [])[0];
+      return {
+        profileId: p.id,
+        name: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        studentId: p.id_number || '—',
+        undergradProgram: edu?.program || '—',
+        undergradBatch: edu?.year || null,
+        licensures: pLic.map((l: any) => ({
+          examTitle: l.exam_title,
+          yearPassed: l.year_passed,
+          rating: l.rating,
+          licenseNumber: l.license_number,
+        })),
+        postgraduate: pPg.map((pg: any) => ({
+          degreeLevel: pg.degree_level,
+          institution: pg.institution,
+          programTitle: pg.program_title,
+          status: pg.status,
+          startYear: pg.start_year,
+          completionYear: pg.completion_year,
+        })),
+      };
+    });
+
     const qproAnalytics = {
       summary: {
         totalAlumniPopulation: profilesFiltered.length,
@@ -1065,6 +1181,32 @@ router.get('/', authenticate, async (req, res, next) => {
         })),
         topEmployersWithLocations,
         alumniRoster,
+      },
+      accreditation: {
+        summary: {
+          totalPassers,
+          prcPassingRate,
+          avgBoardRating,
+          totalPostgrad,
+          postgradPursuitRate,
+          totalDoctoral: levelCounts.doctoral,
+          totalMasteral: levelCounts.masteral,
+        },
+        licensures: {
+          distribution: licensureExamDistribution,
+          passingTrend: licensureYearTrend,
+          totalPassers,
+          prcPassingRate,
+          avgBoardRating,
+        },
+        postgraduate: {
+          degreeLevelDistribution: postgradDegreeDistribution,
+          statusDistribution: postgradStatusDistribution,
+          topInstitutions: topPostgradInstitutions,
+          totalPostgrad,
+          postgradPursuitRate,
+        },
+        accreditationRoster,
       },
     };
 

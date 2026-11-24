@@ -3,7 +3,7 @@ import { Request } from 'express';
 export interface AuthPayload {
   userId: string;
   email: string;
-  role: 'admin' | 'staff' | 'alumni';
+  role: 'admin' | 'staff' | 'alumni' | 'alumni_officer' | 'registrar';
   iat?: number;
   exp?: number;
 }

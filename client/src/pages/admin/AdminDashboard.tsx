@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { adminApi, activitiesApi } from '@/services/api';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/authStore';
 import { formatMonths } from '@/utils/formatExperience';
 import { SkeletonStatCard, SkeletonEventItem, SkeletonActivityItem } from '@/components/ui/Skeleton';
 import { getCached } from '@/utils/apiCache';
@@ -303,6 +304,11 @@ function QuickActionsCarousel({ onActionClick }: { onActionClick?: (route: strin
 }
 
 export default function AdminDashboard() {
+  const { user } = useAuthStore();
+  if (user?.role === 'registrar') {
+    return <Navigate to="/admin/alumni?tab=eligible" replace />;
+  }
+
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [yearDropdownOpen, setYearDropdownOpen] = useState(false);

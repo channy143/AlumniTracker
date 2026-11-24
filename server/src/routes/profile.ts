@@ -18,6 +18,10 @@ import {
   addEducationSchema,
   addCertificationSchema,
   addAchievementSchema,
+  addLicensureSchema,
+  updateLicensureSchema,
+  addPostgraduateSchema,
+  updatePostgraduateSchema,
 } from '../middleware/validationSchemas';
 
 const router = Router();
@@ -107,6 +111,33 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       } catch (backfillErr) {
         console.error('[Profile GET] Onboarding backfill error:', backfillErr);
       }
+    }
+
+    if (profile) {
+      let licensures: any[] = [];
+      let postgraduate: any[] = [];
+      try {
+        const { data: licData } = await db
+          .from('alumni_licensures')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .order('year_passed', { ascending: false });
+        if (licData) licensures = licData;
+      } catch (e) {
+        // Table may not exist yet if migration pending
+      }
+      try {
+        const { data: pgData } = await db
+          .from('alumni_postgraduate')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .order('start_year', { ascending: false });
+        if (pgData) postgraduate = pgData;
+      } catch (e) {
+        // Table may not exist yet if migration pending
+      }
+      profile.licensures = licensures;
+      profile.postgraduate = postgraduate;
     }
 
     res.json(profile);
@@ -815,6 +846,170 @@ router.delete('/achievements/:id', authenticate, async (req: AuthenticatedReques
 
     const { error } = await db
       .from('achievements')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('profile_id', profile.id);
+
+    if (error) throw new AppError(error.message, 500);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// --- Licensures (PRC Board Examinations) ---
+
+router.get('/licensures', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db.from('profiles').select('id').eq('user_id', req.user!.userId).single();
+    if (!profile) throw new AppError('Profile not found', 404);
+
+    const { data: licensures, error } = await db
+      .from('alumni_licensures')
+      .select('*')
+      .eq('profile_id', profile.id)
+      .order('year_passed', { ascending: false });
+
+    if (error && error.code !== '42P01') throw new AppError(error.message, 500);
+    res.json(licensures || []);
+  } catch (err) { next(err); }
+});
+
+router.post('/licensures', authenticate, validate(addLicensureSchema), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db.from('profiles').select('id').eq('user_id', req.user!.userId).single();
+    if (!profile) throw new AppError('Profile not found', 404);
+
+    const { exam_title, license_number, exam_date, year_passed, rating, status } = req.body;
+    const { data: record, error } = await db
+      .from('alumni_licensures')
+      .insert({
+        profile_id: profile.id,
+        user_id: req.user!.userId,
+        exam_title,
+        license_number: license_number || null,
+        exam_date: exam_date || null,
+        year_passed: Number(year_passed),
+        rating: rating !== undefined && rating !== null ? Number(rating) : null,
+        status: status || 'passed',
+      })
+      .select()
+      .single();
+
+    if (error) throw new AppError(error.message, 500);
+    res.json(record);
+  } catch (err) { next(err); }
+});
+
+router.put('/licensures/:id', authenticate, validate(updateLicensureSchema), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db.from('profiles').select('id').eq('user_id', req.user!.userId).single();
+    if (!profile) throw new AppError('Profile not found', 404);
+
+    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    const { error } = await db
+      .from('alumni_licensures')
+      .update(updates)
+      .eq('id', req.params.id)
+      .eq('profile_id', profile.id);
+
+    if (error) throw new AppError(error.message, 500);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/licensures/:id', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db.from('profiles').select('id').eq('user_id', req.user!.userId).single();
+    if (!profile) throw new AppError('Profile not found', 404);
+
+    const { error } = await db
+      .from('alumni_licensures')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('profile_id', profile.id);
+
+    if (error) throw new AppError(error.message, 500);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// --- Postgraduate Studies (Master's & Doctorate) ---
+
+router.get('/postgraduate', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db.from('profiles').select('id').eq('user_id', req.user!.userId).single();
+    if (!profile) throw new AppError('Profile not found', 404);
+
+    const { data: postgrad, error } = await db
+      .from('alumni_postgraduate')
+      .select('*')
+      .eq('profile_id', profile.id)
+      .order('start_year', { ascending: false });
+
+    if (error && error.code !== '42P01') throw new AppError(error.message, 500);
+    res.json(postgrad || []);
+  } catch (err) { next(err); }
+});
+
+router.post('/postgraduate', authenticate, validate(addPostgraduateSchema), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db.from('profiles').select('id').eq('user_id', req.user!.userId).single();
+    if (!profile) throw new AppError('Profile not found', 404);
+
+    const { degree_level, institution, program_title, major, start_year, completion_year, status, thesis_title } = req.body;
+    const { data: record, error } = await db
+      .from('alumni_postgraduate')
+      .insert({
+        profile_id: profile.id,
+        user_id: req.user!.userId,
+        degree_level,
+        institution,
+        program_title,
+        major: major || null,
+        start_year: Number(start_year),
+        completion_year: completion_year ? Number(completion_year) : null,
+        status: status || 'enrolled',
+        thesis_title: thesis_title || null,
+      })
+      .select()
+      .single();
+
+    if (error) throw new AppError(error.message, 500);
+    res.json(record);
+  } catch (err) { next(err); }
+});
+
+router.put('/postgraduate/:id', authenticate, validate(updatePostgraduateSchema), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db.from('profiles').select('id').eq('user_id', req.user!.userId).single();
+    if (!profile) throw new AppError('Profile not found', 404);
+
+    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    const { error } = await db
+      .from('alumni_postgraduate')
+      .update(updates)
+      .eq('id', req.params.id)
+      .eq('profile_id', profile.id);
+
+    if (error) throw new AppError(error.message, 500);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/postgraduate/:id', authenticate, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const db = createUserScopedClient(req.token!);
+    const { data: profile } = await db.from('profiles').select('id').eq('user_id', req.user!.userId).single();
+    if (!profile) throw new AppError('Profile not found', 404);
+
+    const { error } = await db
+      .from('alumni_postgraduate')
       .delete()
       .eq('id', req.params.id)
       .eq('profile_id', profile.id);

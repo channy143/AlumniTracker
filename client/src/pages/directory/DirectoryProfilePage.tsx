@@ -21,6 +21,8 @@ import {
   ChevronDownIcon,
   CheckIcon,
   XMarkIcon,
+  IdentificationIcon,
+  BuildingLibraryIcon,
 } from '@heroicons/react/24/outline';
 import { directoryApi, feedApi, connectionsApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
@@ -104,11 +106,11 @@ export default function DirectoryProfilePage() {
       setProfile((prev: any) =>
         prev
           ? {
-              ...prev,
-              connection_status: 'pending',
-              connection_id: created?.id || prev.id,
-              connection_is_requester: true,
-            }
+            ...prev,
+            connection_status: 'pending',
+            connection_id: created?.id || prev.id,
+            connection_is_requester: true,
+          }
           : prev
       );
     } catch (err: any) {
@@ -127,11 +129,11 @@ export default function DirectoryProfilePage() {
       setProfile((prev: any) =>
         prev
           ? {
-              ...prev,
-              connection_status: null,
-              connection_id: null,
-              connection_is_requester: false,
-            }
+            ...prev,
+            connection_status: null,
+            connection_id: null,
+            connection_is_requester: false,
+          }
           : prev
       );
     } catch (err: any) {
@@ -149,10 +151,10 @@ export default function DirectoryProfilePage() {
       setProfile((prev: any) =>
         prev
           ? {
-              ...prev,
-              connection_status: status === 'accepted' ? 'accepted' : null,
-              connection_id: status === 'accepted' ? prev.connection_id : null,
-            }
+            ...prev,
+            connection_status: status === 'accepted' ? 'accepted' : null,
+            connection_id: status === 'accepted' ? prev.connection_id : null,
+          }
           : prev
       );
     } catch (err: any) {
@@ -188,7 +190,7 @@ export default function DirectoryProfilePage() {
         setProfile(data);
         if (data && !data.is_admin) addRecentlyViewed({ id: data.id, first_name: data.first_name, last_name: data.last_name, avatar_url: data.avatar_url });
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -453,11 +455,10 @@ export default function DirectoryProfilePage() {
             <button
               type="button"
               onClick={() => setActiveTab('overview')}
-              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                activeTab === 'overview'
-                  ? 'bg-orange-500 text-white shadow-xs'
-                  : 'bg-white text-gray-600 hover:text-gray-900 border border-gray-200'
-              }`}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${activeTab === 'overview'
+                ? 'bg-orange-500 text-white shadow-xs'
+                : 'bg-white text-gray-600 hover:text-gray-900 border border-gray-200'
+                }`}
             >
               <BriefcaseIcon className="w-4 h-4" />
               Career & Experience
@@ -465,18 +466,16 @@ export default function DirectoryProfilePage() {
             <button
               type="button"
               onClick={() => setActiveTab('posts')}
-              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                activeTab === 'posts'
-                  ? 'bg-orange-500 text-white shadow-xs'
-                  : 'bg-white text-gray-600 hover:text-gray-900 border border-gray-200'
-              }`}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${activeTab === 'posts'
+                ? 'bg-orange-500 text-white shadow-xs'
+                : 'bg-white text-gray-600 hover:text-gray-900 border border-gray-200'
+                }`}
             >
               <ChatBubbleLeftRightIcon className="w-4 h-4" />
               Alumni Posts
               {posts.length > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  activeTab === 'posts' ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700'
-                }`}>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === 'posts' ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700'
+                  }`}>
                   {posts.length}
                 </span>
               )}
@@ -514,99 +513,99 @@ export default function DirectoryProfilePage() {
           ) : (
             <>
               {/* Career Timeline */}
-          {timeline.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs shrink-0">
-              <SectionTitle icon={ClockIcon} title="Career Timeline" />
-              <div className="space-y-0 mt-3">
-                {timeline.map((emp: any, i: number) => (
-                  <div key={emp.id || i}>
-                    {i > 0 && <TimelineArrow />}
-                    <div className={`flex items-start gap-3.5 p-2.5 rounded-xl transition-colors ${emp.is_current ? 'bg-orange-50/70 border border-orange-100' : 'hover:bg-gray-50'}`}>
-                      <div className="w-12 h-12 rounded-lg bg-orange-100/70 flex flex-col items-center justify-center shrink-0 border border-orange-200/50">
-                        <span className="text-xs font-bold text-orange-700 leading-none">{emp.start_date ? new Date(emp.start_date).getFullYear() : '—'}</span>
-                        {emp.is_current && <span className="text-[8px] font-semibold text-orange-600 uppercase tracking-wider mt-0.5">Current</span>}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-bold text-gray-900 leading-snug">{emp.position}</p>
-                          {emp.is_current && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                              Current Role
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-600 font-medium mt-0.5">
-                          {emp.company_name}{emp.company_industry ? ` · ${emp.company_industry}` : ''}
-                        </p>
-                        {emp.start_date && (
-                          <p className="text-[11px] text-gray-400 mt-1">
-                            {new Date(emp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                            {emp.end_date ? ` — ${new Date(emp.end_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : ' — Present'}
-                          </p>
-                        )}
-                        {emp.description && <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">{emp.description}</p>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Employment History - stretches to align with Skills card */}
-          {profile.employment?.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs lg:flex-1 flex flex-col">
-              <SectionTitle icon={BuildingOfficeIcon} title="Employment History" />
-              <div className="overflow-x-auto mt-2 flex-1">
-                {(() => {
-                  const isOwnProfile = Boolean(currentUser?.id && (currentUser.id === profile?.user_id || currentUser.id === profile?.id));
-                  const showSalaryColumn = (isOwnProfile || profile.privacy_settings?.show_salary !== false) && profile.employment.some((e: any) => Boolean(e.salary_range));
-                  return (
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-gray-100 text-gray-400 uppercase tracking-wider text-[10px]">
-                          <th className="text-left py-2.5 pr-3 font-semibold">Industry</th>
-                          <th className="text-left py-2.5 pr-3 font-semibold">Company</th>
-                          <th className="text-left py-2.5 pr-3 font-semibold">Position</th>
-                          <th className="text-left py-2.5 pr-3 font-semibold">Type</th>
-                          {showSalaryColumn && <th className="text-left py-2.5 pr-3 font-semibold">Salary</th>}
-                          <th className="text-left py-2.5 pr-3 font-semibold">Started</th>
-                          <th className="text-left py-2.5 font-semibold">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {profile.employment.map((emp: any, i: number) => (
-                          <tr key={i} className="hover:bg-gray-50/70 transition-colors">
-                            <td className="py-2.5 pr-3 text-gray-600">{emp.company_industry || '—'}</td>
-                            <td className="py-2.5 pr-3 font-semibold text-gray-800">{emp.company_name}</td>
-                            <td className="py-2.5 pr-3 font-medium text-gray-700">{emp.position}</td>
-                            <td className="py-2.5 pr-3 text-gray-600">
-                              <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase">
-                                {emp.job_type || '—'}
-                              </span>
-                            </td>
-                            {showSalaryColumn && (
-                              <td className="py-2.5 pr-3 text-gray-500 font-medium">
-                                {formatJobSalaryDisplay(emp.salary_range) || '—'}
-                              </td>
-                            )}
-                            <td className="py-2.5 pr-3 text-gray-500">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}</td>
-                            <td className="py-2.5">
-                              {emp.is_current ? (
-                                <span className="text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full text-[10px] font-semibold">Current</span>
-                              ) : (
-                                <span className="text-gray-400 text-[10px]">Past</span>
+              {timeline.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs shrink-0">
+                  <SectionTitle icon={ClockIcon} title="Career Timeline" />
+                  <div className="space-y-0 mt-3">
+                    {timeline.map((emp: any, i: number) => (
+                      <div key={emp.id || i}>
+                        {i > 0 && <TimelineArrow />}
+                        <div className={`flex items-start gap-3.5 p-2.5 rounded-xl transition-colors ${emp.is_current ? 'bg-orange-50/70 border border-orange-100' : 'hover:bg-gray-50'}`}>
+                          <div className="w-12 h-12 rounded-lg bg-orange-100/70 flex flex-col items-center justify-center shrink-0 border border-orange-200/50">
+                            <span className="text-xs font-bold text-orange-700 leading-none">{emp.start_date ? new Date(emp.start_date).getFullYear() : '—'}</span>
+                            {emp.is_current && <span className="text-[8px] font-semibold text-orange-600 uppercase tracking-wider mt-0.5">Current</span>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-bold text-gray-900 leading-snug">{emp.position}</p>
+                              {emp.is_current && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                  Current Role
+                                </span>
                               )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
+                            </div>
+                            <p className="text-xs text-gray-600 font-medium mt-0.5">
+                              {emp.company_name}{emp.company_industry ? ` · ${emp.company_industry}` : ''}
+                            </p>
+                            {emp.start_date && (
+                              <p className="text-[11px] text-gray-400 mt-1">
+                                {new Date(emp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                {emp.end_date ? ` — ${new Date(emp.end_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : ' — Present'}
+                              </p>
+                            )}
+                            {emp.description && <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">{emp.description}</p>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Employment History - stretches to align with Skills card */}
+              {profile.employment?.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs lg:flex-1 flex flex-col">
+                  <SectionTitle icon={BuildingOfficeIcon} title="Employment History" />
+                  <div className="overflow-x-auto mt-2 flex-1">
+                    {(() => {
+                      const isOwnProfile = Boolean(currentUser?.id && (currentUser.id === profile?.user_id || currentUser.id === profile?.id));
+                      const showSalaryColumn = (isOwnProfile || profile.privacy_settings?.show_salary !== false) && profile.employment.some((e: any) => Boolean(e.salary_range));
+                      return (
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-gray-100 text-gray-400 uppercase tracking-wider text-[10px]">
+                              <th className="text-left py-2.5 pr-3 font-semibold">Industry</th>
+                              <th className="text-left py-2.5 pr-3 font-semibold">Company</th>
+                              <th className="text-left py-2.5 pr-3 font-semibold">Position</th>
+                              <th className="text-left py-2.5 pr-3 font-semibold">Type</th>
+                              {showSalaryColumn && <th className="text-left py-2.5 pr-3 font-semibold">Salary</th>}
+                              <th className="text-left py-2.5 pr-3 font-semibold">Started</th>
+                              <th className="text-left py-2.5 font-semibold">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {profile.employment.map((emp: any, i: number) => (
+                              <tr key={i} className="hover:bg-gray-50/70 transition-colors">
+                                <td className="py-2.5 pr-3 text-gray-600">{emp.company_industry || '—'}</td>
+                                <td className="py-2.5 pr-3 font-semibold text-gray-800">{emp.company_name}</td>
+                                <td className="py-2.5 pr-3 font-medium text-gray-700">{emp.position}</td>
+                                <td className="py-2.5 pr-3 text-gray-600">
+                                  <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-medium uppercase">
+                                    {emp.job_type || '—'}
+                                  </span>
+                                </td>
+                                {showSalaryColumn && (
+                                  <td className="py-2.5 pr-3 text-gray-500 font-medium">
+                                    {formatJobSalaryDisplay(emp.salary_range) || '—'}
+                                  </td>
+                                )}
+                                <td className="py-2.5 pr-3 text-gray-500">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}</td>
+                                <td className="py-2.5">
+                                  {emp.is_current ? (
+                                    <span className="text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full text-[10px] font-semibold">Current</span>
+                                  ) : (
+                                    <span className="text-gray-400 text-[10px]">Past</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -644,6 +643,73 @@ export default function DirectoryProfilePage() {
                         {edu.year_graduated && <span className="bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded font-medium">Class of {edu.year_graduated}</span>}
                         {edu.honors && <span className="text-amber-600 font-semibold">• {edu.honors}</span>}
                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Postgraduate & Advanced Studies */}
+          {profile.postgraduate?.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs shrink-0">
+              <SectionTitle icon={BuildingLibraryIcon} title="Postgraduate & Advanced Studies" />
+              <div className="space-y-3 mt-2">
+                {profile.postgraduate.map((pg: any, i: number) => (
+                  <div key={i} className="flex items-start gap-3 border-b border-gray-50 pb-2.5 last:border-0 last:pb-0">
+                    <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <BuildingLibraryIcon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-xs font-bold text-gray-900 leading-snug">{pg.program_title}</p>
+                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-semibold border ${
+                          pg.status === 'graduated'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : pg.status === 'candidate'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}>
+                          {pg.status === 'graduated' ? 'Graduated' : pg.status === 'candidate' ? 'Candidate (CAR)' : 'Enrolled'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-600">{pg.institution}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {pg.start_year}{pg.completion_year ? ` – ${pg.completion_year}` : ' – Present'}
+                        {pg.thesis_title && ` · "${pg.thesis_title}"`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* PRC Board Licensures */}
+          {profile.licensures?.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-xs shrink-0">
+              <SectionTitle icon={IdentificationIcon} title="PRC Board Licensures & Credentials" />
+              <div className="space-y-2.5 mt-2">
+                {profile.licensures.map((lic: any, i: number) => (
+                  <div key={i} className="flex items-start gap-3 border border-emerald-100 rounded-lg p-2.5 bg-emerald-50/20">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <CheckBadgeIcon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-xs font-bold text-gray-900">{lic.exam_title}</p>
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800">
+                          Passed {lic.year_passed}
+                        </span>
+                        {lic.rating && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800">
+                            Rating: {lic.rating}%
+                          </span>
+                        )}
+                      </div>
+                      {lic.license_number && (
+                        <p className="text-[10px] text-gray-500 mt-0.5">PRC License: <strong className="font-mono text-gray-700">{lic.license_number}</strong></p>
+                      )}
                     </div>
                   </div>
                 ))}

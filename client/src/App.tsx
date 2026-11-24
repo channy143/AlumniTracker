@@ -60,7 +60,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/auth/login" replace />;
-  if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  if (['admin', 'staff', 'alumni_officer'].includes(user.role)) return <Navigate to="/admin" replace />;
+  if (user.role === 'registrar') return <Navigate to="/admin/alumni?tab=eligible" replace />;
   if (user.role === 'alumni' && user.survey_completed === false) {
     return <Navigate to="/survey/onboarding" replace />;
   }
@@ -77,7 +78,8 @@ function OnboardingRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/auth/login" replace />;
-  if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  if (['admin', 'staff', 'alumni_officer'].includes(user.role)) return <Navigate to="/admin" replace />;
+  if (user.role === 'registrar') return <Navigate to="/admin/alumni?tab=eligible" replace />;
   if (user.survey_completed) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
@@ -92,7 +94,21 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/auth/login" replace />;
-  if (user.role !== 'admin') return <Navigate to="/" replace />;
+  if (!['admin', 'staff', 'alumni_officer', 'registrar'].includes(user.role)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+function SuperAdminRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuthStore();
+  if (user?.role !== 'admin') return <Navigate to="/admin" replace />;
+  return <>{children}</>;
+}
+
+function RegistrarRestrictedRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuthStore();
+  if (user?.role === 'registrar') {
+    return <Navigate to="/admin/alumni?tab=eligible" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -106,7 +122,8 @@ function IndexRoute() {
     );
   }
   if (!user) return <LandingPage />;
-  if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  if (['admin', 'staff', 'alumni_officer'].includes(user.role)) return <Navigate to="/admin" replace />;
+  if (user.role === 'registrar') return <Navigate to="/admin/alumni?tab=eligible" replace />;
   if (user.role === 'alumni' && user.survey_completed === false) {
     return <Navigate to="/survey/onboarding" replace />;
   }
@@ -181,23 +198,23 @@ export default function App() {
           </AdminRoute>
         }
       >
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin" element={<RegistrarRestrictedRoute><AdminDashboard /></RegistrarRestrictedRoute>} />
         <Route path="/admin/alumni" element={<AlumniManagement />} />
-        <Route path="/admin/ojt" element={<OjtManagement />} />
-        <Route path="/admin/companies" element={<CompanyManagement />} />
-        <Route path="/admin/jobs" element={<JobManagement />} />
-        <Route path="/admin/surveys" element={<GraduateTracerSurveys />} />
-        <Route path="/admin/announcements" element={<AnnouncementManagement />} />
-        <Route path="/admin/events" element={<AdminEvents />} />
-        <Route path="/admin/analytics" element={<CareerAnalytics />} />
+        <Route path="/admin/ojt" element={<RegistrarRestrictedRoute><OjtManagement /></RegistrarRestrictedRoute>} />
+        <Route path="/admin/companies" element={<RegistrarRestrictedRoute><CompanyManagement /></RegistrarRestrictedRoute>} />
+        <Route path="/admin/jobs" element={<RegistrarRestrictedRoute><JobManagement /></RegistrarRestrictedRoute>} />
+        <Route path="/admin/surveys" element={<RegistrarRestrictedRoute><GraduateTracerSurveys /></RegistrarRestrictedRoute>} />
+        <Route path="/admin/announcements" element={<RegistrarRestrictedRoute><AnnouncementManagement /></RegistrarRestrictedRoute>} />
+        <Route path="/admin/events" element={<RegistrarRestrictedRoute><AdminEvents /></RegistrarRestrictedRoute>} />
+        <Route path="/admin/analytics" element={<RegistrarRestrictedRoute><CareerAnalytics /></RegistrarRestrictedRoute>} />
         <Route path="/admin/accreditation" element={<Navigate to="/admin/analytics?tab=qpro" replace />} />
-        <Route path="/admin/curriculum" element={<CurriculumInsights />} />
-        <Route path="/admin/employers" element={<EmployerInsights />} />
-        <Route path="/admin/employers/:name" element={<EmployerDetail />} />
-        <Route path="/admin/employer-dashboard" element={<EmployerDashboard />} />
+        <Route path="/admin/curriculum" element={<RegistrarRestrictedRoute><CurriculumInsights /></RegistrarRestrictedRoute>} />
+        <Route path="/admin/employers" element={<RegistrarRestrictedRoute><EmployerInsights /></RegistrarRestrictedRoute>} />
+        <Route path="/admin/employers/:name" element={<RegistrarRestrictedRoute><EmployerDetail /></RegistrarRestrictedRoute>} />
+        <Route path="/admin/employer-dashboard" element={<RegistrarRestrictedRoute><EmployerDashboard /></RegistrarRestrictedRoute>} />
         <Route path="/admin/reports" element={<ReportsPage />} />
-        <Route path="/admin/settings" element={<SystemSettings />} />
-        <Route path="/admin/activity" element={<AdminActivity />} />
+        <Route path="/admin/settings" element={<SuperAdminRoute><SystemSettings /></SuperAdminRoute>} />
+        <Route path="/admin/activity" element={<SuperAdminRoute><AdminActivity /></SuperAdminRoute>} />
         <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>

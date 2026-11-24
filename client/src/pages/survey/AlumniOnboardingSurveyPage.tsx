@@ -179,6 +179,9 @@ export default function AlumniOnboardingSurveyPage() {
     honors: cachedProf?.honors && cachedProf.honors !== 'None' ? cachedProf.honors : '',
     licensureStatus: 'Not Applicable',
     licensureExamName: '',
+    licensureYearPassed: '',
+    licensureRating: '',
+    licensureNumber: '',
     reasonsForEnrolling: [] as string[],
   });
 
@@ -384,10 +387,22 @@ export default function AlumniOnboardingSurveyPage() {
       }
       if (academicInfo.licensureStatus === 'Passed') {
         if (!academicInfo.licensureExamName.trim()) {
-          return 'Please specify your Board / Licensure Exam or Title.';
+          return 'Please specify your Board / Licensure Exam or Title (e.g. LET Secondary, CPA, etc.).';
         }
         if (isEvasiveInput(academicInfo.licensureExamName)) {
           return 'Please provide your actual Exam / License Title (evasive answers like "secret" are not accepted).';
+        }
+        if (academicInfo.licensureYearPassed.trim()) {
+          const passYr = parseInt(academicInfo.licensureYearPassed.trim(), 10);
+          if (isNaN(passYr) || passYr < 1970 || passYr > new Date().getFullYear() + 1) {
+            return 'Please enter a valid examination passing year.';
+          }
+        }
+        if (academicInfo.licensureRating.trim()) {
+          const rate = parseFloat(academicInfo.licensureRating.trim());
+          if (isNaN(rate) || rate < 50 || rate > 100) {
+            return 'Please enter a valid board rating percentage between 50.00% and 100.00%.';
+          }
         }
       } else if (academicInfo.licensureExamName.trim() && isEvasiveInput(academicInfo.licensureExamName)) {
         return 'Please enter a valid Exam / License Title or leave it blank.';
@@ -1138,34 +1153,146 @@ export default function AlumniOnboardingSurveyPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Professional Licensure / Board Exam <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                  <div className="rounded-xl border border-orange-100 bg-orange-50/40 p-3 sm:p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-gray-800 flex items-center gap-1.5">
+                        <span>Professional Licensure &amp; Board Examinations</span>
+                        <span className="text-gray-400 font-normal text-[11px]">(Institutional Accreditation)</span>
                       </label>
-                      <select
-                        value={academicInfo.licensureStatus}
-                        onChange={(e) => setAcademicInfo((a) => ({ ...a, licensureStatus: e.target.value }))}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
-                      >
-                        <option value="Passed">Passed (PRC Licensed / CSC Eligible)</option>
-                        <option value="Scheduled / Reviewing">Scheduled / Currently Reviewing</option>
-                        <option value="Planning to take">Planning to take in the future</option>
-                        <option value="Not Applicable">Not Applicable</option>
-                      </select>
+                      {academicInfo.licensureStatus === 'Passed' && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
+                          PRC / Board Passer
+                        </span>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Exam / License Title {academicInfo.licensureStatus === 'Passed' ? <span className="text-red-500 font-bold ml-0.5">*</span> : <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. LET, REE, ME, CSC Prof."
-                        value={academicInfo.licensureExamName}
-                        onChange={(e) => setAcademicInfo((a) => ({ ...a, licensureExamName: e.target.value }))}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Licensure / Exam Status <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                        </label>
+                        <select
+                          value={academicInfo.licensureStatus}
+                          onChange={(e) => setAcademicInfo((a) => ({ ...a, licensureStatus: e.target.value }))}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                        >
+                          <option value="Passed">Passed (PRC Licensed / LET / CSC Eligible)</option>
+                          <option value="Scheduled / Reviewing">Scheduled / Currently Reviewing</option>
+                          <option value="Planning to take">Planning to take in the future</option>
+                          <option value="Not Applicable">Not Applicable</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Exam / License Title {academicInfo.licensureStatus === 'Passed' ? <span className="text-red-500 font-bold ml-0.5">*</span> : <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>}
+                        </label>
+                        <input
+                          type="text"
+                          list="survey-licensure-options"
+                          placeholder="e.g. LET Secondary, LET Elementary, CPA, REE"
+                          value={academicInfo.licensureExamName}
+                          onChange={(e) => setAcademicInfo((a) => ({ ...a, licensureExamName: e.target.value }))}
+                          className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                        />
+                        <datalist id="survey-licensure-options">
+                          <option value="Licensure Examination for Teachers (LET) - Secondary" />
+                          <option value="Licensure Examination for Teachers (LET) - Elementary" />
+                          <option value="Certified Public Accountant (CPA) Licensure Examination" />
+                          <option value="Civil Service Examination (CSE) - Professional" />
+                          <option value="Registered Master Electrician (RME)" />
+                          <option value="Registered Electrical Engineer (REE)" />
+                          <option value="Mechanical Engineer (ME) Licensure Examination" />
+                          <option value="Criminologist Licensure Examination (CLE)" />
+                        </datalist>
+                      </div>
                     </div>
+
+                    {academicInfo.licensureStatus === 'Passed' && (
+                      <>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          <span className="text-[11px] text-gray-500 self-center mr-1">Quick Select:</span>
+                          {[
+                            'LET Secondary',
+                            'LET Elementary',
+                            'Civil Service (Prof)',
+                            'CPA Exam',
+                            'REE',
+                            'RME',
+                          ].map((chip) => {
+                            const fullTitle =
+                              chip === 'LET Secondary'
+                                ? 'Licensure Examination for Teachers (LET) - Secondary'
+                                : chip === 'LET Elementary'
+                                ? 'Licensure Examination for Teachers (LET) - Elementary'
+                                : chip === 'Civil Service (Prof)'
+                                ? 'Civil Service Examination (CSE) - Professional'
+                                : chip === 'CPA Exam'
+                                ? 'Certified Public Accountant (CPA) Licensure Examination'
+                                : chip === 'REE'
+                                ? 'Registered Electrical Engineer (REE)'
+                                : 'Registered Master Electrician (RME)';
+                            const isSelected = academicInfo.licensureExamName === fullTitle;
+                            return (
+                              <button
+                                key={chip}
+                                type="button"
+                                onClick={() => setAcademicInfo((a) => ({ ...a, licensureExamName: fullTitle }))}
+                                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-orange-500 text-white border-orange-500 font-semibold shadow-2xs'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:border-orange-400'
+                                }`}
+                              >
+                                {chip}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1.5">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Year Passed <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                            </label>
+                            <input
+                              type="number"
+                              min="1980"
+                              max={new Date().getFullYear()}
+                              placeholder={academicInfo.yearGraduated || String(new Date().getFullYear())}
+                              value={academicInfo.licensureYearPassed}
+                              onChange={(e) => setAcademicInfo((a) => ({ ...a, licensureYearPassed: e.target.value }))}
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Board Rating (%) <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="50"
+                              max="100"
+                              placeholder="e.g. 84.60"
+                              value={academicInfo.licensureRating}
+                              onChange={(e) => setAcademicInfo((a) => ({ ...a, licensureRating: e.target.value }))}
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              PRC License No. <span className="text-gray-400 font-normal text-[11px] ml-1">(Optional)</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 0123456"
+                              value={academicInfo.licensureNumber}
+                              onChange={(e) => setAcademicInfo((a) => ({ ...a, licensureNumber: e.target.value }))}
+                              className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-orange-400 bg-white"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Reasons for choosing CTU - UNCHECKED BY DEFAULT */}

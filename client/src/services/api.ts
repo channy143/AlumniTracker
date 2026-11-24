@@ -343,7 +343,7 @@ export const api = {
 };
 
 export interface LoginResponse {
-  user?: { id: string; email: string; role: 'admin' | 'staff' | 'alumni'; survey_completed?: boolean };
+  user?: { id: string; email: string; role: 'admin' | 'staff' | 'alumni' | 'alumni_officer' | 'registrar'; survey_completed?: boolean };
   token?: string;
   requiresMfa?: boolean;
   mfaToken?: string;
@@ -396,7 +396,7 @@ export const authApi = {
     api.post<{
       message: string;
       autoLoggedIn?: boolean;
-      user?: { id: string; email: string; role: 'admin' | 'staff' | 'alumni'; is_verified?: boolean; survey_completed?: boolean };
+      user?: { id: string; email: string; role: 'admin' | 'staff' | 'alumni' | 'alumni_officer' | 'registrar'; is_verified?: boolean; survey_completed?: boolean };
     }>('/auth/reset-password', { email, otp, password }),
   me: () => api.get<{ user: any }>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) =>
@@ -448,6 +448,16 @@ export const profileApi = {
   listAchievements: () => api.get<any[]>('/profile/achievements'),
   addAchievement: (data: any) => api.post<any>('/profile/achievements', data),
   deleteAchievement: (id: string) => api.delete(`/profile/achievements/${id}`),
+  // Licensures & Board Exams
+  listLicensures: () => api.get<any[]>('/profile/licensures'),
+  addLicensure: (data: any) => api.post<any>('/profile/licensures', data),
+  updateLicensure: (id: string, data: any) => api.put<any>(`/profile/licensures/${id}`, data),
+  deleteLicensure: (id: string) => api.delete(`/profile/licensures/${id}`),
+  // Postgraduate & Advanced Higher Education
+  listPostgraduate: () => api.get<any[]>('/profile/postgraduate'),
+  addPostgraduate: (data: any) => api.post<any>('/profile/postgraduate', data),
+  updatePostgraduate: (id: string, data: any) => api.put<any>(`/profile/postgraduate/${id}`, data),
+  deletePostgraduate: (id: string) => api.delete(`/profile/postgraduate/${id}`),
 };
 
 export const employmentApi = {
@@ -729,7 +739,9 @@ export const adminApi = {
 
   eligibleAlumniList: (params: Record<string, any> = {}) => api.get<any[]>(`/admin/eligible-alumni?${toQuery(params)}`),
   eligibleAlumniCreate: (data: any) => api.post<any>('/admin/eligible-alumni', data),
+  eligibleAlumniBulkImport: (records: any[]) => api.post<any>('/admin/eligible-alumni/bulk', { records }),
   eligibleAlumniDelete: (id: string) => api.delete(`/admin/eligible-alumni/${id}`),
+  eligibleAlumniTemplateUrl: () => '/api/admin/eligible-alumni/template',
 
   settingsGet: () => api.get<any>('/admin/settings'),
   settingsUpdate: (data: any) => api.put<any>('/admin/settings', data),

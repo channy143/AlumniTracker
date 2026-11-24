@@ -8,7 +8,8 @@ import {
   TrophyIcon, ArrowTrendingUpIcon, UserCircleIcon, XMarkIcon,
   LockClosedIcon, ShieldCheckIcon, ShieldExclamationIcon, InformationCircleIcon,
   ChatBubbleBottomCenterTextIcon, DocumentArrowUpIcon, DocumentTextIcon,
-  ArrowTopRightOnSquareIcon, TrashIcon, ArrowPathIcon, QuestionMarkCircleIcon, PlusIcon
+  ArrowTopRightOnSquareIcon, TrashIcon, ArrowPathIcon, QuestionMarkCircleIcon, PlusIcon,
+  IdentificationIcon, BuildingLibraryIcon,
 } from '@heroicons/react/24/outline';
 import { SkeletonCard, SkeletonProfilePage } from '@/components/ui/Skeleton';
 import { getCached } from '@/utils/apiCache';
@@ -144,6 +145,32 @@ export default function ProfilePage() {
   const [showAchievementForm, setShowAchievementForm] = useState(false);
   const [certForm, setCertForm] = useState<any>({ name: '', issuer: '', issue_date: '', expiry_date: '', credential_url: '' });
   const [achievementForm, setAchievementForm] = useState<any>({ title: '', description: '', category: 'other', date_achieved: '' });
+
+  // PRC Licensures & Board Exams state
+  const [licensures, setLicensures] = useState<any[]>([]);
+  const [showLicForm, setShowLicForm] = useState(false);
+  const [licForm, setLicForm] = useState<any>({
+    exam_title: 'Licensure Examination for Teachers (LET) - Secondary',
+    license_number: '',
+    exam_date: '',
+    year_passed: new Date().getFullYear(),
+    rating: '',
+    status: 'passed',
+  });
+
+  // Postgraduate Studies state
+  const [postgraduate, setPostgraduate] = useState<any[]>([]);
+  const [showPostgradForm, setShowPostgradForm] = useState(false);
+  const [postgradForm, setPostgradForm] = useState<any>({
+    degree_level: 'masteral',
+    institution: 'Cebu Technological University',
+    program_title: '',
+    major: '',
+    start_year: new Date().getFullYear(),
+    completion_year: '',
+    status: 'enrolled',
+    thesis_title: '',
+  });
   const [editSection, setEditSection] = useState<'personal' | 'security' | 'privacy'>('personal');
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [mfaEnabled, setMfaEnabled] = useState(false);
@@ -442,12 +469,16 @@ export default function ProfilePage() {
 
   const loadCareerData = async () => {
     try {
-      const [certs, achievs] = await Promise.all([
+      const [certs, achievs, lics, postgrads] = await Promise.all([
         profileApi.get().then(p => p?.certifications || []),
-        profileApi.listAchievements(),
+        profileApi.listAchievements().catch(() => []),
+        profileApi.listLicensures().catch(() => []),
+        profileApi.listPostgraduate().catch(() => []),
       ]);
       setCertifications(certs);
       setAchievements(achievs || []);
+      setLicensures(lics || []);
+      setPostgraduate(postgrads || []);
     } catch { }
   };
 
@@ -612,8 +643,8 @@ export default function ProfilePage() {
             const resolvedStartDate = wasSameRoleBeforeSave
               ? (form.start_date || prevStartStr || new Date().toISOString().slice(0, 10))
               : (!form.start_date || form.start_date === prevStartStr
-                  ? new Date().toISOString().slice(0, 10)
-                  : form.start_date);
+                ? new Date().toISOString().slice(0, 10)
+                : form.start_date);
 
             const empPayload: any = {
               record_category: 'employment',
@@ -1010,6 +1041,84 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAddLicensure = async () => {
+    if (!licForm.exam_title.trim()) {
+      useUIStore.getState().addNotification('Exam title is required', 'error');
+      return;
+    }
+    try {
+      const data = await profileApi.addLicensure({
+        ...licForm,
+        year_passed: Number(licForm.year_passed),
+        rating: licForm.rating ? Number(licForm.rating) : null,
+      });
+      setLicensures(prev => [data, ...prev]);
+      setShowLicForm(false);
+      setLicForm({
+        exam_title: 'Licensure Examination for Teachers (LET) - Secondary',
+        license_number: '',
+        exam_date: '',
+        year_passed: new Date().getFullYear(),
+        rating: '',
+        status: 'passed',
+      });
+      useUIStore.getState().addNotification('Board licensure record added', 'success');
+    } catch (err: any) {
+      useUIStore.getState().addNotification(err.message || 'Failed to add licensure', 'error');
+    }
+  };
+
+  const handleDeleteLicensure = async (id: string) => {
+    if (!window.confirm('Delete this board exam record?')) return;
+    try {
+      await profileApi.deleteLicensure(id);
+      setLicensures(prev => prev.filter(l => l.id !== id));
+      useUIStore.getState().addNotification('Licensure record deleted', 'success');
+    } catch {
+      useUIStore.getState().addNotification('Failed to delete licensure', 'error');
+    }
+  };
+
+  const handleAddPostgraduate = async () => {
+    if (!postgradForm.program_title.trim() || !postgradForm.institution.trim()) {
+      useUIStore.getState().addNotification('Program title and institution are required', 'error');
+      return;
+    }
+    try {
+      const data = await profileApi.addPostgraduate({
+        ...postgradForm,
+        start_year: Number(postgradForm.start_year),
+        completion_year: postgradForm.completion_year ? Number(postgradForm.completion_year) : null,
+      });
+      setPostgraduate(prev => [data, ...prev]);
+      setShowPostgradForm(false);
+      setPostgradForm({
+        degree_level: 'masteral',
+        institution: 'Cebu Technological University',
+        program_title: '',
+        major: '',
+        start_year: new Date().getFullYear(),
+        completion_year: '',
+        status: 'enrolled',
+        thesis_title: '',
+      });
+      useUIStore.getState().addNotification('Postgraduate program record added', 'success');
+    } catch (err: any) {
+      useUIStore.getState().addNotification(err.message || 'Failed to add postgraduate program', 'error');
+    }
+  };
+
+  const handleDeletePostgraduate = async (id: string) => {
+    if (!window.confirm('Delete this postgraduate record?')) return;
+    try {
+      await profileApi.deletePostgraduate(id);
+      setPostgraduate(prev => prev.filter(p => p.id !== id));
+      useUIStore.getState().addNotification('Postgraduate record deleted', 'success');
+    } catch {
+      useUIStore.getState().addNotification('Failed to delete postgraduate record', 'error');
+    }
+  };
+
   if (loading) {
     return <SkeletonProfilePage />;
   }
@@ -1036,13 +1145,13 @@ export default function ProfilePage() {
 
   const initials = profile
     ? `${(profile.first_name || '')[0] || ''}${(profile.last_name || '')[0] || ''}`.toUpperCase() ||
-      (user?.email ? `${user.email[0] || ''}${user.email[1] || ''}`.toUpperCase() : '?')
+    (user?.email ? `${user.email[0] || ''}${user.email[1] || ''}`.toUpperCase() : '?')
     : '?';
   const fullName = profile
     ? [profile.first_name, profile.middle_name, profile.last_name]
-        .map((s) => (s || '').trim())
-        .filter(Boolean)
-        .join(' ')
+      .map((s) => (s || '').trim())
+      .filter(Boolean)
+      .join(' ')
     : '';
   const firstEdu = profile?.education?.[0];
   const programInfo = firstEdu ? (formatProgramLongName(firstEdu.program) || firstEdu.program || '') : '';
@@ -1188,8 +1297,8 @@ export default function ProfilePage() {
               <button
                 onClick={() => setEditSection('personal')}
                 className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 md:py-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'personal'
-                    ? 'bg-orange-600 text-white shadow-xs'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
+                  ? 'bg-orange-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
                   }`}
               >
                 <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
@@ -1199,8 +1308,8 @@ export default function ProfilePage() {
               <button
                 onClick={() => setEditSection('security')}
                 className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 md:py-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'security'
-                    ? 'bg-orange-600 text-white shadow-xs'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
+                  ? 'bg-orange-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
                   }`}
               >
                 <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
@@ -1210,8 +1319,8 @@ export default function ProfilePage() {
               <button
                 onClick={() => setEditSection('privacy')}
                 className={`flex-1 md:flex-initial flex items-center justify-center md:justify-start gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 md:py-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-pointer md:w-full ${editSection === 'privacy'
-                    ? 'bg-orange-600 text-white shadow-xs'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
+                  ? 'bg-orange-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200'
                   }`}
               >
                 <ShieldCheckIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
@@ -1325,166 +1434,164 @@ export default function ProfilePage() {
                       );
                       return (
                         <>
-                    <SectionLine label="Employment Information" />
-                    <p className="text-[11px] text-gray-500 mt-1 mb-2.5">
-                      Maintain your current employment status and workplace details. You can update these anytime.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-600 font-medium mb-1 block">
-                          Employment Status
-                        </label>
-                        <select
-                          value={effectiveStatus}
-                          onChange={(e) => {
-                            const newStatus = e.target.value;
-                            const isNotEmployed = newStatus === 'Unemployed' || newStatus === 'Seeking Opportunities' || newStatus === 'Retired';
-                            setForm((prev: any) => ({
-                              ...prev,
-                              employment_status: newStatus,
-                              ...(isNotEmployed
-                                ? {
-                                    current_job_title: '',
-                                    company_name: '',
-                                    industry: '',
-                                    salary_range: '',
-                                    job_type: '',
-                                    start_date: '',
-                                    proof_url: '',
-                                    proof_type_other: '',
-                                  }
-                                : { job_type: prev.job_type || 'full-time' })
-                            }));
-                          }}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
-                        >
-                          <option value="Unemployed">Unemployed / Seeking</option>
-                          <option value="Employed">Employed</option>
-                          <option value="Self-employed">Self-employed / Freelance</option>
-                          <option value="Seeking Opportunities">Seeking Opportunities</option>
-                          <option value="Retired">Retired</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600 font-medium mb-1 block">
-                          Current Position / Title
-                        </label>
-                        {(() => {
-                          const rawTitle = isFormNotEmployed ? '' : (form.current_job_title || '');
-                          const titleCheck = rawTitle.trim() ? validateJobTitle(rawTitle) : null;
-                          const showInlineErr = !isFormNotEmployed && titleCheck && !titleCheck.valid;
-                          return (
-                            <>
-                              <input
-                                value={rawTitle}
-                                onChange={(e) => setForm((prev: any) => ({ ...prev, current_job_title: e.target.value }))}
+                          <SectionLine label="Employment Information" />
+                          <p className="text-[11px] text-gray-500 mt-1 mb-2.5">
+                            Maintain your current employment status and workplace details. You can update these anytime.
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-gray-600 font-medium mb-1 block">
+                                Employment Status
+                              </label>
+                              <select
+                                value={effectiveStatus}
+                                onChange={(e) => {
+                                  const newStatus = e.target.value;
+                                  const isNotEmployed = newStatus === 'Unemployed' || newStatus === 'Seeking Opportunities' || newStatus === 'Retired';
+                                  setForm((prev: any) => ({
+                                    ...prev,
+                                    employment_status: newStatus,
+                                    ...(isNotEmployed
+                                      ? {
+                                        current_job_title: '',
+                                        company_name: '',
+                                        industry: '',
+                                        salary_range: '',
+                                        job_type: '',
+                                        start_date: '',
+                                        proof_url: '',
+                                        proof_type_other: '',
+                                      }
+                                      : { job_type: prev.job_type || 'full-time' })
+                                  }));
+                                }}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                              >
+                                <option value="Unemployed">Unemployed / Seeking</option>
+                                <option value="Employed">Employed</option>
+                                <option value="Self-employed">Self-employed / Freelance</option>
+                                <option value="Seeking Opportunities">Seeking Opportunities</option>
+                                <option value="Retired">Retired</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-600 font-medium mb-1 block">
+                                Current Position / Title
+                              </label>
+                              {(() => {
+                                const rawTitle = isFormNotEmployed ? '' : (form.current_job_title || '');
+                                const titleCheck = rawTitle.trim() ? validateJobTitle(rawTitle) : null;
+                                const showInlineErr = !isFormNotEmployed && titleCheck && !titleCheck.valid;
+                                return (
+                                  <>
+                                    <input
+                                      value={rawTitle}
+                                      onChange={(e) => setForm((prev: any) => ({ ...prev, current_job_title: e.target.value }))}
+                                      disabled={isFormNotEmployed}
+                                      placeholder={effectiveStatus === 'Self-employed' ? 'e.g. Freelance Developer, Consultant' : isFormNotEmployed ? 'N/A' : 'e.g. Software Engineer, Teacher'}
+                                      className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-white disabled:bg-gray-100 disabled:text-gray-400 ${showInlineErr
+                                        ? 'border-red-400 focus:border-red-500'
+                                        : 'border-gray-300 focus:border-orange-400'
+                                        }`}
+                                    />
+                                    {showInlineErr && (
+                                      <p className="mt-1 text-[11px] text-red-600">{titleCheck?.error}</p>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-600 font-medium mb-1 block">
+                                Company / Organization
+                              </label>
+                              {(() => {
+                                const rawComp = isFormNotEmployed ? '' : (form.company_name || '');
+                                const compCheck = rawComp.trim() ? validateCompanyName(rawComp) : null;
+                                const showCompErr = !isFormNotEmployed && compCheck && !compCheck.valid;
+                                return (
+                                  <>
+                                    <input
+                                      value={rawComp}
+                                      onChange={(e) => setForm((prev: any) => ({ ...prev, company_name: e.target.value }))}
+                                      disabled={isFormNotEmployed}
+                                      placeholder={effectiveStatus === 'Self-employed' ? 'e.g. Business Name or Client (Optional)' : isFormNotEmployed ? 'N/A' : 'e.g. Google, Accenture, DepEd'}
+                                      className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-white disabled:bg-gray-100 disabled:text-gray-400 ${showCompErr ? 'border-red-400 focus:border-red-500' : 'border-gray-300 focus:border-orange-400'
+                                        }`}
+                                    />
+                                    {showCompErr && (
+                                      <p className="mt-1 text-[11px] text-red-600">{compCheck?.error}</p>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-600 font-medium mb-1 block">
+                                Industry
+                              </label>
+                              <select
+                                value={isFormNotEmployed ? '' : (form.industry || '')}
+                                onChange={(e) => setForm((prev: any) => ({ ...prev, industry: e.target.value }))}
                                 disabled={isFormNotEmployed}
-                                placeholder={effectiveStatus === 'Self-employed' ? 'e.g. Freelance Developer, Consultant' : isFormNotEmployed ? 'N/A' : 'e.g. Software Engineer, Teacher'}
-                                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-white disabled:bg-gray-100 disabled:text-gray-400 ${
-                                  showInlineErr
-                                    ? 'border-red-400 focus:border-red-500'
-                                    : 'border-gray-300 focus:border-orange-400'
-                                }`}
-                              />
-                              {showInlineErr && (
-                                <p className="mt-1 text-[11px] text-red-600">{titleCheck?.error}</p>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600 font-medium mb-1 block">
-                          Company / Organization
-                        </label>
-                        {(() => {
-                          const rawComp = isFormNotEmployed ? '' : (form.company_name || '');
-                          const compCheck = rawComp.trim() ? validateCompanyName(rawComp) : null;
-                          const showCompErr = !isFormNotEmployed && compCheck && !compCheck.valid;
-                          return (
-                            <>
-                              <input
-                                value={rawComp}
-                                onChange={(e) => setForm((prev: any) => ({ ...prev, company_name: e.target.value }))}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                              >
+                                <option value="">{isFormNotEmployed ? 'N/A' : 'Select Industry'}</option>
+                                {CANONICAL_INDUSTRIES.map((ind) => (
+                                  <option key={ind} value={ind}>{ind}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-600 font-medium mb-1 block">
+                                Monthly Salary Range (₱)
+                              </label>
+                              <select
+                                value={isFormNotEmployed ? '' : (form.salary_range || '')}
+                                onChange={(e) => setForm((prev: any) => ({ ...prev, salary_range: e.target.value }))}
                                 disabled={isFormNotEmployed}
-                                placeholder={effectiveStatus === 'Self-employed' ? 'e.g. Business Name or Client (Optional)' : isFormNotEmployed ? 'N/A' : 'e.g. Google, Accenture, DepEd'}
-                                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-white disabled:bg-gray-100 disabled:text-gray-400 ${
-                                  showCompErr ? 'border-red-400 focus:border-red-500' : 'border-gray-300 focus:border-orange-400'
-                                }`}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                              >
+                                <option value="">{isFormNotEmployed ? 'N/A' : 'Select Salary Range'}</option>
+                                <option value="Below ₱20,000">Below ₱20,000</option>
+                                <option value="₱20,000–₱40,000">₱20,000–₱40,000</option>
+                                <option value="₱40,000–₱60,000">₱40,000–₱60,000</option>
+                                <option value="₱60,000–₱80,000">₱60,000–₱80,000</option>
+                                <option value="₱80,000+">₱80,000 and above</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-600 font-medium mb-1 block">
+                                Employment Type
+                              </label>
+                              <select
+                                value={isFormNotEmployed ? '' : (form.job_type || 'full-time')}
+                                onChange={(e) => setForm((prev: any) => ({ ...prev, job_type: e.target.value }))}
+                                disabled={isFormNotEmployed}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                              >
+                                {isFormNotEmployed && <option value="">N/A</option>}
+                                <option value="full-time">Full-time</option>
+                                <option value="part-time">Part-time</option>
+                                <option value="contract">Contractual</option>
+                                <option value="freelance">Freelance</option>
+                                <option value="internship">Internship</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-600 font-medium mb-1 block">
+                                Date of Employment / Start Date
+                              </label>
+                              <input
+                                type={isFormNotEmployed ? 'text' : 'date'}
+                                value={isFormNotEmployed ? '' : (form.start_date || '')}
+                                onChange={(e) => setForm((prev: any) => ({ ...prev, start_date: e.target.value }))}
+                                disabled={isFormNotEmployed}
+                                placeholder={isFormNotEmployed ? 'N/A' : undefined}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                               />
-                              {showCompErr && (
-                                <p className="mt-1 text-[11px] text-red-600">{compCheck?.error}</p>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600 font-medium mb-1 block">
-                          Industry
-                        </label>
-                        <select
-                          value={isFormNotEmployed ? '' : (form.industry || '')}
-                          onChange={(e) => setForm((prev: any) => ({ ...prev, industry: e.target.value }))}
-                          disabled={isFormNotEmployed}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                        >
-                          <option value="">{isFormNotEmployed ? 'N/A' : 'Select Industry'}</option>
-                          {CANONICAL_INDUSTRIES.map((ind) => (
-                            <option key={ind} value={ind}>{ind}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600 font-medium mb-1 block">
-                          Monthly Salary Range (₱)
-                        </label>
-                        <select
-                          value={isFormNotEmployed ? '' : (form.salary_range || '')}
-                          onChange={(e) => setForm((prev: any) => ({ ...prev, salary_range: e.target.value }))}
-                          disabled={isFormNotEmployed}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                        >
-                          <option value="">{isFormNotEmployed ? 'N/A' : 'Select Salary Range'}</option>
-                          <option value="Below ₱20,000">Below ₱20,000</option>
-                          <option value="₱20,000–₱40,000">₱20,000–₱40,000</option>
-                          <option value="₱40,000–₱60,000">₱40,000–₱60,000</option>
-                          <option value="₱60,000–₱80,000">₱60,000–₱80,000</option>
-                          <option value="₱80,000+">₱80,000 and above</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600 font-medium mb-1 block">
-                          Employment Type
-                        </label>
-                        <select
-                          value={isFormNotEmployed ? '' : (form.job_type || 'full-time')}
-                          onChange={(e) => setForm((prev: any) => ({ ...prev, job_type: e.target.value }))}
-                          disabled={isFormNotEmployed}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                        >
-                          {isFormNotEmployed && <option value="">N/A</option>}
-                          <option value="full-time">Full-time</option>
-                          <option value="part-time">Part-time</option>
-                          <option value="contract">Contractual</option>
-                          <option value="freelance">Freelance</option>
-                          <option value="internship">Internship</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600 font-medium mb-1 block">
-                          Date of Employment / Start Date
-                        </label>
-                        <input
-                          type={isFormNotEmployed ? 'text' : 'date'}
-                          value={isFormNotEmployed ? '' : (form.start_date || '')}
-                          onChange={(e) => setForm((prev: any) => ({ ...prev, start_date: e.target.value }))}
-                          disabled={isFormNotEmployed}
-                          placeholder={isFormNotEmployed ? 'N/A' : undefined}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                        />
-                      </div>
-                    </div>
+                            </div>
+                          </div>
                         </>
                       );
                     })()}
@@ -1660,239 +1767,239 @@ export default function ProfilePage() {
                   <div data-tour="profile-proof-section" className="pt-4 border-t border-gray-100">
                     {/* Header with Title and Tooltip */}
                     <div className="flex items-center justify-between gap-2 mb-1">
-                          <label className="text-xs text-gray-800 font-bold flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
-                            <CheckBadgeIcon className="w-4 h-4 text-orange-600 shrink-0" />
-                            <span>Proof of Employment <span className="text-gray-500 font-normal sm:font-bold text-[11px] sm:text-xs">(University Accreditation / Q-Pro)</span></span>
-                          </label>
-                          <div className="relative shrink-0">
+                      <label className="text-xs text-gray-800 font-bold flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                        <CheckBadgeIcon className="w-4 h-4 text-orange-600 shrink-0" />
+                        <span>Proof of Employment <span className="text-gray-500 font-normal sm:font-bold text-[11px] sm:text-xs">(University Accreditation / Q-Pro)</span></span>
+                      </label>
+                      <div className="relative shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setShowQProTooltip(!showQProTooltip)}
+                          onMouseEnter={() => setShowQProTooltip(true)}
+                          onMouseLeave={() => setShowQProTooltip(false)}
+                          className="text-gray-400 hover:text-orange-600 transition-colors p-0.5 rounded-full hover:bg-orange-50 cursor-pointer"
+                          title="Learn more about Q-Pro Dossier"
+                          aria-label="Learn more about Q-Pro Dossier"
+                        >
+                          <QuestionMarkCircleIcon className="w-4 h-4" />
+                        </button>
+                        {showQProTooltip && (
+                          <div className="absolute right-0 bottom-full mb-2 w-64 sm:w-72 max-w-[85vw] bg-gray-900 text-white text-[11px] rounded-lg p-3 shadow-xl z-50 leading-relaxed border border-gray-800">
+                            <p className="font-semibold text-orange-300 mb-1">What is Q-Pro Dossier?</p>
+                            CTU-Naga is mandated by CHED, AACCUP, and PESO to verify graduate employment outcomes. Providing official placement proof validates university accreditation metrics. All submitted records are held strictly confidential under Republic Act 10173 (Data Privacy Act of 2012).
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mb-3">
+                      Submit verified evidence of your placement (COE, payslip, contract, or ID) for institutional quality assurance.
+                    </p>
+
+                    {['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(String(form.employment_status || 'Unemployed').trim().toLowerCase()) && (
+                      <div className="mb-3 p-2.5 rounded-lg bg-orange-50/80 border border-orange-100 text-[11px] text-orange-800 flex items-center gap-2">
+                        <span>💡 Proof of employment submission is disabled while your status is Unemployed / Seeking / Retired. Once you secure employment or freelance work, update your status above to submit your proof.</span>
+                      </div>
+                    )}
+
+                    <fieldset
+                      disabled={['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(String(form.employment_status || 'Unemployed').trim().toLowerCase())}
+                      className={['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(String(form.employment_status || 'Unemployed').trim().toLowerCase()) ? 'opacity-55 pointer-events-none select-none' : ''}
+                    >
+                      {/* Proof Type & Specification */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="text-[11px] text-gray-600 font-medium mb-1 block">Proof Document Type</label>
+                          <select
+                            value={form.proof_type || 'coe'}
+                            onChange={(e) => setForm((prev: any) => ({ ...prev, proof_type: e.target.value }))}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                          >
+                            <option value="coe">Certificate of Employment (COE)</option>
+                            <option value="welcome_email_payslip">First-day Payslip / Welcome Email</option>
+                            <option value="affidavit">Affidavit of Employment / Declaration of Status</option>
+                            <option value="company_id">Official Company ID</option>
+                            <option value="contract">Job Contract / Appointment Letter</option>
+                            <option value="dti_sec">Business Permit / DTI / SEC (Self-employed / Freelance)</option>
+                            <option value="other">Other (Please specify)</option>
+                          </select>
+                        </div>
+                        {form.proof_type === 'other' ? (
+                          <div>
+                            <label className="text-[11px] text-gray-600 font-medium mb-1 block">Please specify document type</label>
+                            <input
+                              type="text"
+                              value={form.proof_type_other || ''}
+                              onChange={(e) => setForm((prev: any) => ({ ...prev, proof_type_other: e.target.value }))}
+                              placeholder="e.g. Appointment Letter, OEC, Consultancy Agreement"
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-end">
+                            <span className="text-[11px] text-gray-500 italic pb-2">
+                              {form.proof_type === 'coe' && 'Standard HR certificate confirming active or past tenure.'}
+                              {form.proof_type === 'welcome_email_payslip' && 'Useful if newly hired and official COE is not yet released.'}
+                              {form.proof_type === 'affidavit' && 'Notarized sworn statement of freelancing, gig, or remote work.'}
+                              {form.proof_type === 'company_id' && 'Official corporate badge showing your name and company.'}
+                              {form.proof_type === 'contract' && 'Signed job offer or appointment agreement.'}
+                              {form.proof_type === 'dti_sec' && 'Registered trade name, DTI certificate, or SEC registration.'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Submission Method Tabs: Direct Upload vs Cloud Link */}
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-gray-200 pb-2.5">
+                          <span className="text-[11px] font-semibold text-gray-700">Submission Method:</span>
+                          <div className="grid grid-cols-2 sm:inline-flex rounded-lg bg-gray-200/80 p-0.5 text-xs font-medium w-full sm:w-auto">
                             <button
                               type="button"
-                              onClick={() => setShowQProTooltip(!showQProTooltip)}
-                              onMouseEnter={() => setShowQProTooltip(true)}
-                              onMouseLeave={() => setShowQProTooltip(false)}
-                              className="text-gray-400 hover:text-orange-600 transition-colors p-0.5 rounded-full hover:bg-orange-50 cursor-pointer"
-                              title="Learn more about Q-Pro Dossier"
-                              aria-label="Learn more about Q-Pro Dossier"
+                              onClick={() => setProofSubmissionTab('upload')}
+                              className={`px-2.5 sm:px-3 py-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center text-[11px] sm:text-xs ${proofSubmissionTab === 'upload'
+                                ? 'bg-white text-orange-700 shadow-xs font-semibold'
+                                : 'text-gray-600 hover:text-gray-900'
+                                }`}
                             >
-                              <QuestionMarkCircleIcon className="w-4 h-4" />
+                              <DocumentArrowUpIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>Direct Upload</span>
                             </button>
-                            {showQProTooltip && (
-                              <div className="absolute right-0 bottom-full mb-2 w-64 sm:w-72 max-w-[85vw] bg-gray-900 text-white text-[11px] rounded-lg p-3 shadow-xl z-50 leading-relaxed border border-gray-800">
-                                <p className="font-semibold text-orange-300 mb-1">What is Q-Pro Dossier?</p>
-                                CTU-Naga is mandated by CHED, AACCUP, and PESO to verify graduate employment outcomes. Providing official placement proof validates university accreditation metrics. All submitted records are held strictly confidential under Republic Act 10173 (Data Privacy Act of 2012).
-                              </div>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => setProofSubmissionTab('link')}
+                              className={`px-2.5 sm:px-3 py-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center text-[11px] sm:text-xs ${proofSubmissionTab === 'link'
+                                ? 'bg-white text-orange-700 shadow-xs font-semibold'
+                                : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                            >
+                              <LinkIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>Cloud Link</span>
+                            </button>
                           </div>
                         </div>
-                        <p className="text-[11px] text-gray-500 mb-3">
-                          Submit verified evidence of your placement (COE, payslip, contract, or ID) for institutional quality assurance.
-                        </p>
 
-                        {['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(String(form.employment_status || 'Unemployed').trim().toLowerCase()) && (
-                          <div className="mb-3 p-2.5 rounded-lg bg-orange-50/80 border border-orange-100 text-[11px] text-orange-800 flex items-center gap-2">
-                            <span>💡 Proof of employment submission is disabled while your status is Unemployed / Seeking / Retired. Once you secure employment or freelance work, update your status above to submit your proof.</span>
+                        {/* TAB 1: Direct File Upload */}
+                        {proofSubmissionTab === 'upload' && (
+                          <div>
+                            <input
+                              type="file"
+                              ref={proofFileRef}
+                              accept=".pdf,.jpg,.jpeg,.png,.webp"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleUploadProofFile(e.target.files[0]);
+                                }
+                              }}
+                              className="hidden"
+                            />
+
+                            {form.proof_url && (proofFileInfo || form.proof_url.includes('employment-proofs')) ? (
+                              <div className="flex items-center justify-between p-3 bg-white border border-emerald-200 rounded-lg shadow-2xs">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
+                                    <DocumentTextIcon className="w-5 h-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-gray-800 truncate">
+                                      {proofFileInfo?.name || 'Uploaded Proof Document'}
+                                    </p>
+                                    <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                                      <CheckBadgeIcon className="w-3 h-3 text-emerald-600" />
+                                      Uploaded & Ready to Submit
+                                      {proofFileInfo?.size ? ` • ${(proofFileInfo.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <a
+                                    href={form.proof_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-orange-600 hover:text-orange-700 font-medium inline-flex items-center gap-0.5 px-2 py-1 rounded hover:bg-orange-50 transition-colors"
+                                  >
+                                    <span>Preview</span>
+                                    <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={handleRemoveProof}
+                                    className="text-xs text-red-600 hover:text-red-700 font-medium p-1 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                                    title="Remove uploaded document"
+                                  >
+                                    <TrashIcon className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                onDragOver={handleProofDragOver}
+                                onDragLeave={handleProofDragLeave}
+                                onDrop={handleProofDrop}
+                                onClick={() => proofFileRef.current?.click()}
+                                className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${isDraggingProof
+                                  ? 'border-orange-500 bg-orange-50/50 scale-[1.01]'
+                                  : 'border-gray-300 hover:border-orange-400 bg-white hover:bg-orange-50/20'
+                                  }`}
+                              >
+                                {uploadingProof ? (
+                                  <div className="flex flex-col items-center justify-center py-2">
+                                    <ArrowPathIcon className="w-6 h-6 text-orange-600 animate-spin mb-1.5" />
+                                    <p className="text-xs font-semibold text-gray-700">Uploading document...</p>
+                                    <p className="text-[11px] text-gray-500">Storing securely in university repository</p>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center">
+                                    <DocumentArrowUpIcon className="w-8 h-8 text-orange-500 mb-1.5 stroke-[1.5]" />
+                                    <p className="text-xs font-semibold text-gray-800">
+                                      Drag and drop your file here, or <span className="text-orange-600 underline">Browse</span>
+                                    </p>
+                                    <p className="text-[11px] text-gray-500 mt-0.5">
+                                      Accepts PDF, JPG, or PNG (Maximum file size: 10MB)
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {proofUploadError && (
+                              <p className="text-xs text-red-600 font-medium mt-1.5 flex items-center gap-1">
+                                <InformationCircleIcon className="w-3.5 h-3.5 shrink-0" />
+                                {proofUploadError}
+                              </p>
+                            )}
                           </div>
                         )}
 
-                        <fieldset
-                          disabled={['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(String(form.employment_status || 'Unemployed').trim().toLowerCase())}
-                          className={['unemployed', 'seeking opportunities', 'retired', 'student', 'n/a'].includes(String(form.employment_status || 'Unemployed').trim().toLowerCase()) ? 'opacity-55 pointer-events-none select-none' : ''}
-                        >
-                        {/* Proof Type & Specification */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                          <div>
-                            <label className="text-[11px] text-gray-600 font-medium mb-1 block">Proof Document Type</label>
-                            <select
-                              value={form.proof_type || 'coe'}
-                              onChange={(e) => setForm((prev: any) => ({ ...prev, proof_type: e.target.value }))}
+                        {/* TAB 2: Provide Cloud Link */}
+                        {proofSubmissionTab === 'link' && (
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] text-gray-600 font-medium block">Document Cloud Link / URL</label>
+                            <input
+                              type="url"
+                              value={form.proof_url || ''}
+                              onChange={(e) => setForm((prev: any) => ({ ...prev, proof_url: e.target.value }))}
+                              placeholder="https://drive.google.com/file/d/... or OneDrive / Dropbox link"
                               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
-                            >
-                              <option value="coe">Certificate of Employment (COE)</option>
-                              <option value="welcome_email_payslip">First-day Payslip / Welcome Email</option>
-                              <option value="affidavit">Affidavit of Employment / Declaration of Status</option>
-                              <option value="company_id">Official Company ID</option>
-                              <option value="contract">Job Contract / Appointment Letter</option>
-                              <option value="dti_sec">Business Permit / DTI / SEC (Self-employed / Freelance)</option>
-                              <option value="other">Other (Please specify)</option>
-                            </select>
+                            />
+                            <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                              <InformationCircleIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <span>Make sure link sharing permissions are set to <strong>"Anyone with the link can view"</strong> so administrators can review it.</span>
+                            </p>
                           </div>
-                          {form.proof_type === 'other' ? (
-                            <div>
-                              <label className="text-[11px] text-gray-600 font-medium mb-1 block">Please specify document type</label>
-                              <input
-                                type="text"
-                                value={form.proof_type_other || ''}
-                                onChange={(e) => setForm((prev: any) => ({ ...prev, proof_type_other: e.target.value }))}
-                                placeholder="e.g. Appointment Letter, OEC, Consultancy Agreement"
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex items-end">
-                              <span className="text-[11px] text-gray-500 italic pb-2">
-                                {form.proof_type === 'coe' && 'Standard HR certificate confirming active or past tenure.'}
-                                {form.proof_type === 'welcome_email_payslip' && 'Useful if newly hired and official COE is not yet released.'}
-                                {form.proof_type === 'affidavit' && 'Notarized sworn statement of freelancing, gig, or remote work.'}
-                                {form.proof_type === 'company_id' && 'Official corporate badge showing your name and company.'}
-                                {form.proof_type === 'contract' && 'Signed job offer or appointment agreement.'}
-                                {form.proof_type === 'dti_sec' && 'Registered trade name, DTI certificate, or SEC registration.'}
-                              </span>
-                            </div>
-                          )}
+                        )}
+
+                        {/* Privacy Notice Disclaimer */}
+                        <div className="mt-3 bg-amber-50/90 border border-amber-200/80 rounded-lg p-2.5 text-xs text-amber-900 flex items-start gap-2 shadow-2xs">
+                          <ShieldCheckIcon className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                          <div className="leading-snug">
+                            <span className="font-semibold text-amber-950">Privacy Notice:</span> Please redact (black out) or blur sensitive information such as your exact salary, TIN, SSS, PhilHealth, and bank account numbers before uploading.
+                            <p className="text-[10px] text-amber-800/80 mt-0.5">
+                              In compliance with RA 10173 (Data Privacy Act of 2012), your file will be stored in an encrypted university container and viewed solely for accreditation verification.
+                            </p>
+                          </div>
                         </div>
-
-                        {/* Submission Method Tabs: Direct Upload vs Cloud Link */}
-                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-gray-200 pb-2.5">
-                            <span className="text-[11px] font-semibold text-gray-700">Submission Method:</span>
-                            <div className="grid grid-cols-2 sm:inline-flex rounded-lg bg-gray-200/80 p-0.5 text-xs font-medium w-full sm:w-auto">
-                              <button
-                                type="button"
-                                onClick={() => setProofSubmissionTab('upload')}
-                                className={`px-2.5 sm:px-3 py-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center text-[11px] sm:text-xs ${proofSubmissionTab === 'upload'
-                                    ? 'bg-white text-orange-700 shadow-xs font-semibold'
-                                    : 'text-gray-600 hover:text-gray-900'
-                                  }`}
-                              >
-                                <DocumentArrowUpIcon className="w-3.5 h-3.5 shrink-0" />
-                                <span>Direct Upload</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setProofSubmissionTab('link')}
-                                className={`px-2.5 sm:px-3 py-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center text-[11px] sm:text-xs ${proofSubmissionTab === 'link'
-                                    ? 'bg-white text-orange-700 shadow-xs font-semibold'
-                                    : 'text-gray-600 hover:text-gray-900'
-                                  }`}
-                              >
-                                <LinkIcon className="w-3.5 h-3.5 shrink-0" />
-                                <span>Cloud Link</span>
-                              </button>
-                            </div>
-                          </div>
-
-                            {/* TAB 1: Direct File Upload */}
-                            {proofSubmissionTab === 'upload' && (
-                              <div>
-                                <input
-                                  type="file"
-                                  ref={proofFileRef}
-                                  accept=".pdf,.jpg,.jpeg,.png,.webp"
-                                  onChange={(e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                      handleUploadProofFile(e.target.files[0]);
-                                    }
-                                  }}
-                                  className="hidden"
-                                />
-
-                                {form.proof_url && (proofFileInfo || form.proof_url.includes('employment-proofs')) ? (
-                                  <div className="flex items-center justify-between p-3 bg-white border border-emerald-200 rounded-lg shadow-2xs">
-                                    <div className="flex items-center gap-2.5 min-w-0">
-                                      <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
-                                        <DocumentTextIcon className="w-5 h-5" />
-                                      </div>
-                                      <div className="min-w-0">
-                                        <p className="text-xs font-semibold text-gray-800 truncate">
-                                          {proofFileInfo?.name || 'Uploaded Proof Document'}
-                                        </p>
-                                        <p className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
-                                          <CheckBadgeIcon className="w-3 h-3 text-emerald-600" />
-                                          Uploaded & Ready to Submit
-                                          {proofFileInfo?.size ? ` • ${(proofFileInfo.size / 1024 / 1024).toFixed(2)} MB` : ''}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      <a
-                                        href={form.proof_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-orange-600 hover:text-orange-700 font-medium inline-flex items-center gap-0.5 px-2 py-1 rounded hover:bg-orange-50 transition-colors"
-                                      >
-                                        <span>Preview</span>
-                                        <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
-                                      </a>
-                                      <button
-                                        type="button"
-                                        onClick={handleRemoveProof}
-                                        className="text-xs text-red-600 hover:text-red-700 font-medium p-1 rounded hover:bg-red-50 transition-colors cursor-pointer"
-                                        title="Remove uploaded document"
-                                      >
-                                        <TrashIcon className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div
-                                    onDragOver={handleProofDragOver}
-                                    onDragLeave={handleProofDragLeave}
-                                    onDrop={handleProofDrop}
-                                    onClick={() => proofFileRef.current?.click()}
-                                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${isDraggingProof
-                                        ? 'border-orange-500 bg-orange-50/50 scale-[1.01]'
-                                        : 'border-gray-300 hover:border-orange-400 bg-white hover:bg-orange-50/20'
-                                      }`}
-                                  >
-                                    {uploadingProof ? (
-                                      <div className="flex flex-col items-center justify-center py-2">
-                                        <ArrowPathIcon className="w-6 h-6 text-orange-600 animate-spin mb-1.5" />
-                                        <p className="text-xs font-semibold text-gray-700">Uploading document...</p>
-                                        <p className="text-[11px] text-gray-500">Storing securely in university repository</p>
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col items-center justify-center">
-                                        <DocumentArrowUpIcon className="w-8 h-8 text-orange-500 mb-1.5 stroke-[1.5]" />
-                                        <p className="text-xs font-semibold text-gray-800">
-                                          Drag and drop your file here, or <span className="text-orange-600 underline">Browse</span>
-                                        </p>
-                                        <p className="text-[11px] text-gray-500 mt-0.5">
-                                          Accepts PDF, JPG, or PNG (Maximum file size: 10MB)
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                                {proofUploadError && (
-                                  <p className="text-xs text-red-600 font-medium mt-1.5 flex items-center gap-1">
-                                    <InformationCircleIcon className="w-3.5 h-3.5 shrink-0" />
-                                    {proofUploadError}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-
-                            {/* TAB 2: Provide Cloud Link */}
-                            {proofSubmissionTab === 'link' && (
-                              <div className="space-y-1.5">
-                                <label className="text-[11px] text-gray-600 font-medium block">Document Cloud Link / URL</label>
-                                <input
-                                  type="url"
-                                  value={form.proof_url || ''}
-                                  onChange={(e) => setForm((prev: any) => ({ ...prev, proof_url: e.target.value }))}
-                                  placeholder="https://drive.google.com/file/d/... or OneDrive / Dropbox link"
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white"
-                                />
-                                <p className="text-[11px] text-gray-500 flex items-center gap-1">
-                                  <InformationCircleIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                  <span>Make sure link sharing permissions are set to <strong>"Anyone with the link can view"</strong> so administrators can review it.</span>
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Privacy Notice Disclaimer */}
-                            <div className="mt-3 bg-amber-50/90 border border-amber-200/80 rounded-lg p-2.5 text-xs text-amber-900 flex items-start gap-2 shadow-2xs">
-                              <ShieldCheckIcon className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                              <div className="leading-snug">
-                                <span className="font-semibold text-amber-950">Privacy Notice:</span> Please redact (black out) or blur sensitive information such as your exact salary, TIN, SSS, PhilHealth, and bank account numbers before uploading.
-                                <p className="text-[10px] text-amber-800/80 mt-0.5">
-                                  In compliance with RA 10173 (Data Privacy Act of 2012), your file will be stored in an encrypted university container and viewed solely for accreditation verification.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </fieldset>
-                        </div>
+                      </div>
+                    </fieldset>
+                  </div>
 
                   <div>
                     <SectionLine label="Skills" />
@@ -2301,11 +2408,10 @@ export default function ProfilePage() {
                       href={emp.proof_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`inline-flex items-center gap-1 text-[11px] font-medium hover:underline ${
-                        emp.record_category === 'ojt' || String(emp.job_type || '').toLowerCase() === 'internship' || String(emp.employment_status || '').toLowerCase() === 'ojt'
-                          ? 'text-indigo-600 hover:text-indigo-700'
-                          : 'text-orange-600 hover:text-orange-700'
-                      }`}
+                      className={`inline-flex items-center gap-1 text-[11px] font-medium hover:underline ${emp.record_category === 'ojt' || String(emp.job_type || '').toLowerCase() === 'internship' || String(emp.employment_status || '').toLowerCase() === 'ojt'
+                        ? 'text-indigo-600 hover:text-indigo-700'
+                        : 'text-orange-600 hover:text-orange-700'
+                        }`}
                     >
                       <DocumentTextIcon className="w-3.5 h-3.5" />
                       <span>{emp.record_category === 'ojt' ? 'Certificate of Completion' : formatProofType(emp.proof_type)}</span>
@@ -2470,6 +2576,316 @@ export default function ProfilePage() {
           </div>
         ) : (
           <p className="text-sm text-black/50 font-light">No education records added yet.</p>
+        )}
+      </div>
+
+      {/* PRC Board Licensures */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-2xs">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <SectionLine label="PRC Board Examinations & Licensures" />
+            <p className="text-xs text-gray-500 mt-0.5">Professional Regulation Commission (PRC) and Civil Service board passer credentials</p>
+          </div>
+          <button
+            onClick={() => setShowLicForm(!showLicForm)}
+            className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
+          >
+            {showLicForm ? 'Cancel' : '+ Add Board Exam'}
+          </button>
+        </div>
+
+        {showLicForm && (
+          <div className="mb-4 p-4 bg-orange-50/40 rounded-xl border border-orange-200/60 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Board Examination Title</label>
+                <input
+                  list="prc-exam-options"
+                  value={licForm.exam_title}
+                  onChange={(e) => setLicForm((f: any) => ({ ...f, exam_title: e.target.value }))}
+                  placeholder="e.g. Licensure Examination for Teachers (LET) - Secondary"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+                />
+                <datalist id="prc-exam-options">
+                  <option value="Licensure Examination for Teachers (LET) - Secondary" />
+                  <option value="Licensure Examination for Teachers (LET) - Elementary" />
+                  <option value="Certified Public Accountant (CPA) Licensure Examination" />
+                  <option value="Civil Service Examination (CSE) - Professional" />
+                  <option value="Civil Service Examination (CSE) - Sub-Professional" />
+                  <option value="Registered Master Electrician (RME)" />
+                  <option value="Registered Electrical Engineer (REE)" />
+                </datalist>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Year Passed</label>
+                <input
+                  type="number"
+                  min={1970}
+                  max={2100}
+                  value={licForm.year_passed}
+                  onChange={(e) => setLicForm((f: any) => ({ ...f, year_passed: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Board Rating (%) (Optional)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  max={100}
+                  value={licForm.rating}
+                  onChange={(e) => setLicForm((f: any) => ({ ...f, rating: e.target.value }))}
+                  placeholder="e.g. 86.40"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">PRC License / Registration No. (Optional)</label>
+                <input
+                  type="text"
+                  value={licForm.license_number}
+                  onChange={(e) => setLicForm((f: any) => ({ ...f, license_number: e.target.value }))}
+                  placeholder="e.g. 1234567"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowLicForm(false)}
+                className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddLicensure}
+                className="px-4 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded-lg hover:bg-orange-700 transition-colors shadow-2xs cursor-pointer"
+              >
+                Save Licensure Record
+              </button>
+            </div>
+          </div>
+        )}
+
+        {licensures.length === 0 ? (
+          <p className="text-sm text-gray-400 font-light">No board examinations or licensures recorded yet.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {licensures.map((lic: any) => (
+              <div key={lic.id} className="flex items-start gap-3.5 p-3 rounded-xl border border-gray-100 hover:border-gray-200 bg-gray-50/40 transition-colors group">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                  <IdentificationIcon className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-sm font-bold text-gray-900">{lic.exam_title}</h4>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Passed {lic.year_passed}
+                    </span>
+                    {lic.rating && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        Rating: {lic.rating}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                    {lic.license_number && <span>PRC License No: <strong className="font-mono text-gray-700">{lic.license_number}</strong></span>}
+                    {lic.verified_by_admin && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
+                        <CheckBadgeIcon className="w-3.5 h-3.5" /> Verified by Institution
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDeleteLicensure(lic.id)}
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all p-1.5 cursor-pointer"
+                  title="Delete record"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Postgraduate & Advanced Studies */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-2xs">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <SectionLine label="Postgraduate & Advanced Studies" />
+            <p className="text-xs text-gray-500 mt-0.5">Master's degrees, Doctorate programs, and post-graduate diplomas for accreditation</p>
+          </div>
+          <button
+            onClick={() => setShowPostgradForm(!showPostgradForm)}
+            className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
+          >
+            {showPostgradForm ? 'Cancel' : '+ Add Advanced Degree'}
+          </button>
+        </div>
+
+        {showPostgradForm && (
+          <div className="mb-4 p-4 bg-blue-50/40 rounded-xl border border-blue-200/60 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Degree Level</label>
+                <select
+                  value={postgradForm.degree_level}
+                  onChange={(e) => setPostgradForm((f: any) => ({ ...f, degree_level: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+                >
+                  <option value="masteral">Master's Degree (MS / MA / MEd / MBA)</option>
+                  <option value="doctoral">Doctorate / Ph.D. (Ph.D. / Ed.D. / DIT)</option>
+                  <option value="post_graduate_diploma">Post-Graduate Diploma (DPE / PGD)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Program Title</label>
+                <input
+                  type="text"
+                  value={postgradForm.program_title}
+                  onChange={(e) => setPostgradForm((f: any) => ({ ...f, program_title: e.target.value }))}
+                  placeholder="e.g. Master of Science in Information Technology (MSIT)"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Institution / University</label>
+                <input
+                  type="text"
+                  value={postgradForm.institution}
+                  onChange={(e) => setPostgradForm((f: any) => ({ ...f, institution: e.target.value }))}
+                  placeholder="e.g. Cebu Technological University - Main Campus"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Enrollment / Degree Status</label>
+                <select
+                  value={postgradForm.status}
+                  onChange={(e) => setPostgradForm((f: any) => ({ ...f, status: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+                >
+                  <option value="enrolled">Currently Enrolled (Ongoing)</option>
+                  <option value="candidate">Candidate (Completed Academic Requirements - CAR)</option>
+                  <option value="graduated">Graduated / Degree Conferred</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Start Year</label>
+                <input
+                  type="number"
+                  min={1970}
+                  max={2100}
+                  value={postgradForm.start_year}
+                  onChange={(e) => setPostgradForm((f: any) => ({ ...f, start_year: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Completion Year (Optional)</label>
+                <input
+                  type="number"
+                  min={1970}
+                  max={2100}
+                  value={postgradForm.completion_year}
+                  onChange={(e) => setPostgradForm((f: any) => ({ ...f, completion_year: e.target.value }))}
+                  placeholder="Year conferred or expected"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Thesis / Dissertation Title (Optional)</label>
+              <input
+                type="text"
+                value={postgradForm.thesis_title}
+                onChange={(e) => setPostgradForm((f: any) => ({ ...f, thesis_title: e.target.value }))}
+                placeholder="Title of research study or capstone"
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 bg-white"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowPostgradForm(false)}
+                className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddPostgraduate}
+                className="px-4 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded-lg hover:bg-orange-700 transition-colors shadow-2xs cursor-pointer"
+              >
+                Save Advanced Degree
+              </button>
+            </div>
+          </div>
+        )}
+
+        {postgraduate.length === 0 ? (
+          <p className="text-sm text-gray-400 font-light">No postgraduate degrees or advanced studies recorded yet.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {postgraduate.map((pg: any) => (
+              <div key={pg.id} className="flex items-start gap-3.5 p-3 rounded-xl border border-gray-100 hover:border-gray-200 bg-gray-50/40 transition-colors group">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <BuildingLibraryIcon className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-sm font-bold text-gray-900">{pg.program_title}</h4>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                      pg.degree_level === 'doctoral'
+                        ? 'bg-purple-100 text-purple-800 border-purple-200'
+                        : pg.degree_level === 'masteral'
+                        ? 'bg-blue-100 text-blue-800 border-blue-200'
+                        : 'bg-teal-100 text-teal-800 border-teal-200'
+                    }`}>
+                      {pg.degree_level === 'doctoral' ? 'Doctoral (Ph.D.)' : pg.degree_level === 'masteral' ? "Master's Degree" : 'Post-Grad Diploma'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                      pg.status === 'graduated'
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                        : pg.status === 'candidate'
+                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                        : 'bg-sky-100 text-sky-800 border-sky-200'
+                    }`}>
+                      {pg.status === 'graduated' ? 'Graduated' : pg.status === 'candidate' ? 'Candidate (CAR)' : 'Currently Enrolled'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5 font-medium">{pg.institution}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {pg.start_year}{pg.completion_year ? ` – ${pg.completion_year}` : ' – Present'}
+                    {pg.thesis_title && ` · Thesis: "${pg.thesis_title}"`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDeletePostgraduate(pg.id)}
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all p-1.5 cursor-pointer"
+                  title="Delete record"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
@@ -3018,11 +3434,10 @@ export default function ProfilePage() {
                 key={tab.id}
                 data-tour={tab.id === 'privacy' ? 'profile-privacy-tab' : undefined}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-orange-50 text-orange-600 shadow-2xs font-bold'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-all cursor-pointer ${isActive
+                  ? 'bg-orange-50 text-orange-600 shadow-2xs font-bold'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-orange-600' : 'text-gray-400'}`} />
                 <span>{tab.label}</span>
@@ -3169,11 +3584,10 @@ export default function ProfilePage() {
                           <button
                             type="button"
                             onClick={() => { setEditing(true); setEditSection('personal'); }}
-                            className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors cursor-pointer inline-flex items-center gap-1 ${
-                              currentEmp?.verification_status === 'rejected'
-                                ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
-                                : 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200'
-                            }`}
+                            className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors cursor-pointer inline-flex items-center gap-1 ${currentEmp?.verification_status === 'rejected'
+                              ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
+                              : 'bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200'
+                              }`}
                           >
                             <DocumentArrowUpIcon className="w-3.5 h-3.5" />
                             <span>{currentEmp?.verification_status === 'rejected' ? 'Re-upload Proof' : '+ Submit Proof'}</span>

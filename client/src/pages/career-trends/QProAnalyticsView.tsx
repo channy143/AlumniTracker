@@ -11,6 +11,9 @@ import {
   CheckBadgeIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
+  AcademicCapIcon,
+  IdentificationIcon,
+  BuildingLibraryIcon,
 } from '@heroicons/react/24/outline';
 import {
   BarChart,
@@ -64,6 +67,39 @@ export default function QProAnalyticsView({
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+
+  // Accreditation data
+  const accreditation = qpro.accreditation || {};
+  const accSummary = accreditation.summary || {};
+  const licData = accreditation.licensures || {};
+  const postgradData = accreditation.postgraduate || {};
+  const fullAccRoster = accreditation.accreditationRoster || [];
+
+  const [searchAccRoster, setSearchAccRoster] = useState('');
+  const [currentAccPage, setCurrentAccPage] = useState(1);
+  const accPageSize = 8;
+
+  const filteredAccRoster = useMemo(() => {
+    return fullAccRoster.filter((item: any) => {
+      if (!searchAccRoster) return true;
+      const s = searchAccRoster.toLowerCase();
+      const licTitles = (item.licensures || []).map((l: any) => l.examTitle?.toLowerCase()).join(' ');
+      const pgTitles = (item.postgraduate || []).map((p: any) => `${p.programTitle} ${p.institution}`.toLowerCase()).join(' ');
+      return (
+        item.name?.toLowerCase().includes(s) ||
+        item.studentId?.toLowerCase().includes(s) ||
+        item.undergradProgram?.toLowerCase().includes(s) ||
+        licTitles.includes(s) ||
+        pgTitles.includes(s)
+      );
+    });
+  }, [fullAccRoster, searchAccRoster]);
+
+  const totalAccPages = Math.ceil(filteredAccRoster.length / accPageSize) || 1;
+  const paginatedAccRoster = useMemo(() => {
+    const start = (currentAccPage - 1) * accPageSize;
+    return filteredAccRoster.slice(start, start + accPageSize);
+  }, [filteredAccRoster, currentAccPage]);
 
   // Filtered Roster
   const fullRoster = employability.alumniRoster || [];
@@ -133,6 +169,62 @@ export default function QProAnalyticsView({
       'download',
       `CTU_Naga_QPro_Alumni_Employability_${selectedProgram || 'All'}_${selectedBatch || 'All'}.csv`
     );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportAccreditationCSV = () => {
+    const headers = [
+      'Student ID',
+      'Full Name',
+      'Undergraduate Program',
+      'Batch Year',
+      'PRC Board Examinations Passed',
+      'Board Exam Ratings',
+      'PRC License Numbers',
+      'Postgraduate Degree Level',
+      'Postgraduate Program',
+      'Postgraduate Institution',
+      'Postgraduate Status',
+      'Thesis / Dissertation Title',
+    ];
+
+    const rows = filteredAccRoster.map((item: any) => {
+      const lics = item.licensures || [];
+      const pgs = item.postgraduate || [];
+      const examTitles = lics.map((l: any) => `${l.examTitle} (${l.yearPassed})`).join('; ');
+      const ratings = lics.map((l: any) => l.rating ? `${l.rating}%` : 'N/A').join('; ');
+      const licenses = lics.map((l: any) => l.licenseNumber || 'N/A').join('; ');
+      const pgLevels = pgs.map((p: any) => p.degreeLevel).join('; ');
+      const pgPrograms = pgs.map((p: any) => p.programTitle).join('; ');
+      const pgInsts = pgs.map((p: any) => p.institution).join('; ');
+      const pgStatuses = pgs.map((p: any) => p.status).join('; ');
+      const theses = pgs.map((p: any) => p.thesisTitle || 'N/A').join('; ');
+
+      return [
+        `"${item.studentId || ''}"`,
+        `"${item.name || ''}"`,
+        `"${item.undergradProgram || ''}"`,
+        item.undergradBatch || '',
+        `"${examTitles}"`,
+        `"${ratings}"`,
+        `"${licenses}"`,
+        `"${pgLevels}"`,
+        `"${pgPrograms}"`,
+        `"${pgInsts}"`,
+        `"${pgStatuses}"`,
+        `"${theses}"`,
+      ];
+    });
+
+    const csvContent = [headers.join(','), ...rows.map((r: any) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `CTU_Naga_PRC_Licensures_and_Postgraduate_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -786,6 +878,286 @@ export default function QProAnalyticsView({
             >
               Next
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 4: INSTITUTIONAL ACCREDITATION — PRC BOARD LICENSURES & ADVANCED POSTGRADUATE STUDIES */}
+      <div className="bg-white border border-gray-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-gray-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                CHED &amp; SUC Leveling Criteria
+              </span>
+              <span className="text-xs text-gray-500 font-medium">Quality Assurance &amp; Program Accreditation</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
+              4. PRC Board Exam Passers &amp; Postgraduate Higher Education
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Institutional tracking for professional board exam passers (LET, CPA, CSE) and advanced graduate school degrees (Master's, Ph.D.).
+            </p>
+          </div>
+
+          <button
+            onClick={handleExportAccreditationCSV}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs shrink-0 cursor-pointer"
+          >
+            <ArrowDownTrayIcon className="w-4 h-4" />
+            <span>Export Accreditation Ledger (CSV)</span>
+          </button>
+        </div>
+
+        {/* 4 Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/40 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase text-emerald-800 tracking-wider">PRC Board Passers</span>
+              <IdentificationIcon className="w-5 h-5 text-emerald-600" />
+            </div>
+            <p className="text-2xl font-black text-gray-900">{accSummary.totalPassers || 0}</p>
+            <p className="text-xs text-emerald-700 font-medium">
+              {accSummary.prcPassingRate || 0}% passing rate
+              {accSummary.avgBoardRating ? ` · ${accSummary.avgBoardRating}% avg rating` : ''}
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/40 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase text-blue-800 tracking-wider">LET / Teacher Passers</span>
+              <AcademicCapIcon className="w-5 h-5 text-blue-600" />
+            </div>
+            <p className="text-2xl font-black text-gray-900">
+              {(licData.distribution || []).find((d: any) => d.title.includes('Teachers') || d.title.includes('LET'))?.count || 0}
+            </p>
+            <p className="text-xs text-blue-700 font-medium">
+              Eligible for public &amp; private teaching
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl border border-purple-100 bg-purple-50/40 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase text-purple-800 tracking-wider">Postgraduate Pursuit</span>
+              <BuildingLibraryIcon className="w-5 h-5 text-purple-600" />
+            </div>
+            <p className="text-2xl font-black text-gray-900">{accSummary.totalPostgrad || 0}</p>
+            <p className="text-xs text-purple-700 font-medium">
+              {accSummary.postgradPursuitRate || 0}% graduate school pursuit rate
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl border border-amber-100 bg-amber-50/40 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase text-amber-800 tracking-wider">Advanced Degrees</span>
+              <SparklesIcon className="w-5 h-5 text-amber-600" />
+            </div>
+            <p className="text-2xl font-black text-gray-900">
+              {accSummary.totalMasteral || 0} <span className="text-xs font-normal text-gray-500">MS/MA</span> · {accSummary.totalDoctoral || 0} <span className="text-xs font-normal text-gray-500">Ph.D.</span>
+            </p>
+            <p className="text-xs text-amber-700 font-medium">
+              Active candidates &amp; degree holders
+            </p>
+          </div>
+        </div>
+
+        {/* 2-Column Analytics Visualizations */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Column 1: PRC Board Examinations Breakdown */}
+          <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                PRC Examinations Breakdown
+              </h4>
+              <span className="text-[11px] text-gray-400">By Title</span>
+            </div>
+
+            {(licData.distribution || []).length > 0 ? (
+              <div className="space-y-2">
+                {(licData.distribution || []).map((exam: any, idx: number) => (
+                  <div key={idx} className="p-2.5 rounded-lg bg-white border border-gray-100 space-y-1 shadow-2xs">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-gray-900">{exam.title}</span>
+                      <span className="font-bold text-emerald-700">{exam.count} passers</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-gray-400">
+                      <span>{exam.percentage}% of passers</span>
+                      {exam.avgRating && <span className="text-amber-600 font-medium">Avg Rating: {exam.avgRating}%</span>}
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, Math.max(5, exam.percentage))}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-xs text-gray-400">
+                No licensure exam records logged for the selected cohort.
+              </div>
+            )}
+          </div>
+
+          {/* Column 2: Postgraduate Studies Breakdown */}
+          <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                Postgraduate Degree Levels &amp; Status
+              </h4>
+              <span className="text-[11px] text-gray-400">Advanced Higher Ed</span>
+            </div>
+
+            <div className="space-y-2">
+              {(postgradData.degreeLevelDistribution || []).map((deg: any, idx: number) => (
+                <div key={idx} className="p-2.5 rounded-lg bg-white border border-gray-100 space-y-1 shadow-2xs">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-gray-900">{deg.level}</span>
+                    <span className="font-bold text-purple-700">{deg.count} alumni</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min(100, Math.max(5, deg.percentage))}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {(postgradData.topInstitutions || []).length > 0 && (
+              <div className="pt-2 border-t border-gray-100">
+                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">Top Advanced Institutions</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(postgradData.topInstitutions || []).map((inst: any, idx: number) => (
+                    <span key={idx} className="px-2 py-0.5 rounded-md text-[11px] bg-white border border-gray-200 text-gray-700 font-medium">
+                      {inst.institution} ({inst.count})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Accreditation Audit Ledger Table */}
+        <div className="border border-gray-200/80 rounded-xl overflow-hidden shadow-2xs">
+          <div className="p-3 bg-gray-50/70 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 className="text-xs font-bold text-gray-900">
+                Official Accreditation Audit Ledger (Licensed &amp; Advanced Alumni)
+              </h4>
+              <p className="text-[11px] text-gray-500">Graduates eligible for institutional program leveling credit</p>
+            </div>
+
+            <div className="relative">
+              <MagnifyingGlassIcon className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+              <input
+                type="text"
+                value={searchAccRoster}
+                onChange={(e) => {
+                  setSearchAccRoster(e.target.value);
+                  setCurrentAccPage(1);
+                }}
+                placeholder="Search alumni, exam, university..."
+                className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-gray-200 focus:outline-hidden focus:ring-1 focus:ring-orange-500 bg-white w-52 sm:w-60"
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-600 font-semibold">
+                  <th className="py-2.5 px-3">Alumnus Name &amp; ID</th>
+                  <th className="py-2.5 px-3">Undergraduate Degree</th>
+                  <th className="py-2.5 px-3">PRC Board Examinations</th>
+                  <th className="py-2.5 px-3">Postgraduate Studies</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {paginatedAccRoster.length > 0 ? (
+                  paginatedAccRoster.map((item: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-gray-50/60 transition-colors">
+                      <td className="py-2 px-3">
+                        <div className="font-semibold text-gray-900">{item.name}</div>
+                        <div className="text-[10px] font-mono text-gray-500">{item.studentId}</div>
+                      </td>
+                      <td className="py-2 px-3">
+                        <div className="font-medium text-gray-800">{item.undergradProgram}</div>
+                        <div className="text-[10px] text-gray-400">Class of {item.undergradBatch || '—'}</div>
+                      </td>
+                      <td className="py-2 px-3">
+                        {item.licensures?.length > 0 ? (
+                          <div className="space-y-1">
+                            {item.licensures.map((l: any, lIdx: number) => (
+                              <div key={lIdx} className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-medium text-gray-900">{l.examTitle}</span>
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                  {l.yearPassed}
+                                </span>
+                                {l.rating && (
+                                  <span className="text-[10px] text-amber-600 font-semibold">({l.rating}%)</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-[11px]">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3">
+                        {item.postgraduate?.length > 0 ? (
+                          <div className="space-y-1">
+                            {item.postgraduate.map((p: any, pIdx: number) => (
+                              <div key={pIdx}>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-medium text-gray-900">{p.programTitle}</span>
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-800">
+                                    {p.status}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-gray-500">{p.institution}</div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-[11px]">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-gray-400">
+                      No accredited alumni records match the search criteria.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between p-3 border-t border-gray-100 text-xs text-gray-500">
+            <div>
+              Showing <strong className="text-gray-800">{paginatedAccRoster.length}</strong> of{' '}
+              <strong className="text-gray-800">{filteredAccRoster.length}</strong> accredited alumni
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setCurrentAccPage((p) => Math.max(1, p - 1))}
+                disabled={currentAccPage <= 1}
+                className="px-2.5 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Previous
+              </button>
+              <span className="px-2 py-1 font-semibold text-gray-800">
+                Page {currentAccPage} of {totalAccPages}
+              </span>
+              <button
+                onClick={() => setCurrentAccPage((p) => Math.min(totalAccPages, p + 1))}
+                disabled={currentAccPage >= totalAccPages}
+                className="px-2.5 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       </div>

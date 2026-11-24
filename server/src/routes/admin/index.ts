@@ -34,24 +34,32 @@ function groupBy<T extends Record<string, any>>(arr: T[], key: string): Record<s
 
 const router = Router();
 
-router.use(authenticate, authorize('admin'));
+// Allow all institutional administrative roles into the admin router
+router.use(authenticate, authorize('admin', 'alumni_officer', 'staff', 'registrar'));
 
-router.use('/dashboard', dashboardRouter);
-router.use('/alumni', alumniRouter);
-router.use('/companies', companiesRouter);
-router.use('/jobs', jobsRouter);
-router.use('/surveys', surveysRouter);
-router.use('/announcements', announcementsRouter);
-router.use('/events', eventsRouter);
-router.use('/reports', reportsRouter);
-router.use('/analytics', analyticsRouter);
-router.use('/employer-insights', employerInsightsRouter);
-router.use('/curriculum-insights', curriculumInsightsRouter);
-router.use('/users', usersRouter);
-router.use('/settings', settingsRouter);
-router.use('/audit-logs', auditLogsRouter);
+// Shared institutional records (Admin, Alumni Officer, Staff, and Registrar)
 router.use('/eligible-alumni', eligibleAlumniRouter);
-router.use('/security-incidents', securityIncidentsRouter);
+router.use('/alumni', alumniRouter);
+router.use('/reports', reportsRouter);
+
+// Alumni Affairs Operations (Admin, Alumni Officer, Staff)
+const authorizeOperations = authorize('admin', 'alumni_officer', 'staff');
+router.use('/dashboard', authorizeOperations, dashboardRouter);
+router.use('/companies', authorizeOperations, companiesRouter);
+router.use('/jobs', authorizeOperations, jobsRouter);
+router.use('/surveys', authorizeOperations, surveysRouter);
+router.use('/announcements', authorizeOperations, announcementsRouter);
+router.use('/events', authorizeOperations, eventsRouter);
+router.use('/analytics', authorizeOperations, analyticsRouter);
+router.use('/employer-insights', authorizeOperations, employerInsightsRouter);
+router.use('/curriculum-insights', authorizeOperations, curriculumInsightsRouter);
+
+// Sensitive System Management (Super Admin Only)
+const authorizeSuperAdmin = authorize('admin');
+router.use('/users', authorizeSuperAdmin, usersRouter);
+router.use('/settings', authorizeSuperAdmin, settingsRouter);
+router.use('/audit-logs', authorizeSuperAdmin, auditLogsRouter);
+router.use('/security-incidents', authorizeSuperAdmin, securityIncidentsRouter);
 
 router.get('/export', adminSensitiveLimiter, requireAdminSudo, async (req: AuthenticatedRequest, res, next) => {
   try {
