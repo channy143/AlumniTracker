@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
+import { getPesoEventsAndAnnouncements, PESO_FB_PAGE_URL } from '../services/pesoFacebookService';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.get('/', authenticate, async (req, res, next) => {
       result = events || [];
     }
 
-    res.json(result.map((e: any) => ({
+    const dbEvents = result.map((e: any) => ({
       id: e.id,
       name: e.title,
       description: e.content || '',
@@ -41,7 +42,37 @@ router.get('/', authenticate, async (req, res, next) => {
       registration_link: e.job_url || '',
       gallery: e.event_gallery || [],
       created_at: e.created_at,
-    })));
+    }));
+
+    // Fetch official PESO Facebook events (e.g. City of Naga Year-End Job Fair)
+    let pesoEvents: any[] = [];
+    try {
+      const pesoItems = await getPesoEventsAndAnnouncements();
+      pesoEvents = (pesoItems || [])
+        .filter((p) => /job fair|event|gymnasium/i.test(`${p.position} ${p.job_type}`))
+        .map((p) => {
+          const venueMatch = p.description.match(/(?:Venue\s*:|📍\s*(?:Venue\s*:)?)\s*([^\n\r]+)/i);
+          const dateMatch = p.description.match(/(?:Date\s*:|🗓\s*(?:Date\s*:)?)\s*([^\n\r]+)/i);
+          const timeMatch = p.description.match(/(?:Time\s*:|⏰\s*(?:Time\s*:)?)\s*([^\n\r]+)/i);
+          return {
+            id: p.id,
+            name: p.position,
+            description: p.description,
+            date: dateMatch ? dateMatch[1].trim() : 'November 27, 2026',
+            event_date: '2026-11-27',
+            time: timeMatch ? timeMatch[1].trim() : '9:00 A.M. - 4:00 P.M.',
+            location: venueMatch ? venueMatch[1].trim() : p.location || 'Brgy. Colon Gymnasium, City of Naga, Cebu',
+            organizer: 'PESO - City of Naga, Cebu',
+            banner: p.poster_url || (p.gallery_images && p.gallery_images[0]) || '',
+            registration_link: p.application_url || PESO_FB_PAGE_URL,
+            gallery: p.gallery_images || [],
+            created_at: p.created_at,
+          };
+        });
+    } catch {}
+
+    const combinedEvents = [...pesoEvents, ...dbEvents];
+    res.json(combinedEvents);
   } catch (err) { next(err); }
 });
 

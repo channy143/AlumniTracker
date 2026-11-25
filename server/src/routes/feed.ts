@@ -16,6 +16,7 @@ import {
   matchMentionsInText,
   notifyMentionedUsers,
 } from '../utils/mentions';
+import { getPesoEventsAndAnnouncements, PESO_FB_PAGE_URL } from '../services/pesoFacebookService';
 
 const router = Router();
 
@@ -214,8 +215,55 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
       return true;
     });
 
+    // Merge official PESO Facebook Events & Announcements so they appear on the alumni home dashboard
+    let pesoFeedPosts: any[] = [];
+    try {
+      const pesoItems = await getPesoEventsAndAnnouncements();
+      pesoFeedPosts = (pesoItems || []).map((p) => {
+        const isEvent = /event|job fair|venue|gymnasium|sched/i.test(`${p.position} ${p.job_type}`);
+        const venueMatch = p.description.match(/(?:Venue\s*:|📍\s*(?:Venue\s*:)?)\s*([^\n\r]+)/i);
+        const dateMatch = p.description.match(/(?:Date\s*:|🗓\s*(?:Date\s*:)?)\s*([^\n\r]+)/i);
+        const timeMatch = p.description.match(/(?:Time\s*:|⏰\s*(?:Time\s*:)?)\s*([^\n\r]+)/i);
+
+        return {
+          id: p.id,
+          type: isEvent ? 'event' : 'announcement',
+          title: p.position,
+          content: p.description,
+          author: 'PESO - City of Naga, Cebu',
+          author_avatar: 'P',
+          image_url: p.poster_url || (p.gallery_images && p.gallery_images[0]) || null,
+          company: 'PESO - City of Naga, Cebu',
+          job_url: p.application_url || PESO_FB_PAGE_URL,
+          tag: isEvent ? 'Official Event' : 'Official Announcement',
+          tag_color: isEvent ? 'bg-orange-50 text-orange-700' : 'bg-blue-50 text-blue-700',
+          is_official: true,
+          like_count: 0,
+          comment_count: 0,
+          share_count: 0,
+          created_at: p.created_at,
+          updated_at: p.created_at,
+          linked_survey_id: null,
+          audience: 'public',
+          feeling: null,
+          location: venueMatch ? venueMatch[1].trim() : p.location || 'City of Naga, Cebu',
+          event_date: dateMatch ? dateMatch[1].trim() : (isEvent ? 'November 27, 2026' : null),
+          event_time: timeMatch ? timeMatch[1].trim() : (isEvent ? '9:00 AM - 4:00 PM' : null),
+          event_location: venueMatch ? venueMatch[1].trim() : (isEvent ? 'Brgy. Colon Gymnasium, City of Naga, Cebu' : null),
+          event_gallery: p.gallery_images || [],
+          tagged_friends: [],
+          media_type: 'photo',
+          video_url: null,
+          comments_disabled: false,
+          reactions_summary: {},
+        };
+      });
+    } catch {
+      // Fallback gracefully if Facebook fetch errors
+    }
+
     const seen = new Set<string>();
-    const merged = [...visiblePosts, ...announcementPosts].filter((p: any) => {
+    const merged = [...visiblePosts, ...announcementPosts, ...pesoFeedPosts].filter((p: any) => {
       if (seen.has(p.id)) return false;
       seen.add(p.id);
       return true;

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../services/supabase';
 import { authenticate } from '../middleware/auth';
+import { getPesoEventsAndAnnouncements } from '../services/pesoFacebookService';
 
 const router = Router();
 
@@ -80,7 +81,26 @@ router.get('/', authenticate, async (_req, res, next) => {
         linked_survey: null,
       }));
 
-    const combined = [...itemsFromAnnouncements, ...itemsFromFeed];
+    // Fetch official PESO Facebook announcements and advisories
+    let pesoAnnouncements: any[] = [];
+    try {
+      const allPeso = await getPesoEventsAndAnnouncements();
+      pesoAnnouncements = (allPeso || [])
+        .filter((p) => !/colon gymnasium|event alert/i.test(p.position))
+        .map((p) => ({
+          id: p.id,
+          title: p.position,
+          content: p.description,
+          image_url: p.poster_url || (p.gallery_images && p.gallery_images[0]) || null,
+          document_url: null,
+          is_pinned: false,
+          created_at: p.created_at,
+          created_by: 'PESO - City of Naga, Cebu',
+          linked_survey: null,
+        }));
+    } catch {}
+
+    const combined = [...itemsFromAnnouncements, ...itemsFromFeed, ...pesoAnnouncements];
 
     // Sort: pinned first, then newest created_at first
     combined.sort((a, b) => {

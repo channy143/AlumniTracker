@@ -682,3 +682,48 @@ export async function getPesoJobById(id: string): Promise<PesoJobPosting | null>
   const all = await getAllPesoFacebookJobs();
   return all.find((j) => String(j.id) === String(id)) || null;
 }
+
+/**
+ * Differentiates whether a PESO Facebook post is a genuine employer job vacancy
+ * versus a general announcement or event advisory (e.g. Job Fair alert, coming soon teaser, training program).
+ */
+export function isPesoJobPosting(post: PesoJobPosting): boolean {
+  if (!post) return false;
+  const title = (post.position || '').toLowerCase();
+  const type = (post.job_type || '').toLowerCase();
+  const industry = (post.industry || '').toLowerCase();
+
+  // If explicitly labeled as Job Fair Event, Announcement, Advisory, or Technical Training
+  if (type === 'job fair event' || type === 'announcement' || type === 'advisory' || type === 'technical training') {
+    return false;
+  }
+  if (/year-end job fair|yearend job fair|job fair alert|coming soon advisory|free smaw training/i.test(title)) {
+    return false;
+  }
+  if (/multi-industry mega job fair|skills training|recruitment advisory/i.test(industry)) {
+    return false;
+  }
+
+  // True employer hiring opportunities (e.g. MinebeaMitsumi, IPI, Oasia Global)
+  return true;
+}
+
+export function isPesoEventOrAnnouncement(post: PesoJobPosting): boolean {
+  return !isPesoJobPosting(post);
+}
+
+/**
+ * Returns only genuine PESO employer job vacancies for the Job Postings page
+ */
+export async function getPesoHiringJobsOnly(): Promise<PesoJobPosting[]> {
+  const all = await getAllPesoFacebookJobs();
+  return all.filter((j) => isPesoJobPosting(j));
+}
+
+/**
+ * Returns PESO events and announcements for the Alumni Home Dashboard feed and Events/Announcements views
+ */
+export async function getPesoEventsAndAnnouncements(): Promise<PesoJobPosting[]> {
+  const all = await getAllPesoFacebookJobs();
+  return all.filter((j) => isPesoEventOrAnnouncement(j));
+}

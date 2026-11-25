@@ -1014,13 +1014,25 @@ export default function JobsPage() {
     setQueryFilter(urlFilter);
   }, [urlFilter]);
 
+  const isJobVacancy = (j: any) => {
+    const normTitle = (j.position || '').toLowerCase();
+    const normType = (j.job_type || '').toLowerCase();
+    if (normType === 'job fair event' || normType === 'announcement' || normType === 'advisory' || normType === 'technical training') {
+      return false;
+    }
+    if (/year-end job fair|yearend job fair|job fair alert|coming soon advisory|free smaw training/i.test(normTitle)) {
+      return false;
+    }
+    return true;
+  };
+
   const [loading, setLoading] = useState(() => getCached('/jobs') === undefined);
   const [jobs, setJobs] = useState<any[]>(() => {
     const raw = getCached<any[]>('/jobs') || [];
     const seen = new Set<string>();
     return raw.filter((j: any) => {
       const id = String(j.id || '');
-      if (!id || seen.has(id)) return false;
+      if (!id || seen.has(id) || !isJobVacancy(j)) return false;
       seen.add(id);
       return true;
     });
@@ -1041,7 +1053,7 @@ export default function JobsPage() {
         const seen = new Set<string>();
         const deduped = (jobsData || []).filter((j: any) => {
           const id = String(j.id || '');
-          if (!id || seen.has(id)) return false;
+          if (!id || seen.has(id) || !isJobVacancy(j)) return false;
           seen.add(id);
           return true;
         });
@@ -1109,6 +1121,7 @@ export default function JobsPage() {
   const newThisWeek = jobs.filter((j: any) => new Date(j.created_at).getTime() > weekAgo).length;
 
   const filteredJobs = jobs.filter((job) => {
+    if (!isJobVacancy(job)) return false;
     if (filter === 'exclusive' && !job.is_alumni_exclusive) return false;
     if (filter === 'peso' && !String(job.id || '').startsWith('peso-fb-') && job.source !== 'peso') return false;
     if (filter === 'system' && (String(job.id || '').startsWith('peso-fb-') || job.source === 'peso')) return false;
@@ -1153,7 +1166,7 @@ export default function JobsPage() {
             </span>
           </div>
           <p className="text-xs text-gray-500">
-            Official career opportunities and recruitment advisories from PESO - City of Naga, Cebu and CTU portal employers
+            Active employment opportunities and hiring vacancies from PESO - City of Naga, Cebu and CTU portal employers
           </p>
         </div>
 
@@ -1318,9 +1331,9 @@ export default function JobsPage() {
           <BriefcaseIcon className="w-4 h-4 text-gray-400 shrink-0" />
           <div className="flex items-center gap-1 flex-wrap">
             {([
-              { value: 'all', label: 'All Jobs' },
+              { value: 'all', label: 'All Vacancies' },
               { type: 'divider' },
-              { value: 'peso', label: 'PESO Naga' },
+              { value: 'peso', label: 'PESO Hiring' },
               { value: 'system', label: 'Portal Jobs' },
               { type: 'divider' },
               { value: 'full-time', label: 'Full-Time' },

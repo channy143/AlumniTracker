@@ -8,7 +8,7 @@ import { AuthenticatedRequest } from '../types';
 import { applyJobSchema } from '../middleware/validationSchemas';
 import { validateResumeContent } from '../utils/validateResume';
 import { createNotification, notifyAdmins } from './notifications';
-import { getAllPesoFacebookJobs, getPesoJobById } from '../services/pesoFacebookService';
+import { getPesoHiringJobsOnly, getPesoJobById } from '../services/pesoFacebookService';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -22,12 +22,12 @@ async function getProfileByUserId(db: any, userId: string) {
   return data;
 }
 
-// Returns ALL posts from official PESO - City of Naga, Cebu Facebook page TOGETHER WITH original system jobs created in the portal
-// PESO jobs (sorted newest first) are displayed on top, followed by all active employer/alumni jobs created in the system
+// Returns actual employer hiring job vacancies from PESO - City of Naga, Cebu TOGETHER WITH original system jobs created in the portal
+// General announcements and events (like Job Fairs) are routed to the Alumni Dashboard Feed and Events/Announcements views
 router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    // 1. Fetch official PESO Facebook jobs
-    const fbJobs = await getAllPesoFacebookJobs();
+    // 1. Fetch official PESO Facebook employer hiring jobs (excluding general events & announcements)
+    const fbJobs = await getPesoHiringJobsOnly();
 
     // 2. Fetch original jobs created in the system from database
     const db = createUserScopedClient(req.token!);
