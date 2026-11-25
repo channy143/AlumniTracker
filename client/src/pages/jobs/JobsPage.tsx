@@ -215,7 +215,16 @@ function getCompanyInitials(name: string): string {
   return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
 }
 
-type JobFilter = 'all' | 'full-time' | 'part-time' | 'contract' | 'freelance' | 'internship' | 'exclusive';
+type JobFilter =
+  | 'all'
+  | 'full-time'
+  | 'part-time'
+  | 'contract'
+  | 'freelance'
+  | 'internship'
+  | 'exclusive'
+  | 'peso'
+  | 'system';
 
 function JobCard({
   job,
@@ -325,6 +334,15 @@ function JobCard({
 
         {/* Badges / Pills Row */}
         <div className="flex flex-wrap items-center gap-2 mb-2">
+          {String(job.id || '').startsWith('peso-fb-') || job.source === 'peso' ? (
+            <span className="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+              PESO Naga
+            </span>
+          ) : (
+            <span className="px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Portal Employer
+            </span>
+          )}
           <span className="px-3 py-1 text-xs font-medium bg-gray-100 text-gray-800">
             {jobTypeLabel}
           </span>
@@ -1092,7 +1110,9 @@ export default function JobsPage() {
 
   const filteredJobs = jobs.filter((job) => {
     if (filter === 'exclusive' && !job.is_alumni_exclusive) return false;
-    if (filter !== 'all' && filter !== 'exclusive' && job.job_type !== filter) return false;
+    if (filter === 'peso' && !String(job.id || '').startsWith('peso-fb-') && job.source !== 'peso') return false;
+    if (filter === 'system' && (String(job.id || '').startsWith('peso-fb-') || job.source === 'peso')) return false;
+    if (filter !== 'all' && filter !== 'exclusive' && filter !== 'peso' && filter !== 'system' && job.job_type !== filter) return false;
     if (queryFilter) {
       const q = queryFilter.toLowerCase().trim();
       const posMatch = (job.position || '').toLowerCase().includes(q);
@@ -1129,11 +1149,11 @@ export default function JobsPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-base font-bold text-gray-900">Job Opportunities</h1>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider">
-              PESO City of Naga, Cebu
+              PESO Naga &amp; CTU Career Network
             </span>
           </div>
           <p className="text-xs text-gray-500">
-            Official career opportunities and recruitment advisories fetched from PESO - City of Naga, Cebu (sorted with latest first)
+            Official career opportunities and recruitment advisories from PESO - City of Naga, Cebu and CTU portal employers
           </p>
         </div>
 
@@ -1298,12 +1318,14 @@ export default function JobsPage() {
           <BriefcaseIcon className="w-4 h-4 text-gray-400 shrink-0" />
           <div className="flex items-center gap-1 flex-wrap">
             {([
-              { value: 'all', label: 'All' },
+              { value: 'all', label: 'All Jobs' },
+              { type: 'divider' },
+              { value: 'peso', label: 'PESO Naga' },
+              { value: 'system', label: 'Portal Jobs' },
               { type: 'divider' },
               { value: 'full-time', label: 'Full-Time' },
               { value: 'part-time', label: 'Part-Time' },
               { value: 'contract', label: 'Contract' },
-              { value: 'freelance', label: 'Freelance' },
               { value: 'internship', label: 'Internship' },
               { type: 'divider' },
               { value: 'exclusive', label: 'Alumni Exclusive' },

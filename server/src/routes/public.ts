@@ -121,7 +121,7 @@ router.get('/stats', async (_req, res, next) => {
       },
       mentorshipMatches: matches.length || 0,
       programsTracked,
-      activeJobsCount: allPesoJobs.length,
+      activeJobsCount: allPesoJobs.length + activeJobs.length,
       featuredJobs,
       featuredAlumni,
     });
