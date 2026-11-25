@@ -1108,8 +1108,15 @@ export default function JobsPage() {
     <div className="max-w-7xl mx-auto pb-8">
       <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-base font-bold text-gray-900">Job Opportunities</h1>
-          <p className="text-xs text-gray-500">Discover verified employment opportunities directly from employers hiring CTU-Naga alumni</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-bold text-gray-900">Job Opportunities</h1>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider">
+              PESO City of Naga, Cebu
+            </span>
+          </div>
+          <p className="text-xs text-gray-500">
+            Official career opportunities and recruitment advisories fetched from PESO - City of Naga, Cebu (sorted with latest first)
+          </p>
         </div>
 
         {/* View Switcher Tabs: Job Opportunities & SAVED */}

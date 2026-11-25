@@ -8,6 +8,7 @@ import { AuthenticatedRequest } from '../types';
 import { applyJobSchema } from '../middleware/validationSchemas';
 import { validateResumeContent } from '../utils/validateResume';
 import { createNotification, notifyAdmins } from './notifications';
+import { getAllPesoFacebookJobs, getPesoJobById } from '../services/pesoFacebookService';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -21,72 +22,12 @@ async function getProfileByUserId(db: any, userId: string) {
   return data;
 }
 
-router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
+// Returns ONLY all posts fetched from the official PESO - City of Naga, Cebu Facebook page
+// Sorted chronologically descending with the latest post at index 0 (top of the list)
+router.get('/', authenticate, async (_req: AuthenticatedRequest, res, next) => {
   try {
-    const db = createUserScopedClient(req.token!);
-    const nowIso = new Date().toISOString();
-    const { data: jobs, error } = await db
-      .from('job_postings')
-      .select('*')
-      .or(`expires_at.is.null,expires_at.gte.${nowIso}`)
-      .order('created_at', { ascending: false });
-
-    if (error) throw new AppError(error.message, 500);
-
-    // Batch-fetch poster profiles so we can show the alumni's profile picture
-    const posterIds = (jobs || []).map((j: any) => j.posted_by).filter(Boolean);
-    const posterMap = new Map<string, any>();
-    if (posterIds.length > 0) {
-      const { data: posters } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, avatar_url')
-        .in('id', posterIds);
-      (posters || []).forEach((p: any) => posterMap.set(p.id, p));
-    }
-
-    const result = await Promise.all((jobs || []).map(async (job: any) => {
-      let companyInfo: any = null;
-      if (job.company_name) {
-        const { data: company } = await supabase
-          .from('companies')
-          .select('name, website, contact_email, logo, industry')
-          .ilike('name', job.company_name)
-          .maybeSingle();
-        companyInfo = company;
-      }
-      const poster = job.posted_by ? posterMap.get(job.posted_by) || null : null;
-      return {
-        id: job.id,
-        employer_id: job.employer_id || null,
-        company_name: job.company_name,
-        position: job.position,
-        description: job.description,
-        requirements: job.requirements,
-        location: job.location,
-        job_type: job.job_type,
-        salary_range: job.salary_range,
-        is_alumni_exclusive: job.is_alumni_exclusive,
-        required_skills: job.required_skills || [],
-        experience_level: job.experience_level || 'entry',
-        is_remote: job.is_remote || false,
-        industry: job.industry || null,
-        created_at: job.created_at,
-        expires_at: job.expires_at,
-        application_url: job.application_url || null,
-        poster_url: job.poster_url || null,
-        vacancies_count: job.vacancies_count ?? 1,
-        contact_phone: job.contact_phone || null,
-        contact_email: job.contact_email || null,
-        company_website: job.company_website || companyInfo?.website || null,
-        company_email: job.contact_email || companyInfo?.contact_email || null,
-        company_logo: companyInfo?.logo || null,
-        company_industry: companyInfo?.industry || null,
-        poster_avatar_url: poster?.avatar_url || null,
-        poster_name: poster ? `${poster.first_name || ''} ${poster.last_name || ''}`.trim() : null,
-      };
-    }));
-
-    res.json(result);
+    const fbJobs = await getAllPesoFacebookJobs();
+    res.json(fbJobs);
   } catch (err) {
     next(err);
   }
@@ -175,6 +116,11 @@ router.delete('/applications/:id', authenticate, async (req: AuthenticatedReques
 
 router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
+    const fbJob = await getPesoJobById(req.params.id);
+    if (fbJob) {
+      return res.json(fbJob);
+    }
+
     const db = createUserScopedClient(req.token!);
     const { data: job, error } = await db
       .from('job_postings')

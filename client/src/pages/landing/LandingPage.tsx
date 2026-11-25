@@ -596,13 +596,19 @@ export default function LandingPage() {
       batch: string;
     }>;
   } | null>(null);
+  const [isJobsLoading, setIsJobsLoading] = useState(true);
 
   useEffect(() => {
     const fetchLatestStats = () => {
       publicApi
         .stats()
-        .then(setStats)
-        .catch(() => {});
+        .then((data) => {
+          setStats(data);
+          setIsJobsLoading(false);
+        })
+        .catch(() => {
+          setIsJobsLoading(false);
+        });
     };
     fetchLatestStats();
     // Automatically poll every 60 seconds and on window focus so new PESO Facebook posts appear live
@@ -985,6 +991,98 @@ export default function LandingPage() {
                 : currentSlideIdx % PESO_CTU_SLIDES.length === 2
                 ? `${stats?.activeJobsCount || allJobs.length} ACTIVE JOB OPENINGS`
                 : `${stats?.employmentRate ?? 0}% EMPLOYMENT · ${stats?.mentorshipMatches ?? 0} CONNECTIONS`;
+
+            if (isJobsLoading || !stats) {
+              return (
+                <div className="w-full h-full flex flex-col justify-center -translate-y-[10px]">
+                  {/* 2-Column Flex Layout Skeleton Matching Exact lg:h-[525px] Hero Jobs View */}
+                  <div className="flex flex-col lg:flex-row items-stretch gap-4 w-full lg:h-[525px]">
+                    {/* LEFT SIDE SKELETON */}
+                    <div className="w-full lg:w-[57%] shrink-0 flex flex-col justify-between h-full gap-2.5">
+                      {/* Huge Picture Skeleton */}
+                      <div className="relative w-full h-[280px] sm:h-[320px] lg:h-auto lg:flex-1 lg:min-h-0 bg-[#0f172a]/90 border border-white/20 overflow-hidden rounded-none shadow-2xl p-4 flex flex-col justify-between animate-pulse select-none">
+                        {/* Top Bar Skeleton */}
+                        <div className="flex items-center justify-end">
+                          <div className="h-5 w-44 bg-white/20 rounded-none" />
+                        </div>
+
+                        {/* Bottom-Left Details Skeleton */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="h-4 w-28 bg-ctu-marigold/50 rounded-none" />
+                            <div className="h-3 w-40 bg-white/20 rounded-none" />
+                          </div>
+                          <div className="h-7 w-4/5 bg-white/30 rounded-none" />
+                          <div className="h-4 w-3/5 bg-white/15 rounded-none" />
+                          {/* Slide indicators skeleton */}
+                          <div className="flex items-center gap-1.5 pt-2">
+                            <div className="h-1 w-9 bg-ctu-marigold/60 rounded-none" />
+                            <div className="h-1 w-4 bg-white/25 rounded-none" />
+                            <div className="h-1 w-4 bg-white/25 rounded-none" />
+                            <div className="h-1 w-4 bg-white/25 rounded-none" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2 Stacked Horizontal Description Bars Below the Huge Square Skeleton */}
+                      <div className="shrink-0 flex flex-col justify-between gap-2 lg:h-[112px]">
+                        <div className="bg-white/95 border border-white/20 px-3.5 py-2 rounded-none flex items-center justify-between gap-2 shrink-0 animate-pulse">
+                          <div className="h-4 w-56 bg-gray-300 rounded-none" />
+                          <div className="h-4 w-28 bg-gray-300 rounded-none" />
+                        </div>
+                        <div className="bg-white/95 border border-white/20 px-3.5 py-2.5 rounded-none flex-1 flex flex-col justify-center gap-1.5 animate-pulse">
+                          <div className="h-3 w-full bg-gray-300 rounded-none" />
+                          <div className="h-3 w-4/5 bg-gray-200 rounded-none" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CENTER VERTICAL DIVIDER SKELETON */}
+                    <div className="hidden lg:flex justify-center relative h-full shrink-0 px-0.5">
+                      <div className="w-px h-full bg-white/25" />
+                    </div>
+
+                    {/* RIGHT SIDE SKELETON */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between h-full gap-2.5">
+                      {/* 3 Stacked Rectangular Job Cards Skeleton */}
+                      <div className="flex-1 min-h-0 grid grid-rows-3 gap-2.5">
+                        {[0, 1, 2].map((idx) => (
+                          <div
+                            key={idx}
+                            className="relative w-full h-full bg-white border border-white/25 rounded-none overflow-hidden animate-pulse flex items-stretch"
+                          >
+                            <div className="w-1.5 bg-gray-300 shrink-0 rounded-none" />
+                            <div className="w-[44%] sm:w-[46%] bg-gray-200" />
+                            <div className="flex-1 pl-[34%] sm:pl-[36%] pr-4 py-2.5 flex flex-col justify-between text-right">
+                              <div className="flex flex-col items-end gap-1.5">
+                                <div className="h-3 w-32 bg-gray-300 rounded-none" />
+                                <div className="h-4 w-44 bg-gray-400 rounded-none" />
+                                <div className="h-3 w-36 bg-gray-200 rounded-none" />
+                              </div>
+                              <div className="flex items-center justify-end gap-2 pt-1 border-t border-gray-200/80">
+                                <div className="h-3 w-16 bg-gray-300 rounded-none" />
+                                <div className="h-3 w-20 bg-gray-300 rounded-none" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 2 Stacked Horizontal Bars Below the 3 Job Cards Skeleton */}
+                      <div className="shrink-0 flex flex-col justify-between gap-2 lg:h-[112px]">
+                        <div className="bg-white/95 border border-white/20 px-3.5 py-2 rounded-none flex items-center justify-between animate-pulse">
+                          <div className="h-3.5 w-64 bg-gray-300 rounded-none" />
+                        </div>
+                        <div className="bg-[#111c33]/95 border border-white/20 px-3.5 py-2.5 rounded-none flex-1 flex items-center justify-between gap-3 animate-pulse">
+                          <div className="h-4 w-44 bg-white/20 rounded-none" />
+                          <div className="h-6 w-32 bg-ctu-marigold/30 rounded-none" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <div className="w-full h-full flex flex-col justify-center -translate-y-[10px]">
