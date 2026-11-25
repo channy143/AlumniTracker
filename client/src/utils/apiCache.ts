@@ -58,7 +58,10 @@ export function getDefaultStaleTime(endpoint: string): number {
   // while still storing responses so initial modal/drawer mounts hydrate in 0ms via getCached().
   if (
     norm.startsWith('/notifications/unread-count') ||
-    norm.startsWith('/messages/')
+    norm.startsWith('/messages/') ||
+    norm === '/jobs' ||
+    norm.startsWith('/jobs?') ||
+    norm === '/public/stats'
   ) {
     return 0;
   }

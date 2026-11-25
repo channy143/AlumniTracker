@@ -41,45 +41,54 @@ export const BASELINE_PESO_POSTS: PesoJobPosting[] = [
   {
     id: 'peso-fb-yearend-jobfair-2026',
     employer_id: null,
-    position: 'City of Naga Year-End Job Fair 2026 (Massive Hiring Event)',
+    position: 'City of Naga Year-End Job Fair 2026 (Brgy. Colon Gymnasium)',
     company_name: 'PESO - City of Naga, Cebu · Official Upcoming Event',
-    description: `Thousands of jobs. One massive event.
+    description: `CITY OF NAGA YEAR-END JOB FAIR ALERT!
 
-End the year by taking one step closer to landing your dream job! 
+Still looking for the perfect job? Ready for a fresh start? Don't miss your chance to land your dream job before the year ends!
 
-Prepare your resumes, practice your pitch, and get ready to be hired on the spot — the City of Naga Year-End Job Fair is COMING SOON!
+The City Government of Naga, through the Public Employment Service Office (PESO), invites you to the City of Naga Year-End Job Fair!
 
-Stay tuned for the complete details, Nagahanons!
+🗓 Date: November 27, 2026 (Friday)
+⏰ Time: 9:00 A.M. - 4:00 P.M.
+📍 Venue: Brgy. Colon Gymnasium, City of Naga, Cebu 
 
-#CityofNagaYearEndJobFair #PESOCityofNagCebu #NagaAtongGarbo #TrabahoParaSaTanan`,
+Whether you're a fresh graduate or an experienced professional, exciting career opportunities are waiting for you!
+
+Bring as many resumes as you can, dress to impress, and get ready for a chance to be HIRED-ON-THE-SPOT!
+
+Don't just end the year—welcome it with a new beginning!
+
+See you at the job fair, Nagahanons!`,
     description_preview:
-      'Thousands of jobs. One massive event. End the year by taking one step closer to landing your dream job! Prepare your resumes, practice your pitch, and get ready to be hired on the spot — the City of Naga Year-End Job Fair is COMING SOON! #CityofNagaYearEndJobFair #PESOCityofNagCebu #TrabahoParaSaTanan',
+      'CITY OF NAGA YEAR-END JOB FAIR ALERT! Date: November 27, 2026 (Friday) 9:00 AM - 4:00 PM at Brgy. Colon Gymnasium, City of Naga, Cebu. Bring multiple resumes and get ready to be hired on-the-spot!',
     requirements: [
-      'Prepare multiple copies of your updated resume / biodata',
-      'Bring valid government ID, school ID, or CTU-Naga alumni ID',
-      'Fill out the National Skills Registration Program (NSRP) Form',
-      'Wear smart casual attire suitable for on-the-spot interviews',
+      'Date & Time: Friday, November 27, 2026 (9:00 A.M. – 4:00 P.M.)',
+      'Venue: Brgy. Colon Gymnasium, City of Naga, Cebu',
+      'Bring multiple copies of updated resume / biodata with 2x2 ID photos',
+      'Valid government ID, school ID, or CTU-Naga alumni ID',
+      'Wear smart casual or business attire for on-the-spot employer interviews',
       'Open to all Nagahanons, CTU-Naga graduates, and job seekers',
     ],
     requirements_preview:
-      'Prepare multiple copies of your updated resume/biodata, valid government/alumni ID, and NSRP form. Stay tuned to PESO - City of Naga, Cebu for venue and participating employers.',
+      'Nov 27, 2026 (Friday) 9AM–4PM at Brgy. Colon Gymnasium. Bring updated resumes and valid ID. Hired on-the-spot interviews with participating employers.',
     industry: 'Multi-Industry Mega Job Fair Event',
     required_skills: ['Hired On-The-Spot', 'Local & Overseas Jobs', 'Fresh Graduates Welcome', 'PESO Naga Event'],
-    location: 'City of Naga, Cebu (Official PESO Event)',
+    location: 'Brgy. Colon Gymnasium, City of Naga, Cebu',
     job_type: 'Job Fair Event',
     is_remote: false,
     is_alumni_exclusive: false,
-    salary_range: 'Hired On-The-Spot',
+    salary_range: 'Nov 27 · 9AM–4PM',
     experience_level: 'Open to All Graduates',
-    created_at: '2026-11-24T04:32:35Z',
+    created_at: '2026-11-25T10:51:13Z',
     expires_at: null,
     vacancies_count: 1000,
     application_url: PESO_FB_PAGE_URL,
     fb_url: PESO_FB_PAGE_URL,
     poster_url:
-      'https://scontent.fceb2-2.fna.fbcdn.net/v/t39.30808-6/924087287_1116813584510111_3991031352338831839_n.jpg?stp=dst-jpg_s552x414_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=882B9-si25IQ7kNvwFO27PC&_nc_oc=AdppDNx5RgWgkXY-VwWdjIpjnrHm_fJOM9XCxv84ouByphB9DxNpJRu181AAsxubNqI&_nc_zt=23&_nc_ht=scontent.fceb2-2.fna&edm=ADwHzz8EAAAA&_nc_gid=ayIjlpFWy_dl7IlstE9Mhw&oh=00_AQRyka3uf4ZACA5LT_8p42lENC7TJIB5BVynfz77v1OLTw&oe=6B0C4367',
+      'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/923911128_1118169227707880_6692897517334989093_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=NSSUAb3lexIQ7kNvwF-SgcN&_nc_oc=AdrM8jx7TCanNB98DjPlVN_3I5EHfvMBXUuRRqUN6-eEef_8MQxIFs_KgkcpXg5D8PSPRa2NRmzeraq3XHDDhLXw&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQSykAbrwIrhKWIPk7M9FJu0Tz0a09IS5AIKNX_OjLTxWQ&oe=6B0CD947',
     gallery_images: [
-      'https://scontent.fceb2-2.fna.fbcdn.net/v/t39.30808-6/924087287_1116813584510111_3991031352338831839_n.jpg?stp=dst-jpg_s552x414_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=882B9-si25IQ7kNvwFO27PC&_nc_oc=AdppDNx5RgWgkXY-VwWdjIpjnrHm_fJOM9XCxv84ouByphB9DxNpJRu181AAsxubNqI&_nc_zt=23&_nc_ht=scontent.fceb2-2.fna&edm=ADwHzz8EAAAA&_nc_gid=ayIjlpFWy_dl7IlstE9Mhw&oh=00_AQRyka3uf4ZACA5LT_8p42lENC7TJIB5BVynfz77v1OLTw&oe=6B0C4367',
+      'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/923911128_1118169227707880_6692897517334989093_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=NSSUAb3lexIQ7kNvwF-SgcN&_nc_oc=AdrM8jx7TCanNB98DjPlVN_3I5EHfvMBXUuRRqUN6-eEef_8MQxIFs_KgkcpXg5D8PSPRa2NRmzeraq3XHDDhLXw&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQSykAbrwIrhKWIPk7M9FJu0Tz0a09IS5AIKNX_OjLTxWQ&oe=6B0CD947',
     ],
     contact_phone: null,
     contact_email: null,
@@ -568,7 +577,7 @@ let lastAllFetchTime = 0;
  */
 export async function getAllPesoFacebookJobs(): Promise<PesoJobPosting[]> {
   const now = Date.now();
-  if (cachedAllPesoJobs && now - lastAllFetchTime < 60 * 1000) {
+  if (cachedAllPesoJobs && now - lastAllFetchTime < 10 * 1000) {
     return cachedAllPesoJobs;
   }
 

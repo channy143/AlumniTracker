@@ -872,27 +872,27 @@ export default function LandingPage() {
             const fallbackJobs = [
               {
                 id: 'peso-fb-yearend-jobfair-2026',
-                position: 'City of Naga Year-End Job Fair 2026 (Massive Hiring Event)',
+                position: 'City of Naga Year-End Job Fair 2026 (Brgy. Colon Gymnasium)',
                 company_name: 'PESO - City of Naga, Cebu · Official Upcoming Event',
                 description_preview:
-                  'Thousands of jobs. One massive event. End the year by taking one step closer to landing your dream job! Prepare your resumes, practice your pitch, and get ready to be hired on the spot — the City of Naga Year-End Job Fair is COMING SOON! #CityofNagaYearEndJobFair #PESOCityofNagCebu #TrabahoParaSaTanan',
+                  'CITY OF NAGA YEAR-END JOB FAIR ALERT! Date: November 27, 2026 (Friday) 9:00 AM - 4:00 PM at Brgy. Colon Gymnasium, City of Naga, Cebu. Bring multiple resumes and get ready to be hired on-the-spot!',
                 requirements_preview:
-                  'Prepare multiple copies of your updated resume/biodata, valid government/alumni ID, and NSRP form. Stay tuned to PESO - City of Naga, Cebu for venue and participating employers.',
+                  'Nov 27, 2026 (Friday) 9AM–4PM at Brgy. Colon Gymnasium. Bring updated resumes and valid ID. Hired on-the-spot interviews with participating employers.',
                 industry: 'Multi-Industry Mega Job Fair Event',
                 required_skills: ['Hired On-The-Spot', 'Local & Overseas Jobs', 'Fresh Graduates Welcome', 'PESO Naga Event'],
-                location: 'City of Naga, Cebu (Official PESO Event)',
+                location: 'Brgy. Colon Gymnasium, City of Naga, Cebu',
                 job_type: 'Job Fair Event',
                 is_remote: false,
                 is_alumni_exclusive: false,
-                salary_range: 'Hired On-The-Spot',
+                salary_range: 'Nov 27 · 9AM–4PM',
                 experience_level: 'Open to All Graduates',
-                created_at: '2026-11-24T04:32:35Z',
+                created_at: '2026-11-25T10:51:13Z',
                 vacancies_count: 1000,
                 fb_url: PESO_FB_PAGE_URL,
                 poster_url:
-                  'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/924087287_1116813584510111_3991031352338831839_n.jpg?stp=dst-jpg_s552x414_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=882B9-si25IQ7kNvwFyOL1E&_nc_oc=Adqb6x_c1rmlo0ciSJqMgS9c5cytIDnqvjCL5RyQdAA_lgCpr_0mLaVNuQzXLTgVTMFOCDbfEJxiFeiOnGJj7vly&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQSgh3KFmUMcYSCxpkeXGodCaSgJpdJD0L5wYn_sOeBw-w&oe=6B0BD2E7',
+                  'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/923911128_1118169227707880_6692897517334989093_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=NSSUAb3lexIQ7kNvwF-SgcN&_nc_oc=AdrM8jx7TCanNB98DjPlVN_3I5EHfvMBXUuRRqUN6-eEef_8MQxIFs_KgkcpXg5D8PSPRa2NRmzeraq3XHDDhLXw&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQSykAbrwIrhKWIPk7M9FJu0Tz0a09IS5AIKNX_OjLTxWQ&oe=6B0CD947',
                 gallery_images: [
-                  'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/924087287_1116813584510111_3991031352338831839_n.jpg?stp=dst-jpg_s552x414_tt6&_nc_cat=100&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=882B9-si25IQ7kNvwFyOL1E&_nc_oc=Adqb6x_c1rmlo0ciSJqMgS9c5cytIDnqvjCL5RyQdAA_lgCpr_0mLaVNuQzXLTgVTMFOCDbfEJxiFeiOnGJj7vly&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQSgh3KFmUMcYSCxpkeXGodCaSgJpdJD0L5wYn_sOeBw-w&oe=6B0BD2E7',
+                  'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/923911128_1118169227707880_6692897517334989093_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=NSSUAb3lexIQ7kNvwF-SgcN&_nc_oc=AdrM8jx7TCanNB98DjPlVN_3I5EHfvMBXUuRRqUN6-eEef_8MQxIFs_KgkcpXg5D8PSPRa2NRmzeraq3XHDDhLXw&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQSykAbrwIrhKWIPk7M9FJu0Tz0a09IS5AIKNX_OjLTxWQ&oe=6B0CD947',
                 ],
                 poster_avatar_url: null,
               },

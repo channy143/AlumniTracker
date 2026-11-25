@@ -534,7 +534,7 @@ export const communityApi = {
 };
 
 export const jobsApi = {
-  list: () => api.get<any[]>('/jobs'),
+  list: (options?: ApiGetOptions) => api.get<any[]>('/jobs', { force: true, ...options }),
   get: (id: string) => api.get<any>(`/jobs/${id}`),
   create: (data: any) => api.post<any>('/jobs', data),
   myApplications: () => api.get<any[]>('/jobs/my-applications'),
