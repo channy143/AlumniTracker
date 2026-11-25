@@ -338,6 +338,8 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
           event_time: timeMatch ? timeMatch[1].trim() : (isEvent ? '9:00 AM - 4:00 PM' : null),
           event_location: venueMatch ? venueMatch[1].trim() : (isEvent ? 'Brgy. Colon Gymnasium, City of Naga, Cebu' : null),
           event_gallery: p.gallery_images || [],
+          gallery_images: p.gallery_images || (p.poster_url ? [p.poster_url] : []),
+          images: p.gallery_images || (p.poster_url ? [p.poster_url] : []),
           tagged_friends: [],
           media_type: 'photo',
           video_url: null,
@@ -446,6 +448,9 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
         user_reaction: myReaction,
         reactions_summary: liveStats.reactions_summary,
         top_reactions: liveStats.top_reactions,
+        gallery_images: p.gallery_images || p.event_gallery || (p.image_url ? [p.image_url] : []),
+        event_gallery: p.event_gallery || p.gallery_images || [],
+        images: p.images || p.gallery_images || p.event_gallery || (p.image_url ? [p.image_url] : []),
         linked_survey: linkedSurvey,
       };
     }));
@@ -834,6 +839,9 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
       user_reaction: like?.reaction_type || (like ? '👍' : null),
       reactions_summary: liveStats.reactions_summary,
       top_reactions: liveStats.top_reactions,
+      gallery_images: post.gallery_images || post.event_gallery || (post.image_url ? [post.image_url] : []),
+      event_gallery: post.event_gallery || post.gallery_images || [],
+      images: post.images || post.gallery_images || post.event_gallery || (post.image_url ? [post.image_url] : []),
       comments: finalComments,
     });
   } catch (err) { next(err); }

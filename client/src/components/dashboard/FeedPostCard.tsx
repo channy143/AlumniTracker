@@ -34,6 +34,7 @@ import MentionInput from '@/components/ui/MentionInput';
 import MentionText from '@/components/ui/MentionText';
 import ExpandablePostText from '@/components/ui/ExpandablePostText';
 import { MentionCandidate } from '@/hooks/useMentionPeople';
+import { PostPhotoGallery, PostPhotoLightbox } from './PostPhotoGallery';
 
 export const REAL_REACTIONS = [
   { emoji: '👍', label: 'Endorse', color: 'text-blue-600', activeBg: 'bg-blue-50 text-blue-600' },
@@ -105,6 +106,9 @@ export interface PostItem {
   tag?: string;
   tag_color?: string;
   image_url?: string;
+  gallery_images?: string[];
+  event_gallery?: string[];
+  images?: string[];
   is_official?: boolean;
   linked_survey?: any;
   author_profile_id?: string | null;
@@ -252,6 +256,14 @@ export default function FeedPostCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showImageLightbox, setShowImageLightbox] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const postPhotos = Array.from(new Set([
+    ...(Array.isArray(currentPost.gallery_images) ? currentPost.gallery_images : []),
+    ...(Array.isArray(currentPost.event_gallery) ? currentPost.event_gallery : []),
+    ...(Array.isArray(currentPost.images) ? currentPost.images : []),
+    ...(currentPost.image_url ? [currentPost.image_url] : []),
+  ].filter(Boolean)));
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoMuted, setVideoMuted] = useState(false);
 
@@ -1249,34 +1261,15 @@ export default function FeedPostCard({
         )}
       </div>
 
-      {/* Post Photo */}
-      {currentPost.image_url && (
-        <div className="relative group mt-2 bg-gray-50 flex items-center justify-center overflow-hidden border-y border-gray-100 max-h-96 md:max-h-none">
-          <img
-            src={currentPost.image_url}
-            alt=""
-            className="w-full h-auto max-h-96 md:max-h-none object-cover md:object-contain hover:opacity-95 transition-opacity cursor-pointer"
-            onClick={() => {
-              if (onViewDetails) {
-                onViewDetails(currentPost);
-              } else {
-                setShowImageLightbox(true);
-              }
-            }}
-          />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowImageLightbox(true);
-            }}
-            className="hidden md:flex absolute top-2.5 right-2.5 items-center gap-1.5 px-2.5 py-1 bg-black/60 hover:bg-black/80 text-white text-[11px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-xs shadow-md cursor-pointer border border-white/20"
-            title="View full size image"
-          >
-            <ArrowsPointingOutIcon className="w-3.5 h-3.5" />
-            <span>Full Size</span>
-          </button>
-        </div>
+      {/* Post Photo Gallery (Supports 1, 2, 3, 4, 5+ pictures with Facebook-style multi-image grid) */}
+      {postPhotos.length > 0 && (
+        <PostPhotoGallery
+          images={postPhotos}
+          onImageClick={(idx) => {
+            setLightboxIndex(idx);
+            setShowImageLightbox(true);
+          }}
+        />
       )}
 
       {/* Post Video (automatically pauses when scrolled out of the viewport) */}
@@ -2527,40 +2520,14 @@ export default function FeedPostCard({
           document.body
         )}
 
-      {/* Lightbox / Fullscreen Image Viewer Modal */}
-      {showImageLightbox && currentPost.image_url && createPortal(
-        <div
-          className="fixed inset-0 bg-black/85 backdrop-blur-xs z-[10000] flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
-          onClick={() => setShowImageLightbox(false)}
-        >
-          <div className="relative max-w-5xl max-h-[92vh] flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
-              <a
-                href={currentPost.image_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1.5 text-xs bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors border border-white/20 shadow-md backdrop-blur-xs"
-              >
-                Open original ↗
-              </a>
-              <button
-                type="button"
-                onClick={() => setShowImageLightbox(false)}
-                className="p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors border border-white/20 shadow-md cursor-pointer"
-                aria-label="Close"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-            </div>
-            <img
-              src={currentPost.image_url}
-              alt=""
-              className="max-h-[88vh] max-w-full w-auto h-auto object-contain rounded-xl shadow-2xl"
-            />
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* Multi-Image Lightbox Modal */}
+      <PostPhotoLightbox
+        images={postPhotos}
+        currentIndex={lightboxIndex}
+        isOpen={showImageLightbox}
+        onClose={() => setShowImageLightbox(false)}
+        onChangeIndex={(idx) => setLightboxIndex(idx)}
+      />
     </div>
   );
 }

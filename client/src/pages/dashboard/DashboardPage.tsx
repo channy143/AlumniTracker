@@ -29,6 +29,7 @@ import { formatExperience } from '@/utils/formatExperience';
 import { supabase, isSupabaseConfigured } from '@/services/supabase';
 import CreatePostBox from '@/components/dashboard/CreatePostBox';
 import FeedPostCard, { PostItem, REAL_REACTIONS } from '@/components/dashboard/FeedPostCard';
+import { PostPhotoGallery, PostPhotoLightbox } from '@/components/dashboard/PostPhotoGallery';
 import EmojiPicker from '@/components/ui/EmojiPicker';
 import MentionInput from '@/components/ui/MentionInput';
 import MentionText from '@/components/ui/MentionText';
@@ -190,6 +191,14 @@ function PostDetailView({
   const [loadingReactions, setLoadingReactions] = useState(false);
   const [selectedReactionTab, setSelectedReactionTab] = useState<string>('all');
   const [showDetailImageLightbox, setShowDetailImageLightbox] = useState(false);
+  const [detailLightboxIndex, setDetailLightboxIndex] = useState(0);
+
+  const postPhotos = Array.from(new Set([
+    ...(Array.isArray(post.gallery_images) ? post.gallery_images : []),
+    ...(Array.isArray((post as any).event_gallery) ? (post as any).event_gallery : []),
+    ...(Array.isArray((post as any).images) ? (post as any).images : []),
+    ...(post.image_url ? [post.image_url] : []),
+  ].filter(Boolean)));
   const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
   const [replyingToAuthorName, setReplyingToAuthorName] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -691,27 +700,16 @@ function PostDetailView({
           />
         </p>
 
-        {/* Post Image */}
-        {post.image_url && (
-          <div className="relative group rounded-xl overflow-hidden mb-3 bg-gray-50 flex items-center justify-center border border-gray-100 max-h-96 md:max-h-none">
-            <img
-              src={post.image_url}
-              alt=""
-              className="w-full h-auto max-h-96 md:max-h-none object-cover md:object-contain cursor-pointer hover:opacity-95 transition-opacity"
-              onClick={() => setShowDetailImageLightbox(true)}
-            />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
+        {/* Post Photo Gallery (Supports 1, 2, 3, 4, 5+ pictures) */}
+        {postPhotos.length > 0 && (
+          <div className="mb-3 rounded-xl overflow-hidden">
+            <PostPhotoGallery
+              images={postPhotos}
+              onImageClick={(idx) => {
+                setDetailLightboxIndex(idx);
                 setShowDetailImageLightbox(true);
               }}
-              className="hidden md:flex absolute top-2.5 right-2.5 items-center gap-1.5 px-2.5 py-1 bg-black/60 hover:bg-black/80 text-white text-[11px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-xs shadow-md cursor-pointer border border-white/20"
-              title="View full size image"
-            >
-              <ArrowsPointingOutIcon className="w-3.5 h-3.5" />
-              <span>Full Size</span>
-            </button>
+            />
           </div>
         )}
 
@@ -1319,39 +1317,14 @@ function PostDetailView({
         </div>
       </div>
 
-      {/* Lightbox / Fullscreen Image Viewer Modal */}
-      {showDetailImageLightbox && post.image_url && (
-        <div
-          className="fixed inset-0 bg-black/85 backdrop-blur-xs z-[10001] flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
-          onClick={() => setShowDetailImageLightbox(false)}
-        >
-          <div className="relative max-w-5xl max-h-[92vh] flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
-              <a
-                href={post.image_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1.5 text-xs bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors border border-white/20 shadow-md backdrop-blur-xs"
-              >
-                Open original ↗
-              </a>
-              <button
-                type="button"
-                onClick={() => setShowDetailImageLightbox(false)}
-                className="p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors border border-white/20 shadow-md cursor-pointer"
-                aria-label="Close"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-            </div>
-            <img
-              src={post.image_url}
-              alt=""
-              className="max-h-[88vh] max-w-full w-auto h-auto object-contain rounded-xl shadow-2xl"
-            />
-          </div>
-        </div>
-      )}
+      {/* Multi-Image Lightbox Modal */}
+      <PostPhotoLightbox
+        images={postPhotos}
+        currentIndex={detailLightboxIndex}
+        isOpen={showDetailImageLightbox}
+        onClose={() => setShowDetailImageLightbox(false)}
+        onChangeIndex={(idx) => setDetailLightboxIndex(idx)}
+      />
     </div>,
     document.body
   );
