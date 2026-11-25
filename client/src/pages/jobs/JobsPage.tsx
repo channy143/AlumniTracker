@@ -997,7 +997,27 @@ export default function JobsPage() {
   }, [urlFilter]);
 
   const [loading, setLoading] = useState(() => getCached('/jobs') === undefined);
-  const [jobs, setJobs] = useState<any[]>(() => getCached<any[]>('/jobs') || []);
+  const [jobs, setJobs] = useState<any[]>(() => {
+    const raw = getCached<any[]>('/jobs') || [];
+    const seen = new Set<string>();
+    return raw.filter((j: any) => {
+      const norm = `${j.position || ''} ${j.company_name || ''} ${j.id || ''}`.toLowerCase();
+      const key = norm.includes('year-end') || norm.includes('yearend')
+        ? 'event:yearend'
+        : norm.includes('minebea')
+        ? 'company:minebea'
+        : norm.includes('ipi')
+        ? 'company:ipi'
+        : norm.includes('smaw')
+        ? 'training:smaw'
+        : norm.includes('oasia')
+        ? 'company:oasia'
+        : String(j.id || '');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  });
   const [userProfile, setUserProfile] = useState<any>(() => getCached('/profile') || null);
   const [activeTab, setActiveTab] = useState<'opportunities' | 'saved'>('opportunities');
   const [filter, setFilter] = useState<JobFilter>('all');
@@ -1010,7 +1030,27 @@ export default function JobsPage() {
       jobsApi.list().catch(() => []),
       profileApi.get().catch(() => null),
     ]).then(([jobsData, profileData]: any) => {
-      if (jobsData) setJobs(jobsData);
+      if (jobsData) {
+        const seen = new Set<string>();
+        const deduped = (jobsData || []).filter((j: any) => {
+          const norm = `${j.position || ''} ${j.company_name || ''} ${j.id || ''}`.toLowerCase();
+          const key = norm.includes('year-end') || norm.includes('yearend')
+            ? 'event:yearend'
+            : norm.includes('minebea')
+            ? 'company:minebea'
+            : norm.includes('ipi')
+            ? 'company:ipi'
+            : norm.includes('smaw')
+            ? 'training:smaw'
+            : norm.includes('oasia')
+            ? 'company:oasia'
+            : String(j.id || '');
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        setJobs(deduped);
+      }
       if (profileData) setUserProfile(profileData);
     }).finally(() => setLoading(false));
   }, []);

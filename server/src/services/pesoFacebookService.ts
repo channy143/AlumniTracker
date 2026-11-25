@@ -376,8 +376,17 @@ export function buildDynamicPesoJobFromPost(post: any, idx: number): PesoJobPost
   // 1. City of Naga Year-End Job Fair
   if (/City of Naga Year-End Job Fair|Year-End Job Fair/i.test(combined)) {
     const exactImages = images.length > 0 ? [images[0]] : BASELINE_PESO_POSTS[0].gallery_images;
+    const venueMatch = combined.match(/(?:Venue\s*:|📍\s*(?:Venue\s*:)?)\s*([^\n\r]+)/i);
+    const dateMatch = combined.match(/(?:Date\s*:|🗓\s*(?:Date\s*:)?)\s*([^\n\r]+)/i);
+    const venue = venueMatch ? venueMatch[1].trim() : 'Brgy. Colon Gymnasium, City of Naga, Cebu';
+    const salaryRange = dateMatch ? `${dateMatch[1].trim().slice(0, 15)} · 9AM–4PM` : 'Nov 27 · 9AM–4PM';
+
     return {
       ...BASELINE_PESO_POSTS[0],
+      location: venue,
+      salary_range: salaryRange,
+      description: combined,
+      description_preview: combined.slice(0, 320).replace(/\s+/g, ' ').trim(),
       created_at: createdIso,
       poster_url: exactImages[0],
       gallery_images: exactImages,
@@ -502,12 +511,60 @@ export function buildDynamicPesoJobFromPost(post: any, idx: number): PesoJobPost
   };
 }
 
+export function getCanonicalJobKey(job: PesoJobPosting): string {
+  const normTitle = normalizeFbUnicodeText(job.position || '').toLowerCase();
+  const normCompany = normalizeFbUnicodeText(job.company_name || '').toLowerCase();
+  const normId = String(job.id || '').toLowerCase();
+
+  if (/year-end|yearend|job fair/i.test(normTitle) || normId.includes('yearend-jobfair')) {
+    return 'event:naga-yearend-jobfair';
+  }
+  if (/minebeamitsumi/i.test(normTitle) || /minebeamitsumi/i.test(normCompany) || normId.includes('minebeamitsumi')) {
+    return 'company:minebeamitsumi';
+  }
+  if (/smaw|shielded metal arc welding|sugbo kahanas/i.test(normTitle) || normId.includes('smaw')) {
+    return 'training:smaw-welding';
+  }
+  if (/international pharmaceuticals|\bipi\b/i.test(normTitle) || /international pharmaceuticals|\bipi\b/i.test(normCompany) || normId.includes('ipi')) {
+    return 'company:ipi';
+  }
+  if (/oasia global/i.test(normTitle) || /oasia global/i.test(normCompany) || normId.includes('oasia')) {
+    return 'company:oasia';
+  }
+
+  const cleanTitle = normTitle.replace(/[^a-z0-9]/g, '');
+  return `${normCompany}:::${cleanTitle}`;
+}
+
+export function deduplicateJobs(jobs: PesoJobPosting[]): PesoJobPosting[] {
+  const seenKeys = new Set<string>();
+  const seenIds = new Set<string>();
+  const result: PesoJobPosting[] = [];
+
+  for (const job of jobs) {
+    if (!job) continue;
+    const idKey = String(job.id || '').trim();
+    const canonKey = getCanonicalJobKey(job);
+
+    if (seenIds.has(idKey) || seenKeys.has(canonKey)) {
+      continue;
+    }
+
+    seenIds.add(idKey);
+    seenKeys.add(canonKey);
+    result.push(job);
+  }
+
+  return result;
+}
+
 let cachedAllPesoJobs: PesoJobPosting[] | null = null;
 let lastAllFetchTime = 0;
 
 /**
  * Returns ALL posts fetched from the PESO - City of Naga, Cebu Facebook page.
  * Chronologically sorted descending by created_at (the 1st item is always the latest post).
+ * Guaranteed zero duplicates across multiple postings of the same event/employer.
  */
 export async function getAllPesoFacebookJobs(): Promise<PesoJobPosting[]> {
   const now = Date.now();
@@ -528,16 +585,24 @@ export async function getAllPesoFacebookJobs(): Promise<PesoJobPosting[]> {
     if (m) {
       const posts = JSON.parse(m[1]);
       if (Array.isArray(posts) && posts.length > 0) {
+        // Sort newest first before mapping and deduplicating
+        posts.sort((a: any, b: any) => Number(b.createdTime || 0) - Number(a.createdTime || 0));
+
         const mapped = posts
           .map((p: any, i: number) => buildDynamicPesoJobFromPost(p, i))
           .filter((item): item is PesoJobPosting => Boolean(item));
 
         if (mapped.length > 0) {
-          // Sort descending by created_at so the latest post is always first
-          mapped.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          cachedAllPesoJobs = mapped;
+          // Deduplicate so only the newest post for any topic/event is kept
+          const dedupedLive = deduplicateJobs(mapped);
+
+          // Add any baseline posts not present in the current live window (e.g. Oasia Global)
+          const combinedWithBaselines = deduplicateJobs([...dedupedLive, ...BASELINE_PESO_POSTS]);
+          combinedWithBaselines.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+          cachedAllPesoJobs = combinedWithBaselines;
           lastAllFetchTime = now;
-          return mapped;
+          return combinedWithBaselines;
         }
       }
     }
@@ -545,18 +610,21 @@ export async function getAllPesoFacebookJobs(): Promise<PesoJobPosting[]> {
     // If external fetch fails, fallback to baseline curated posts
   }
 
-  const fallback = [...BASELINE_PESO_POSTS].sort(
+  const fallback = deduplicateJobs(BASELINE_PESO_POSTS).sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
   return fallback;
 }
 
 /**
- * Returns top 3 featured posts for the hero / landing page spotlight
+ * Returns top 3 featured posts for the hero / landing page spotlight (no duplicate jobs)
  */
 export async function getFeaturedPesoFacebookJobs(): Promise<PesoJobPosting[]> {
   const all = await getAllPesoFacebookJobs();
-  return all.slice(0, 3);
+  // For the landing page hero cards, prioritize employer career hiring (excluding skills training if >=3 employer jobs exist)
+  const employerJobs = all.filter((j) => !/smaw|welding/i.test(j.position));
+  const featured = employerJobs.length >= 3 ? employerJobs.slice(0, 3) : all.slice(0, 3);
+  return featured;
 }
 
 /**

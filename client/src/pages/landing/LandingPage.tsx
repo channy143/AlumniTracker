@@ -953,12 +953,32 @@ export default function LandingPage() {
             ];
 
             // Always prioritize PESO - City of Naga, Cebu Facebook jobs on the Hero section
-            const allJobs =
+            const rawAllJobs =
               stats?.featuredJobs &&
               stats.featuredJobs.length > 0 &&
               String(stats.featuredJobs[0]?.id || '').startsWith('peso-fb-')
                 ? stats.featuredJobs
                 : fallbackJobs;
+
+            // Deduplicate to guarantee no duplicate job is ever shown on the hero cards
+            const seenJobKeys = new Set<string>();
+            const allJobs = rawAllJobs.filter((j) => {
+              const norm = `${j.position || ''} ${j.company_name || ''} ${j.id || ''}`.toLowerCase();
+              const key = norm.includes('year-end') || norm.includes('yearend')
+                ? 'event:yearend'
+                : norm.includes('minebea')
+                ? 'company:minebea'
+                : norm.includes('ipi')
+                ? 'company:ipi'
+                : norm.includes('smaw')
+                ? 'training:smaw'
+                : norm.includes('oasia')
+                ? 'company:oasia'
+                : String(j.id || '');
+              if (seenJobKeys.has(key)) return false;
+              seenJobKeys.add(key);
+              return true;
+            });
 
             const visibleJobs = allJobs.slice(0, 3);
 
