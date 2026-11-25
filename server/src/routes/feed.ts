@@ -21,14 +21,35 @@ import { getPesoEventsAndAnnouncements, PESO_FB_PAGE_URL } from '../services/pes
 const router = Router();
 
 /**
- * Ensures an announcements-table item has a shadow row in feed_posts so
+ * Resolves any custom or string ID (like peso-fb-post-1795603873) into a deterministic, valid RFC4122 UUID.
+ * This ensures full compatibility with PostgreSQL UUID columns in feed_posts, feed_post_likes, and feed_post_comments.
+ */
+export function getDeterministicUuid(input: string): string {
+  if (!input) return input;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input)) {
+    return input;
+  }
+  const hash = crypto.createHash('md5').update(`alumni-peso-feed-${input}`).digest('hex');
+  return [
+    hash.substring(0, 8),
+    hash.substring(8, 12),
+    '4' + hash.substring(13, 16),
+    'a' + hash.substring(17, 20),
+    hash.substring(20, 32),
+  ].join('-');
+}
+
+/**
+ * Ensures an announcements-table item or official PESO Facebook item has a shadow row in feed_posts so
  * feed_post_likes, feed_post_comments, and reactions work seamlessly for official posts.
  */
 async function ensureFeedPostExists(postId: string): Promise<any | null> {
+  const resolvedId = getDeterministicUuid(postId);
+
   const { data: existingPost } = await supabase
     .from('feed_posts')
     .select('*')
-    .eq('id', postId)
+    .eq('id', resolvedId)
     .maybeSingle();
 
   if (existingPost) return existingPost;
@@ -36,53 +57,117 @@ async function ensureFeedPostExists(postId: string): Promise<any | null> {
   const { data: ann } = await supabase
     .from('announcements')
     .select('*')
-    .eq('id', postId)
+    .eq('id', resolvedId)
     .eq('status', 'published')
     .maybeSingle();
 
-  if (!ann) return null;
+  if (ann) {
+    const shadowPayload = {
+      id: ann.id,
+      type: 'announcement',
+      title: ann.title,
+      content: ann.content,
+      author: 'CTU-Naga Alumni Office',
+      author_avatar: 'C',
+      image_url: ann.image_url || null,
+      company: null,
+      job_url: null,
+      tag: ann.is_pinned ? 'Pinned Announcement' : 'Announcement',
+      tag_color: ann.is_pinned ? 'bg-orange-50 text-orange-700' : 'bg-blue-50 text-blue-700',
+      is_official: true,
+      user_id: null,
+      like_count: 0,
+      comment_count: 0,
+      share_count: 0,
+      audience: 'public',
+      media_type: 'photo',
+      comments_disabled: false,
+      reactions_summary: {},
+      linked_survey_id: ann.linked_survey_id || null,
+      created_at: ann.published_at || ann.created_at,
+      updated_at: ann.updated_at || ann.created_at,
+    };
 
-  const shadowPayload = {
-    id: ann.id,
-    type: 'announcement',
-    title: ann.title,
-    content: ann.content,
-    author: 'CTU-Naga Alumni Office',
-    author_avatar: 'C',
-    image_url: ann.image_url || null,
-    company: null,
-    job_url: null,
-    tag: ann.is_pinned ? 'Pinned Announcement' : 'Announcement',
-    tag_color: ann.is_pinned ? 'bg-orange-50 text-orange-700' : 'bg-blue-50 text-blue-700',
-    is_official: true,
-    user_id: null,
-    like_count: 0,
-    comment_count: 0,
-    share_count: 0,
-    audience: 'public',
-    media_type: 'photo',
-    comments_disabled: false,
-    reactions_summary: {},
-    linked_survey_id: ann.linked_survey_id || null,
-    created_at: ann.published_at || ann.created_at,
-    updated_at: ann.updated_at || ann.created_at,
-  };
+    const { data: inserted } = await supabase
+      .from('feed_posts')
+      .upsert(shadowPayload, { onConflict: 'id', ignoreDuplicates: true })
+      .select('*')
+      .maybeSingle();
 
-  const { data: inserted } = await supabase
-    .from('feed_posts')
-    .upsert(shadowPayload, { onConflict: 'id', ignoreDuplicates: true })
-    .select('*')
-    .maybeSingle();
+    if (inserted) return inserted;
 
-  if (inserted) return inserted;
+    const { data: refetched } = await supabase
+      .from('feed_posts')
+      .select('*')
+      .eq('id', resolvedId)
+      .maybeSingle();
 
-  const { data: refetched } = await supabase
-    .from('feed_posts')
-    .select('*')
-    .eq('id', postId)
-    .maybeSingle();
+    return refetched || shadowPayload;
+  }
 
-  return refetched || shadowPayload;
+  // Support PESO Facebook events and announcements by creating a shadow post
+  try {
+    const pesoItems = await getPesoEventsAndAnnouncements();
+    const matchedPeso = (pesoItems || []).find(
+      (p) => p.id === postId || getDeterministicUuid(p.id) === resolvedId
+    );
+
+    if (matchedPeso) {
+      const isEvent = /event|job fair|venue|gymnasium|sched/i.test(`${matchedPeso.position} ${matchedPeso.job_type}`);
+      const venueMatch = matchedPeso.description.match(/(?:Venue\s*:|📍\s*(?:Venue\s*:)?)\s*([^\n\r]+)/i);
+      const timeMatch = matchedPeso.description.match(/(?:Time\s*:|⏰\s*(?:Time\s*:)?)\s*([^\n\r]+)/i);
+
+      const shadowPayload = {
+        id: resolvedId,
+        type: isEvent ? 'event' : 'announcement',
+        title: matchedPeso.position,
+        content: matchedPeso.description,
+        author: 'PESO - City of Naga, Cebu',
+        author_avatar: 'P',
+        image_url: matchedPeso.poster_url || (matchedPeso.gallery_images && matchedPeso.gallery_images[0]) || null,
+        company: 'PESO - City of Naga, Cebu',
+        job_url: matchedPeso.application_url || PESO_FB_PAGE_URL,
+        tag: isEvent ? 'Official Event' : 'Official Announcement',
+        tag_color: isEvent ? 'bg-orange-50 text-orange-700' : 'bg-blue-50 text-blue-700',
+        is_official: true,
+        user_id: null,
+        like_count: 0,
+        comment_count: 0,
+        share_count: 0,
+        audience: 'public',
+        media_type: 'photo',
+        comments_disabled: false,
+        reactions_summary: {},
+        linked_survey_id: null,
+        event_date: isEvent ? '2026-11-27' : null,
+        event_time: timeMatch ? timeMatch[1].trim() : (isEvent ? '9:00 AM - 4:00 PM' : null),
+        event_location: venueMatch ? venueMatch[1].trim() : (isEvent ? 'Brgy. Colon Gymnasium, City of Naga, Cebu' : null),
+        event_gallery: matchedPeso.gallery_images || [],
+        created_at: matchedPeso.created_at,
+        updated_at: matchedPeso.created_at,
+      };
+
+      const { data: inserted } = await supabase
+        .from('feed_posts')
+        .upsert(shadowPayload, { onConflict: 'id', ignoreDuplicates: true })
+        .select('*')
+        .maybeSingle();
+
+      if (inserted) return inserted;
+
+      const { data: refetched } = await supabase
+        .from('feed_posts')
+        .select('*')
+        .eq('id', resolvedId)
+        .maybeSingle();
+
+      return refetched || shadowPayload;
+    }
+  } catch {
+    // Fall through if PESO lookup fails
+  }
+
+  return null;
 }
 
 function summarizeLikes(likes: Array<{ reaction_type?: string | null }>) {
@@ -224,9 +309,11 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
         const venueMatch = p.description.match(/(?:Venue\s*:|📍\s*(?:Venue\s*:)?)\s*([^\n\r]+)/i);
         const dateMatch = p.description.match(/(?:Date\s*:|🗓\s*(?:Date\s*:)?)\s*([^\n\r]+)/i);
         const timeMatch = p.description.match(/(?:Time\s*:|⏰\s*(?:Time\s*:)?)\s*([^\n\r]+)/i);
+        const resolvedId = getDeterministicUuid(p.id);
 
         return {
-          id: p.id,
+          id: resolvedId,
+          original_peso_id: p.id,
           type: isEvent ? 'event' : 'announcement',
           title: p.position,
           content: p.description,
@@ -258,6 +345,26 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res, next) => {
           reactions_summary: {},
         };
       });
+
+      // Synchronize comment counts and share counts from shadow posts in database
+      const pesoUuids = pesoFeedPosts.map((p) => p.id);
+      if (pesoUuids.length > 0) {
+        const { data: existingShadows } = await supabase
+          .from('feed_posts')
+          .select('id, comment_count, share_count')
+          .in('id', pesoUuids);
+
+        if (existingShadows && existingShadows.length > 0) {
+          const shadowMap = new Map(existingShadows.map((s: any) => [s.id, s]));
+          pesoFeedPosts.forEach((p) => {
+            const shadow = shadowMap.get(p.id);
+            if (shadow) {
+              p.comment_count = shadow.comment_count || 0;
+              p.share_count = shadow.share_count || 0;
+            }
+          });
+        }
+      }
     } catch {
       // Fallback gracefully if Facebook fetch errors
     }
@@ -597,20 +704,23 @@ router.get('/user/:userId', authenticate, async (req: AuthenticatedRequest, res,
 // GET /api/feed/:id - single post with comments and nested replies
 router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const post = await ensureFeedPostExists(req.params.id);
+    const resolvedId = getDeterministicUuid(req.params.id);
+    const post = await ensureFeedPostExists(resolvedId);
     if (!post) throw new AppError('Post not found', 404);
+
+    const cleanPostId = post.id || resolvedId;
 
     // Fetch live likes for this post
     const { data: allPostLikes } = await supabase
       .from('feed_post_likes')
       .select('id, user_id, reaction_type')
-      .eq('post_id', req.params.id);
+      .eq('post_id', cleanPostId);
     const like = (allPostLikes || []).find((l: any) => l.user_id === req.user!.userId) || null;
 
     const { data: comments, error: commentsError } = await supabase
       .from('feed_post_comments')
       .select('*')
-      .eq('post_id', req.params.id)
+      .eq('post_id', cleanPostId)
       .order('created_at', { ascending: true });
 
     if (commentsError) throw new AppError(commentsError.message, 500);
@@ -732,10 +842,11 @@ router.get('/:id', authenticate, async (req: AuthenticatedRequest, res, next) =>
 // GET /api/feed/:id/reactions - list of users who reacted to a post
 router.get('/:id/reactions', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
+    const resolvedId = getDeterministicUuid(req.params.id);
     const { data: likes, error } = await supabase
       .from('feed_post_likes')
       .select('id, reaction_type, user_id, created_at')
-      .eq('post_id', req.params.id);
+      .eq('post_id', resolvedId);
 
     if (error) throw new AppError(error.message, 500);
 
@@ -942,15 +1053,17 @@ router.put('/:id', authenticate, validate(updatePostSchema), async (req: Authent
 });
 
 async function applyPostReaction(postId: string, userId: string, reaction: string) {
-  const targetPost = await ensureFeedPostExists(postId);
+  const resolvedId = getDeterministicUuid(postId);
+  const targetPost = await ensureFeedPostExists(resolvedId);
   if (!targetPost) {
     throw new AppError('Post not found', 404);
   }
+  const cleanPostId = targetPost.id || resolvedId;
 
   const { data: existing, error: lookupError } = await supabase
     .from('feed_post_likes')
     .select('id, reaction_type')
-    .eq('post_id', postId)
+    .eq('post_id', cleanPostId)
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -975,13 +1088,13 @@ async function applyPostReaction(postId: string, userId: string, reaction: strin
   } else {
     const { error: insErr } = await supabase
       .from('feed_post_likes')
-      .insert({ post_id: postId, user_id: userId, reaction_type: reaction });
+      .insert({ post_id: cleanPostId, user_id: userId, reaction_type: reaction });
     if (insErr) {
       if (insErr.code === '23505') {
         const { error: fallbackUpdErr } = await supabase
           .from('feed_post_likes')
           .update({ reaction_type: reaction })
-          .eq('post_id', postId)
+          .eq('post_id', cleanPostId)
           .eq('user_id', userId);
         if (fallbackUpdErr) throw new AppError(fallbackUpdErr.message, 500);
       } else {
@@ -1003,7 +1116,7 @@ async function applyPostReaction(postId: string, userId: string, reaction: strin
   const { data: allLikes, error: countErr } = await supabase
     .from('feed_post_likes')
     .select('reaction_type')
-    .eq('post_id', postId);
+    .eq('post_id', cleanPostId);
 
   if (countErr) throw new AppError(countErr.message, 500);
 
@@ -1012,7 +1125,7 @@ async function applyPostReaction(postId: string, userId: string, reaction: strin
   await supabase
     .from('feed_posts')
     .update({ like_count: liveStats.like_count, reactions_summary: liveStats.reactions_summary })
-    .eq('id', postId);
+    .eq('id', cleanPostId);
 
   if (liked && targetPost.user_id && targetPost.user_id !== userId) {
     const { data: senderProfile } = await supabase
@@ -1030,7 +1143,7 @@ async function applyPostReaction(postId: string, userId: string, reaction: strin
       type: 'post',
       title: 'New Reaction on Your Post',
       message: `${senderName} reacted ${userReaction || '👍'} to your post.`,
-      link: '/?post=' + postId,
+      link: '/?post=' + cleanPostId,
     }).catch(() => {});
   }
 
@@ -1065,12 +1178,15 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
     const { content, parent_id, mentions } = req.body;
     if (!content || !content.trim()) throw new AppError('Comment content is required', 400);
 
-    const post = await ensureFeedPostExists(req.params.id);
+    const resolvedId = getDeterministicUuid(req.params.id);
+    const post = await ensureFeedPostExists(resolvedId);
     if (!post) throw new AppError('Post not found', 404);
 
     if (post.comments_disabled) {
       throw new AppError('Comments are turned off for this post.', 400);
     }
+
+    const cleanPostId = post.id || resolvedId;
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -1086,7 +1202,7 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
     const { data: comment, error } = await supabase
       .from('feed_post_comments')
       .insert({
-        post_id: req.params.id,
+        post_id: cleanPostId,
         user_id: req.user!.userId,
         author: displayName,
         author_avatar: avatar,
@@ -1103,11 +1219,11 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
     const { data: curr } = await supabase
       .from('feed_posts')
       .select('comment_count')
-      .eq('id', req.params.id)
+      .eq('id', cleanPostId)
       .single();
     await supabase.from('feed_posts')
       .update({ comment_count: (curr?.comment_count || 0) + 1 })
-      .eq('id', req.params.id);
+      .eq('id', cleanPostId);
 
     addActivity(displayName, parent_id ? 'replied to a comment on' : 'commented on', 'a post').catch(() => {});
 
@@ -1119,7 +1235,7 @@ router.post('/:id/comments', authenticate, async (req: AuthenticatedRequest, res
         type: 'post',
         title: 'New Comment on Your Post',
         message: `${displayName} commented: "${snippet}"`,
-        link: '/?post=' + req.params.id,
+        link: '/?post=' + cleanPostId,
       }).catch(() => {});
     }
 
@@ -1383,15 +1499,16 @@ router.post('/:id/report', authenticate, async (req: AuthenticatedRequest, res, 
 // POST /api/feed/:id/share - increment share count
 router.post('/:id/share', authenticate, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const postId = req.params.id;
-    const curr = await ensureFeedPostExists(postId);
+    const resolvedId = getDeterministicUuid(req.params.id);
+    const curr = await ensureFeedPostExists(resolvedId);
     if (!curr) throw new AppError('Post not found', 404);
 
+    const cleanPostId = curr.id || resolvedId;
     const newCount = (curr.share_count || 0) + 1;
     await supabase
       .from('feed_posts')
       .update({ share_count: newCount })
-      .eq('id', postId);
+      .eq('id', cleanPostId);
 
     res.json({ share_count: newCount });
   } catch (err) { next(err); }
