@@ -36,10 +36,10 @@ export interface PesoJobPosting {
   fb_url: string;
 }
 
-// 5 Curated Baseline Posts from PESO - City of Naga, Cebu Facebook Timeline
+// Curated Baseline Posts from PESO - City of Naga, Cebu Facebook Timeline
 export const BASELINE_PESO_POSTS: PesoJobPosting[] = [
   {
-    id: 'peso-fb-yearend-jobfair-2026',
+    id: 'peso-fb-post-1795603873',
     employer_id: null,
     position: 'City of Naga Year-End Job Fair 2026 (Brgy. Colon Gymnasium)',
     company_name: 'PESO - City of Naga, Cebu · Official Upcoming Event',
@@ -89,6 +89,9 @@ See you at the job fair, Nagahanons!`,
       'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/923911128_1118169227707880_6692897517334989093_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=NSSUAb3lexIQ7kNvwF-SgcN&_nc_oc=AdrM8jx7TCanNB98DjPlVN_3I5EHfvMBXUuRRqUN6-eEef_8MQxIFs_KgkcpXg5D8PSPRa2NRmzeraq3XHDDhLXw&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQSykAbrwIrhKWIPk7M9FJu0Tz0a09IS5AIKNX_OjLTxWQ&oe=6B0CD947',
     gallery_images: [
       'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/923911128_1118169227707880_6692897517334989093_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=NSSUAb3lexIQ7kNvwF-SgcN&_nc_oc=AdrM8jx7TCanNB98DjPlVN_3I5EHfvMBXUuRRqUN6-eEef_8MQxIFs_KgkcpXg5D8PSPRa2NRmzeraq3XHDDhLXw&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQSykAbrwIrhKWIPk7M9FJu0Tz0a09IS5AIKNX_OjLTxWQ&oe=6B0CD947',
+      'https://scontent.fceb1-3.fna.fbcdn.net/v/t39.30808-6/925373954_1118169224374547_802658889830779117_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=Nuj2x7-DfcMQ7kNvwGSsan-&_nc_oc=Adr5G0ImkhUBgia_zG5kAI0TDMdJVRSWmqFBhFf4bndr96gPH6WXho4TX2wJyoyGCg01IWA1njDSCMWg-sMhoAXw&_nc_zt=23&_nc_ht=scontent.fceb1-3.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQQcSBLyymv_86DMs5qtRNzRJAjCKaGmdnCWcDMqBrtDsg&oe=6B0BC122',
+      'https://scontent.fceb1-5.fna.fbcdn.net/v/t39.30808-6/928472117_1118169207707882_613547556650700031_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=107&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=7W4vQ6J4XTIQ7kNvwG5494y&_nc_oc=Adpj0w0t1-t12nL4r5u23V8k1v4&_nc_zt=23&_nc_ht=scontent.fceb1-5.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQTL8N8L3F-rBq-U5Xk&oe=6B0CE120',
+      'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/923780437_1118169297707873_7041296306908408836_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=kQf-wU5hG88Q7kNvwFlm1L7&_nc_oc=Adr93bN2x5L&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQSqK98Yw7Z&oe=6B0CE3A9',
     ],
     contact_phone: null,
     contact_email: null,
@@ -100,7 +103,56 @@ See you at the job fair, Nagahanons!`,
     poster_name: 'PESO - City of Naga, Cebu',
   },
   {
-    id: 'peso-fb-minebeamitsumi-2026',
+    id: 'peso-fb-post-1795494755',
+    employer_id: null,
+    position: 'City of Naga Year-End Job Fair (Coming Soon Advisory)',
+    company_name: 'PESO - City of Naga, Cebu · Job Fair Advisory',
+    description: `Thousands of jobs. One massive event.
+
+End the year by taking one step closer to landing your dream job!
+
+Prepare your resumes, practice your pitch, and get ready to be hired on the spot— the City of Naga Year-End Job Fair is COMING SOON!
+
+Stay tuned for the complete details, Nagahanons!`,
+    description_preview:
+      'Thousands of jobs. One massive event. End the year by taking one step closer to landing your dream job! Prepare your resumes, practice your pitch, and get ready to be hired on the spot— the City of Naga Year-End Job Fair is COMING SOON!',
+    requirements: [
+      'Event: City of Naga Year-End Local & Overseas Job Fair (Coming Soon)',
+      'Venue & Participating Employers: Stay tuned for official announcement by PESO Naga',
+      'Prepare multiple copies of updated resume / biodata with 2x2 ID photos',
+      'Open to all Nagahanons, CTU-Naga graduates, and job seekers',
+    ],
+    requirements_preview:
+      'City of Naga Year-End Job Fair COMING SOON! Prepare your resumes and stay tuned for complete event details from PESO - City of Naga, Cebu.',
+    industry: 'Mega Job Fair Advisory',
+    required_skills: ['Coming Soon', 'Local & Overseas Jobs', 'Career Event', 'PESO Naga Advisory'],
+    location: 'City of Naga, Cebu',
+    job_type: 'Job Fair Event',
+    is_remote: false,
+    is_alumni_exclusive: false,
+    salary_range: 'Coming Soon · Naga, Cebu',
+    experience_level: 'Open to All',
+    created_at: '2026-11-24T04:32:35Z',
+    expires_at: null,
+    vacancies_count: 1000,
+    application_url: PESO_FB_PAGE_URL,
+    fb_url: PESO_FB_PAGE_URL,
+    poster_url:
+      'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/924087287_1116813584510111_3991031352338831839_n.jpg?stp=dst-jpg_s720x720_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=y4o5rG6yW7IQ7kNvwE5H-u4&_nc_oc=Adrcw8L-d3w7Q7nL8L9jQoU6p0o&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQQ-a728L1hL53Jg&oe=6B0C68E2',
+    gallery_images: [
+      'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/924087287_1116813584510111_3991031352338831839_n.jpg?stp=dst-jpg_s720x720_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=y4o5rG6yW7IQ7kNvwE5H-u4&_nc_oc=Adrcw8L-d3w7Q7nL8L9jQoU6p0o&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQQ-a728L1hL53Jg&oe=6B0C68E2',
+    ],
+    contact_phone: null,
+    contact_email: null,
+    company_website: PESO_FB_PAGE_URL,
+    company_email: null,
+    company_logo: null,
+    company_industry: 'Public Employment Service',
+    poster_avatar_url: null,
+    poster_name: 'PESO - City of Naga, Cebu',
+  },
+  {
+    id: 'peso-fb-post-1795135195',
     employer_id: null,
     position: 'MinebeaMitsumi Career Opportunities (On-Site Hiring)',
     company_name: 'MinebeaMitsumi · PESO - City of Naga, Cebu',
@@ -167,7 +219,7 @@ Just bring your resume, wear smart casual attire, and seize the chance to get hi
     poster_name: 'MinebeaMitsumi · PESO City of Naga',
   },
   {
-    id: 'peso-fb-smaw-training-2026',
+    id: 'peso-fb-post-1794992031',
     employer_id: null,
     position: 'Sugbo Kahanas Free SMAW Training (Shielded Metal Arc Welding)',
     company_name: 'City Government of Naga & PESO Naga · Sugbo Kahanas',
@@ -228,7 +280,7 @@ Deadline of application: Thursday, November 19, 2026. Limited to first 20 qualif
     poster_name: 'Sugbo Kahanas & PESO Naga',
   },
   {
-    id: 'peso-fb-ipi-2026',
+    id: 'peso-fb-post-1794982959',
     employer_id: null,
     position: 'International Pharmaceuticals Inc. (IPI) — Cebu Vacancies',
     company_name: 'International Pharmaceuticals Inc. (IPI) · PESO Naga',
@@ -280,7 +332,7 @@ Be part of something bigger. Build your future with IPI! Apply now, Nagahanons!`
     poster_name: 'IPI HR Recruitment',
   },
   {
-    id: 'peso-fb-oasia-global-2026',
+    id: 'peso-fb-post-1794556131',
     employer_id: null,
     position: 'Oasia Global Resources Inc. Special Recruitment Activity',
     company_name: 'Oasia Global Resources Inc. · PESO Naga',
@@ -381,10 +433,25 @@ export function buildDynamicPesoJobFromPost(post: any, idx: number): PesoJobPost
 
   const images = extractPostGalleryImages(post);
   const createdIso = post.createdTime ? new Date(post.createdTime * 1000).toISOString() : new Date().toISOString();
+  const postId = `peso-fb-post-${post?.createdTime || idx}`;
 
-  // 1. City of Naga Year-End Job Fair
+  // 1a. City of Naga Year-End Job Fair — Coming Soon Advisory (Single Image)
+  if (/coming soon/i.test(combined) && /year-end|yearend|job fair/i.test(combined)) {
+    const singleImage = images.length > 0 ? [images[0]] : BASELINE_PESO_POSTS[1].gallery_images;
+    return {
+      ...BASELINE_PESO_POSTS[1],
+      id: postId,
+      description: combined,
+      description_preview: combined.slice(0, 320).replace(/\s+/g, ' ').trim(),
+      created_at: createdIso,
+      poster_url: singleImage[0],
+      gallery_images: singleImage,
+    };
+  }
+
+  // 1b. City of Naga Year-End Job Fair — Official Event Alert (Multiple Images / Album)
   if (/City of Naga Year-End Job Fair|Year-End Job Fair/i.test(combined)) {
-    const exactImages = images.length > 0 ? [images[0]] : BASELINE_PESO_POSTS[0].gallery_images;
+    const exactImages = images.length > 0 ? images : BASELINE_PESO_POSTS[0].gallery_images;
     const venueMatch = combined.match(/(?:Venue\s*:|📍\s*(?:Venue\s*:)?)\s*([^\n\r]+)/i);
     const dateMatch = combined.match(/(?:Date\s*:|🗓\s*(?:Date\s*:)?)\s*([^\n\r]+)/i);
     const venue = venueMatch ? venueMatch[1].trim() : 'Brgy. Colon Gymnasium, City of Naga, Cebu';
@@ -392,6 +459,7 @@ export function buildDynamicPesoJobFromPost(post: any, idx: number): PesoJobPost
 
     return {
       ...BASELINE_PESO_POSTS[0],
+      id: postId,
       location: venue,
       salary_range: salaryRange,
       description: combined,
@@ -402,12 +470,13 @@ export function buildDynamicPesoJobFromPost(post: any, idx: number): PesoJobPost
     };
   }
 
-  // 2. MinebeaMitsumi On-Site Hiring
+  // 2. MinebeaMitsumi On-Site Hiring (with accurate flyer)
   if (/MinebeaMitsumi/i.test(combined)) {
-    const firstImg = images[0] || BASELINE_PESO_POSTS[1].poster_url;
+    const firstImg = images[0] || BASELINE_PESO_POSTS[2].poster_url;
     const exactGallery = images.length >= 2 ? images : [firstImg, '/image/minebeamitsumi-peso-naga-2.jpg'];
     return {
-      ...BASELINE_PESO_POSTS[1],
+      ...BASELINE_PESO_POSTS[2],
+      id: postId,
       created_at: createdIso,
       poster_url: firstImg,
       gallery_images: exactGallery,
@@ -416,9 +485,10 @@ export function buildDynamicPesoJobFromPost(post: any, idx: number): PesoJobPost
 
   // 3. Free SMAW Training (Welding)
   if (/SMAW TRAINING|Shielded Metal Arc Welding|Sugbo Kahanas/i.test(combined)) {
-    const exactGallery = images.length > 0 ? images : BASELINE_PESO_POSTS[2].gallery_images;
+    const exactGallery = images.length > 0 ? images : BASELINE_PESO_POSTS[3].gallery_images;
     return {
-      ...BASELINE_PESO_POSTS[2],
+      ...BASELINE_PESO_POSTS[3],
+      id: postId,
       created_at: createdIso,
       poster_url: exactGallery[0],
       gallery_images: exactGallery,
@@ -427,9 +497,10 @@ export function buildDynamicPesoJobFromPost(post: any, idx: number): PesoJobPost
 
   // 4. International Pharmaceuticals Inc. (IPI)
   if (/International Pharmaceuticals|\(IPI\)|hrdrecruit@ipi\.ph/i.test(combined)) {
-    const exactGallery = images.length > 0 ? images : BASELINE_PESO_POSTS[3].gallery_images;
+    const exactGallery = images.length > 0 ? images : BASELINE_PESO_POSTS[4].gallery_images;
     return {
-      ...BASELINE_PESO_POSTS[3],
+      ...BASELINE_PESO_POSTS[4],
+      id: postId,
       created_at: createdIso,
       poster_url: exactGallery[0],
       gallery_images: exactGallery,
@@ -438,9 +509,10 @@ export function buildDynamicPesoJobFromPost(post: any, idx: number): PesoJobPost
 
   // 5. OASIA Global Resources Inc.
   if (/OASIA GLOBAL RESOURCES|Oasia Global/i.test(combined)) {
-    const exactGallery = images.length > 0 ? images : BASELINE_PESO_POSTS[4].gallery_images;
+    const exactGallery = images.length > 0 ? images : BASELINE_PESO_POSTS[5].gallery_images;
     return {
-      ...BASELINE_PESO_POSTS[4],
+      ...BASELINE_PESO_POSTS[5],
+      id: postId,
       created_at: createdIso,
       poster_url: exactGallery[0],
       gallery_images: exactGallery,
@@ -481,7 +553,7 @@ export function buildDynamicPesoJobFromPost(post: any, idx: number): PesoJobPost
   const exactGallery = images.length > 0 ? images : [fallbackPoster];
 
   return {
-    id: `peso-fb-live-${post?.createdTime || idx}`,
+    id: postId,
     employer_id: null,
     position: title,
     company_name: actorName.includes('PESO') ? `${actorName} · Official Post` : `${actorName} · PESO Naga`,
@@ -520,47 +592,17 @@ export function buildDynamicPesoJobFromPost(post: any, idx: number): PesoJobPost
   };
 }
 
-export function getCanonicalJobKey(job: PesoJobPosting): string {
-  const normTitle = normalizeFbUnicodeText(job.position || '').toLowerCase();
-  const normCompany = normalizeFbUnicodeText(job.company_name || '').toLowerCase();
-  const normId = String(job.id || '').toLowerCase();
-
-  if (/year-end|yearend|job fair/i.test(normTitle) || normId.includes('yearend-jobfair')) {
-    return 'event:naga-yearend-jobfair';
-  }
-  if (/minebeamitsumi/i.test(normTitle) || /minebeamitsumi/i.test(normCompany) || normId.includes('minebeamitsumi')) {
-    return 'company:minebeamitsumi';
-  }
-  if (/smaw|shielded metal arc welding|sugbo kahanas/i.test(normTitle) || normId.includes('smaw')) {
-    return 'training:smaw-welding';
-  }
-  if (/international pharmaceuticals|\bipi\b/i.test(normTitle) || /international pharmaceuticals|\bipi\b/i.test(normCompany) || normId.includes('ipi')) {
-    return 'company:ipi';
-  }
-  if (/oasia global/i.test(normTitle) || /oasia global/i.test(normCompany) || normId.includes('oasia')) {
-    return 'company:oasia';
-  }
-
-  const cleanTitle = normTitle.replace(/[^a-z0-9]/g, '');
-  return `${normCompany}:::${cleanTitle}`;
-}
-
 export function deduplicateJobs(jobs: PesoJobPosting[]): PesoJobPosting[] {
-  const seenKeys = new Set<string>();
   const seenIds = new Set<string>();
   const result: PesoJobPosting[] = [];
 
   for (const job of jobs) {
     if (!job) continue;
     const idKey = String(job.id || '').trim();
-    const canonKey = getCanonicalJobKey(job);
-
-    if (seenIds.has(idKey) || seenKeys.has(canonKey)) {
+    if (!idKey || seenIds.has(idKey)) {
       continue;
     }
-
     seenIds.add(idKey);
-    seenKeys.add(canonKey);
     result.push(job);
   }
 
@@ -573,7 +615,7 @@ let lastAllFetchTime = 0;
 /**
  * Returns ALL posts fetched from the PESO - City of Naga, Cebu Facebook page.
  * Chronologically sorted descending by created_at (the 1st item is always the latest post).
- * Guaranteed zero duplicates across multiple postings of the same event/employer.
+ * Preserves distinct posts while preventing duplicate keys.
  */
 export async function getAllPesoFacebookJobs(): Promise<PesoJobPosting[]> {
   const now = Date.now();
@@ -594,7 +636,7 @@ export async function getAllPesoFacebookJobs(): Promise<PesoJobPosting[]> {
     if (m) {
       const posts = JSON.parse(m[1]);
       if (Array.isArray(posts) && posts.length > 0) {
-        // Sort newest first before mapping and deduplicating
+        // Sort newest first
         posts.sort((a: any, b: any) => Number(b.createdTime || 0) - Number(a.createdTime || 0));
 
         const mapped = posts
@@ -602,16 +644,13 @@ export async function getAllPesoFacebookJobs(): Promise<PesoJobPosting[]> {
           .filter((item): item is PesoJobPosting => Boolean(item));
 
         if (mapped.length > 0) {
-          // Deduplicate so only the newest post for any topic/event is kept
-          const dedupedLive = deduplicateJobs(mapped);
+          // Combine live posts with baselines and deduplicate by post ID
+          const combined = deduplicateJobs([...mapped, ...BASELINE_PESO_POSTS]);
+          combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-          // Add any baseline posts not present in the current live window (e.g. Oasia Global)
-          const combinedWithBaselines = deduplicateJobs([...dedupedLive, ...BASELINE_PESO_POSTS]);
-          combinedWithBaselines.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-          cachedAllPesoJobs = combinedWithBaselines;
+          cachedAllPesoJobs = combined;
           lastAllFetchTime = now;
-          return combinedWithBaselines;
+          return combined;
         }
       }
     }
@@ -626,11 +665,11 @@ export async function getAllPesoFacebookJobs(): Promise<PesoJobPosting[]> {
 }
 
 /**
- * Returns top 3 featured posts for the hero / landing page spotlight (no duplicate jobs)
+ * Returns top 3 featured posts for the hero / landing page spotlight
  */
 export async function getFeaturedPesoFacebookJobs(): Promise<PesoJobPosting[]> {
   const all = await getAllPesoFacebookJobs();
-  // For the landing page hero cards, prioritize employer career hiring (excluding skills training if >=3 employer jobs exist)
+  // Exclude technical skills training from the 3 featured slots if enough hiring postings exist
   const employerJobs = all.filter((j) => !/smaw|welding/i.test(j.position));
   const featured = employerJobs.length >= 3 ? employerJobs.slice(0, 3) : all.slice(0, 3);
   return featured;

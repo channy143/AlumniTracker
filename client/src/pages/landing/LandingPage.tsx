@@ -871,7 +871,7 @@ export default function LandingPage() {
           {(() => {
             const fallbackJobs = [
               {
-                id: 'peso-fb-yearend-jobfair-2026',
+                id: 'peso-fb-post-1795603873',
                 position: 'City of Naga Year-End Job Fair 2026 (Brgy. Colon Gymnasium)',
                 company_name: 'PESO - City of Naga, Cebu · Official Upcoming Event',
                 description_preview:
@@ -893,11 +893,40 @@ export default function LandingPage() {
                   'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/923911128_1118169227707880_6692897517334989093_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=NSSUAb3lexIQ7kNvwF-SgcN&_nc_oc=AdrM8jx7TCanNB98DjPlVN_3I5EHfvMBXUuRRqUN6-eEef_8MQxIFs_KgkcpXg5D8PSPRa2NRmzeraq3XHDDhLXw&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQSykAbrwIrhKWIPk7M9FJu0Tz0a09IS5AIKNX_OjLTxWQ&oe=6B0CD947',
                 gallery_images: [
                   'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/923911128_1118169227707880_6692897517334989093_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=NSSUAb3lexIQ7kNvwF-SgcN&_nc_oc=AdrM8jx7TCanNB98DjPlVN_3I5EHfvMBXUuRRqUN6-eEef_8MQxIFs_KgkcpXg5D8PSPRa2NRmzeraq3XHDDhLXw&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQSykAbrwIrhKWIPk7M9FJu0Tz0a09IS5AIKNX_OjLTxWQ&oe=6B0CD947',
+                  'https://scontent.fceb1-3.fna.fbcdn.net/v/t39.30808-6/925373954_1118169224374547_802658889830779117_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=102&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=Nuj2x7-DfcMQ7kNvwGSsan-&_nc_oc=Adr5G0ImkhUBgia_zG5kAI0TDMdJVRSWmqFBhFf4bndr96gPH6WXho4TX2wJyoyGCg01IWA1njDSCMWg-sMhoAXw&_nc_zt=23&_nc_ht=scontent.fceb1-3.fna&edm=ADwHzz8EAAAA&_nc_gid=j35h8NQmuMdraTwNQUpH6g&oh=00_AQQcSBLyymv_86DMs5qtRNzRJAjCKaGmdnCWcDMqBrtDsg&oe=6B0BC122',
+                  'https://scontent.fceb1-5.fna.fbcdn.net/v/t39.30808-6/928472117_1118169207707882_613547556650700031_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=107&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=7W4vQ6J4XTIQ7kNvwG5494y&_nc_oc=Adpj0w0t1-t12nL4r5u23V8k1v4&_nc_zt=23&_nc_ht=scontent.fceb1-5.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQTL8N8L3F-rBq-U5Xk&oe=6B0CE120',
+                  'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/923780437_1118169297707873_7041296306908408836_n.jpg?stp=dst-jpg_p261x260_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=kQf-wU5hG88Q7kNvwFlm1L7&_nc_oc=Adr93bN2x5L&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQSqK98Yw7Z&oe=6B0CE3A9',
                 ],
                 poster_avatar_url: null,
               },
               {
-                id: 'peso-fb-minebeamitsumi-2026',
+                id: 'peso-fb-post-1795494755',
+                position: 'City of Naga Year-End Job Fair (Coming Soon Advisory)',
+                company_name: 'PESO - City of Naga, Cebu · Job Fair Advisory',
+                description_preview:
+                  'Thousands of jobs. One massive event. End the year by taking one step closer to landing your dream job! Prepare your resumes, practice your pitch, and get ready to be hired on the spot— the City of Naga Year-End Job Fair is COMING SOON!',
+                requirements_preview:
+                  'City of Naga Year-End Job Fair COMING SOON! Prepare your resumes and stay tuned for complete event details from PESO - City of Naga, Cebu.',
+                industry: 'Mega Job Fair Advisory',
+                required_skills: ['Coming Soon', 'Local & Overseas Jobs', 'Career Event', 'PESO Naga Advisory'],
+                location: 'City of Naga, Cebu',
+                job_type: 'Job Fair Event',
+                is_remote: false,
+                is_alumni_exclusive: false,
+                salary_range: 'Coming Soon · Naga, Cebu',
+                experience_level: 'Open to All',
+                created_at: '2026-11-24T04:32:35Z',
+                vacancies_count: 1000,
+                fb_url: PESO_FB_PAGE_URL,
+                poster_url:
+                  'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/924087287_1116813584510111_3991031352338831839_n.jpg?stp=dst-jpg_s720x720_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=y4o5rG6yW7IQ7kNvwE5H-u4&_nc_oc=Adrcw8L-d3w7Q7nL8L9jQoU6p0o&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQQ-a728L1hL53Jg&oe=6B0C68E2',
+                gallery_images: [
+                  'https://scontent.fceb1-1.fna.fbcdn.net/v/t39.30808-6/924087287_1116813584510111_3991031352338831839_n.jpg?stp=dst-jpg_s720x720_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ccb=1-7&_nc_sid=127cfc&_nc_ohc=y4o5rG6yW7IQ7kNvwE5H-u4&_nc_oc=Adrcw8L-d3w7Q7nL8L9jQoU6p0o&_nc_zt=23&_nc_ht=scontent.fceb1-1.fna&edm=ADwHzz8EAAAA&_nc_gid=DDO-jolAoJmk5ZWRjtwcbg&oh=00_AQQ-a728L1hL53Jg&oe=6B0C68E2',
+                ],
+                poster_avatar_url: null,
+              },
+              {
+                id: 'peso-fb-post-1795135195',
                 position: 'MinebeaMitsumi Career Opportunities (On-Site Hiring)',
                 company_name: 'MinebeaMitsumi · PESO - City of Naga, Cebu',
                 description_preview:
@@ -924,7 +953,7 @@ export default function LandingPage() {
                 poster_avatar_url: null,
               },
               {
-                id: 'peso-fb-ipi-2026',
+                id: 'peso-fb-post-1794982959',
                 position: 'International Pharmaceuticals Inc. (IPI) — Cebu Vacancies',
                 company_name: 'International Pharmaceuticals Inc. (IPI) · PESO Naga',
                 description_preview:
@@ -960,23 +989,12 @@ export default function LandingPage() {
                 ? stats.featuredJobs
                 : fallbackJobs;
 
-            // Deduplicate to guarantee no duplicate job is ever shown on the hero cards
-            const seenJobKeys = new Set<string>();
+            // Deduplicate only by exact job ID to guarantee unique React keys while preserving distinct posts
+            const seenJobIds = new Set<string>();
             const allJobs = rawAllJobs.filter((j) => {
-              const norm = `${j.position || ''} ${j.company_name || ''} ${j.id || ''}`.toLowerCase();
-              const key = norm.includes('year-end') || norm.includes('yearend')
-                ? 'event:yearend'
-                : norm.includes('minebea')
-                ? 'company:minebea'
-                : norm.includes('ipi')
-                ? 'company:ipi'
-                : norm.includes('smaw')
-                ? 'training:smaw'
-                : norm.includes('oasia')
-                ? 'company:oasia'
-                : String(j.id || '');
-              if (seenJobKeys.has(key)) return false;
-              seenJobKeys.add(key);
+              const id = String(j.id || '');
+              if (!id || seenJobIds.has(id)) return false;
+              seenJobIds.add(id);
               return true;
             });
 
@@ -1020,12 +1038,7 @@ export default function LandingPage() {
                     {/* LEFT SIDE SKELETON */}
                     <div className="w-full lg:w-[57%] shrink-0 flex flex-col justify-between h-full gap-2.5">
                       {/* Huge Picture Skeleton */}
-                      <div className="relative w-full h-[280px] sm:h-[320px] lg:h-auto lg:flex-1 lg:min-h-0 bg-[#0f172a]/90 border border-white/20 overflow-hidden rounded-none shadow-2xl p-4 flex flex-col justify-between animate-pulse select-none">
-                        {/* Top Bar Skeleton */}
-                        <div className="flex items-center justify-end">
-                          <div className="h-5 w-44 bg-white/20 rounded-none" />
-                        </div>
-
+                      <div className="relative w-full h-[280px] sm:h-[320px] lg:h-auto lg:flex-1 lg:min-h-0 bg-[#0f172a]/90 border border-white/20 overflow-hidden rounded-none shadow-2xl p-4 flex flex-col justify-end animate-pulse select-none">
                         {/* Bottom-Left Details Skeleton */}
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
@@ -1132,26 +1145,6 @@ export default function LandingPage() {
 
                       {/* Dark Fade Coming Up from the Bottom */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/65 to-transparent pointer-events-none" />
-
-                      {/* Top Bar inside Huge Square (Right-aligned Bulletin / Back button) */}
-                      <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-end gap-2 z-10">
-                        {selectedJob ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedLandingJobId(null);
-                              setJobSlideIndex(0);
-                            }}
-                            className="bg-ctu-marigold hover:bg-amber-600 text-black text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 border border-white/30 rounded-none cursor-pointer transition-colors"
-                          >
-                            ← Back to PESO &amp; CTU Overview
-                          </button>
-                        ) : (
-                          <div className="bg-ctu-blue/90 border border-white/20 px-2.5 py-1 text-[10px] font-bold tracking-widest text-ctu-gold uppercase rounded-none">
-                            OFFICIAL CAREER BULLETIN
-                          </div>
-                        )}
-                      </div>
 
                       {/* Bottom-Left Title & Subtitle inside Dark Bottom Fade */}
                       <div className="absolute bottom-0 left-0 right-0 p-4 z-10 flex flex-col justify-end">
@@ -1284,7 +1277,11 @@ export default function LandingPage() {
                               ease: [0.22, 1, 0.36, 1],
                             }}
                             onClick={() => {
-                              setSelectedLandingJobId(String(job.id));
+                              if (selectedLandingJobId === String(job.id)) {
+                                setSelectedLandingJobId(null);
+                              } else {
+                                setSelectedLandingJobId(String(job.id));
+                              }
                               setJobSlideIndex(0);
                             }}
                             className={`relative w-full h-full text-left bg-white border transition-colors rounded-none p-0 flex items-stretch overflow-hidden cursor-pointer group ${

@@ -1001,20 +1001,9 @@ export default function JobsPage() {
     const raw = getCached<any[]>('/jobs') || [];
     const seen = new Set<string>();
     return raw.filter((j: any) => {
-      const norm = `${j.position || ''} ${j.company_name || ''} ${j.id || ''}`.toLowerCase();
-      const key = norm.includes('year-end') || norm.includes('yearend')
-        ? 'event:yearend'
-        : norm.includes('minebea')
-        ? 'company:minebea'
-        : norm.includes('ipi')
-        ? 'company:ipi'
-        : norm.includes('smaw')
-        ? 'training:smaw'
-        : norm.includes('oasia')
-        ? 'company:oasia'
-        : String(j.id || '');
-      if (seen.has(key)) return false;
-      seen.add(key);
+      const id = String(j.id || '');
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
       return true;
     });
   });
@@ -1033,20 +1022,9 @@ export default function JobsPage() {
       if (jobsData) {
         const seen = new Set<string>();
         const deduped = (jobsData || []).filter((j: any) => {
-          const norm = `${j.position || ''} ${j.company_name || ''} ${j.id || ''}`.toLowerCase();
-          const key = norm.includes('year-end') || norm.includes('yearend')
-            ? 'event:yearend'
-            : norm.includes('minebea')
-            ? 'company:minebea'
-            : norm.includes('ipi')
-            ? 'company:ipi'
-            : norm.includes('smaw')
-            ? 'training:smaw'
-            : norm.includes('oasia')
-            ? 'company:oasia'
-            : String(j.id || '');
-          if (seen.has(key)) return false;
-          seen.add(key);
+          const id = String(j.id || '');
+          if (!id || seen.has(id)) return false;
+          seen.add(id);
           return true;
         });
         setJobs(deduped);
