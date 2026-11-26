@@ -91,12 +91,36 @@ router.get('/stats', async (_req, res, next) => {
       }
     });
 
-    const featuredAlumni = profiles
-      .filter((p: any) => p.first_name && p.avatar_url)
+    const toShortProgram = (raw?: string): string => {
+      if (!raw) return 'CTU-Naga Alumni';
+      const lower = raw.toLowerCase();
+      if (lower.includes('information technology')) return 'BSIT';
+      if (lower.includes('industrial technology')) return 'BIT';
+      if (lower.includes('elementary education')) return 'BEEd';
+      if (lower.includes('secondary education')) return 'BSEd';
+      if (lower.includes('technology and livelihood')) return 'BTLED';
+      if (lower.includes('computer science')) return 'BSCS';
+      return raw.trim();
+    };
+
+    const isChristianSalinas = (p: any) =>
+      /christian/i.test(String(p.first_name || '')) && /salinas/i.test(String(p.last_name || ''));
+    const isAshlieManacap = (p: any) =>
+      /ashlie/i.test(String(p.first_name || '')) && /ma[nñ]acap/i.test(String(p.last_name || ''));
+
+    const eligibleFeatured = profiles.filter(
+      (p: any) => p.first_name && p.avatar_url && !isAshlieManacap(p)
+    );
+    const prioritizedFeatured = [
+      ...eligibleFeatured.filter(isChristianSalinas),
+      ...eligibleFeatured.filter((p: any) => !isChristianSalinas(p)),
+    ];
+
+    const featuredAlumni = prioritizedFeatured
       .slice(0, 6)
       .map((p: any) => {
         const edu = eduByProfileId.get(String(p.id));
-        const programPart = edu?.program || 'CTU-Naga Alumni';
+        const programPart = toShortProgram(edu?.program);
         const yearPart = edu?.year_graduated ? ` '${String(edu.year_graduated).slice(-2)}` : '';
         const rolePart = p.headline ? ` · ${p.headline}` : '';
         return {

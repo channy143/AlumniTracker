@@ -27,6 +27,9 @@ import { Marquee } from '@/components/ui/3d-testimonails';
 import { BentoGridShowcase } from '@/components/ui/bento-grid-showcase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { MobileHeroSection, MobileHeroSkeleton } from './MobileHeroSection';
+import { MobileNumbersSection } from './MobileNumbersSection';
+import { MobileAlumniChatSection } from './MobileAlumniChatSection';
 
 /* ─── Data ─── */
 
@@ -552,6 +555,7 @@ function AlumniChatCard({ img, name, batch, body, tag }: { img: string; name: st
 
 export default function LandingPage() {
   const [showHeader, setShowHeader] = useState(false);
+  const [mobileHeroScrolled, setMobileHeroScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('');
   const [careerHovered, setCareerHovered] = useState(false);
@@ -629,6 +633,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     const handleScroll = () => {
+      setMobileHeroScrolled(window.scrollY > 24);
       const numbers = document.getElementById('numbers');
       const hero = document.getElementById('hero');
       if (!numbers || !hero) return;
@@ -741,7 +746,9 @@ export default function LandingPage() {
             ? 'bg-transparent text-white'
             : showHeader
               ? 'bg-white/95 backdrop-blur-xl shadow-[0_1px_20px_rgba(0,0,0,0.06)]'
-              : 'bg-transparent'
+              : mobileHeroScrolled
+                ? 'bg-slate-950/75 backdrop-blur-lg border-b border-white/10 lg:bg-transparent lg:backdrop-blur-none lg:border-b-0'
+                : 'bg-transparent'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -867,7 +874,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(232,160,80,0.08),transparent_60%)]" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/50 to-black/75 pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-20 pb-5 w-full h-full lg:h-screen flex items-center relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-[74px] pb-6 lg:pt-20 lg:pb-5 w-full h-full lg:h-screen flex items-center relative z-10">
           {(() => {
             const fallbackJobs = [
               {
@@ -1032,7 +1039,9 @@ export default function LandingPage() {
 
             if (isJobsLoading || !stats) {
               return (
-                <div className="w-full h-full flex flex-col justify-center -translate-y-[10px]">
+                <>
+                  <MobileHeroSkeleton />
+                  <div className="hidden lg:flex w-full h-full flex-col justify-center -translate-y-[10px]">
                   {/* 2-Column Flex Layout Skeleton Matching Exact lg:h-[525px] Hero Jobs View */}
                   <div className="flex flex-col lg:flex-row items-stretch gap-4 w-full lg:h-[525px]">
                     {/* LEFT SIDE SKELETON */}
@@ -1114,11 +1123,42 @@ export default function LandingPage() {
                     </div>
                   </div>
                 </div>
+                </>
               );
             }
 
             return (
-              <div className="w-full h-full flex flex-col justify-center -translate-y-[10px]">
+              <>
+                <MobileHeroSection
+                  activeSlides={activeSlides}
+                  currentSlideIdx={currentSlideIdx}
+                  currentSlide={currentSlide}
+                  currentOverviewBarTitle={currentOverviewSlide.barTitle}
+                  currentOverviewDescription={PESO_CTU_SLIDES[currentSlideIdx % PESO_CTU_SLIDES.length].description}
+                  overviewRightStat={overviewRightStat}
+                  visibleJobs={visibleJobs}
+                  selectedJob={selectedJob}
+                  selectedLandingJobId={selectedLandingJobId}
+                  onSelectJob={(jobId) => {
+                    setSelectedLandingJobId(jobId);
+                    setJobSlideIndex(0);
+                  }}
+                  onSelectSlide={(idx) => setJobSlideIndex(idx)}
+                  onStepSlide={(delta) =>
+                    setJobSlideIndex((prev) => {
+                      const len = activeSlides.length;
+                      return (((prev % len) + len) % len + delta + len) % len;
+                    })
+                  }
+                  getJobThumb={(job) => getJobRelatedSlides(job)[0]?.image}
+                  jobTypeLabels={JOB_TYPE_LABELS}
+                  pesoFbUrl={PESO_FB_PAGE_URL}
+                  totalAlumni={stats?.totalAlumni || 308}
+                  programsTracked={stats?.programsTracked || 5}
+                  activeJobsCount={stats?.activeJobsCount || allJobs.length}
+                />
+
+                <div className="hidden lg:flex w-full h-full flex-col justify-center -translate-y-[10px]">
                 {/* 2-Column Flex Layout Centered Over Hero Background (+30px height -> lg:h-[525px]) */}
                 <div className="flex flex-col lg:flex-row items-stretch gap-4 w-full lg:h-[525px]">
                   {/* ─── LEFT SIDE: Huge Picture Slideshow Box + 2 Stacked Horizontal Description Bars ─── */}
@@ -1382,6 +1422,7 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
+              </>
             );
           })()}
         </div>
@@ -1398,6 +1439,18 @@ export default function LandingPage() {
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-ctu-gold/10 to-transparent" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 w-full relative z-10">
+          <MobileNumbersSection
+            revealed={statsRevealed}
+            totalAlumni={stats?.totalAlumni ?? 0}
+            employmentRate={stats?.employmentRate ?? 0}
+            mentorshipMatches={stats?.mentorshipMatches ?? 0}
+            programsTracked={stats?.programsTracked ?? 0}
+            activeJobsCount={stats?.activeJobsCount ?? 0}
+            employmentBreakdown={stats?.employmentBreakdown}
+            onViewJobs={scrollToTop}
+          />
+
+          <div className="hidden lg:block">
           <motion.div
             initial="hidden"
             animate={statsRevealed ? 'visible' : 'hidden'}
@@ -1633,6 +1686,7 @@ export default function LandingPage() {
               </div>
             }
           />
+          </div>
         </div>
       </section>
 
@@ -1698,7 +1752,9 @@ export default function LandingPage() {
         className="min-h-screen flex items-center pt-20 pb-10 sm:py-20 bg-white relative overflow-hidden snap-start"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full relative z-10">
-          <div className="grid lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          <MobileAlumniChatSection chatItems={chatItems} revealed={chatRevealed} />
+
+          <div className="hidden lg:grid lg:grid-cols-12 gap-10 lg:gap-12 items-center">
             {/* Left: Chat Feature Summary */}
             <motion.div
               initial={false}
